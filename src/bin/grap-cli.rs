@@ -46,12 +46,15 @@ enum Commands {
 
     /// Run a text search (and optionally a graph traversal) against the knowledge graph.
     Query(QueryArgs),
-    // Future commands (Phase 2+):
-    // Ingest(IngestArgs),
-    // DeleteNode(DeleteArgs),
-    // Vacuum(VacuumArgs),
-    // Rebalance(RebalanceArgs),
-    // AddFile(AddFileArgs),
+
+    /// Add a file as a new node in the knowledge graph.
+    AddFile(AddFileArgs),
+
+    /// Delete a node (creates a tombstone; use `vacuum` to reclaim space).
+    DeleteNode(DeleteNodeArgs),
+
+    /// Run incremental vacuum to reclaim space from deleted documents.
+    Vacuum(VacuumArgs),
 }
 
 /// Arguments for the `stats` subcommand.
@@ -77,6 +80,33 @@ struct QueryArgs {
     max_results: usize,
 }
 
+/// Arguments for `add-file`.
+#[derive(Parser)]
+struct AddFileArgs {
+    /// Path to the file to ingest as a node.
+    #[arg(long, short)]
+    path: PathBuf,
+
+    /// Optional human-readable label for the node.
+    #[arg(long)]
+    label: Option<String>,
+}
+
+/// Arguments for `delete-node`.
+#[derive(Parser)]
+struct DeleteNodeArgs {
+    /// The internal NodeId (u32) of the node to delete.
+    node_id: u32,
+}
+
+/// Arguments for `vacuum`.
+#[derive(Parser)]
+struct VacuumArgs {
+    /// Show segment information before and after vacuuming.
+    #[arg(long)]
+    show_segments: bool,
+}
+
 fn main() {
     let cli = Cli::parse();
 
@@ -87,6 +117,9 @@ fn main() {
     match cli.command {
         Commands::Stats(args) => run_stats(&graph_dir, cli.json, args),
         Commands::Query(args) => run_query(&graph_dir, cli.json, args),
+        Commands::AddFile(args) => run_add_file(&graph_dir, cli.json, args),
+        Commands::DeleteNode(args) => run_delete_node(&graph_dir, cli.json, args),
+        Commands::Vacuum(args) => run_vacuum(&graph_dir, cli.json, args),
     }
 }
 
@@ -261,6 +294,131 @@ fn run_query(graph_dir: &PathBuf, json: bool, args: QueryArgs) {
                     snippet.replace('\n', " ")
                 );
             }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Mutation commands (for live demo scenarios)
+// ---------------------------------------------------------------------------
+
+fn run_add_file(graph_dir: &PathBuf, json: bool, args: AddFileArgs) {
+    let mut ig = match IndexedKnowledgeGraph::load_from_dir(graph_dir) {
+        Ok(g) => g,
+        Err(e) => {
+            eprintln!("Failed to load graph: {}", e);
+            std::process::exit(1);
+        }
+    };
+
+    let content = match std::fs::read_to_string(&args.path) {
+        Ok(c) => c,
+        Err(e) => {
+            eprintln!("Failed to read file {:?}: {}", args.path, e);
+            std::process::exit(1);
+        }
+    };
+
+    let label = args.label.clone().or_else(|| {
+        args.path
+            .file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+    });
+
+    let node_id = ig.add_node(&content, label.as_deref());
+
+    // Persist the change
+    if let Err(e) = ig.save_to_dir(graph_dir) {
+        eprintln!("Failed to save graph after adding node: {}", e);
+        std::process::exit(1);
+    }
+
+    if json {
+        println!(
+            "{}",
+            serde_json::json!({
+                "status": "ok",
+                "node_id": node_id.0,
+                "label": label,
+                "file": args.path.to_string_lossy(),
+            })
+        );
+    } else {
+        println!(
+            "Added node {} from {:?} (label: {:?})",
+            node_id.0,
+            args.path,
+            label
+        );
+    }
+}
+
+fn run_delete_node(graph_dir: &PathBuf, json: bool, args: DeleteNodeArgs) {
+    let mut ig = match IndexedKnowledgeGraph::load_from_dir(graph_dir) {
+        Ok(g) => g,
+        Err(e) => {
+            eprintln!("Failed to load graph: {}", e);
+            std::process::exit(1);
+        }
+    };
+
+    let node_id = grap::NodeId(args.node_id);
+
+    ig.graph.remove_node(node_id);
+
+    if let Err(e) = ig.save_to_dir(graph_dir) {
+        eprintln!("Failed to save after delete: {}", e);
+        std::process::exit(1);
+    }
+
+    if json {
+        println!("{}", serde_json::json!({ "status": "deleted", "node_id": args.node_id }));
+    } else {
+        println!("Deleted node {} (tombstone created). Run `vacuum` to reclaim space.", args.node_id);
+    }
+}
+
+fn run_vacuum(graph_dir: &PathBuf, json: bool, args: VacuumArgs) {
+    let mut ig = match IndexedKnowledgeGraph::load_from_dir(graph_dir) {
+        Ok(g) => g,
+        Err(e) => {
+            eprintln!("Failed to load graph: {}", e);
+            std::process::exit(1);
+        }
+    };
+
+    let before = if args.show_segments {
+        ig.text_index_segment_info()
+    } else {
+        vec![]
+    };
+
+    ig.vacuum_deleted_nodes();
+
+    let after = if args.show_segments {
+        ig.text_index_segment_info()
+    } else {
+        vec![]
+    };
+
+    if let Err(e) = ig.save_to_dir(graph_dir) {
+        eprintln!("Failed to save after vacuum: {}", e);
+        std::process::exit(1);
+    }
+
+    if json {
+        println!(
+            "{}",
+            serde_json::json!({
+                "status": "ok",
+                "before_segments": before.len(),
+                "after_segments": after.len(),
+            })
+        );
+    } else {
+        println!("Vacuum complete.");
+        if args.show_segments {
+            println!("Segments before: {}, after: {}", before.len(), after.len());
         }
     }
 }
