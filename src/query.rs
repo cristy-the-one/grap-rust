@@ -247,11 +247,36 @@ impl KnowledgeGraph {
     #[inline]
     fn edge_passes_filters(
         &self,
-        _edge: &crate::graph::Edge,
-        _filters: &[(PropertyTag, PropertyFilter)],
+        edge: &crate::graph::Edge,
+        filters: &[(PropertyTag, PropertyFilter)],
     ) -> bool {
-        // Full predicate logic (Exists/Equals/Range) will be filled when properties are wired.
-        // For Phase 1 bootstrap we accept everything that passed the mask/strength checks.
+        // Exact port of md:665-698 (with String labels instead of CompactString)
+        for (tag, filter) in filters {
+            match filter {
+                PropertyFilter::Exists => {
+                    if edge.properties.iter().find(|(t, _)| t == tag).is_none() {
+                        return false;
+                    }
+                }
+                PropertyFilter::Equals(expected) => {
+                    match edge.properties.iter().find(|(t, _)| t == tag).map(|(_, v)| v) {
+                        Some(val) if val == expected => {}
+                        _ => return false,
+                    }
+                }
+                PropertyFilter::Range { min, max } => {
+                    match edge.properties.iter().find(|(t, _)| t == tag).map(|(_, v)| v) {
+                        Some(PropertyValue::Float(v)) if *v >= *min && *v <= *max => {}
+                        Some(PropertyValue::Int(v))
+                            if (*v as f64) >= *min && (*v as f64) <= *max => {}
+                        _ => return false,
+                    }
+                }
+                PropertyFilter::MinStrength(_) => {
+                    // Applied at edge.strength level in the caller.
+                }
+            }
+        }
         true
     }
 }
