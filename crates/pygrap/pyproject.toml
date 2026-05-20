@@ -1,0 +1,17 @@
+[build-system]
+requires = ["maturin>=1.0,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "pygrap"
+version = "0.1.0"
+description = "Python bindings for the grap knowledge graph engine (internal/WIP)"
+authors = [{ name = "The grap Contributors" }]
+license = { text = "MIT OR Apache-2.0" }
+requires-python = ">=3.9"
+
+[tool.maturin]
+features = ["pyo3/extension-module"]
+module-name = "pygrap"
+# We keep the source layout simple for now
+# python-source = "python"   # uncomment later if we want a python/ subdirectory

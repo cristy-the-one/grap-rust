@@ -22,7 +22,7 @@ exclude = [
 ]
 
 [workspace]
-members = ["spikes/on_disk_index"]
+members = ["spikes/on_disk_index", "crates/pygrap"]
 resolver = "2"
 
 [lib]
