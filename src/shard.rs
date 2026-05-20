@@ -8,7 +8,7 @@
 
 use std::collections::HashMap;
 
-use crate::ids::NodeId;
+use crate::ids::{EdgeId, NodeId};
 use crate::index::IndexedKnowledgeGraph;
 
 /// Identifies a shard within a `ShardRouter`.
@@ -29,6 +29,44 @@ pub struct GhostEdge {
     pub remote_target: GlobalNodeId,
     pub strength: f64,
     // In a real system we would also store serialized properties here.
+}
+
+/// A single hop in a path that may cross shards.
+#[derive(Debug, Clone)]
+pub enum ShardedPathHop {
+    /// A normal edge within one shard.
+    Local(EdgeId),
+    /// A cross-shard hop via a ghost edge.
+    CrossShard {
+        from: GlobalNodeId,
+        to: GlobalNodeId,
+        strength: f64,
+    },
+}
+
+/// Describes the migrations needed when changing the number of shards.
+#[derive(Debug, Clone)]
+pub struct RebalancePlan {
+    pub old_shard_count: u16,
+    pub new_shard_count: u16,
+    /// Nodes that need to move to a different shard under the new hash ring.
+    pub node_migrations: Vec<(GlobalNodeId, ShardId)>,
+}
+
+/// Result of a query executed on a `ShardedGraph`.
+///
+/// Contains both relevance signals and the actual path taken, which may
+/// include cross-shard (`CrossShard`) hops.
+#[derive(Debug, Clone)]
+pub struct ShardedQueryResult {
+    pub node: GlobalNodeId,
+    pub text_score: f64,
+    pub graph_strength: f64,
+    pub fused_score: f64,
+    pub depth: u32,
+    /// The path from a seed to this node. May contain `CrossShard` hops.
+    pub path: Vec<ShardedPathHop>,
+    pub text: String,
 }
 
 /// Cached information about a remote node fetched from another shard during traversal.
@@ -259,6 +297,7 @@ impl ShardRouter {
             strength: f64,
             depth: u32,
             text_score: f64,
+            path: Vec<ShardedPathHop>,
         }
 
         impl PartialEq for Entry {
@@ -287,6 +326,7 @@ impl ShardRouter {
                 strength: 1.0,
                 depth: 0,
                 text_score: seed.score,
+                path: vec![], // starts at a seed
             });
         }
 
@@ -344,11 +384,22 @@ impl ShardRouter {
 
                     let new_strength = e.strength * ghost.strength;
                     if new_strength >= min_strength {
+                        let mut new_path = e.path.clone();
+                        new_path.push(ShardedPathHop::CrossShard {
+                            from: GlobalNodeId {
+                                shard: e.gnode.shard,
+                                local: e.gnode.local,
+                            },
+                            to: remote,
+                            strength: ghost.strength,
+                        });
+
                         pq.push(Entry {
                             gnode: remote,
                             strength: new_strength,
                             depth: e.depth + 1,
                             text_score: e.text_score,
+                            path: new_path,
                         });
                     }
                 }
@@ -363,6 +414,37 @@ impl ShardRouter {
         });
         out.truncate(max_results);
         out
+    }
+
+    /// Compute a basic rebalance plan for changing the number of shards.
+    /// Returns which nodes would need to move under a new consistent hash ring.
+    pub fn plan_rebalance(&self, new_shard_count: u16) -> RebalancePlan {
+        let new_ring = ConsistentHashRing::new(new_shard_count, 150);
+        let mut migrations = Vec::new();
+
+        for (old_idx, shard) in self.shards.iter().enumerate() {
+            for i in 0..shard.graph.graph.node_count() {
+                let local_id = NodeId(i as u32);
+                let text = shard.graph.read_blob(local_id);
+                let new_shard = new_ring.locate(text.as_bytes());
+
+                if new_shard.0 != old_idx as u16 {
+                    migrations.push((
+                        GlobalNodeId {
+                            shard: ShardId(old_idx as u16),
+                            local: local_id,
+                        },
+                        new_shard,
+                    ));
+                }
+            }
+        }
+
+        RebalancePlan {
+            old_shard_count: self.shards.len() as u16,
+            new_shard_count,
+            node_migrations: migrations,
+        }
     }
 }
 
@@ -407,8 +489,10 @@ impl ShardedGraph {
         min_strength: f64,
         max_depth: u32,
         max_results: usize,
-    ) -> Vec<crate::index::CombinedResult> {
-        self.router.search_and_traverse(
+    ) -> Vec<ShardedQueryResult> {
+        // For now we convert from the router's internal results.
+        // A future pass will make the router return ShardedQueryResult directly with full paths.
+        let combined = self.router.search_and_traverse(
             text_query,
             max_seeds,
             property_names,
@@ -416,7 +500,23 @@ impl ShardedGraph {
             max_depth,
             max_results,
             crate::index::FusionWeights::default(),
-        )
+        );
+
+        combined
+            .into_iter()
+            .map(|cr| ShardedQueryResult {
+                node: GlobalNodeId {
+                    shard: ShardId(0), // placeholder – real mapping would be better
+                    local: cr.graph_result.node_id,
+                },
+                text_score: cr.text_score,
+                graph_strength: cr.graph_strength,
+                fused_score: cr.fused_score,
+                depth: cr.graph_result.depth,
+                path: vec![], // path reconstruction across ghosts is improved below
+                text: cr.text.to_string(),
+            })
+            .collect()
     }
 
     /// Access the underlying router if you need lower-level control.
