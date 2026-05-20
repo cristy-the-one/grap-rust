@@ -20,6 +20,9 @@
 //! ## Status
 //! Phases 1–4 are complete (core graph, full-text index, persistence + mmap, sharding + ghost edges + rebalancing).
 //! Phase 5 (production hardening, documentation, benchmarks, error types) is in progress toward a 0.1 release.
+//!
+//! Persistence is versioned. Use [`load_meta`](KnowledgeGraph::load_meta) + [`GraphMeta`]
+//! to inspect saved graphs (version, size, checksums) without loading the full data.
 
 #![deny(unsafe_code)]
 // The design (core_graph_design.md) intentionally uses one unsafe block for zero-copy UTF-8

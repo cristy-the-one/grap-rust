@@ -61,6 +61,37 @@ pub struct GraphMeta {
     pub created_timestamp: u64,
 }
 
+impl GraphMeta {
+    /// The on-disk format version that this version of the library writes
+    /// and fully supports.
+    pub const CURRENT_VERSION: u16 = CURRENT_GRAPH_FORMAT_VERSION;
+
+    /// Returns `true` if this metadata was produced by a compatible version
+    /// of the library (i.e. the same format version).
+    pub fn is_current_version(&self) -> bool {
+        self.version == Self::CURRENT_VERSION
+    }
+
+    /// Returns the format version recorded in the metadata file.
+    #[inline]
+    pub fn version(&self) -> u16 {
+        self.version
+    }
+}
+
+impl std::fmt::Display for GraphMeta {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "GraphMeta(v{}, {} nodes, {} edges, ~{} KiB blobs)",
+            self.version,
+            self.node_count,
+            self.edge_count,
+            self.blob_total_bytes / 1024
+        )
+    }
+}
+
 /// Current on-disk format version for grap graphs.
 ///
 /// When breaking changes are made to the persisted layout, this number is
@@ -527,5 +558,54 @@ mod tests {
             .execute();
 
         assert!(!results.is_empty());
+    }
+
+    #[test]
+    fn load_meta_and_version_rejection() {
+        // Build and save a small graph
+        let mut g = KnowledgeGraph::new();
+        let topic = g.properties.register("topic");
+
+        let n1 = g.add_node("Document one for load_meta test.", Some("doc1"));
+        let n2 = g.add_node("Document two for load_meta test.", Some("doc2"));
+
+        g.add_edge(
+            n1,
+            n2,
+            0.88,
+            vec![(topic, PropertyValue::Label("test".to_string()))],
+        );
+
+        let dir = tempdir().unwrap();
+        g.save_to_disk(dir.path()).expect("save should succeed");
+
+        // load_meta should succeed and return useful information
+        let meta = KnowledgeGraph::load_meta(dir.path()).expect("load_meta should succeed");
+        assert!(meta.is_current_version());
+        assert_eq!(meta.version(), GraphMeta::CURRENT_VERSION);
+        assert_eq!(meta.node_count, 2);
+        assert_eq!(meta.edge_count, 1);
+        assert!(meta.blob_total_bytes > 0);
+
+        // Also works through IndexedKnowledgeGraph
+        let ig_meta =
+            IndexedKnowledgeGraph::load_meta(dir.path()).expect("Indexed load_meta should succeed");
+        assert_eq!(ig_meta.node_count, 2);
+
+        // Now corrupt the meta file with a future version and verify rejection
+        let mut bad_meta = meta;
+        bad_meta.version = 99; // future / incompatible version
+
+        let bad_json = serde_json::to_string_pretty(&bad_meta).expect("serialize bad meta");
+        std::fs::write(dir.path().join("graph.meta"), bad_json).expect("write bad meta");
+
+        let err = KnowledgeGraph::load_meta(dir.path()).expect_err("should reject bad version");
+        match err {
+            GraphError::UnsupportedVersion { found, supported } => {
+                assert_eq!(found, 99);
+                assert_eq!(supported, GraphMeta::CURRENT_VERSION);
+            }
+            other => panic!("expected UnsupportedVersion, got {:?}", other),
+        }
     }
 }
