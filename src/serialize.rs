@@ -68,14 +68,33 @@ pub struct GraphMeta {
 }
 
 /// Report returned by [`KnowledgeGraph::repair`].
+///
+/// This struct provides diagnostic information about the state of a graph
+/// directory and what (if anything) was repaired.
 #[derive(Debug, Clone, Default)]
 pub struct RepairReport {
-    /// Number of stale temporary save directories that were successfully removed.
+    /// Number of stale temporary save directories (`.grap-save-*`) that were removed.
     pub removed_temp_dirs: usize,
-    /// Whether the core graph files (`graph.meta`, `graph.topo`, `graph.blobs`) appear to exist
-    /// after the repair attempt.
+
+    /// Whether all three core files (`graph.meta`, `graph.topo`, `graph.blobs`) are present.
     pub graph_files_present: bool,
-    /// Any informational notes collected during the repair process.
+
+    /// Individual file presence flags.
+    pub meta_present: bool,
+    pub topo_present: bool,
+    pub blobs_present: bool,
+
+    /// The format version found in `graph.meta`, if the file could be read and parsed.
+    pub meta_version: Option<u16>,
+
+    /// Whether the on-disk version (if readable) is compatible with the current library.
+    pub version_compatible: Option<bool>,
+
+    /// Number of checksum mismatches detected during a best-effort verification
+    /// of the blob chunks (0 if verification was not performed or everything matched).
+    pub checksum_failures: usize,
+
+    /// Human-readable notes about what was observed or repaired.
     pub notes: Vec<String>,
 }
 
@@ -361,13 +380,24 @@ impl KnowledgeGraph {
     pub fn repair(dir: &Path) -> Result<RepairReport, GraphError> {
         let removed = Self::cleanup_stale_temp_saves(dir);
 
-        let graph_files_present = dir.join("graph.meta").exists()
-            && dir.join("graph.topo").exists()
-            && dir.join("graph.blobs").exists();
+        let meta_path = dir.join("graph.meta");
+        let topo_path = dir.join("graph.topo");
+        let blobs_path = dir.join("graph.blobs");
+
+        let meta_present = meta_path.exists();
+        let topo_present = topo_path.exists();
+        let blobs_present = blobs_path.exists();
+        let graph_files_present = meta_present && topo_present && blobs_present;
 
         let mut report = RepairReport {
             removed_temp_dirs: removed,
             graph_files_present,
+            meta_present,
+            topo_present,
+            blobs_present,
+            meta_version: None,
+            version_compatible: None,
+            checksum_failures: 0,
             notes: Vec::new(),
         };
 
@@ -379,9 +409,66 @@ impl KnowledgeGraph {
             ));
         }
 
+        // Try to read and analyze meta
+        if meta_present {
+            match fs::read_to_string(&meta_path) {
+                Ok(meta_str) => {
+                    match serde_json::from_str::<GraphMeta>(&meta_str) {
+                        Ok(meta) => {
+                            report.meta_version = Some(meta.version);
+                            let compatible = meta.version == CURRENT_GRAPH_FORMAT_VERSION;
+                            report.version_compatible = Some(compatible);
+
+                            if !compatible {
+                                report.notes.push(format!(
+                                    "Version mismatch: on-disk version is {}, current library supports {}",
+                                    meta.version, CURRENT_GRAPH_FORMAT_VERSION
+                                ));
+                            }
+
+                            // Light checksum verification (best effort)
+                            if blobs_present {
+                                if let Ok(blob_data) = fs::read(&blobs_path) {
+                                    let mut failures = 0;
+                                    for (i, &boundary) in meta.chunk_boundaries.iter().enumerate() {
+                                        let end = if i + 1 < meta.chunk_boundaries.len() {
+                                            meta.chunk_boundaries[i + 1] as usize
+                                        } else {
+                                            blob_data.len()
+                                        };
+                                        if boundary as usize > blob_data.len() {
+                                            failures += 1;
+                                            continue;
+                                        }
+                                        let chunk = &blob_data[boundary as usize..end];
+                                        if crc32(chunk) != meta.chunk_checksums[i] {
+                                            failures += 1;
+                                        }
+                                    }
+                                    report.checksum_failures = failures;
+                                    if failures > 0 {
+                                        report.notes.push(format!(
+                                            "{} blob chunk checksum(s) failed verification",
+                                            failures
+                                        ));
+                                    }
+                                }
+                            }
+                        }
+                        Err(_) => {
+                            report.notes.push("Failed to parse graph.meta (corrupted or invalid JSON)".to_string());
+                        }
+                    }
+                }
+                Err(_) => {
+                    report.notes.push("Failed to read graph.meta".to_string());
+                }
+            }
+        }
+
         if !graph_files_present && removed == 0 {
             report.notes.push(
-                "No graph files found and no stale temp directories were present".to_string(),
+                "Core graph files are missing and no stale temp directories were found".to_string(),
             );
         }
 
