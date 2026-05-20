@@ -68,22 +68,25 @@ Run the built-in demo:
 ```bash
 cargo run --example demo
 cargo run --example hybrid_search
-cargo run --example on_disk_persistence --features "fulltext,on-disk-index,sharding"
+cargo run --example on_disk_persistence --features "fulltext,sharding"
 ```
+
+For a more complete, Python-driven holistic experience (ingestion, live vacuum, statistics, etc.), see [`DEMO.md`](./DEMO.md).
 
 ## Feature Flags
 
-| Feature        | Description                                                                 | Brings in                  |
-|----------------|-----------------------------------------------------------------------------|----------------------------|
-| `fulltext`     | BM25 inverted index + phrase search + hybrid fusion                         | —                          |
-| `on-disk-index`| Segmented on-disk text index with WAL, tiered merge, incremental vacuum   | —                          |
-| `mmap`         | Real memory-mapped blob store (zero-copy reads)                             | `memmap2`, `crc32fast`     |
-| `sharding`     | `ShardedGraph` + consistent hashing + ghost edges + rebalancing             | —                          |
+| Feature     | Description                                                                 | Brings in                  |
+|-------------|-----------------------------------------------------------------------------|----------------------------|
+| `fulltext`  | BM25 inverted index + phrase search + hybrid fusion                         | —                          |
+| `mmap`      | Real memory-mapped blob store (zero-copy reads)                             | `memmap2`, `crc32fast`     |
+| `sharding`  | `ShardedGraph` + consistent hashing + ghost edges + rebalancing             | —                          |
+
+The segmented on-disk text index (WAL, tiered merging, incremental vacuum, background workers, `save_to_dir`/`load_from_dir` with automatic backend detection) is **always available** — no extra feature flag is required.
 
 All features are additive. Core graph + property bitmasks + traversal work with no features.
 
 ```toml
-grap = { version = "0.1", features = ["fulltext", "on-disk-index", "sharding"] }
+grap = { version = "0.1", features = ["fulltext", "sharding"] }
 ```
 
 ## The Three Main APIs
@@ -105,7 +108,7 @@ Wraps `KnowledgeGraph` with an incremental BM25 index.
 - `phrase_search("exact phrase", max_gap, k)`
 - `search_and_traverse(...)` with `FusionWeights` blending text score and graph strength
 
-When the `on-disk-index` feature is enabled you can also use a persistent backend:
+`IndexedKnowledgeGraph` supports a persistent segmented on-disk backend out of the box:
 
 ```rust
 let mut g = IndexedKnowledgeGraph::new_on_disk();
@@ -114,7 +117,7 @@ g.save_to_dir("my-index/")?;
 let g2 = IndexedKnowledgeGraph::load_from_dir("my-index/")?;
 ```
 
-The on-disk backend supports incremental vacuum, background merge workers, and per-segment statistics.
+The on-disk backend supports incremental vacuum, background merge workers, per-segment statistics (`SegmentInfo`), and automatic detection on load.
 
 ### 3. `ShardedGraph` (requires `sharding`)
 
@@ -152,6 +155,28 @@ g.save_to_dir("my-cluster/")?;
 let g2 = ShardedGraph::load_from_dir("my-cluster/")?;
 ```
 
+## On-Disk Segmented Text Index
+
+grap includes a production segmented on-disk inverted index that is always available (no feature flag required).
+
+Key capabilities:
+
+- `IndexedKnowledgeGraph::new_on_disk()` for a persistent text backend
+- `OnDiskTextIndex`, `OnDiskIndex`, `OnDiskSegment`, `SegmentInfo`, `MergeWorkerHandle`, and `TieredMergePolicy` are first-class public types
+- Real incremental `vacuum()` (not just full compaction) + background merge workers
+- Automatic backend detection on `load_from_dir` / `load_mmap` (manifest.json → on-disk engine)
+- Full integration with `ShardedGraph` (per-shard on-disk indexes + ghost edge persistence)
+- Segment-level observability and migration primitives for advanced rebalancing
+
+```rust
+let mut g = IndexedKnowledgeGraph::new_on_disk();
+// ... build graph ...
+g.start_background_workers(std::time::Duration::from_secs(30));
+g.save_to_dir("my-persistent-graph/")?;
+```
+
+See the crate documentation and the design doc for details.
+
 ## Persistence
 
 grap offers two persistence styles:
@@ -173,7 +198,7 @@ g.save_to_dir("my-index/")?;
 let g2 = IndexedKnowledgeGraph::load_from_dir("my-index/")?;
 ```
 
-When using the `on-disk-index` feature, `save_to_dir` / `load_from_dir` will correctly persist and restore the segmented on-disk text indexes, including after rebalancing. Ghost edges are also persisted for `ShardedGraph`.
+`save_to_dir` / `load_from_dir` automatically persist and restore segmented on-disk text indexes (when using `new_on_disk()` or `OnDiskTextIndex`), including after rebalancing. `ShardedGraph` also persists its ghost edges and ring configuration.
 
 ## Architecture at a Glance
 
@@ -201,17 +226,17 @@ The design is described in detail in [`core_graph_design.md`](./core_graph_desig
 
 ## Status & Roadmap
 
-- **Core engine + full-text + sharding** (0.1 features) are stable.
-- **0.2 on-disk work** (behind the `on-disk-index` feature):
-  - Segmented immutable on-disk text index with WAL and tiered merging
-  - Incremental vacuum / compaction
-  - First-class `save_to_dir` / `load_from_dir` for both single-graph and sharded use (including ghost edge persistence)
-  - Background maintenance workers
-  - Segment-aware rebalancing with real `SegmentMigration` execution
+- **Core engine + full-text + sharding** are stable.
+- **On-disk segmented text index** is fully integrated (no separate feature flag):
+  - Segmented immutable on-disk text index with WAL, tiered merging, and incremental vacuum
+  - `IndexedKnowledgeGraph::new_on_disk()` + `save_to_dir` / `load_from_dir` with automatic backend detection
+  - Background maintenance workers (`start_background_workers`)
+  - Rich segment statistics (`SegmentInfo`) and segment-aware rebalancing in `ShardedGraph`
+  - Full support for per-shard on-disk indexes + persisted ghost edges
 
-The `on-disk-index` + `sharding` combination now supports realistic large-scale persistent deployments.
+The combination of full-text + on-disk persistence + sharding supports realistic large-scale deployments.
 
-See [`docs/roadmap-0.2.md`](./docs/roadmap-0.2.md) and [`docs/design-0.2-on-disk-index-and-deletes.md`](./docs/design-0.2-on-disk-index-and-deletes.md) for design details.
+Design details are in [`docs/design-0.2-on-disk-index-and-deletes.md`](./docs/design-0.2-on-disk-index-and-deletes.md).
 
 ## Performance Claims (to be validated in Phase 5)
 

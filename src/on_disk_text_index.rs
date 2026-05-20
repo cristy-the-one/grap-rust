@@ -1,19 +1,22 @@
 //! On-Disk Text Index Adapter
 //!
-//! This module provides [`OnDiskTextIndex`], a thin adapter that implements
-//! the [`TextIndex`] trait on top of the real on-disk engine
-//! (`on_disk_index` module).
+//! [`OnDiskTextIndex`] is the adapter that implements [`crate::TextIndex`] on top
+//! of the real segmented on-disk engine in [`crate::on_disk_index`].
 //!
-//! It is responsible for:
-//! - Tokenization
-//! - Mapping between `NodeId` and the engine's internal local document IDs
-//! - Delegation of search, phrase search, persistence, compaction, and
-//!   segment information
-//! - Starting background merge/vacuum workers
+//! It handles:
+//! - Tokenization and `NodeId` ↔ local doc id mapping
+//! - Search / phrase search delegation
+//! - Persistence (`save_to_dir` / `load_from_dir`)
+//! - Incremental `vacuum` / `compact`
+//! - Segment information for rebalancing and monitoring
+//! - Background merge/vacuum workers
 //!
-//! Most of the heavy lifting (segment storage, tiered merging, WAL, etc.)
-//! lives in `on_disk_index.rs`. This module exists so the rest of the
-//! crate can stay backend-agnostic via the `TextIndex` trait.
+//! Most low-level segment, WAL, and merge logic lives in the `on_disk_index` module.
+//! End users normally interact with this type (or via the higher-level
+//! `IndexedKnowledgeGraph::new_on_disk` and `start_background_workers` APIs).
+//!
+//! This module (and the engine) is always compiled — the on-disk index is a
+//! first-class, supported backend.
 
 use crate::ids::NodeId;
 use crate::index::{DefaultTokenizer, IndexStats, TextIndex, Tokenizer};

@@ -3,7 +3,7 @@
 //! Uses only public APIs and directly exercises the ghost snapshot/restore
 //! helpers we added for persistence.
 
-#![cfg(all(feature = "fulltext", feature = "on-disk-index", feature = "sharding"))]
+#![cfg(all(feature = "fulltext", feature = "sharding"))]
 
 use grap::{GlobalNodeId, NodeId, ShardId, ShardedGraph};
 

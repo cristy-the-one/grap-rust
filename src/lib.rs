@@ -19,10 +19,22 @@
 //!
 //! ## Status
 //! Phases 1–4 are complete (core graph, full-text index, persistence + mmap, sharding + ghost edges + rebalancing).
-//! Phase 5 (production hardening, documentation, benchmarks, error types) is in progress toward a 0.1 release.
+//! The 0.2 on-disk segmented text index work is fully integrated and always available (no feature flag).
 //!
 //! Persistence is versioned. Use [`load_meta`](KnowledgeGraph::load_meta) + [`GraphMeta`]
 //! to inspect saved graphs (version, size, checksums) without loading the full data.
+//!
+//! ## On-Disk Segmented Text Index
+//! The crate ships with a production-quality segmented on-disk inverted index:
+//!
+//! - `IndexedKnowledgeGraph::new_on_disk()` and `OnDiskTextIndex`
+//! - WAL + tiered merge + true incremental `vacuum()`
+//! - `save_to_dir` / `load_from_dir` with automatic backend detection
+//! - Background workers, `SegmentInfo`, and segment migration support
+//! - First-class integration with `ShardedGraph` (per-shard indexes + ghost edges)
+//!
+//! The main types (`OnDiskIndex`, `OnDiskSegment`, `SegmentInfo`, `MergeWorkerHandle`, etc.)
+//! are public and stable. Power users can work directly with the engine in `on_disk_index`.
 
 #![deny(unsafe_code)]
 // The design (core_graph_design.md) intentionally uses one unsafe block for zero-copy UTF-8
@@ -36,19 +48,25 @@ pub mod index;
 pub mod properties;
 pub mod query; // Full-text BM25 index (Phase 2)
 
-#[cfg(feature = "on-disk-index")]
+// On-disk segmented text index (0.2) — always available.
+// Power users can access the full modules at `grap::on_disk_index` and `grap::on_disk_text_index`.
+pub mod on_disk_index;
 pub mod on_disk_text_index;
 
-#[cfg(feature = "on-disk-index")]
-mod on_disk_index;
 pub mod serialize; // Persistence (save/load + optional mmap) - Phase 3 in progress
 
 // Re-exports for ergonomic use
-
-// On-disk index bridge (behind feature flag)
 pub use crate::index::TextIndex;
-#[cfg(feature = "on-disk-index")]
-pub use crate::on_disk_text_index::OnDiskTextIndex;
+
+// Flat re-exports for the primary on-disk types (first-class public API).
+// Advanced/escape-hatch types (LocalDocId, Posting, SegmentBuilder, ActiveBuffer,
+// merge_segments, etc.) remain available under the full `on_disk_index` module.
+pub use on_disk_index::{
+    MergeCommand, MergeStats, MergeWorkerHandle, OnDiskIndex, OnDiskSegment, SegmentInfo,
+    TieredMergePolicy,
+};
+pub use on_disk_text_index::OnDiskTextIndex;
+
 pub use graph::KnowledgeGraph;
 pub use ids::{EdgeId, NodeId, PropertyTag};
 pub use properties::{PropertyFilter, PropertyRegistry, PropertyValue};

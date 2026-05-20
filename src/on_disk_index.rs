@@ -1,6 +1,23 @@
-//! Full production port of the on-disk inverted index engine (from the validated spike).
-//! This replaces the previous stub with the complete working logic for WAL, active buffer,
-//! segments, tiered merge, phrase search with positions, manifest persistence, etc.
+//! Segmented On-Disk Inverted Index Engine (first-class public API).
+//!
+//! This module contains the core persistent text index implementation:
+//! - Immutable segments (`OnDiskSegment`) with term dictionary + postings + tombstone bitmap
+//! - Active buffer + simple WAL for durability before sealing
+//! - Tiered merge policy (`TieredMergePolicy`) and background `MergeWorker`
+//! - Real incremental `vacuum()` (only rewrites segments above a delete threshold)
+//! - `save_to_dir` / `load_from_dir` with manifest + per-segment files
+//! - Segment-aware primitives (`SegmentInfo`, `take_sealed_segment`, etc.) used by sharded rebalancing
+//!
+//! Most application code should use the higher-level adapter
+//! [`crate::on_disk_text_index::OnDiskTextIndex`] (which implements [`crate::TextIndex`])
+//! or the convenience constructors on [`crate::IndexedKnowledgeGraph`].
+//!
+//! Advanced users who want direct access to the engine (custom merging, low-level
+//! segment migration, etc.) can work with [`OnDiskIndex`], [`OnDiskSegment`],
+//! [`merge_segments`], and the worker types directly.
+//!
+//! This module is always available — the on-disk index is a core, supported feature
+//! of the library, not an optional experiment.
 
 use std::collections::{BTreeMap, HashMap};
 use std::fs::File;

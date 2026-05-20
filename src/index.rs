@@ -301,14 +301,12 @@ pub trait TextIndex: Send + Sync + std::any::Any {
     /// Trigger a lighter compaction (no-op for memory backend).
     fn compact(&mut self) {}
 
-    // Segment migration & content-aware rebalancing support (0.2)
-    fn take_sealed_segment(
-        &mut self,
-        _index: usize,
-    ) -> Option<(crate::on_disk_index::OnDiskSegment, u32)> {
+    // Segment migration & content-aware rebalancing support.
+    // Default implementations are no-ops; only `OnDiskTextIndex` provides real behavior.
+    fn take_sealed_segment(&mut self, _index: usize) -> Option<(crate::OnDiskSegment, u32)> {
         None
     }
-    fn add_sealed_segment(&mut self, _seg: crate::on_disk_index::OnDiskSegment, _tier: u32) {}
+    fn add_sealed_segment(&mut self, _seg: crate::OnDiskSegment, _tier: u32) {}
     fn sample_representative_for_segment(&self, _seg_idx: usize) -> Option<String> {
         None
     }
@@ -316,7 +314,7 @@ pub trait TextIndex: Send + Sync + std::any::Any {
     /// Returns per-segment information (doc counts, live counts, approximate sizes, tiers).
     /// Memory backends return an empty vec. On-disk backends return one entry per sealed segment.
     /// Useful for monitoring, cost-based rebalancing, and deciding when to vacuum.
-    fn segment_info(&self) -> Vec<crate::on_disk_index::SegmentInfo> {
+    fn segment_info(&self) -> Vec<crate::SegmentInfo> {
         vec![]
     }
 }
@@ -630,14 +628,13 @@ use crate::query::QueryResult;
 /// `search_and_traverse` workflow described in the design document.
 pub struct IndexedKnowledgeGraph {
     pub graph: KnowledgeGraph,
-    /// The text index backend. Can be the classic in-memory implementation
-    /// or (when the `on-disk-index` feature is enabled) a persistent
-    /// segmented implementation.
+    /// The text index backend. Can be the classic in-memory `InvertedIndex`
+    /// or the persistent segmented `OnDiskTextIndex`.
     pub text_index: Box<dyn TextIndex>,
 
     /// Background merge/vacuum worker handles for on-disk text indexes.
     /// Stored here so they stay alive as long as the graph does.
-    merge_workers: Vec<crate::on_disk_index::MergeWorkerHandle>,
+    merge_workers: Vec<crate::MergeWorkerHandle>,
 }
 
 impl IndexedKnowledgeGraph {
@@ -659,11 +656,10 @@ impl IndexedKnowledgeGraph {
     }
 
     /// Create an `IndexedKnowledgeGraph` that uses the on-disk segmented
-    /// inverted index (requires the `on-disk-index` feature).
+    /// inverted index (the recommended default for persistent workloads).
     ///
     /// After construction, call `start_background_workers(...)` to enable
     /// automatic incremental compaction / vacuum in the background.
-    #[cfg(feature = "on-disk-index")]
     pub fn new_on_disk() -> Self {
         Self {
             graph: KnowledgeGraph::new(),
@@ -673,8 +669,8 @@ impl IndexedKnowledgeGraph {
     }
 
     /// Builder-style constructor that lets you choose the text backend.
-    /// When the `on-disk-index` feature is enabled you can pass an
-    /// `OnDiskTextIndex`.
+    /// You can pass an `OnDiskTextIndex` (for persistence) or a plain
+    /// `InvertedIndex` (lightweight, in-memory only).
     pub fn with_text_index(index: Box<dyn TextIndex>) -> Self {
         Self {
             graph: KnowledgeGraph::new(),
@@ -1002,19 +998,14 @@ impl IndexedKnowledgeGraph {
         // Load the graph topology + blobs (use the established portable loader)
         let graph = KnowledgeGraph::load_from_disk(&dir.join("graph"))?;
 
-        // Decide on the text index backend by inspecting the directory
+        // Decide on the text index backend by inspecting the directory.
+        // If a manifest.json is present we use the persistent on-disk backend;
+        // otherwise we fall back to the lightweight in-memory index.
         let text_dir = dir.join("text_index");
         let text_index: Box<dyn TextIndex> = if text_dir.join("manifest.json").exists() {
-            #[cfg(feature = "on-disk-index")]
-            {
-                match crate::on_disk_text_index::OnDiskTextIndex::load_from_dir(&text_dir) {
-                    Ok(idx) => idx,
-                    Err(_) => Box::new(InvertedIndex::new()),
-                }
-            }
-            #[cfg(not(feature = "on-disk-index"))]
-            {
-                Box::new(InvertedIndex::new())
+            match crate::on_disk_text_index::OnDiskTextIndex::load_from_dir(&text_dir) {
+                Ok(idx) => idx,
+                Err(_) => Box::new(InvertedIndex::new()),
             }
         } else {
             Box::new(InvertedIndex::new())
@@ -1034,16 +1025,9 @@ impl IndexedKnowledgeGraph {
 
         let text_dir = dir.join("text_index");
         let text_index: Box<dyn TextIndex> = if text_dir.join("manifest.json").exists() {
-            #[cfg(feature = "on-disk-index")]
-            {
-                match crate::on_disk_text_index::OnDiskTextIndex::load_from_dir(&text_dir) {
-                    Ok(idx) => idx,
-                    Err(_) => Box::new(InvertedIndex::new()),
-                }
-            }
-            #[cfg(not(feature = "on-disk-index"))]
-            {
-                Box::new(InvertedIndex::new())
+            match crate::on_disk_text_index::OnDiskTextIndex::load_from_dir(&text_dir) {
+                Ok(idx) => idx,
+                Err(_) => Box::new(InvertedIndex::new()),
             }
         } else {
             Box::new(InvertedIndex::new())
@@ -1064,7 +1048,7 @@ impl IndexedKnowledgeGraph {
 
     /// Returns segment-level information from the text index (doc counts, live counts, sizes, tiers).
     /// Memory backends return an empty list. On-disk backends return one entry per sealed segment.
-    pub fn text_index_segment_info(&self) -> Vec<crate::on_disk_index::SegmentInfo> {
+    pub fn text_index_segment_info(&self) -> Vec<crate::SegmentInfo> {
         self.text_index.segment_info()
     }
 
@@ -1083,16 +1067,15 @@ impl IndexedKnowledgeGraph {
     pub fn start_background_workers(&mut self, interval: std::time::Duration) -> usize {
         let mut started = 0;
 
-        // Try to start a worker if we have an on-disk text index
-        #[cfg(feature = "on-disk-index")]
+        // If the current text index is an OnDiskTextIndex, start a background
+        // merge/vacuum worker for it. Worker handles are stored internally so
+        // they live as long as the IndexedKnowledgeGraph.
+        if let Some(ot) = (&mut *self.text_index as &mut dyn std::any::Any)
+            .downcast_mut::<crate::on_disk_text_index::OnDiskTextIndex>()
         {
-            if let Some(ot) = (&mut *self.text_index as &mut dyn std::any::Any)
-                .downcast_mut::<crate::on_disk_text_index::OnDiskTextIndex>()
-            {
-                let handle = ot.start_merge_worker(interval);
-                self.merge_workers.push(handle);
-                started += 1;
-            }
+            let handle = ot.start_merge_worker(interval);
+            self.merge_workers.push(handle);
+            started += 1;
         }
 
         started

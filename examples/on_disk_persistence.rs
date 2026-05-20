@@ -7,7 +7,7 @@
 //! - Background maintenance with real periodic vacuum
 //!
 //! Run with:
-//!   cargo run --example on_disk_persistence --features "fulltext,on-disk-index,sharding"
+//!   cargo run --example on_disk_persistence --features "fulltext,sharding"
 
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
