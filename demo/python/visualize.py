@@ -5,7 +5,8 @@ Simple visualization helper for grap graphs.
 
 Usage examples:
     python -m demo.python.visualize --graph-dir ./my-kg --output graph.dot
-    python -m demo.python.visualize --graph-dir ./my-kg --render graph.png
+    python -m demo.python.visualize --graph-dir ./my-kg --output graph.png   # auto-renders using graphviz if available
+    python -m demo.python.visualize --graph-dir ./my-kg --output graph.dot --render   # force render even for .dot
 
 It uses the `grap-cli export` command under the hood.
 """
@@ -74,7 +75,7 @@ def write_dot(graph_dir: Path, output_path: Path) -> Path:
 def main(
     graph_dir: str = typer.Option(..., "--graph-dir", "-g"),
     output: str | None = typer.Option(None, "--output", "-o", help="Output file (.dot, .png, .svg)"),
-    render: bool = typer.Option(False, "--render", help="Try to render using graphviz"),
+    render: bool = typer.Option(False, "--render", help="Force rendering to an image (only useful together with --output)"),
 ):
     """Export or render a grap graph."""
     graph_path = Path(graph_dir).expanduser().resolve()

@@ -198,46 +198,70 @@ impl From<SerializablePropertyValue> for PropertyValue {
 // ============================================================================
 
 impl KnowledgeGraph {
-    /// Serialize the graph to a directory in an atomic, crash-safe way.
+    /// Serialize the graph to a directory in a crash-safe way.
     ///
-    /// The save is performed by writing all data to a temporary directory
-    /// and then atomically renaming it into place. This guarantees that
-    /// readers will either see the old complete version or the new complete
-    /// version — never a partially written state.
+    /// When the directory does not yet exist, writes directly (no old version
+    /// to protect). When it already exists, stages new files into a `.grap-new`
+    /// subdirectory and then renames each file individually into place, with
+    /// `graph.meta` renamed last so it acts as the commit record.
+    ///
+    /// Per-file renames are used rather than directory-level rename/delete because
+    /// on Windows, Defender and file-system watchers hold directory handles that
+    /// reliably block `remove_dir_all` and directory-level `rename`, while
+    /// individual file renames within the same directory always succeed.
     ///
     /// Creates three files inside `dir`:
     /// - `graph.topo`
     /// - `graph.blobs`
     /// - `graph.meta`
     pub fn save_to_disk(&self, dir: &Path) -> Result<(), GraphError> {
-        let parent = dir.parent().unwrap_or(Path::new("."));
-
-        // Create a temporary directory next to the target (atomic rename target)
-        let temp_dir = tempfile::Builder::new()
-            .prefix(".grap-save-")
-            .tempdir_in(parent)?;
-
-        let temp_path = temp_dir.path();
-
-        // Write everything into the temporary directory
-        self.write_graph_to_dir(temp_path)?;
-
-        // Ensure data is on disk
-        Self::sync_directory(temp_path)?;
-
-        // Atomic replacement
-        if dir.exists() {
-            fs::remove_dir_all(dir)?;
+        if !dir.exists() {
+            // First save: write directly (no atomicity needed, no existing version to protect).
+            fs::create_dir_all(dir)?;
+            self.write_graph_to_dir(dir)?;
+            let _ = Self::sync_directory(dir);
+            if let Some(parent) = dir.parent() {
+                let _ = Self::sync_directory(parent);
+            }
+            return Ok(());
         }
-        fs::rename(temp_path, dir)?;
 
-        // Ensure the rename is durable
-        Self::sync_directory(parent)?;
+        // Stage new files into `dir/.grap-new/`, then rename each into place.
+        // Using a staging subdirectory INSIDE the target keeps source and destination
+        // on the same filesystem (rename is always atomic within one volume).
+        let staging = dir.join(".grap-new");
+        self.write_graph_to_dir(&staging)?;
+        let _ = Self::sync_directory(&staging);
 
-        // Prevent the TempDir from deleting the directory we just moved
-        let _ = temp_dir.into_path();
+        // Rename each file: blobs and topo first, meta last (meta = commit point).
+        // Retries handle the brief window where Defender may be scanning a just-written file.
+        Self::rename_with_retry(&staging.join("graph.blobs"), &dir.join("graph.blobs"))?;
+        Self::rename_with_retry(&staging.join("graph.topo"),  &dir.join("graph.topo"))?;
+        Self::rename_with_retry(&staging.join("graph.meta"),  &dir.join("graph.meta"))?;
 
+        // Remove the now-empty staging directory (best-effort).
+        let _ = fs::remove_dir(&staging);
+
+        let _ = Self::sync_directory(dir);
         Ok(())
+    }
+
+    fn rename_with_retry(src: &Path, dst: &Path) -> Result<(), GraphError> {
+        let mut last_err: Option<std::io::Error> = None;
+        for attempt in 0..8u64 {
+            match fs::rename(src, dst) {
+                Ok(_) => return Ok(()),
+                Err(e) => {
+                    last_err = Some(e);
+                    if attempt < 7 {
+                        std::thread::sleep(std::time::Duration::from_millis(50 + attempt * 30));
+                    }
+                }
+            }
+        }
+        Err(last_err
+            .map(GraphError::from)
+            .unwrap_or_else(|| std::io::Error::new(std::io::ErrorKind::Other, "rename failed after retries").into()))
     }
 
     /// Internal: writes the graph contents into an existing directory.
@@ -264,13 +288,13 @@ impl KnowledgeGraph {
         let serializable_nodes: Vec<SerializableNode> = self
             .nodes
             .iter()
-            .enumerate()
-            .map(|(i, node)| {
-                let global_offset = if i < chunk_offsets.len() {
-                    chunk_offsets[node.blob.chunk_idx as usize] + node.blob.offset as u64
-                } else {
-                    0
-                };
+            .map(|node| {
+                let chunk_base = chunk_offsets
+                    .get(node.blob.chunk_idx as usize)
+                    .copied()
+                    .expect("internal error: node blob chunk_idx is out of range");
+
+                let global_offset = chunk_base + node.blob.offset as u64;
 
                 SerializableNode {
                     blob_global_offset: global_offset,
@@ -356,7 +380,7 @@ impl KnowledgeGraph {
                 for entry in entries.flatten() {
                     let name = entry.file_name();
                     if let Some(name_str) = name.to_str() {
-                        if name_str.starts_with(".grap-save-") {
+                        if name_str.starts_with(".grap-save-") || name_str.starts_with(".grap-old-") || name_str == ".grap-new" {
                             if fs::remove_dir_all(entry.path()).is_ok() {
                                 removed += 1;
                             }

@@ -20,48 +20,58 @@ import sys
 from pathlib import Path
 from typing import Any, Optional
 
-
 def find_grap_cli() -> Path:
     """
-    Find the grap-cli binary with a sensible priority order.
+    Find the grap-cli binary with a robust priority order.
 
     Priority:
     1. GRAP_CLI_PATH environment variable (explicit override)
     2. In PATH (shutil.which)
-    3. Common cargo output locations relative to this file:
-       - ../../target/debug/grap-cli(.exe)
-       - ../../target/release/grap-cli(.exe)
+    3. Relative to the repository (prefers release over debug)
     """
-    # 1. Explicit override
+    # 1. Explicit override via environment variable
     env_path = os.environ.get("GRAP_CLI_PATH")
     if env_path:
-        p = Path(env_path)
-        if p.exists() and p.is_file():
-            return p
-        print(f"[grap] GRAP_CLI_PATH points to non-existent file: {env_path}", file=sys.stderr)
+        p = Path(env_path).expanduser()
 
-    # 2. In PATH
-    candidates = ["grap-cli", "grap-cli.exe"]
-    for name in candidates:
+        # Try as provided (handles both relative and absolute paths)
+        if p.exists() and p.is_file():
+            return p.resolve()
+
+        # Try resolving relative to current working directory
+        p_resolved = (Path.cwd() / env_path).resolve()
+        if p_resolved.exists() and p_resolved.is_file():
+            return p_resolved
+
+        print(f"[grap] Warning: GRAP_CLI_PATH={env_path} does not point to a valid file", file=sys.stderr)
+
+    # 2. Check if it's available in PATH
+    for name in ["grap-cli", "grap-cli.exe"]:
         found = shutil.which(name)
         if found:
             return Path(found)
 
-    # 3. Relative to this script (works when running from the repo)
+    # 3. Look relative to the repo root (prefer release over debug)
     script_dir = Path(__file__).resolve().parent
-    repo_root = script_dir.parent.parent  # demo/python -> demo -> repo root
+    repo_root = script_dir.parent.parent   # demo/python/ → demo/ → repo root
 
-    for profile in ("debug", "release"):
-        for name in ("grap-cli", "grap-cli.exe"):
+    # Check release first, then debug
+    for profile in ("release", "debug"):
+        for name in ("grap-cli.exe", "grap-cli"):
             candidate = repo_root / "target" / profile / name
             if candidate.exists():
                 return candidate
 
+    # Nothing found
     raise FileNotFoundError(
-        "Could not find the 'grap-cli' binary.\n"
-        "Please build it first:\n"
+        "Could not find the 'grap-cli' binary.\n\n"
+        "Please build it with:\n"
         "    cargo build --release --bin grap-cli --features \"fulltext,sharding\"\n\n"
-        "Or set the GRAP_CLI_PATH environment variable to the full path of the binary."
+        "Or set the GRAP_CLI_PATH environment variable to the full path of the binary.\n"
+        "Example (Windows):\n"
+        "    set GRAP_CLI_PATH=target\\release\\grap-cli.exe\n"
+        "Example (PowerShell):\n"
+        "    $env:GRAP_CLI_PATH=\"target\\release\\grap-cli.exe\""
     )
 
 

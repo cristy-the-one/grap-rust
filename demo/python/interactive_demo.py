@@ -88,6 +88,12 @@ def main(
 
     # === Step 2: Show rich statistics ===
     console.print("[bold yellow]Step 2: Exploring statistics and segment information[/bold yellow]")
+    console.print(
+        "[dim]This shows the on-disk segmented text index (grap 0.2).\n"
+        "Each segment is an immutable inverted index. 'live' = usable documents, 'deleted' = tombstones.\n"
+        "The tier column shows how the background merge policy has grouped segments.\n"
+        "High delete_ratio segments will be compacted during vacuum.[/dim]\n"
+    )
     run_grap_cli(["stats", "--graph-dir", str(graph_path), "--segments"], json_output=False)
     console.print()
 
@@ -137,6 +143,11 @@ def main(
 
     # === Step 5: Delete + incremental vacuum (the heart of the 0.2 demo) ===
     console.print("\n[bold yellow]Step 5: Delete + incremental vacuum[/bold yellow]")
+    console.print(
+        "[dim]Deletes are cheap: we only write a tombstone bit. The document is logically gone\n"
+        "but its bytes stay in the segment until vacuum decides it is worth rewriting.\n"
+        "Vacuum only touches segments whose delete_ratio exceeds a threshold (incremental, not full rewrite).[/dim]\n"
+    )
 
     if created_nodes:
         # Delete the last ingested document (usually "lifetimes" or similar)
@@ -149,17 +160,23 @@ def main(
             check=False,
         )
 
-        console.print("\n[bold]Before vacuum[/bold] (note increased delete ratio):")
+        console.print("\n[bold]Before vacuum[/bold] — note the raised delete ratio on one or more segments:")
         run_grap_cli(["stats", "--graph-dir", str(graph_path), "--segments"], json_output=False)
 
         if not auto:
             pause("Press Enter to run vacuum...")
 
         console.print("\n[bold]Running incremental vacuum...[/bold]")
+        console.print("[dim]Only segments above the delete threshold are compacted. Live documents are copied into new segments; tombstones are dropped.[/dim]")
         run_grap_cli(["vacuum", "--graph-dir", str(graph_path), "--show-segments"], json_output=False)
 
-        console.print("\n[bold]After vacuum[/bold] (space reclaimed, segments may have merged or shrunk):")
+        console.print("\n[bold]After vacuum[/bold] — delete ratios dropped and space was reclaimed:")
         run_grap_cli(["stats", "--graph-dir", str(graph_path), "--segments"], json_output=False)
+
+        console.print(
+            "\n[green]This is the key 0.2 feature:[/green] cheap, safe deletes + partial, incremental compaction\n"
+            "instead of rewriting the entire index on every change."
+        )
     else:
         console.print("[yellow]No tracked nodes to delete — skipping live delete demo.[/yellow]")
 
@@ -167,12 +184,13 @@ def main(
         pause()
 
     # === Step 6: Persistence roundtrip ===
-    console.print("\n[bold yellow]Step 6: Persistence & closing thoughts[/bold yellow]")
+    console.print("\n[bold yellow]Step 6: Persistence round-trip[/bold yellow]")
     console.print(
-        "Everything you just did (including on-disk segments, tombstones, and vacuum state) "
-        "was durably written to disk using `save_to_dir`."
+        "Every mutation (add, delete, vacuum) was persisted using the atomic `save_to_dir` mechanism.\n"
+        "The new per-file staging strategy (writing into `.grap-new/`, then renaming files individually,\n"
+        "with `graph.meta` as the final commit record) is what made this reliable on Windows."
     )
-    console.print(f"\nYou can now exit and later continue with:\n  python -m demo.python.interactive_demo --graph-dir {graph_path}")
+    console.print(f"\n[dim]You can exit now and later continue exactly where you left off with:[/dim]\n  python -m demo.python.interactive_demo --graph-dir {graph_path}")
 
     if not auto:
         pause()
@@ -185,10 +203,10 @@ def main(
         dot_path = graph_path / "demo-graph.dot"
         viz.write_dot(graph_path, dot_path)
 
-        console.print(f"[green]✓[/green] Visualization DOT file generated:")
+        console.print(f"[green][OK][/green] Visualization DOT file generated:")
         console.print(f"  {dot_path}")
         console.print("\nYou can render it with:")
-        console.print(f"  python -m demo.python.visualize --graph-dir {graph_path} --render graph.png")
+        console.print(f"  python -m demo.python.visualize --graph-dir {graph_path} --output graph.png")
 
     except Exception as e:
         console.print(f"[yellow]Visualization step skipped:[/yellow] {e}")
@@ -197,8 +215,17 @@ def main(
 
     console.print("\n[bold green]Demo complete![/bold green]")
     console.print(
-        "You have experienced: document ingestion → rich observability → hybrid search → "
-        "live modification → delete + real incremental vacuum → persistence + visualization."
+        "\n[bold]What you just saw:[/bold]\n"
+        "• Real Markdown documents ingested with automatic relationship inference\n"
+        "• On-disk segmented inverted index (tiered segments, live/delete counts)\n"
+        "• Hybrid text + graph search with traversal\n"
+        "• Cheap deletes via tombstones + incremental vacuum (only dirty segments rewritten)\n"
+        "• Durable persistence with a Windows-friendly per-file atomic save strategy\n"
+        "• Live visualization of the resulting graph\n"
+    )
+    console.print(
+        "[dim]This is the complete 0.2 story: high-performance, observable, incrementally maintainable\n"
+        "knowledge graphs that survive crashes and work reliably on real operating systems.[/dim]"
     )
 
 

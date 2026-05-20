@@ -330,6 +330,12 @@ fn run_query(graph_dir: &PathBuf, json: bool, args: QueryArgs) {
 // ---------------------------------------------------------------------------
 
 fn run_add_file(graph_dir: &PathBuf, json: bool, args: AddFileArgs) {
+    // Ensure the target directory exists (harmless if it already does).
+    if let Err(e) = std::fs::create_dir_all(graph_dir) {
+        eprintln!("Failed to create graph directory {:?}: {}", graph_dir, e);
+        std::process::exit(1);
+    }
+
     let mut ig = match IndexedKnowledgeGraph::load_from_dir(graph_dir) {
         Ok(g) => g,
         Err(_) => {
@@ -354,9 +360,8 @@ fn run_add_file(graph_dir: &PathBuf, json: bool, args: AddFileArgs) {
 
     let node_id = ig.add_node(&content, label.as_deref());
 
-    // Persist the change
     if let Err(e) = ig.save_to_dir(graph_dir) {
-        eprintln!("Failed to save graph after adding node: {}", e);
+        eprintln!("Failed to save after adding node: {}", e);
         std::process::exit(1);
     }
 
