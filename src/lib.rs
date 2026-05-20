@@ -81,6 +81,9 @@ pub use index::{
 
 pub use vector_index::{BruteForceVectorIndex, VectorIndex, VectorIndexStats};
 
+#[cfg(feature = "ann-hnsw")]
+pub use vector_index::{HNSWParams, HNSWVectorIndex};
+
 pub use shard::{
     GhostEdge, GlobalNodeId, RebalancePlan, ShardId, ShardRouter, ShardedGraph, ShardedQueryResult,
 };

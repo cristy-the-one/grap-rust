@@ -46,12 +46,17 @@ optional = true
 version = "1"
 optional = true
 
+[dependencies.hnsw_rs]
+version = "0.3"
+optional = true
+
 [features]
 default = []
 mmap = ["memmap2", "crc32fast"]
 fulltext = []
 sharding = []
 telemetry = []  # Enables the Telemetry trait and observability hooks
+ann-hnsw = ["hnsw_rs"]  # Experimental: HNSW ANN backend for vector search (Phase 1)
 
 [dev-dependencies]
 criterion = { version = "0.5", features = ["html_reports"] }

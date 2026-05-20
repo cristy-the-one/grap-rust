@@ -7,6 +7,11 @@
 use crate::ids::NodeId;
 use crate::index::cosine_similarity; // reuse the existing helper
 
+#[cfg(feature = "ann-hnsw")]
+use hnsw_rs::anndists::dist::distances::DistCosine;
+#[cfg(feature = "ann-hnsw")]
+use hnsw_rs::hnsw::{Hnsw, Neighbour};
+
 /// Statistics about a vector index.
 #[derive(Debug, Clone, Default)]
 pub struct VectorIndexStats {
@@ -135,6 +140,151 @@ impl VectorIndex for BruteForceVectorIndex {
             dimension: self.dimension,
             backend: "brute_force",
         }
+    }
+}
+
+// ============================================================================
+// HNSW Backend (Phase 1)
+// ============================================================================
+
+/// In-memory HNSW vector index using the `hnsw_rs` crate.
+///
+/// This is the recommended production-grade backend for Phase 1+.
+///
+/// It is only compiled when the `ann-hnsw` feature is enabled.
+#[cfg(feature = "ann-hnsw")]
+pub struct HNSWVectorIndex {
+    /// The actual HNSW index. Uses cosine distance.
+    inner: Hnsw<'static, f32, DistCosine>,
+    /// Dimension of the vectors (inferred on first insert).
+    dimension: usize,
+    /// Set of logically deleted node ids (we don't have great delete in hnsw_rs yet).
+    deleted: std::collections::HashSet<NodeId>,
+    /// Parameters used at construction time (for stats / future rebuild).
+    params: HNSWParams,
+}
+
+/// Tunable parameters for the HNSW index.
+#[cfg(feature = "ann-hnsw")]
+#[derive(Debug, Clone, Copy)]
+pub struct HNSWParams {
+    /// Maximum number of connections per layer (M). Typical: 16–32.
+    pub max_connections: usize,
+    /// Size of the dynamic candidate list for construction (ef_construction).
+    /// Higher = better index quality, slower build.
+    pub ef_construction: usize,
+    /// Default search parameter (ef). Can be overridden at query time.
+    pub ef_search: usize,
+    /// Maximum number of layers in the hierarchy.
+    pub max_layers: usize,
+}
+
+#[cfg(feature = "ann-hnsw")]
+impl Default for HNSWParams {
+    fn default() -> Self {
+        Self {
+            max_connections: 16,
+            ef_construction: 100,
+            ef_search: 50,
+            max_layers: 16,
+        }
+    }
+}
+
+#[cfg(feature = "ann-hnsw")]
+impl HNSWVectorIndex {
+    /// Create a new HNSW index with default parameters.
+    pub fn new() -> Self {
+        Self::with_params(HNSWParams::default())
+    }
+
+    /// Create a new HNSW index with custom parameters.
+    pub fn with_params(params: HNSWParams) -> Self {
+        // We use a generous initial capacity. Hnsw will grow as needed.
+        let hnsw = Hnsw::<f32, DistCosine>::new(
+            params.max_connections,
+            10_000, // initial capacity hint
+            params.max_layers,
+            params.ef_construction,
+            DistCosine {},
+        );
+
+        Self {
+            inner: hnsw,
+            dimension: 0,
+            deleted: std::collections::HashSet::new(),
+            params,
+        }
+    }
+}
+
+#[cfg(feature = "ann-hnsw")]
+impl VectorIndex for HNSWVectorIndex {
+    fn add_vector(&mut self, node: NodeId, embedding: &[f32]) {
+        if self.dimension == 0 && !embedding.is_empty() {
+            self.dimension = embedding.len();
+        }
+
+        // hnsw_rs uses usize labels. We cast NodeId (u32) safely.
+        let label = node.0 as usize;
+
+        // Insert (or re-insert). hnsw_rs will handle duplicates by label.
+        self.inner.insert((embedding, label));
+
+        // If it was previously deleted, un-delete it.
+        self.deleted.remove(&node);
+    }
+
+    fn remove_vector(&mut self, node: NodeId) {
+        self.deleted.insert(node);
+        // Note: We do not call any remove on the inner HNSW because
+        // hnsw_rs has limited delete support. We filter at search time.
+    }
+
+    fn search(&self, query: &[f32], max_results: usize) -> Vec<(NodeId, f64)> {
+        if self.dimension == 0 || query.is_empty() {
+            return Vec::new();
+        }
+
+        let ef = self.params.ef_search.max(max_results * 2);
+
+        // hnsw_rs returns neighbors with distance (lower is better for DistCosine)
+        let neighbors = self.inner.search(query, max_results * 2, ef);
+
+        let mut results = Vec::new();
+
+        for neighbor in neighbors {
+            let node_id = NodeId(neighbor.d_id as u32);
+
+            if self.deleted.contains(&node_id) {
+                continue;
+            }
+
+            // Convert cosine *distance* to similarity.
+            // DistCosine returns 1 - cosine_similarity for normalized vectors.
+            let distance = neighbor.distance;
+            let similarity: f64 = (1.0 - distance as f64).clamp(0.0, 1.0);
+
+            results.push((node_id, similarity));
+        }
+
+        results.truncate(max_results);
+        results
+    }
+
+    fn stats(&self) -> VectorIndexStats {
+        VectorIndexStats {
+            vector_count: self.inner.get_nb_point() - self.deleted.len(),
+            dimension: self.dimension,
+            backend: "hnsw",
+        }
+    }
+}
+
+#[cfg(feature = "ann-hnsw")]
+impl Default for HNSWVectorIndex {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

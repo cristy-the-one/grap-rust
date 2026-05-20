@@ -845,9 +845,18 @@ impl IndexedKnowledgeGraph {
         // Phase 0/1 vector index ingestion
         if let Some(emb) = embedding {
             if self.vector_index.is_none() {
-                self.vector_index = Some(Box::new(
-                    crate::vector_index::BruteForceVectorIndex::new(),
-                ));
+                #[cfg(feature = "ann-hnsw")]
+                {
+                    self.vector_index = Some(Box::new(
+                        crate::vector_index::HNSWVectorIndex::new(),
+                    ));
+                }
+                #[cfg(not(feature = "ann-hnsw"))]
+                {
+                    self.vector_index = Some(Box::new(
+                        crate::vector_index::BruteForceVectorIndex::new(),
+                    ));
+                }
             }
             if let Some(vidx) = &mut self.vector_index {
                 vidx.add_vector(id, emb);
