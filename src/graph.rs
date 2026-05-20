@@ -229,6 +229,22 @@ impl Default for KnowledgeGraph {
 
 /// Internal constructor used by the serialization layer.
 impl KnowledgeGraph {
+    /// Construct a graph from its parts, supplying an explicit deleted bitmap.
+    /// `deleted` is padded with `false` if shorter than `nodes.len()`.
+    pub(crate) fn from_parts_with_deleted(
+        nodes: Vec<Node>,
+        edges: Vec<Edge>,
+        blobs: BlobStore,
+        properties: PropertyRegistry,
+        deleted: Vec<bool>,
+    ) -> Self {
+        let n = nodes.len();
+        let mut d = deleted;
+        d.resize(n, false); // pad if shorter
+        Self { nodes, edges, blobs, properties, deleted: d }
+    }
+
+    /// Convenience wrapper that starts with all nodes alive.
     pub(crate) fn from_parts(
         nodes: Vec<Node>,
         edges: Vec<Edge>,
@@ -236,12 +252,6 @@ impl KnowledgeGraph {
         properties: PropertyRegistry,
     ) -> Self {
         let n = nodes.len();
-        Self {
-            nodes,
-            edges,
-            blobs,
-            properties,
-            deleted: vec![false; n],
-        }
+        Self::from_parts_with_deleted(nodes, edges, blobs, properties, vec![false; n])
     }
 }

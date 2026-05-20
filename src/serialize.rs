@@ -235,9 +235,10 @@ impl KnowledgeGraph {
 
         // Rename each file: blobs and topo first, meta last (meta = commit point).
         // Retries handle the brief window where Defender may be scanning a just-written file.
-        Self::rename_with_retry(&staging.join("graph.blobs"), &dir.join("graph.blobs"))?;
-        Self::rename_with_retry(&staging.join("graph.topo"),  &dir.join("graph.topo"))?;
-        Self::rename_with_retry(&staging.join("graph.meta"),  &dir.join("graph.meta"))?;
+        Self::rename_with_retry(&staging.join("graph.blobs"),   &dir.join("graph.blobs"))?;
+        Self::rename_with_retry(&staging.join("graph.topo"),    &dir.join("graph.topo"))?;
+        Self::rename_with_retry(&staging.join("graph.deleted"), &dir.join("graph.deleted"))?;
+        Self::rename_with_retry(&staging.join("graph.meta"),    &dir.join("graph.meta"))?;
 
         // Remove the now-empty staging directory (best-effort).
         let _ = fs::remove_dir(&staging);
@@ -349,6 +350,11 @@ impl KnowledgeGraph {
         let meta_path = dir.join("graph.meta");
         let meta_json = serde_json::to_string_pretty(&meta)?;
         fs::write(meta_path, meta_json)?;
+
+        // 5. Write deleted-node bitmap (optional file; missing == all-false on load)
+        let deleted_bytes: Vec<u8> = self.deleted.iter().map(|&b| if b { 1u8 } else { 0u8 }).collect();
+        let deleted_path = dir.join("graph.deleted");
+        fs::write(deleted_path, &deleted_bytes)?;
 
         Ok(())
     }
@@ -520,14 +526,28 @@ impl KnowledgeGraph {
         // Read blobs
         let blob_data = fs::read(dir.join("graph.blobs"))?;
 
-        // Verify checksums
+        // Verify checksums — reject any boundary that exceeds the blob data length
         for (i, &boundary) in meta.chunk_boundaries.iter().enumerate() {
+            let start = boundary as usize;
+            if start > blob_data.len() {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    format!("chunk boundary {} exceeds blob size {}", start, blob_data.len()),
+                ).into());
+            }
             let end = if i + 1 < meta.chunk_boundaries.len() {
-                meta.chunk_boundaries[i + 1] as usize
+                let next = meta.chunk_boundaries[i + 1] as usize;
+                if next > blob_data.len() {
+                    return Err(io::Error::new(
+                        io::ErrorKind::InvalidData,
+                        format!("chunk boundary {} exceeds blob size {}", next, blob_data.len()),
+                    ).into());
+                }
+                next
             } else {
                 blob_data.len()
             };
-            let chunk_slice = &blob_data[boundary as usize..end];
+            let chunk_slice = &blob_data[start..end];
             let computed = crc32(chunk_slice);
             if computed != meta.chunk_checksums[i] {
                 return Err(GraphError::ChecksumMismatch);
@@ -565,7 +585,13 @@ impl KnowledgeGraph {
         let mut rebuilt_nodes = Vec::with_capacity(serializable_nodes.len());
         for sn in serializable_nodes {
             let (chunk_idx, local_offset) =
-                find_chunk_for_offset(&meta.chunk_boundaries, sn.blob_global_offset);
+                find_chunk_for_offset(&meta.chunk_boundaries, sn.blob_global_offset)
+                    .ok_or_else(|| {
+                        io::Error::new(
+                            io::ErrorKind::InvalidData,
+                            format!("blob offset {} out of range", sn.blob_global_offset),
+                        )
+                    })?;
 
             let blob = BlobRef {
                 chunk_idx,
@@ -601,19 +627,29 @@ impl KnowledgeGraph {
             });
         }
 
-        let graph = KnowledgeGraph::from_parts(
+        // Restore tombstones (optional; missing file = all-false for backward compat)
+        let deleted_path = dir.join("graph.deleted");
+        let deleted: Vec<bool> = if deleted_path.exists() {
+            fs::read(&deleted_path)?.iter().map(|&b| b != 0).collect()
+        } else {
+            vec![false; rebuilt_nodes.len()]
+        };
+
+        let graph = KnowledgeGraph::from_parts_with_deleted(
             rebuilt_nodes,
             rebuilt_edges,
             crate::blob_store::BlobStore::from_chunks(chunks),
             properties,
+            deleted,
         );
 
         Ok(graph)
     }
 }
 
-/// Helper: given global offset and chunk boundaries, return (chunk_idx, local_offset)
-fn find_chunk_for_offset(boundaries: &[u64], global_offset: u64) -> (u32, u32) {
+/// Helper: given global offset and chunk boundaries, return `Some((chunk_idx, local_offset))`
+/// or `None` if the offset does not fall within any chunk.
+fn find_chunk_for_offset(boundaries: &[u64], global_offset: u64) -> Option<(u32, u32)> {
     for (i, &start) in boundaries.iter().enumerate() {
         let end = if i + 1 < boundaries.len() {
             boundaries[i + 1]
@@ -621,10 +657,10 @@ fn find_chunk_for_offset(boundaries: &[u64], global_offset: u64) -> (u32, u32) {
             u64::MAX
         };
         if global_offset >= start && global_offset < end {
-            return (i as u32, (global_offset - start) as u32);
+            return Some((i as u32, (global_offset - start) as u32));
         }
     }
-    (0, 0)
+    None
 }
 
 impl KnowledgeGraph {
@@ -874,5 +910,49 @@ mod tests {
         let report2 =
             KnowledgeGraph::repair(&graph_dir).expect("repair on empty dir should succeed");
         assert_eq!(report2.removed_temp_dirs, 0);
+    }
+
+    #[test]
+    fn deleted_nodes_survive_save_load() {
+        let mut g = KnowledgeGraph::new();
+        let n0 = g.add_node("Document zero.", Some("zero"));
+        let n1 = g.add_node("Document one.", Some("one"));
+        let n2 = g.add_node("Document two.", Some("two"));
+
+        // Delete the middle node
+        assert!(g.remove_node(n1));
+        assert!(g.is_node_deleted(n1));
+        assert!(!g.is_node_deleted(n0));
+        assert!(!g.is_node_deleted(n2));
+
+        let dir = tempdir().unwrap();
+        g.save_to_disk(dir.path()).expect("save");
+
+        let loaded = KnowledgeGraph::load_from_disk(dir.path()).expect("load");
+        // Tombstone must survive
+        assert!(loaded.is_node_deleted(n1), "n1 should still be deleted after reload");
+        assert!(!loaded.is_node_deleted(n0));
+        assert!(!loaded.is_node_deleted(n2));
+    }
+
+    #[test]
+    fn load_rejects_corrupt_blob_offset() {
+        let mut g = KnowledgeGraph::new();
+        g.add_node("Hello.", None);
+
+        let dir = tempdir().unwrap();
+        g.save_to_disk(dir.path()).expect("save");
+
+        // Corrupt graph.meta: push a fake boundary far beyond the actual blob size
+        let meta_path = dir.path().join("graph.meta");
+        let meta_str = std::fs::read_to_string(&meta_path).unwrap();
+        let mut meta: GraphMeta = serde_json::from_str(&meta_str).unwrap();
+        meta.chunk_boundaries.push(u64::MAX / 2);
+        meta.chunk_checksums.push(0);
+        std::fs::write(&meta_path, serde_json::to_string_pretty(&meta).unwrap()).unwrap();
+
+        // Load should return Err, not silently return wrong data
+        let result = KnowledgeGraph::load_from_disk(dir.path());
+        assert!(result.is_err(), "expected error on corrupt offset, got {:?}", result);
     }
 }
