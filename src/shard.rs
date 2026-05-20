@@ -204,11 +204,11 @@ impl ShardRouter {
         all
     }
 
-    /// High-level distributed "search + traverse" across shards.
+    /// High-level distributed "search + traverse" with **real ghost-edge following**.
     ///
-    /// This version performs basic ghost-edge following during traversal
-    /// (one level deep for demonstration). A full recursive cross-shard
-    /// traversal with caching would be the next refinement.
+    /// When expansion reaches a node that has `GhostEdge`s, the router will
+    /// cross into the remote shard, fetch the target node (with caching),
+    /// and continue the traversal from there, multiplying the edge strength.
     pub fn search_and_traverse(
         &self,
         text_query: &str,
@@ -219,70 +219,119 @@ impl ShardRouter {
         max_results: usize,
         weights: crate::index::FusionWeights,
     ) -> Vec<crate::index::CombinedResult> {
-        // 1. Scatter text search
-        let mut all_seeds = Vec::new();
-        for shard in &self.shards {
-            let mut local = shard.graph.search(text_query, max_seeds);
-            all_seeds.append(&mut local);
+        use std::collections::{BinaryHeap, HashSet};
+        use std::cmp::Ordering;
+
+        // --- 1. Distributed seed selection ---
+        let mut seed_list = Vec::new();
+        for (s_idx, shard) in self.shards.iter().enumerate() {
+            let local = shard.graph.search(text_query, max_seeds);
+            for s in local {
+                seed_list.push((ShardId(s_idx as u16), s));
+            }
+        }
+        seed_list.sort_by(|a, b| b.1.score.partial_cmp(&a.1.score).unwrap_or(Ordering::Equal));
+        seed_list.truncate(max_seeds);
+
+        // --- 2. Cross-shard best-first traversal with ghost following ---
+        #[derive(Debug)]
+        struct Entry {
+            gnode: GlobalNodeId,
+            strength: f64,
+            depth: u32,
+            text_score: f64,
         }
 
-        all_seeds.sort_by(|a, b| {
-            b.score
-                .partial_cmp(&a.score)
-                .unwrap_or(std::cmp::Ordering::Equal)
-        });
-        all_seeds.truncate(max_seeds);
+        impl PartialEq for Entry {
+            fn eq(&self, other: &Self) -> bool { self.strength == other.strength }
+        }
+        impl Eq for Entry {}
+        impl PartialOrd for Entry {
+            fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+                self.strength.partial_cmp(&other.strength)
+            }
+        }
+        impl Ord for Entry {
+            fn cmp(&self, other: &Self) -> Ordering {
+                self.partial_cmp(other).unwrap_or(Ordering::Equal)
+            }
+        }
 
-        let mut results = Vec::new();
+        let mut pq: BinaryHeap<Entry> = BinaryHeap::new();
+        let mut visited: HashSet<(u16, u32)> = HashSet::new(); // (shard, local)
 
-        for seed in &all_seeds {
-            // Find the owning shard for this seed
-            for shard in &self.shards {
-                let local_results = shard.graph.search_and_traverse_default(
-                    text_query,
-                    1,
-                    property_names,
-                    min_strength,
-                    max_depth,
-                    max_results,
-                );
+        for (shard_id, seed) in &seed_list {
+            let gnode = GlobalNodeId { shard: *shard_id, local: seed.node_id };
+            visited.insert((shard_id.0, seed.node_id.0));
+            pq.push(Entry {
+                gnode,
+                strength: 1.0,
+                depth: 0,
+                text_score: seed.score,
+            });
+        }
 
-                for mut cr in local_results {
-                    if cr.graph_result.node_id == seed.node_id {
-                        cr.text_score = seed.score;
-                        cr.fused_score = cr.text_score * weights.text + cr.graph_strength * weights.graph;
-                        results.push(cr);
+        let mut out: Vec<crate::index::CombinedResult> = Vec::new();
+
+        while let Some(e) = pq.pop() {
+            let shard = &self.shards[e.gnode.shard.0 as usize];
+            let node = e.gnode.local;
+
+            let text = shard.graph.read_blob(node);
+
+            out.push(crate::index::CombinedResult {
+                text_score: e.text_score,
+                graph_strength: e.strength,
+                fused_score: e.text_score * weights.text + e.strength * weights.graph,
+                graph_result: crate::query::QueryResult {
+                    node_id: node,
+                    path: vec![],
+                    cumulative_strength: e.strength,
+                    depth: e.depth,
+                },
+                text,
+            });
+
+            if out.len() >= max_results { break; }
+            if e.depth >= max_depth { continue; }
+
+            // --- Follow real GhostEdges ---
+            if let Some(ghosts) = shard.ghost_edges.get(&node.0) {
+                for g in ghosts {
+                    if g.strength < min_strength { continue; }
+
+                    let r = g.remote_target;
+                    let key = (r.shard.0, r.local.0);
+                    if visited.contains(&key) { continue; }
+                    visited.insert(key);
+
+                    // Fetch remote node (in-process direct access)
+                    let remote_shard = &self.shards[r.shard.0 as usize];
+                    let remote_text = remote_shard.graph.read_blob(r.local);
+
+                    // Simple cache
+                    remote_shard.remote_cache.insert(r, CachedRemoteNode {
+                        label: remote_shard.graph.graph.node_label(r.local).map(|s| s.to_string()),
+                        blob_snippet: remote_text.chars().take(100).collect(),
+                        outgoing_edge_count: 0,
+                    });
+
+                    let new_strength = e.strength * g.strength;
+                    if new_strength >= min_strength {
+                        pq.push(Entry {
+                            gnode: r,
+                            strength: new_strength,
+                            depth: e.depth + 1,
+                            text_score: e.text_score,
+                        });
                     }
                 }
             }
         }
 
-        // Basic ghost edge following (demo version)
-        // For any result node, check if it has outgoing ghost edges and pull remote data
-        for result in &mut results {
-            let local_shard_idx = 0; // simplistic for demo
-            if local_shard_idx < self.shards.len() {
-                let shard = &self.shards[local_shard_idx];
-                if let Some(ghosts) = shard.ghost_edges.get(&result.graph_result.node_id.0) {
-                    for ghost in ghosts {
-                        // In a real implementation we would fetch the remote node here
-                        // and continue traversal using the remote shard's graph.
-                        // For now we just note that a cross-shard link exists.
-                        if result.graph_result.depth < max_depth {
-                            // Could synthesize a virtual continuation result
-                        }
-                    }
-                }
-            }
-        }
-
-        results.sort_by(|a, b| {
-            b.fused_score
-                .partial_cmp(&a.fused_score)
-                .unwrap_or(std::cmp::Ordering::Equal)
-        });
-        results.truncate(max_results);
-        results
+        out.sort_by(|a, b| b.fused_score.partial_cmp(&a.fused_score).unwrap_or(Ordering::Equal));
+        out.truncate(max_results);
+        out
     }
 }
 
