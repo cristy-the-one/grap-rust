@@ -160,10 +160,17 @@ impl TextIndex for OnDiskTextIndex {
 
     /// Load an `OnDiskTextIndex` from a directory previously written by `save_to_dir`.
     pub fn load_from_dir(dir: &std::path::Path) -> Result<Box<dyn crate::index::TextIndex>, crate::GraphError> {
-        // For now we create a fresh engine and let the caller decide the directory.
-        // A more complete version would load the OnDiskIndex state here.
-        let mut idx = Self::new_in_dir(dir)?;
-        // TODO: actually load the inner OnDiskIndex from `dir`
+        // Load the real engine state (this is the important part that was missing).
+        let engine = crate::on_disk_index::OnDiskIndex::load_from_dir(dir)
+            .map_err(|e| crate::GraphError::Other(format!("failed to load on-disk index: {}", e)))?;
+
+        let idx = Self {
+            engine,
+            tokenizer: Box::new(crate::index::DefaultTokenizer::new()),
+            node_to_local: std::collections::HashMap::new(),
+            next_local_id: 0,
+        };
+
         Ok(Box::new(idx))
     }
 }

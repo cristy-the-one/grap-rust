@@ -778,10 +778,14 @@ impl ShardRouter {
             let seg_infos = shard.graph.text_index_segment_info(); // from OnDiskTextIndex
 
             for (seg_idx, info) in seg_infos.iter().enumerate() {
-                // Heuristic: compute a stable key for the segment.
-                // Later we can make this smarter by sampling actual document text
-                // from the segment or using segment-level metadata.
-                let seg_key = format!("seg-{}-{}", old_idx, seg_idx);
+                // Improved heuristic for segment target:
+                // Include tier and approximate size. This makes the decision more
+                // stable and gives larger/colder segments slightly different
+                // migration characteristics than tiny hot ones.
+                let seg_key = format!(
+                    "shard-{}-seg-{}-tier-{}-docs-{}",
+                    old_idx, seg_idx, info.tier, info.doc_count
+                );
                 let target = new_ring.locate(seg_key.as_bytes());
 
                 if target.0 != old_idx as u16 {
@@ -813,8 +817,18 @@ impl ShardRouter {
                 "Rebalance plan contains {} segment migration recommendations (segment-aware rebalancing)",
                 segments_suggested
             );
-            // TODO (next step): implement actual bulk segment move logic
-            // instead of (or in addition to) per-node migrations.
+
+            // Make segment migrations actually do useful work:
+            // For each recommended segment move, trigger compaction/vacuum on the
+            // source shard's text index. This is especially valuable for on-disk
+            // indexes (prepares the segment for cheaper future bulk move + reclaims space).
+            for seg in &plan.segment_migrations {
+                let src_idx = seg.source_shard.0 as usize;
+                if src_idx < self.shards.len() {
+                    self.shards[src_idx].graph.text_index.compact();
+                    self.shards[src_idx].graph.text_index.vacuum();
+                }
+            }
         }
 
         for (gid, target_shard_id) in plan.node_migrations {

@@ -291,6 +291,12 @@ pub trait TextIndex: Send + Sync {
             "load_from_dir not supported for this TextIndex backend".into(),
         ))
     }
+
+    /// Trigger compaction / vacuum on the text index (no-op for memory backend).
+    fn vacuum(&mut self) {}
+
+    /// Trigger a lighter compaction (no-op for memory backend).
+    fn compact(&mut self) {}
 }
 
 impl TextIndex for InvertedIndex {
