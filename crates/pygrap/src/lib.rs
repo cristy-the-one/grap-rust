@@ -4,15 +4,30 @@
 
 use pyo3::prelude::*;
 
+mod errors;
+mod indexed_graph;
+mod sharded_graph;
+
+pub use errors::GraphError;
+
 /// Python module exposed as `import pygrap`
 #[pymodule]
 fn pygrap(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add("__version__", env!("CARGO_PKG_VERSION"))?;
+
+    // Register custom exception
+    m.add("GraphError", m.py().get_type::<GraphError>())?;
+
+    // Register classes
+    m.add_class::<indexed_graph::IndexedKnowledgeGraph>()?;
+    m.add_class::<sharded_graph::ShardedGraph>()?;
+    m.add_class::<sharded_graph::RebalancePlanPy>()?;
+
     m.add_function(wrap_pyfunction!(version, m)?)?;
     Ok(())
 }
 
-/// Returns the version of the pygrap bindings (and indirectly the grap crate).
+/// Returns the version of the pygrap bindings.
 #[pyfunction]
 fn version() -> &'static str {
     env!("CARGO_PKG_VERSION")
