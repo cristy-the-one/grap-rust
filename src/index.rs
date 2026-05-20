@@ -1051,6 +1051,12 @@ impl IndexedKnowledgeGraph {
     pub fn text_index_segment_info(&self) -> Vec<crate::on_disk_index::SegmentInfo> {
         self.text_index.segment_info()
     }
+
+    /// Trigger incremental vacuum / space reclamation on the text index
+    /// (especially valuable for on-disk backends after deletes).
+    pub fn vacuum_deleted_nodes(&mut self) {
+        self.text_index.vacuum();
+    }
 }
 
 impl Default for IndexedKnowledgeGraph {
