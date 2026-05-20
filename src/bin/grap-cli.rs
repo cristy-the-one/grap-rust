@@ -305,9 +305,9 @@ fn run_query(graph_dir: &PathBuf, json: bool, args: QueryArgs) {
 fn run_add_file(graph_dir: &PathBuf, json: bool, args: AddFileArgs) {
     let mut ig = match IndexedKnowledgeGraph::load_from_dir(graph_dir) {
         Ok(g) => g,
-        Err(e) => {
-            eprintln!("Failed to load graph: {}", e);
-            std::process::exit(1);
+        Err(_) => {
+            // Directory is new or empty — create a fresh on-disk graph
+            IndexedKnowledgeGraph::new_on_disk()
         }
     };
 

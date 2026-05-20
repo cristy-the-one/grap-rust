@@ -17,6 +17,7 @@ It is designed to be impressive in a live demo or workshop setting.
 
 from __future__ import annotations
 
+import shutil
 import time
 from pathlib import Path
 
@@ -43,9 +44,16 @@ def pause(msg: str = "Press Enter to continue..."):
 def main(
     graph_dir: str = typer.Option("demo-graph", "--graph-dir", "-g", help="Where to store the demo graph"),
     auto: bool = typer.Option(False, "--auto", help="Run without pauses (for recording)"),
+    reset: bool = typer.Option(False, "--reset", help="Delete the graph directory first and start fresh"),
 ):
     """Run the complete interactive grap demonstration."""
-    graph_path = ensure_graph_dir(graph_dir)
+    graph_path = Path(graph_dir).expanduser().resolve()
+
+    if reset and graph_path.exists():
+        console.print(f"[yellow]Resetting demo graph at {graph_path}...[/yellow]")
+        shutil.rmtree(graph_path)
+
+    graph_path = ensure_graph_dir(graph_path)
 
     console.print(Panel.fit(
         "[bold cyan]grap Holistic Demo[/bold cyan]\n\n"
@@ -61,15 +69,19 @@ def main(
     # === Step 1: Create initial graph by ingesting curated docs ===
     console.print("\n[bold yellow]Step 1: Ingesting curated documents[/bold yellow]")
 
-    # For now we use the CLI's add-file repeatedly (simple and effective)
+    created_nodes = []
     for doc in sorted(SAMPLE_DOCS.glob("*.md")):
-        run_grap_cli(
-            ["add-file", "--graph-dir", str(graph_path), "--path", str(doc)],
-            json_output=False,
-            check=False,
+        result = run_grap_cli(
+            ["add-file", "--graph-dir", str(graph_path), "--path", str(doc), "--json"],
+            json_output=True,
+            check=True,   # Surface errors during ingestion
         )
+        if result and "node_id" in result:
+            created_nodes.append((doc.stem, result["node_id"]))
 
-    console.print("[green]✓[/green] Documents ingested into the knowledge graph.\n")
+    console.print(f"[green][OK][/green] Ingested {len(created_nodes)} documents into the knowledge graph.")
+    if created_nodes:
+        console.print("[dim]Node IDs:[/dim]", [nid for _, nid in created_nodes])
 
     if not auto:
         pause()
@@ -118,43 +130,55 @@ def main(
         json_output=False,
     )
 
-    console.print("[green]✓[/green] Added new document about concurrency.")
+    console.print("[green][OK][/green] Added new document about concurrency.")
 
     if not auto:
         pause()
 
-    # === Step 5: Delete + Vacuum ===
+    # === Step 5: Delete + incremental vacuum (the heart of the 0.2 demo) ===
     console.print("\n[bold yellow]Step 5: Delete + incremental vacuum[/bold yellow]")
 
-    # Get current stats to find a node to delete (we'll just delete the last added one conceptually)
-    stats_before = run_grap_cli(["stats", "--graph-dir", str(graph_path), "--segments"], json_output=True)
+    if created_nodes:
+        # Delete the last ingested document (usually "lifetimes" or similar)
+        label, node_id = created_nodes[-1]
+        console.print(f"Deleting node [cyan]{node_id}[/cyan] (\"{label}\") — this creates a tombstone...")
 
-    # For demo purposes, delete a known node (the "Lifetimes" one we added earlier)
-    # In a real interactive demo we would let the user choose.
-    # Here we simulate by deleting the "lifetimes" concept if present.
+        run_grap_cli(
+            ["delete-node", "--graph-dir", str(graph_path), str(node_id)],
+            json_output=False,
+            check=False,
+        )
 
-    # Simpler: just demonstrate the flow
-    console.print("Deleting the 'Lifetimes' concept (simulated)...")
-    # We don't know the exact ID, so we just show the concept
-    console.print(
-        "[italic]In a live session you would run:[/italic]\n"
-        "  grap-cli delete-node --graph-dir <dir> <node-id>"
-    )
+        console.print("\n[bold]Before vacuum[/bold] (note increased delete ratio):")
+        run_grap_cli(["stats", "--graph-dir", str(graph_path), "--segments"], json_output=False)
 
-    console.print("\nRunning vacuum to reclaim space...")
-    run_grap_cli(["vacuum", "--graph-dir", str(graph_path), "--show-segments"], json_output=False)
+        if not auto:
+            pause("Press Enter to run vacuum...")
+
+        console.print("\n[bold]Running incremental vacuum...[/bold]")
+        run_grap_cli(["vacuum", "--graph-dir", str(graph_path), "--show-segments"], json_output=False)
+
+        console.print("\n[bold]After vacuum[/bold] (space reclaimed, segments may have merged or shrunk):")
+        run_grap_cli(["stats", "--graph-dir", str(graph_path), "--segments"], json_output=False)
+    else:
+        console.print("[yellow]No tracked nodes to delete — skipping live delete demo.[/yellow]")
 
     if not auto:
         pause()
 
     # === Step 6: Persistence roundtrip ===
-    console.print("\n[bold yellow]Step 6: Persistence roundtrip[/bold yellow]")
-    console.print("The entire graph (including on-disk text index segments) is persisted to disk.")
-    console.print(f"You can close this process and later run any command with `--graph-dir {graph_path}`")
-    console.print("to continue exactly where you left off.")
+    console.print("\n[bold yellow]Step 6: Persistence & closing thoughts[/bold yellow]")
+    console.print(
+        "Everything you just did (including on-disk segments, tombstones, and vacuum state) "
+        "was durably written to disk using `save_to_dir`."
+    )
+    console.print(f"\nYou can now exit and later continue with:\n  python -m demo.python.interactive_demo --graph-dir {graph_path}")
 
     console.print("\n[bold green]Demo complete![/bold green]")
-    console.print("You have seen ingestion, querying, live modification, vacuum, and persistence.")
+    console.print(
+        "You have experienced: document ingestion → rich observability → hybrid search → "
+        "live modification → delete + real incremental vacuum → persistence."
+    )
 
 
 if __name__ == "__main__":
