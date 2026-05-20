@@ -32,12 +32,18 @@ pub mod blob_store;
 pub mod properties;
 pub mod graph;
 pub mod query;
+pub mod index; // Full-text BM25 index (Phase 2)
 
-// Re-exports for ergonomic use (will grow with features)
+// Re-exports for ergonomic use
 pub use ids::{EdgeId, NodeId, PropertyTag};
 pub use properties::{PropertyFilter, PropertyRegistry, PropertyValue};
 pub use graph::KnowledgeGraph;
 pub use query::{GraphQuery, QueryBuilder, QueryResult};
+
+// Index types (always available – makes the engine truly useful)
+pub use index::{
+    DefaultTokenizer, IndexedKnowledgeGraph, InvertedIndex, TextSearchResult, Tokenizer,
+};
 
 // Feature-gated modules (stubs for now)
 #[cfg(feature = "fulltext")]
