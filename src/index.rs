@@ -991,25 +991,59 @@ impl IndexedKnowledgeGraph {
     }
 
     pub fn load_from_dir(dir: &std::path::Path) -> Result<Self, GraphError> {
-        // For the 0.2 spike we keep the graph load simple. The important new
-        // capability is that save_to_dir now correctly persists on-disk text indexes.
-        // Full bidirectional round-trip (including auto-detecting OnDiskTextIndex)
-        // will be polished right after the compaction work.
-        let graph = KnowledgeGraph::new(); // placeholder – real load can be wired in the next micro-step
-        let text_index: Box<dyn TextIndex> = Box::new(InvertedIndex::new());
+        // Load the graph topology + blobs (use the established portable loader)
+        let graph = KnowledgeGraph::load_from_disk(&dir.join("graph"))?;
 
-        // Note: in a real load we would read the graph blobs/topo from dir.join("graph")
-        // and decide the text backend by inspecting dir.join("text_index/manifest.json").
-        let _ = dir; // silence unused for the placeholder
+        // Decide on the text index backend by inspecting the directory
+        let text_dir = dir.join("text_index");
+        let text_index: Box<dyn TextIndex> = if text_dir.join("manifest.json").exists() {
+            #[cfg(feature = "on-disk-index")]
+            {
+                match crate::on_disk_text_index::OnDiskTextIndex::load_from_dir(&text_dir) {
+                    Ok(idx) => idx,
+                    Err(_) => Box::new(InvertedIndex::new()),
+                }
+            }
+            #[cfg(not(feature = "on-disk-index"))]
+            {
+                Box::new(InvertedIndex::new())
+            }
+        } else {
+            Box::new(InvertedIndex::new())
+        };
+
         Ok(Self { graph, text_index })
     }
 
+    #[cfg(feature = "mmap")]
     pub fn load_mmap(dir: &std::path::Path) -> Result<Self, GraphError> {
-        // Same placeholder strategy as load_from_dir for the spike.
-        let graph = KnowledgeGraph::new();
-        let text_index: Box<dyn TextIndex> = Box::new(InvertedIndex::new());
-        let _ = dir;
+        // When the mmap feature is enabled, use the real mmap loader for the graph part.
+        let graph = crate::load_mmap(&dir.join("graph"))?;
+
+        let text_dir = dir.join("text_index");
+        let text_index: Box<dyn TextIndex> = if text_dir.join("manifest.json").exists() {
+            #[cfg(feature = "on-disk-index")]
+            {
+                match crate::on_disk_text_index::OnDiskTextIndex::load_from_dir(&text_dir) {
+                    Ok(idx) => idx,
+                    Err(_) => Box::new(InvertedIndex::new()),
+                }
+            }
+            #[cfg(not(feature = "on-disk-index"))]
+            {
+                Box::new(InvertedIndex::new())
+            }
+        } else {
+            Box::new(InvertedIndex::new())
+        };
+
         Ok(Self { graph, text_index })
+    }
+
+    #[cfg(not(feature = "mmap"))]
+    pub fn load_mmap(dir: &std::path::Path) -> Result<Self, GraphError> {
+        // Fallback: when mmap feature is not compiled in, behave like load_from_dir.
+        Self::load_from_dir(dir)
     }
 
     /// Returns segment-level information from the text index (doc counts, live counts, sizes, tiers).

@@ -514,10 +514,10 @@ impl ShardRouter {
         let shards_dir = dir.join("shards");
         for i in 0..shard_count {
             let shard_dir = shards_dir.join(format!("{:04}", i));
-            // For now we assume all shards were on-disk when saved.
-            // A more complete loader would inspect which backend was used.
-            let mut ig = crate::index::IndexedKnowledgeGraph::load_from_dir(&shard_dir)?;
-            // If we want on-disk, the caller should replace the text_index after loading.
+            // IndexedKnowledgeGraph::load_from_dir now auto-detects whether the
+            // text_index/ subdir contains an on-disk manifest and loads the
+            // correct backend (OnDiskTextIndex or InvertedIndex).
+            let ig = crate::index::IndexedKnowledgeGraph::load_from_dir(&shard_dir)?;
             router.shards[i as usize].graph = ig;
         }
 
