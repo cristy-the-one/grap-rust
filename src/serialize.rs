@@ -200,10 +200,11 @@ impl KnowledgeGraph {
 
         // 3. Write topology (bincode)
         let topo_path = dir.join("graph.topo");
+        let property_names = self.properties.property_names().to_vec();
         let topo_data = bincode::serialize(&(
             serializable_nodes,
             serializable_edges,
-            &self.properties.tag_to_name, // simple for now
+            property_names,
         ))
         .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
         fs::write(&topo_path, &topo_data)?;
@@ -264,21 +265,117 @@ impl KnowledgeGraph {
             chunks.push(blob_data[start as usize..end].to_vec());
         }
 
-        // TODO: reconstruct full KnowledgeGraph from topology + blobs
-        // This is a large piece — will be completed in subsequent steps.
+        // Read topology
+        let topo_path = dir.join("graph.topo");
+        let topo_data = fs::read(topo_path)?;
+        let (serializable_nodes, serializable_edges, property_names): (
+            Vec<SerializableNode>,
+            Vec<SerializableEdge>,
+            Vec<String>,
+        ) = bincode::deserialize(&topo_data)
+            .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
 
-        let mut graph = KnowledgeGraph::new();
-        // For now we just return an empty graph with correct blob data reconstructed
-        // Full reconstruction will be done next.
-        graph.blobs.chunks = chunks;
+        // Rebuild PropertyRegistry first
+        let mut properties = crate::properties::PropertyRegistry::new();
+        for name in property_names {
+            properties.register(&name);
+        }
+
+        // Rebuild nodes
+        let mut rebuilt_nodes = Vec::with_capacity(serializable_nodes.len());
+        for sn in serializable_nodes {
+            let (chunk_idx, local_offset) =
+                find_chunk_for_offset(&meta.chunk_boundaries, sn.blob_global_offset);
+
+            let blob = BlobRef {
+                chunk_idx,
+                offset: local_offset,
+                length: sn.blob_length,
+                uncompressed_len: sn.blob_uncompressed_len,
+            };
+
+            rebuilt_nodes.push(crate::graph::Node {
+                blob,
+                outgoing: sn.outgoing.into_iter().map(EdgeId).collect(),
+                incoming: sn.incoming.into_iter().map(EdgeId).collect(),
+                label: sn.label,
+                outgoing_property_mask: sn.outgoing_property_mask,
+            });
+        }
+
+        // Rebuild edges
+        let mut rebuilt_edges = Vec::with_capacity(serializable_edges.len());
+        for se in serializable_edges {
+            let props: Vec<(PropertyTag, PropertyValue)> = se
+                .properties
+                .into_iter()
+                .map(|(tag, val)| (PropertyTag(tag), SerializablePropertyValue::into(val)))
+                .collect();
+
+            rebuilt_edges.push(crate::graph::Edge {
+                source: NodeId(se.source),
+                target: NodeId(se.target),
+                strength: se.strength,
+                properties: props,
+                property_mask: se.property_mask,
+            });
+        }
+
+        let graph = KnowledgeGraph::from_parts(
+            rebuilt_nodes,
+            rebuilt_edges,
+            crate::blob_store::BlobStore { chunks },
+            properties,
+        );
 
         Ok(graph)
     }
 }
+
+/// Helper: given global offset and chunk boundaries, return (chunk_idx, local_offset)
+fn find_chunk_for_offset(boundaries: &[u64], global_offset: u64) -> (u32, u32) {
+    for (i, &start) in boundaries.iter().enumerate() {
+        let end = if i + 1 < boundaries.len() {
+            boundaries[i + 1]
+        } else {
+            u64::MAX
+        };
+        if global_offset >= start && global_offset < end {
+            return (i as u32, (global_offset - start) as u32);
+        }
+    }
+    (0, 0)
+}
+
 
 #[cfg(feature = "mmap")]
 pub fn load_with_mmap(dir: &Path) -> io::Result<KnowledgeGraph> {
     // Placeholder for mmap-based fast load path.
     // Will use memmap2 to memory-map graph.blobs and reconstruct BlobRefs.
     KnowledgeGraph::load_from_disk(dir)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::tempdir;
+
+    #[test]
+    fn basic_save_load_roundtrip() {
+        let mut g = KnowledgeGraph::new();
+        let p = g.properties.register("topic");
+
+        let n1 = g.add_node("Hello world from grap serialization test.", Some("first"));
+        g.add_node("Second document about graphs and persistence.", Some("second"));
+
+        // We don't have edges in this minimal test yet
+
+        let dir = tempdir().unwrap();
+        g.save_to_disk(dir.path()).expect("save should succeed");
+
+        let loaded = KnowledgeGraph::load_from_disk(dir.path()).expect("load should succeed");
+
+        assert_eq!(loaded.node_count(), 2);
+        assert!(loaded.read_blob(n1).contains("grap serialization"));
+    }
 }

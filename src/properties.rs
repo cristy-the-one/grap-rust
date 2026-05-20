@@ -68,4 +68,9 @@ impl PropertyRegistry {
         }
         mask
     }
+
+    /// Internal: get the ordered list of property names for serialization.
+    pub(crate) fn property_names(&self) -> &[String] {
+        &self.tag_to_name
+    }
 }

@@ -555,6 +555,16 @@ impl IndexedKnowledgeGraph {
     pub fn index_stats(&self) -> IndexStats {
         self.text_index.stats()
     }
+
+    /// Perform a plain text search (no graph traversal) and return the scored nodes.
+    pub fn search(&self, query: &str, max_results: usize) -> Vec<TextSearchResult> {
+        self.text_index.search(query, max_results)
+    }
+
+    /// Perform a phrase search (no graph traversal).
+    pub fn phrase_search(&self, phrase: &str, max_gap: u32, max_results: usize) -> Vec<TextSearchResult> {
+        self.text_index.phrase_search(phrase, max_gap, max_results)
+    }
 }
 
 impl Default for IndexedKnowledgeGraph {

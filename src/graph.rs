@@ -129,3 +129,20 @@ impl Default for KnowledgeGraph {
         Self::new()
     }
 }
+
+/// Internal constructor used by the serialization layer.
+impl KnowledgeGraph {
+    pub(crate) fn from_parts(
+        nodes: Vec<Node>,
+        edges: Vec<Edge>,
+        blobs: BlobStore,
+        properties: PropertyRegistry,
+    ) -> Self {
+        Self {
+            nodes,
+            edges,
+            blobs,
+            properties,
+        }
+    }
+}
