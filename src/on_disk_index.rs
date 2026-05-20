@@ -362,14 +362,14 @@ impl SegmentBuilder {
         self.doc_lengths.push(terms.len() as u32);
         for (i, t) in terms.iter().enumerate() {
             let p = positions.get(i).cloned().unwrap_or_default();
-            self.postings
-                .entry(t.to_string())
-                .or_default()
-                .push(Posting {
-                    doc_id,
-                    term_freq: 1,
-                    positions: p,
-                });
+            let entries = self.postings.entry(t.to_string()).or_default();
+            // Merge into the existing posting for this doc_id if present; otherwise push new
+            if let Some(existing) = entries.iter_mut().find(|x| x.doc_id == doc_id) {
+                existing.term_freq += 1;
+                existing.positions.extend_from_slice(&p);
+            } else {
+                entries.push(Posting { doc_id, term_freq: 1, positions: p });
+            }
         }
         doc_id
     }
@@ -1326,6 +1326,21 @@ mod tests {
         let ids: Vec<u32> = results.iter().map(|(id, _)| *id).collect();
         assert!(!ids.contains(&id0), "id0 should be deleted");
         assert!(ids.contains(&id1), "id1 should still appear");
+    }
+
+    #[test]
+    fn term_freq_reflects_actual_frequency() {
+        let mut idx = OnDiskIndex::new();
+        // "rust" appears 3 times in doc0, once in doc1
+        let id0 = idx.add_document(
+            &["rust", "rust", "rust", "programming"],
+            &[vec![0], vec![1], vec![2], vec![3]],
+        );
+        let id1 = idx.add_document(&["rust", "programming"], &[vec![0], vec![1]]);
+        let results = idx.search(&["rust"]);
+        let score0 = results.iter().find(|(id, _)| *id == id0).map(|(_, s)| *s).unwrap_or(0.0);
+        let score1 = results.iter().find(|(id, _)| *id == id1).map(|(_, s)| *s).unwrap_or(0.0);
+        assert!(score0 > score1, "doc with 3x 'rust' (score={}) should score higher than 1x 'rust' (score={})", score0, score1);
     }
 
     #[test]

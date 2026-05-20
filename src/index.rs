@@ -82,10 +82,13 @@ impl Tokenizer for DefaultTokenizer {
             }
         }
 
-        // Handle last token
+        // Handle last token (same rules as the main loop, including stop-word check)
         if let Some(s) = start {
             let word = &text[s..];
-            if word.len() >= 2 && !word.chars().all(|c| c.is_numeric()) {
+            if word.len() >= 2
+                && !word.chars().all(|c| c.is_numeric())
+                && !self.stop_words.contains(word.to_lowercase().as_str())
+            {
                 tokens.push((word, s as u32));
             }
         }
@@ -1217,6 +1220,19 @@ mod tests {
         let phrase_results = idx.phrase_search("quick brown fox", 10, 5);
         assert!(!phrase_results.is_empty());
         assert_eq!(phrase_results[0].node_id, NodeId(0));
+    }
+
+    #[test]
+    fn stopword_check_is_case_insensitive() {
+        let tok = DefaultTokenizer::new();
+        // Stop word at end of string (no trailing whitespace) — last-token path
+        let tokens = tok.tokenize("quick fox THE");
+        let words: Vec<&str> = tokens.iter().map(|(w, _)| *w).collect();
+        assert!(!words.contains(&"THE"), "'THE' at end of string should be filtered as a stop word");
+        // Stop word mid-string — main loop path
+        let tokens2 = tok.tokenize("THE quick brown fox");
+        let words2: Vec<&str> = tokens2.iter().map(|(w, _)| *w).collect();
+        assert!(!words2.contains(&"THE"), "'THE' mid-string should be filtered as a stop word");
     }
 
     #[test]
