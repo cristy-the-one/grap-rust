@@ -297,6 +297,15 @@ pub trait TextIndex: Send + Sync {
 
     /// Trigger a lighter compaction (no-op for memory backend).
     fn compact(&mut self) {}
+
+    // Segment migration & content-aware rebalancing support (0.2)
+    fn take_sealed_segment(&mut self, _index: usize) -> Option<(crate::on_disk_index::OnDiskSegment, u32)> {
+        None
+    }
+    fn add_sealed_segment(&mut self, _seg: crate::on_disk_index::OnDiskSegment, _tier: u32) {}
+    fn sample_representative_for_segment(&self, _seg_idx: usize) -> Option<String> {
+        None
+    }
 }
 
 impl TextIndex for InvertedIndex {

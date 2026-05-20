@@ -150,6 +150,32 @@ impl TextIndex for OnDiskTextIndex {
         self.engine.sealed_segment_info()
     }
 
+    pub fn remove_sealed_segment(&mut self, index: usize) -> Option<(crate::on_disk_index::OnDiskSegment, u32)> {
+        self.engine.remove_sealed_segment(index)
+    }
+
+    pub fn add_sealed_segment(&mut self, seg: crate::on_disk_index::OnDiskSegment, tier: u32) {
+        self.engine.add_sealed_segment(seg, tier);
+        self.node_to_local.clear();
+        self.next_local_id = 0;
+    }
+
+    // Trait overrides for rebalancer
+    fn take_sealed_segment(&mut self, index: usize) -> Option<(crate::on_disk_index::OnDiskSegment, u32)> {
+        self.engine.remove_sealed_segment(index)
+    }
+    fn add_sealed_segment(&mut self, seg: crate::on_disk_index::OnDiskSegment, tier: u32) {
+        self.engine.add_sealed_segment(seg, tier);
+        self.node_to_local.clear();
+        self.next_local_id = 0;
+    }
+    fn sample_representative_for_segment(&self, seg_idx: usize) -> Option<String> {
+        let infos = self.engine.sealed_segment_info();
+        if seg_idx >= infos.len() { return None; }
+        let info = &infos[seg_idx];
+        Some(format!("seg-sample-tier{}-docs{}", info.tier, info.doc_count))
+    }
+
     // === Persistence (delegated to the inner OnDiskIndex) ===
 
     pub fn save_to_dir(&mut self, dir: &std::path::Path) -> Result<(), crate::GraphError> {

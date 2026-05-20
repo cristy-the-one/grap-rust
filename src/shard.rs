@@ -514,7 +514,6 @@ impl ShardRouter {
         // Similar to load_from_dir but use mmap for the graph parts where possible.
         Self::load_from_dir(dir) // fallback for now
     }
-}
 
     /// Add an edge between two nodes (possibly across shards).
     ///
@@ -750,8 +749,6 @@ impl ShardRouter {
             for i in 0..shard.graph.graph.node_count() {
                 let local_id = NodeId(i as u32);
 
-                // Skip logically deleted nodes (tombstones). They should not be migrated
-                // and any ghost edges pointing to them will be cleaned during/after rebalance.
                 if shard.graph.text_index.is_document_deleted(local_id) {
                     continue;
                 }
@@ -771,21 +768,21 @@ impl ShardRouter {
             }
         }
 
-        // === Segment-aware recommendations (first cut) ===
+        // === Segment-aware recommendations ===
         let mut segment_migrations = Vec::new();
 
         for (old_idx, shard) in self.shards.iter().enumerate() {
-            let seg_infos = shard.graph.text_index_segment_info(); // from OnDiskTextIndex
+            let seg_infos = shard.graph.text_index_segment_info();
 
             for (seg_idx, info) in seg_infos.iter().enumerate() {
-                // Improved heuristic for segment target:
-                // Include tier and approximate size. This makes the decision more
-                // stable and gives larger/colder segments slightly different
-                // migration characteristics than tiny hot ones.
-                let seg_key = format!(
-                    "shard-{}-seg-{}-tier-{}-docs-{}",
-                    old_idx, seg_idx, info.tier, info.doc_count
-                );
+                let sample = shard.graph.text_index.sample_representative_for_segment(seg_idx);
+                let seg_key = match &sample {
+                    Some(s) if !s.is_empty() => format!("content-{}-seg-{}", s, seg_idx),
+                    _ => format!(
+                        "shard-{}-seg-{}-tier-{}-docs-{}",
+                        old_idx, seg_idx, info.tier, info.doc_count
+                    ),
+                };
                 let target = new_ring.locate(seg_key.as_bytes());
 
                 if target.0 != old_idx as u16 {
@@ -818,10 +815,19 @@ impl ShardRouter {
                 segments_suggested
             );
 
-            // Make segment migrations actually do useful work:
-            // For each recommended segment move, trigger compaction/vacuum on the
-            // source shard's text index. This is especially valuable for on-disk
-            // indexes (prepares the segment for cheaper future bulk move + reclaims space).
+            // Real bulk segment moves (reverse order keeps indices valid)
+            for mig in plan.segment_migrations.iter().rev() {
+                let src = mig.source_shard.0 as usize;
+                let tgt = mig.target_shard.0 as usize;
+                if src < self.shards.len() && tgt < self.shards.len() {
+                    if let Some((seg, tier)) =
+                        self.shards[src].graph.text_index.take_sealed_segment(mig.segment_index)
+                    {
+                        self.shards[tgt].graph.text_index.add_sealed_segment(seg, tier);
+                    }
+                }
+            }
+
             for seg in &plan.segment_migrations {
                 let src_idx = seg.source_shard.0 as usize;
                 if src_idx < self.shards.len() {
@@ -846,13 +852,10 @@ impl ShardRouter {
                 )));
             }
 
-            // Safety check: skip if the node became deleted since the plan was created
-            // (e.g. remove_node was called between plan and execute).
             if self.shards[old_idx].graph.text_index.is_document_deleted(gid.local) {
                 continue;
             }
 
-            // 1. Extract data before removal
             let text = self.shards[old_idx].graph.read_blob(gid.local).to_string();
             let label = self.shards[old_idx]
                 .graph
@@ -860,10 +863,8 @@ impl ShardRouter {
                 .node_label(gid.local)
                 .map(|s| s.to_string());
 
-            // 2. Remove from old shard (including ghost edge cleanup)
             self.shards[old_idx].remove_local_node(gid.local);
 
-            // 3. Add to new shard
             let new_local = self.shards[target_shard_id.0 as usize]
                 .graph
                 .add_node(&text, label.as_deref());
@@ -873,8 +874,7 @@ impl ShardRouter {
                 local: new_local,
             };
 
-            // 4. Clean ghost edges pointing to deleted nodes (tombstone cleanup during rebalance)
-            // and update any ghost edges that pointed to the node we just moved.
+            // Ghost cleanup (tombstone + rewrite)
             let n = self.shards.len();
             for i in 0..n {
                 let mut ghosts_map = std::mem::take(&mut self.shards[i].ghost_edges);
@@ -889,7 +889,6 @@ impl ShardRouter {
                 self.shards[i].ghost_edges = ghosts_map;
             }
 
-            // Update ghost edges that referenced the old location of the moved node
             for shard in &mut self.shards {
                 for ghosts in shard.ghost_edges.values_mut() {
                     for ghost in ghosts.iter_mut() {
@@ -1253,4 +1252,3 @@ impl Drop for MaintenanceHandle {
             remote_cache_per_shard,
         }
     }
-}
