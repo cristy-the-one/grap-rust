@@ -2,14 +2,24 @@
 name = "grap"
 version = "0.1.0"
 edition = "2021"
-rust-version = "1.80"
-authors = ["Grok + User"]
-description = "Rust-native knowledge graph engine for interconnected text documents with property-weighted, bitmask-filtered edges. Hot topology + cold blob store + BM25 seed index."
+rust-version = "1.81"
+authors = ["The grap Contributors"]
+description = "A fast, read-optimized Rust knowledge graph engine with property bitmask pruning, BM25 full-text search, sharding with ghost edges, and atomic persistence."
 license = "MIT OR Apache-2.0"
-repository = "https://github.com/yourname/grap-rust"  # placeholder
+repository = "https://github.com/yourname/grap-rust"
+documentation = "https://docs.rs/grap"
 readme = "README.md"
 keywords = ["graph", "knowledge-graph", "search", "retrieval", "bm25"]
 categories = ["database-implementations", "text-processing"]
+exclude = [
+    "core_graph_design.md",
+    "docs/",
+    "target/",
+    ".devcontainer/",
+    ".github/",
+    "benches/",
+    "examples/",
+]
 
 [lib]
 name = "grap"
