@@ -158,7 +158,7 @@ impl IndexedKnowledgeGraph {
         max_results: usize,
         text_weight: f64,
         graph_weight: f64,
-    ) -> PyResult<Vec<(u32, f64)>> {
+    ) -> PyResult<Vec<QueryResult>> {
         // Note: Property filtering via string names is simplified here.
         // A better version would resolve property names to tags.
         // For the MVP we pass empty required properties to keep things simple.
@@ -183,7 +183,15 @@ impl IndexedKnowledgeGraph {
 
         Ok(results
             .into_iter()
-            .map(|r| (r.graph_result.node_id.0, r.fused_score))
+            .map(|r| QueryResult {
+                node: r.graph_result.node_id.0,
+                text_score: r.text_score,
+                vector_score: 0.0,
+                graph_strength: r.graph_strength,
+                fused_score: r.fused_score,
+                depth: r.graph_result.depth,
+                text: r.text.to_string(),
+            })
             .collect())
     }
 

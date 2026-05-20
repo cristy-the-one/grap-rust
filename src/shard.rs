@@ -376,10 +376,21 @@ impl ShardRouter {
         text: &str,
         label: Option<&str>,
     ) -> Result<GlobalNodeId, crate::GraphError> {
+        self.add_node_with_embedding(text, label, None)
+    }
+
+    /// Add a node (with optional embedding) to the appropriate shard
+    /// (chosen via consistent hashing) and return its [`GlobalNodeId`].
+    pub fn add_node_with_embedding(
+        &mut self,
+        text: &str,
+        label: Option<&str>,
+        embedding: Option<&[f32]>,
+    ) -> Result<GlobalNodeId, crate::GraphError> {
         let shard_id = self.shard_for_new_node(text);
         let shard = &mut self.shards[shard_id.0 as usize];
 
-        let local_id = shard.graph.add_node(text, label, None);
+        let local_id = shard.graph.add_node(text, label, embedding);
         Ok(GlobalNodeId {
             shard: shard_id,
             local: local_id,
@@ -1130,6 +1141,17 @@ impl ShardedGraph {
         label: Option<&str>,
     ) -> Result<GlobalNodeId, crate::GraphError> {
         self.router.add_node(text, label)
+    }
+
+    /// Adds a new node (with optional embedding) with the given text and label,
+    /// routing it to the appropriate shard using consistent hashing.
+    pub fn add_node_with_embedding(
+        &mut self,
+        text: &str,
+        label: Option<&str>,
+        embedding: Option<&[f32]>,
+    ) -> Result<GlobalNodeId, crate::GraphError> {
+        self.router.add_node_with_embedding(text, label, embedding)
     }
 
     /// Adds a directed edge between two globally-addressed nodes with the given strength and properties.

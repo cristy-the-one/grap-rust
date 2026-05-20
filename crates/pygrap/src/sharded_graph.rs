@@ -7,7 +7,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyType};
 
 use crate::errors::to_py_err;
-use grap::{FusionWeights, GlobalNodeId, NodeId, ShardId, ShardedGraph as InnerShardedGraph};
+use grap::{FusionWeights, GlobalNodeId, HybridWeights, NodeId, ShardId, ShardedGraph as InnerShardedGraph};
 
 /// Represents a sharded knowledge graph.
 ///
@@ -65,8 +65,17 @@ impl ShardedGraph {
     }
 
     /// Add a node. Returns the global node ID as a tuple `(shard_id, local_id)`.
-    fn add_node(&mut self, text: &str, label: Option<&str>) -> PyResult<(u16, u32)> {
-        let gid = self.inner.add_node(text, label).map_err(to_py_err)?;
+    ///
+    /// Optionally accepts an embedding (list of floats) for hybrid vector search.
+    #[pyo3(signature = (text, label=None, embedding=None))]
+    fn add_node(
+        &mut self,
+        text: &str,
+        label: Option<&str>,
+        embedding: Option<Vec<f32>>,
+    ) -> PyResult<(u16, u32)> {
+        let emb_ref: Option<&[f32]> = embedding.as_deref();
+        let gid = self.inner.add_node_with_embedding(text, label, emb_ref).map_err(to_py_err)?;
         Ok((gid.shard.0, gid.local.0))
     }
 
@@ -142,6 +151,67 @@ impl ShardedGraph {
             .map(|r| ShardedQueryResult {
                 node: (r.node.shard.0, r.node.local.0),
                 text_score: r.text_score,
+                vector_score: r.vector_score,
+                graph_strength: r.graph_strength,
+                fused_score: r.fused_score,
+                depth: r.depth,
+                text: r.text.clone(),
+            })
+            .collect())
+    }
+
+    /// Hybrid text + vector + graph search across the sharded cluster.
+    #[pyo3(signature = (
+        query,
+        vector = None,
+        max_seeds = 10,
+        required_properties = vec![],
+        min_strength = 0.3,
+        max_depth = 4,
+        max_results = 50,
+        text_weight = 0.4,
+        vector_weight = 0.4,
+        graph_weight = 0.2,
+    ))]
+    fn search_and_traverse_hybrid(
+        &self,
+        query: &str,
+        vector: Option<Vec<f32>>,
+        max_seeds: usize,
+        required_properties: Vec<String>,
+        min_strength: f64,
+        max_depth: u32,
+        max_results: usize,
+        text_weight: f64,
+        vector_weight: f64,
+        graph_weight: f64,
+    ) -> PyResult<Vec<ShardedQueryResult>> {
+        let weights = HybridWeights {
+            text: text_weight,
+            vector: vector_weight,
+            graph: graph_weight,
+        };
+
+        let prop_refs: Vec<&str> = required_properties.iter().map(|s| s.as_str()).collect();
+        let vec_ref: Option<&[f32]> = vector.as_deref();
+
+        let results = self.inner.search_and_traverse_hybrid(
+            query,
+            vec_ref,
+            max_seeds,
+            &prop_refs,
+            min_strength,
+            max_depth,
+            max_results,
+            weights,
+        );
+
+        Ok(results
+            .into_iter()
+            .map(|r| ShardedQueryResult {
+                node: (r.node.shard.0, r.node.local.0),
+                text_score: r.text_score,
+                vector_score: r.vector_score,
                 graph_strength: r.graph_strength,
                 fused_score: r.fused_score,
                 depth: r.depth,
@@ -254,7 +324,7 @@ impl RebalancePlanPy {
     }
 }
 
-/// Rich result from `ShardedGraph.search_and_traverse`.
+/// Rich result from `ShardedGraph.search_and_traverse` and hybrid variants.
 #[pyclass]
 #[derive(Clone)]
 pub struct ShardedQueryResult {
@@ -263,6 +333,8 @@ pub struct ShardedQueryResult {
     pub node: (u16, u32),
     #[pyo3(get)]
     pub text_score: f64,
+    #[pyo3(get)]
+    pub vector_score: f64,
     #[pyo3(get)]
     pub graph_strength: f64,
     #[pyo3(get)]
@@ -277,8 +349,8 @@ pub struct ShardedQueryResult {
 impl ShardedQueryResult {
     fn __repr__(&self) -> String {
         format!(
-            "ShardedQueryResult(node=({}, {}), fused={:.3}, depth={})",
-            self.node.0, self.node.1, self.fused_score, self.depth
+            "ShardedQueryResult(node=({}, {}), fused={:.3}, vec={:.2}, depth={})",
+            self.node.0, self.node.1, self.fused_score, self.vector_score, self.depth
         )
     }
 }
