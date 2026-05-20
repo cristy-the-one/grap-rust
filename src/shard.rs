@@ -64,8 +64,9 @@ pub(crate) enum ShardedPathHop {
 
 /// The result of calling [`ShardRouter::plan_rebalance`].
 ///
-/// Describes which nodes would need to move if the cluster changed size.
-/// The plan is safe to execute later via [`ShardedGraph::execute_rebalance`].
+/// Contains both traditional per-node migrations and (new) segment-level
+/// recommendations for more efficient rebalancing when using the on-disk
+/// inverted index.
 #[derive(Debug, Clone)]
 pub struct RebalancePlan {
     /// Number of shards the cluster currently has.
@@ -74,6 +75,28 @@ pub struct RebalancePlan {
     pub new_shard_count: u16,
     /// List of nodes that must migrate, together with their new target shard.
     pub node_migrations: Vec<(GlobalNodeId, ShardId)>,
+
+    /// Segment-level migration recommendations (new in segment-aware rebalancing).
+    ///
+    /// When a whole `OnDiskSegment` would benefit from moving to another shard
+    /// (cheaper I/O, better locality), it is listed here. Executors of the plan
+    /// can use this information to perform bulk segment moves instead of many
+    /// individual node migrations.
+    pub segment_migrations: Vec<SegmentMigration>,
+}
+
+/// Describes a recommendation to move an entire on-disk segment during rebalancing.
+#[derive(Debug, Clone)]
+pub struct SegmentMigration {
+    /// The shard the segment currently lives on.
+    pub source_shard: ShardId,
+    /// Index of the segment within the source shard's list of sealed segments
+    /// (as returned by `segment_distribution()` / `sealed_segment_info()`).
+    pub segment_index: usize,
+    /// The recommended target shard for this segment.
+    pub target_shard: ShardId,
+    /// Approximate number of documents in the segment.
+    pub doc_count: u32,
 }
 
 /// Aggregate statistics for a [`ShardedGraph`].
@@ -748,16 +771,51 @@ impl ShardRouter {
             }
         }
 
+        // === Segment-aware recommendations (first cut) ===
+        let mut segment_migrations = Vec::new();
+
+        for (old_idx, shard) in self.shards.iter().enumerate() {
+            let seg_infos = shard.graph.text_index_segment_info(); // from OnDiskTextIndex
+
+            for (seg_idx, info) in seg_infos.iter().enumerate() {
+                // Heuristic: compute a stable key for the segment.
+                // Later we can make this smarter by sampling actual document text
+                // from the segment or using segment-level metadata.
+                let seg_key = format!("seg-{}-{}", old_idx, seg_idx);
+                let target = new_ring.locate(seg_key.as_bytes());
+
+                if target.0 != old_idx as u16 {
+                    segment_migrations.push(SegmentMigration {
+                        source_shard: ShardId(old_idx as u16),
+                        segment_index: seg_idx,
+                        target_shard: target,
+                        doc_count: info.doc_count,
+                    });
+                }
+            }
+        }
+
         RebalancePlan {
             old_shard_count: self.shards.len() as u16,
             new_shard_count,
             node_migrations: migrations,
+            segment_migrations,
         }
     }
 
     /// Apply a rebalance plan, moving nodes between shards and repairing ghost edges.
     pub fn execute_rebalance(&mut self, plan: RebalancePlan) -> Result<(), crate::GraphError> {
         let nodes_moved = plan.node_migrations.len() as u64;
+        let segments_suggested = plan.segment_migrations.len();
+
+        if segments_suggested > 0 {
+            log::info!(
+                "Rebalance plan contains {} segment migration recommendations (segment-aware rebalancing)",
+                segments_suggested
+            );
+            // TODO (next step): implement actual bulk segment move logic
+            // instead of (or in addition to) per-node migrations.
+        }
 
         for (gid, target_shard_id) in plan.node_migrations {
             let old_idx = gid.shard.0 as usize;
