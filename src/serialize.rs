@@ -136,14 +136,14 @@ impl KnowledgeGraph {
         let mut checksums = Vec::new();
         {
             let mut writer = BufWriter::new(File::create(&blob_path)?);
-            for chunk in &self.blobs.chunks {
+            for chunk in self.blobs.chunks() {
                 writer.write_all(chunk)?;
                 checksums.push(crc32(chunk));
             }
             writer.flush()?;
         }
 
-        let total_blob_bytes: u64 = self.blobs.chunks.iter().map(|c| c.len() as u64).sum();
+        let total_blob_bytes: u64 = self.blobs.chunks().iter().map(|c| c.len() as u64).sum();
 
         // 2. Build serializable structures
         let serializable_nodes: Vec<SerializableNode> = self
@@ -218,9 +218,9 @@ impl KnowledgeGraph {
     }
 
     fn compute_chunk_offsets(&self) -> Vec<u64> {
-        let mut offsets = Vec::with_capacity(self.blobs.chunks.len());
+        let mut offsets = Vec::with_capacity(self.blobs.chunk_count());
         let mut running = 0u64;
-        for chunk in &self.blobs.chunks {
+        for chunk in self.blobs.chunks() {
             offsets.push(running);
             running += chunk.len() as u64;
         }
@@ -324,7 +324,7 @@ impl KnowledgeGraph {
         let graph = KnowledgeGraph::from_parts(
             rebuilt_nodes,
             rebuilt_edges,
-            crate::blob_store::BlobStore { chunks },
+            crate::blob_store::BlobStore::from_chunks(chunks),
             properties,
         );
 
@@ -349,10 +349,104 @@ fn find_chunk_for_offset(boundaries: &[u64], global_offset: u64) -> (u32, u32) {
 
 
 #[cfg(feature = "mmap")]
-pub fn load_with_mmap(dir: &Path) -> io::Result<KnowledgeGraph> {
-    // Placeholder for mmap-based fast load path.
-    // Will use memmap2 to memory-map graph.blobs and reconstruct BlobRefs.
-    KnowledgeGraph::load_from_disk(dir)
+pub fn load_mmap(dir: &Path) -> io::Result<KnowledgeGraph> {
+    use memmap2::MmapOptions;
+    use std::fs::File;
+
+    // Read meta (needed for chunk boundaries / offsets and validation)
+    let meta_str = fs::read_to_string(dir.join("graph.meta"))?;
+    let meta: GraphMeta =
+        serde_json::from_str(&meta_str).map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+
+    // Open and memory-map the blobs file
+    let blob_file = File::open(dir.join("graph.blobs"))?;
+    #[allow(unsafe_code)]
+    let mmap = unsafe { MmapOptions::new().map(&blob_file)? };
+
+    // Verify checksums against the mapped data (we can do it without extra copies)
+    for (i, &boundary) in meta.chunk_boundaries.iter().enumerate() {
+        let end = if i + 1 < meta.chunk_boundaries.len() {
+            meta.chunk_boundaries[i + 1] as usize
+        } else {
+            mmap.len()
+        };
+        let chunk_slice = &mmap[boundary as usize..end];
+        let computed = crc32(chunk_slice);
+        if computed != meta.chunk_checksums[i] {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                format!("Checksum mismatch for chunk {} during mmap load", i),
+            ));
+        }
+    }
+
+    // Build a BlobStore backed by the mmap
+    let blob_store = crate::blob_store::BlobStore::from_mmap(mmap);
+
+    // Read topology (still needs to be deserialized normally)
+    let topo_path = dir.join("graph.topo");
+    let topo_data = fs::read(topo_path)?;
+    let (serializable_nodes, serializable_edges, property_names): (
+        Vec<SerializableNode>,
+        Vec<SerializableEdge>,
+        Vec<String>,
+    ) = bincode::deserialize(&topo_data)
+        .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+
+    // Rebuild PropertyRegistry
+    let mut properties = crate::properties::PropertyRegistry::new();
+    for name in property_names {
+        properties.register(&name);
+    }
+
+    // Rebuild nodes — for mmap we store the *global offset* in the BlobRef's `offset` field
+    // and set chunk_idx = 0 (flat view). This works with the read implementation above.
+    let mut rebuilt_nodes = Vec::with_capacity(serializable_nodes.len());
+    for sn in serializable_nodes {
+        // In the mmap path we put the absolute file offset into `offset`
+        // (we reuse the global offset we calculated at save time)
+        let blob = BlobRef {
+            chunk_idx: 0, // flat mmap view
+            offset: sn.blob_global_offset as u32, // absolute offset into the mapped region
+            length: sn.blob_length,
+            uncompressed_len: sn.blob_uncompressed_len,
+        };
+
+        rebuilt_nodes.push(crate::graph::Node {
+            blob,
+            outgoing: sn.outgoing.into_iter().map(EdgeId).collect(),
+            incoming: sn.incoming.into_iter().map(EdgeId).collect(),
+            label: sn.label,
+            outgoing_property_mask: sn.outgoing_property_mask,
+        });
+    }
+
+    // Rebuild edges (same as portable path)
+    let mut rebuilt_edges = Vec::with_capacity(serializable_edges.len());
+    for se in serializable_edges {
+        let props: Vec<(PropertyTag, PropertyValue)> = se
+            .properties
+            .into_iter()
+            .map(|(tag, val)| (PropertyTag(tag), SerializablePropertyValue::into(val)))
+            .collect();
+
+        rebuilt_edges.push(crate::graph::Edge {
+            source: NodeId(se.source),
+            target: NodeId(se.target),
+            strength: se.strength,
+            properties: props,
+            property_mask: se.property_mask,
+        });
+    }
+
+    let graph = KnowledgeGraph::from_parts(
+        rebuilt_nodes,
+        rebuilt_edges,
+        blob_store,
+        properties,
+    );
+
+    Ok(graph)
 }
 
 #[cfg(test)]
