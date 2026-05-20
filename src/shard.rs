@@ -40,7 +40,7 @@ pub struct GlobalNodeId {
 /// During distributed traversal the system follows these ghost edges by
 /// fetching data from the target shard (with caching).
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub(crate) struct GhostEdge {
+pub struct GhostEdge {
     /// The local node (on this shard) that has an outgoing cross-shard reference.
     pub local_source: NodeId,
     /// The target node living on a different shard.
@@ -441,6 +441,24 @@ impl ShardRouter {
     pub fn start_background_merge_workers(&mut self, interval: std::time::Duration) {
         for shard in &mut self.shards {
             let _ = shard.graph.start_merge_worker(interval);
+        }
+    }
+
+    /// Returns a serializable snapshot of all ghost edges (used by persistence).
+    pub fn ghost_edges_snapshot(&self) -> Vec<(u16, HashMap<u32, Vec<GhostEdge>>)> {
+        self.shards
+            .iter()
+            .enumerate()
+            .map(|(i, s)| (i as u16, s.ghost_edges.clone()))
+            .collect()
+    }
+
+    /// Restores ghost edges from a previously saved snapshot (used by load).
+    pub fn restore_ghost_edges(&mut self, data: Vec<(u16, HashMap<u32, Vec<GhostEdge>>)> ) {
+        for (sid, map) in data {
+            if (sid as usize) < self.shards.len() {
+                self.shards[sid as usize].ghost_edges = map;
+            }
         }
     }
 
@@ -1055,6 +1073,16 @@ impl ShardedGraph {
     /// a chance to reclaim space from deleted nodes.
     pub fn vacuum_deleted_nodes(&mut self) {
         self.router.vacuum_deleted_nodes();
+    }
+
+    /// Returns a serializable snapshot of ghost edges (for persistence / testing).
+    pub fn ghost_edges_snapshot(&self) -> Vec<(u16, HashMap<u32, Vec<GhostEdge>>)> {
+        self.router.ghost_edges_snapshot()
+    }
+
+    /// Restores ghost edges from a snapshot (used during load).
+    pub fn restore_ghost_edges(&mut self, data: Vec<(u16, HashMap<u32, Vec<GhostEdge>>)> ) {
+        self.router.restore_ghost_edges(data);
     }
 
 

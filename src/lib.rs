@@ -62,7 +62,7 @@ pub use index::{
 };
 
 pub use shard::{
-    GlobalNodeId, RebalancePlan, ShardedGraph, ShardedQueryResult, ShardId, ShardRouter,
+    GhostEdge, GlobalNodeId, RebalancePlan, ShardedGraph, ShardedQueryResult, ShardId, ShardRouter,
 };
 
 pub use serialize::{GraphMeta, RepairReport, CURRENT_GRAPH_FORMAT_VERSION};
