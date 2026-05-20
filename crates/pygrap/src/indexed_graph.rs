@@ -7,13 +7,36 @@ use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyType};
 
 use crate::errors::to_py_err;
-use grap::{FusionWeights, IndexedKnowledgeGraph as InnerGraph};
+use grap::{FusionWeights, HybridWeights, IndexedKnowledgeGraph as InnerGraph};
 
 #[pyclass]
 pub struct IndexedKnowledgeGraph {
     inner: InnerGraph,
     /// Directory the graph is persisted to (if any).
     path: Option<PathBuf>,
+}
+
+/// Rich result returned by hybrid (and legacy) search methods from Python.
+#[pyclass(get_all)]
+#[derive(Clone)]
+pub struct QueryResult {
+    pub node: u32,
+    pub text_score: f64,
+    pub vector_score: f64,
+    pub graph_strength: f64,
+    pub fused_score: f64,
+    pub depth: u32,
+    pub text: String,
+}
+
+#[pymethods]
+impl QueryResult {
+    fn __repr__(&self) -> String {
+        format!(
+            "QueryResult(node={}, fused={:.3}, text={:.2}, vec={:.2}, graph={:.2}, depth={})",
+            self.node, self.fused_score, self.text_score, self.vector_score, self.graph_strength, self.depth
+        )
+    }
 }
 
 #[pymethods]
@@ -98,9 +121,19 @@ impl IndexedKnowledgeGraph {
         Ok(())
     }
 
-    /// Add a new node with optional label.
-    fn add_node(&mut self, text: &str, label: Option<&str>) -> PyResult<u32> {
-        let id = self.inner.add_node(text, label);
+    /// Add a new node with optional label and optional embedding (list of f32).
+    ///
+    /// When an embedding is supplied, the node can participate in hybrid
+    /// vector + text + graph search via `search_and_traverse_hybrid`.
+    #[pyo3(signature = (text, label=None, embedding=None))]
+    fn add_node(
+        &mut self,
+        text: &str,
+        label: Option<&str>,
+        embedding: Option<Vec<f32>>,
+    ) -> PyResult<u32> {
+        let emb_ref: Option<&[f32]> = embedding.as_deref();
+        let id = self.inner.add_node(text, label, emb_ref);
         Ok(id.0)
     }
 
@@ -151,6 +184,71 @@ impl IndexedKnowledgeGraph {
         Ok(results
             .into_iter()
             .map(|r| (r.graph_result.node_id.0, r.fused_score))
+            .collect())
+    }
+
+    /// Hybrid text + vector + graph search.
+    ///
+    /// `vector` is an optional list of floats (the query embedding).
+    /// When provided, cosine similarity against stored node embeddings is computed
+    /// and fused using the supplied weights.
+    #[pyo3(signature = (
+        query,
+        vector = None,
+        max_seeds = 10,
+        required_properties = vec![],
+        min_strength = 0.3,
+        max_depth = 4,
+        max_results = 50,
+        text_weight = 0.4,
+        vector_weight = 0.4,
+        graph_weight = 0.2,
+    ))]
+    fn search_and_traverse_hybrid(
+        &self,
+        query: &str,
+        vector: Option<Vec<f32>>,
+        max_seeds: usize,
+        required_properties: Vec<String>,
+        min_strength: f64,
+        max_depth: u32,
+        max_results: usize,
+        text_weight: f64,
+        vector_weight: f64,
+        graph_weight: f64,
+    ) -> PyResult<Vec<QueryResult>> {
+        let weights = HybridWeights {
+            text: text_weight,
+            vector: vector_weight,
+            graph: graph_weight,
+        };
+
+        let prop_refs: Vec<&str> = required_properties.iter().map(|s| s.as_str()).collect();
+
+        let vec_ref: Option<&[f32]> = vector.as_deref();
+
+        let results = self.inner.search_and_traverse_hybrid(
+            query,
+            vec_ref,
+            max_seeds,
+            &prop_refs,
+            min_strength,
+            max_depth,
+            max_results,
+            weights,
+        );
+
+        Ok(results
+            .into_iter()
+            .map(|r| QueryResult {
+                node: r.graph_result.node_id.0,
+                text_score: r.text_score,
+                vector_score: r.vector_score,
+                graph_strength: r.graph_strength,
+                fused_score: r.fused_score,
+                depth: r.graph_result.depth,
+                text: r.text.to_string(),
+            })
             .collect())
     }
 

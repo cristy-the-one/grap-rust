@@ -33,7 +33,7 @@ fn node_blobs_and_labels_roundtrip_after_persistence() {
             i, i * 12345, i
         );
 
-        let _ = ig.add_node(&text, label.as_deref());
+        let _ = ig.add_node(&text, label.as_deref(), None);
         expected.push((label, text));
     }
 

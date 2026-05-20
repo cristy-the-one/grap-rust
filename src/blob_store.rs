@@ -108,6 +108,57 @@ impl BlobStore {
         }
     }
 
+    /// Store a slice of f32 values (intended for embeddings).
+    /// The data is stored as raw bytes and can be read back with `read_embedding`.
+    #[allow(unsafe_code)]
+    pub fn store_embedding(&mut self, embedding: &[f32]) -> BlobRef {
+        // SAFETY: We are only reinterpreting the f32 slice as bytes for storage.
+        // The inverse operation in `read_embedding` is also carefully controlled.
+        let bytes = unsafe {
+            std::slice::from_raw_parts(
+                embedding.as_ptr() as *const u8,
+                embedding.len() * std::mem::size_of::<f32>(),
+            )
+        };
+        self.store_bytes(bytes)
+    }
+
+    /// Internal helper used by both `store` and `store_embedding`.
+    fn store_bytes(&mut self, bytes: &[u8]) -> BlobRef {
+        // Handle mmap fallback
+        #[cfg(feature = "mmap")]
+        if matches!(self.storage, Storage::Mmap(_)) {
+            self.storage = Storage::default();
+        }
+
+        let chunks = match &mut self.storage {
+            Storage::Chunks(chunks) => chunks,
+            #[cfg(feature = "mmap")]
+            Storage::Mmap(_) => unreachable!(),
+        };
+
+        let len = bytes.len();
+        let chunk_idx = {
+            let last = chunks.len() - 1;
+            if chunks[last].len() + len > CHUNK_SIZE && !chunks[last].is_empty() {
+                chunks.push(Vec::with_capacity(CHUNK_SIZE.max(len)));
+                chunks.len() - 1
+            } else {
+                last
+            }
+        };
+
+        let offset = chunks[chunk_idx].len();
+        chunks[chunk_idx].extend_from_slice(bytes);
+
+        BlobRef {
+            chunk_idx: chunk_idx as u32,
+            offset: offset as u32,
+            length: len as u32,
+            uncompressed_len: len as u32,
+        }
+    }
+
     /// Zero-copy read. Works for both in-memory and memory-mapped backends.
     #[allow(unsafe_code)]
     pub fn read(&self, r: &BlobRef) -> &str {
@@ -138,6 +189,51 @@ impl BlobStore {
     #[cfg(feature = "mmap")]
     pub fn is_mapped(&self) -> bool {
         matches!(self.storage, Storage::Mmap(_))
+    }
+
+    /// Best-effort read back of a previously stored embedding.
+    /// Returns `None` if the blob is not a valid f32 array.
+    ///
+    /// The result is always an owned `Vec<f32>` because the underlying byte storage
+    /// cannot guarantee f32 alignment for zero-copy reinterpretation.
+    pub fn read_embedding(&self, r: &BlobRef) -> Option<Vec<f32>> {
+        let bytes = self.read_bytes(r)?;
+        if bytes.len() % 4 != 0 {
+            return None;
+        }
+
+        // Safe: we validated the length. We copy into an aligned Vec<f32>.
+        let mut out = Vec::with_capacity(bytes.len() / 4);
+        // Copy in chunks of 4 bytes and transmute (portable, no alignment issues)
+        for chunk in bytes.chunks_exact(4) {
+            let val = f32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]);
+            out.push(val);
+        }
+        Some(out)
+    }
+
+    /// Internal helper to read raw bytes for a BlobRef (used by `read` and `read_embedding`).
+    fn read_bytes(&self, r: &BlobRef) -> Option<&[u8]> {
+        match &self.storage {
+            Storage::Chunks(chunks) => {
+                let chunk = &chunks[r.chunk_idx as usize];
+                let start = r.offset as usize;
+                let end = start + r.length as usize;
+                if end > chunk.len() {
+                    return None;
+                }
+                Some(&chunk[start..end])
+            }
+            #[cfg(feature = "mmap")]
+            Storage::Mmap(mmap) => {
+                let start = r.offset as usize;
+                let end = start + r.length as usize;
+                if end > mmap.len() {
+                    return None;
+                }
+                Some(&mmap[start..end])
+            }
+        }
     }
 
     /// Returns the number of chunks (only meaningful in in-memory mode).

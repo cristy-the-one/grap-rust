@@ -20,8 +20,10 @@ fn pygrap(m: &Bound<'_, PyModule>) -> PyResult<()> {
 
     // Register classes
     m.add_class::<indexed_graph::IndexedKnowledgeGraph>()?;
+    m.add_class::<indexed_graph::QueryResult>()?;
     m.add_class::<sharded_graph::ShardedGraph>()?;
     m.add_class::<sharded_graph::RebalancePlanPy>()?;
+    m.add_class::<sharded_graph::ShardedQueryResult>()?;
 
     m.add_function(wrap_pyfunction!(version, m)?)?;
     Ok(())

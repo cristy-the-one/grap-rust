@@ -90,6 +90,22 @@ impl ShardedGraph {
         Ok(())
     }
 
+    /// Remove a node (and its incident edges) across the sharded cluster.
+    /// Accepts a global node ID as tuple `(shard_id, local_id)`.
+    fn remove_node(&mut self, gid: (u16, u32)) -> PyResult<bool> {
+        let global_id = GlobalNodeId {
+            shard: ShardId(gid.0),
+            local: NodeId(gid.1),
+        };
+        let removed = self.inner.remove_node(global_id).map_err(to_py_err)?;
+        Ok(removed)
+    }
+
+    /// Aggressively clean up ghost edges that point to deleted nodes.
+    fn cleanup_ghost_edges(&mut self) {
+        self.inner.cleanup_ghost_edges();
+    }
+
     /// Hybrid search + traversal.
     /// Global node IDs in results are returned as tuples `(shard_id, local_id)`.
     #[pyo3(signature = (
@@ -108,7 +124,7 @@ impl ShardedGraph {
         min_strength: f64,
         max_depth: u32,
         max_results: usize,
-    ) -> PyResult<Vec<((u16, u32), f64)>> {
+    ) -> PyResult<Vec<ShardedQueryResult>> {
         // Convert Vec<String> to Vec<&str>
         let prop_refs: Vec<&str> = required_properties.iter().map(|s| s.as_str()).collect();
 
@@ -123,9 +139,13 @@ impl ShardedGraph {
 
         Ok(results
             .into_iter()
-            .map(|r| {
-                let gid = r.node;
-                ((gid.shard.0, gid.local.0), r.fused_score)
+            .map(|r| ShardedQueryResult {
+                node: (r.node.shard.0, r.node.local.0),
+                text_score: r.text_score,
+                graph_strength: r.graph_strength,
+                fused_score: r.fused_score,
+                depth: r.depth,
+                text: r.text.clone(),
             })
             .collect())
     }
@@ -148,6 +168,7 @@ impl ShardedGraph {
     }
 
     /// Start background maintenance (merge + vacuum + ghost cleanup) on the sharded graph.
+    #[allow(deprecated)]
     fn start_background_maintenance(&mut self, interval_ms: u64) -> bool {
         let _handle = self.inner
             .start_background_maintenance(Duration::from_millis(interval_ms));
@@ -164,6 +185,22 @@ impl ShardedGraph {
 
     fn ghost_edge_count(&self) -> usize {
         self.inner.ghost_edge_count()
+    }
+
+    /// Return basic cluster statistics as a dictionary.
+    fn stats(&self) -> PyResult<Py<PyAny>> {
+        let stats = self.inner.stats();
+        Python::with_gil(|py| {
+            let dict = pyo3::types::PyDict::new_bound(py);
+            dict.set_item("shard_count", stats.shard_count)?;
+            dict.set_item("total_nodes", stats.total_nodes)?;
+            dict.set_item("total_ghost_edges", stats.total_ghost_edges)?;
+            dict.set_item("nodes_per_shard", stats.nodes_per_shard.clone())?;
+            dict.set_item("ghost_edges_per_shard", stats.ghost_edges_per_shard.clone())?;
+            dict.set_item("remote_cache_entries", stats.remote_cache_entries)?;
+            // You can extend this later with more fields
+            Ok(dict.into())
+        })
     }
 
     fn __repr__(&self) -> String {
@@ -213,6 +250,35 @@ impl RebalancePlanPy {
         format!(
             "RebalancePlan(target_shards={}, migrations={})",
             self.target_shards, self.node_migrations
+        )
+    }
+}
+
+/// Rich result from `ShardedGraph.search_and_traverse`.
+#[pyclass]
+#[derive(Clone)]
+pub struct ShardedQueryResult {
+    /// Global node ID as (shard_id, local_id)
+    #[pyo3(get)]
+    pub node: (u16, u32),
+    #[pyo3(get)]
+    pub text_score: f64,
+    #[pyo3(get)]
+    pub graph_strength: f64,
+    #[pyo3(get)]
+    pub fused_score: f64,
+    #[pyo3(get)]
+    pub depth: u32,
+    #[pyo3(get)]
+    pub text: String,
+}
+
+#[pymethods]
+impl ShardedQueryResult {
+    fn __repr__(&self) -> String {
+        format!(
+            "ShardedQueryResult(node=({}, {}), fused={:.3}, depth={})",
+            self.node.0, self.node.1, self.fused_score, self.depth
         )
     }
 }

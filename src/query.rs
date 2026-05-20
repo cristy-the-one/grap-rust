@@ -88,7 +88,7 @@ impl KnowledgeGraph {
     ///
     /// let mut g = KnowledgeGraph::new();
     /// // In real code you would obtain a real NodeId first.
-    /// let dummy = g.add_node("example", None);
+    /// let dummy = g.add_node("example", None, None);
     /// let results = g.find()
     ///     .from_node(dummy)
     ///     .with_property("topic")

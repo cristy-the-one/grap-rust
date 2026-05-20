@@ -25,6 +25,7 @@ fn main() {
          concurrency, and performance. It achieves memory safety without \
          garbage collection through its ownership system...",
         Some("Rust Overview"),
+        None,
     );
 
     let ownership_node = g.add_node(
@@ -32,6 +33,7 @@ fn main() {
          Every value has exactly one owner, and when the owner goes \
          out of scope, the value is dropped...",
         Some("Ownership"),
+        None,
     );
 
     let borrowing_node = g.add_node(
@@ -39,6 +41,7 @@ fn main() {
          You can have multiple immutable references or exactly one mutable \
          reference at any given time...",
         Some("Borrowing"),
+        None,
     );
 
     let lifetimes_node = g.add_node(
@@ -46,6 +49,7 @@ fn main() {
          valid. The borrow checker uses lifetime annotations to verify \
          that references don't outlive the data they point to...",
         Some("Lifetimes"),
+        None,
     );
 
     let concurrency_node = g.add_node(
@@ -53,6 +57,7 @@ fn main() {
          time. Combined with types like Mutex<T> and Arc<T>, it enables \
          fearless concurrency...",
         Some("Concurrency"),
+        None,
     );
 
     println!(

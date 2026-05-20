@@ -230,6 +230,54 @@ impl Default for FusionWeights {
     }
 }
 
+/// Weights used when combining text (BM25), vector (embedding), and graph signals
+/// during hybrid retrieval.
+///
+/// All three weights are normalized at query time so that `text + vector + graph = 1.0`.
+#[derive(Debug, Clone, Copy)]
+pub struct HybridWeights {
+    /// Weight given to the text / BM25 score.
+    pub text: f64,
+    /// Weight given to the vector similarity score (e.g. cosine).
+    pub vector: f64,
+    /// Weight given to the graph path strength.
+    pub graph: f64,
+}
+
+impl Default for HybridWeights {
+    fn default() -> Self {
+        Self {
+            text: 0.4,
+            vector: 0.4,
+            graph: 0.2,
+        }
+    }
+}
+
+/// Cosine similarity between two vectors.
+/// Returns 0.0 if either vector is empty or they have different lengths.
+fn cosine_similarity(a: &[f32], b: &[f32]) -> f64 {
+    if a.len() != b.len() || a.is_empty() {
+        return 0.0;
+    }
+
+    let mut dot = 0.0;
+    let mut norm_a = 0.0;
+    let mut norm_b = 0.0;
+
+    for i in 0..a.len() {
+        dot += a[i] as f64 * b[i] as f64;
+        norm_a += a[i] as f64 * a[i] as f64;
+        norm_b += b[i] as f64 * b[i] as f64;
+    }
+
+    if norm_a == 0.0 || norm_b == 0.0 {
+        return 0.0;
+    }
+
+    dot / (norm_a.sqrt() * norm_b.sqrt())
+}
+
 /// Rich result type returned by [`IndexedKnowledgeGraph::search_and_traverse`]
 /// and [`IndexedKnowledgeGraph::phrase_search_and_traverse`].
 ///
@@ -239,9 +287,11 @@ impl Default for FusionWeights {
 pub struct CombinedResult<'a> {
     /// Original score from the text or phrase search.
     pub text_score: f64,
+    /// Cosine similarity to the query vector (0.0 if no vector was provided or node has none).
+    pub vector_score: f64,
     /// Cumulative strength of the path taken through the graph.
     pub graph_strength: f64,
-    /// Final score after applying [`FusionWeights`] (what results are sorted by).
+    /// Final score after applying [`HybridWeights`] or [`FusionWeights`].
     pub fused_score: f64,
     /// Underlying graph traversal details (target node, path, depth, etc.).
     pub graph_result: QueryResult,
@@ -767,8 +817,16 @@ impl IndexedKnowledgeGraph {
     }
 
     /// Add a node and immediately index its text content.
-    pub fn add_node(&mut self, text: &str, label: Option<&str>) -> NodeId {
-        let id = self.graph.add_node(text, label);
+    /// Adds a node with optional embedding.
+    ///
+    /// When an embedding is provided, it will be stored and can participate in hybrid vector + text + graph search.
+    pub fn add_node(
+        &mut self,
+        text: &str,
+        label: Option<&str>,
+        embedding: Option<&[f32]>,
+    ) -> NodeId {
+        let id = self.graph.add_node(text, label, embedding);
         self.text_index.index_document(id, text);
         id
     }
@@ -838,6 +896,7 @@ impl IndexedKnowledgeGraph {
 
                 CombinedResult {
                     text_score,
+                    vector_score: 0.0,
                     graph_strength,
                     fused_score,
                     graph_result: gr,
@@ -857,9 +916,127 @@ impl IndexedKnowledgeGraph {
         combined
     }
 
+    /// High-level hybrid "text + vector + graph" query.
+    ///
+    /// 1. Runs BM25 text search to obtain high-quality seed nodes (same as `search_and_traverse`).
+    /// 2. Expands using the normal graph traversal.
+    /// 3. For every reached node that has a stored embedding, computes cosine similarity against
+    ///    the provided `vector` (if any).
+    /// 4. Fuses the three signals using the supplied [`HybridWeights`].
+    ///
+    /// When `vector` is `None`, the method behaves exactly like `search_and_traverse` with
+    /// `vector_score` set to 0.0 for all results.
+    pub fn search_and_traverse_hybrid(
+        &self,
+        text_query: &str,
+        vector: Option<&[f32]>,
+        max_seeds: usize,
+        property_names: &[&str],
+        min_strength: f64,
+        max_depth: u32,
+        max_results: usize,
+        weights: HybridWeights,
+    ) -> Vec<CombinedResult<'_>> {
+        let text_results = self.text_index.search(text_query, max_seeds);
+
+        if text_results.is_empty() {
+            return Vec::new();
+        }
+
+        let seed_ids: Vec<NodeId> = text_results.iter().map(|(id, _)| *id).collect();
+
+        let seed_scores: std::collections::HashMap<NodeId, f64> =
+            text_results.iter().map(|(id, sc)| (*id, *sc)).collect();
+
+        let mut builder = self
+            .graph
+            .find()
+            .from_nodes(&seed_ids)
+            .min_strength(min_strength)
+            .depth(max_depth)
+            .limit(max_results);
+
+        for name in property_names {
+            builder = builder.with_property(name);
+        }
+
+        let graph_results = builder.execute_with_text();
+
+        // Build combined results with all three signals
+        let mut combined: Vec<CombinedResult> = graph_results
+            .into_iter()
+            .map(|(gr, text)| {
+                let text_score = seed_scores.get(&gr.node_id).copied().unwrap_or(0.0);
+
+                // Vector score (cosine) if both query vector and node embedding exist
+                let vector_score = if let Some(qvec) = vector {
+                    self.read_embedding(gr.node_id)
+                        .map(|node_vec| cosine_similarity(qvec, &node_vec))
+                        .unwrap_or(0.0)
+                } else {
+                    0.0
+                };
+
+                let graph_strength = gr.cumulative_strength;
+
+                // Weighted fusion (callers should typically make the weights sum to ~1.0)
+                let fused_score = text_score * weights.text
+                    + vector_score * weights.vector
+                    + graph_strength * weights.graph;
+
+                CombinedResult {
+                    text_score,
+                    vector_score,
+                    graph_strength,
+                    fused_score,
+                    graph_result: gr,
+                    text,
+                }
+            })
+            .collect();
+
+        // Re-rank by the hybrid fused score
+        combined.sort_by(|a, b| {
+            b.fused_score
+                .partial_cmp(&a.fused_score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+        combined.truncate(max_results);
+
+        combined
+    }
+
+    /// Like [`search_and_traverse_hybrid`] but with sensible default [`HybridWeights`].
+    pub fn search_and_traverse_hybrid_default(
+        &self,
+        text_query: &str,
+        vector: Option<&[f32]>,
+        max_seeds: usize,
+        property_names: &[&str],
+        min_strength: f64,
+        max_depth: u32,
+        max_results: usize,
+    ) -> Vec<CombinedResult<'_>> {
+        self.search_and_traverse_hybrid(
+            text_query,
+            vector,
+            max_seeds,
+            property_names,
+            min_strength,
+            max_depth,
+            max_results,
+            HybridWeights::default(),
+        )
+    }
+
     /// Returns the full text content of a node's blob (zero-copy).
     pub fn read_blob(&self, node: NodeId) -> &str {
         self.graph.read_blob(node)
+    }
+
+    /// Returns the embedding stored for a node, if any.
+    pub fn read_embedding(&self, node: NodeId) -> Option<Vec<f32>> {
+        self.graph.read_embedding(node)
     }
 
     /// Phrase-aware high-level query (see [`search_and_traverse`] for details).
@@ -910,6 +1087,7 @@ impl IndexedKnowledgeGraph {
 
                 CombinedResult {
                     text_score,
+                    vector_score: 0.0,
                     graph_strength,
                     fused_score,
                     graph_result: gr,
@@ -1264,14 +1442,17 @@ mod tests {
         let n0 = g.add_node(
             "Rust ownership and borrowing are fundamental to memory safety.",
             Some("rust"),
+            None,
         );
         let n1 = g.add_node(
             "The borrow checker enforces rules about references and lifetimes.",
             Some("borrow"),
+            None,
         );
         let n2 = g.add_node(
             "Concurrency in Rust is fearless thanks to the ownership model.",
             Some("concurrency"),
+            None,
         );
 
         g.add_edge(
@@ -1330,10 +1511,12 @@ mod tests {
         g.add_node(
             "Rust ownership model prevents data races effectively",
             Some("a"),
+            None,
         );
         g.add_node(
             "Effective data race prevention using Rust ownership",
             Some("b"),
+            None,
         );
 
         // Keyword search may rank "b" higher or equal

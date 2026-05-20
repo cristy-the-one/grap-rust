@@ -74,8 +74,8 @@ pub use query::{GraphQuery, QueryBuilder, QueryResult};
 
 // Index types (always available – makes the engine truly useful)
 pub use index::{
-    CombinedResult, DefaultTokenizer, FusionWeights, IndexedKnowledgeGraph, InvertedIndex,
-    TextSearchResult, Tokenizer,
+    CombinedResult, DefaultTokenizer, FusionWeights, HybridWeights, IndexedKnowledgeGraph,
+    InvertedIndex, TextSearchResult, Tokenizer,
 };
 
 pub use shard::{

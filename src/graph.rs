@@ -17,6 +17,8 @@ use crate::properties::{PropertyRegistry, PropertyValue};
 #[derive(Debug)]
 pub(crate) struct Node {
     pub(crate) blob: BlobRef,
+    /// Optional embedding stored as a blob reference (treated like text blobs).
+    pub(crate) embedding: Option<BlobRef>,
     pub(crate) outgoing: Vec<EdgeId>,
     pub(crate) incoming: Vec<EdgeId>,
     pub(crate) label: Option<String>,
@@ -81,14 +83,26 @@ impl KnowledgeGraph {
     ///
     /// Returns a stable [`NodeId`] that can be used to refer to this node
     /// for the rest of the graph's lifetime.
-    pub fn add_node(&mut self, text: &str, label: Option<&str>) -> NodeId {
+    /// Adds a new node with the given text content, optional label, and optional embedding.
+    ///
+    /// The embedding (if provided) is stored using the same `BlobStore` mechanism as text,
+    /// so it benefits from chunking and future mmap support.
+    pub fn add_node(
+        &mut self,
+        text: &str,
+        label: Option<&str>,
+        embedding: Option<&[f32]>,
+    ) -> NodeId {
         let blob = self.blobs.store(text);
+        let embedding_ref = embedding.map(|e| self.blobs.store_embedding(e));
+
         let id = NodeId(
             u32::try_from(self.nodes.len())
                 .expect("node count exceeds u32::MAX — graph too large"),
         );
         self.nodes.push(Node {
             blob,
+            embedding: embedding_ref,
             outgoing: Vec::new(),
             incoming: Vec::new(),
             label: label.map(|s| s.to_string()),
@@ -96,6 +110,17 @@ impl KnowledgeGraph {
         });
         self.deleted.push(false);
         id
+    }
+
+    /// Adds a new node with optional embedding.
+    /// This is the lower-level method used when embeddings are provided.
+    pub fn add_node_with_embedding(
+        &mut self,
+        text: &str,
+        label: Option<&str>,
+        embedding: Option<&[f32]>,
+    ) -> NodeId {
+        self.add_node(text, label, embedding)
     }
 
     /// Logically removes a node and all its incident edges (soft delete / tombstone).
@@ -151,6 +176,12 @@ impl KnowledgeGraph {
     /// Returns the full text blob associated with a node (zero-copy when possible).
     pub fn read_blob(&self, node: NodeId) -> &str {
         self.blobs.read(&self.nodes[node.0 as usize].blob)
+    }
+
+    /// Returns the embedding of a node, if one was stored.
+    pub fn read_embedding(&self, node: NodeId) -> Option<Vec<f32>> {
+        let node_data = &self.nodes[node.0 as usize];
+        node_data.embedding.as_ref().and_then(|r| self.blobs.read_embedding(r))
     }
 
     /// Bounds-checked variant of [`read_blob`]. Returns `None` if the node id is out of range.
@@ -269,7 +300,7 @@ mod tests {
     #[test]
     fn try_read_blob_returns_some_for_valid_id() {
         let mut g = KnowledgeGraph::new();
-        let n = g.add_node("hello world", Some("test"));
+        let n = g.add_node("hello world", Some("test"), None);
         assert_eq!(g.try_read_blob(n), Some("hello world"));
         assert_eq!(g.try_node_label(n), Some(Some("test")));
     }

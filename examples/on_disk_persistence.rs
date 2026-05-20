@@ -27,14 +27,17 @@ fn main() {
     let intro = g.add_node(
         "Knowledge graphs combined with on-disk indexes enable massive scale RAG systems.",
         Some("On-Disk Intro"),
+        None,
     );
     let scale = g.add_node(
         "The segmented immutable design with tiered merging and incremental vacuum is key.",
         Some("Scale"),
+        None,
     );
     let safety = g.add_node(
         "Tombstones + ghost edges allow safe deletes and cross-shard queries.",
         Some("Safety"),
+        None,
     );
 
     g.add_edge(intro, scale, 0.92, vec![]);

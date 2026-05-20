@@ -139,9 +139,11 @@ pub struct ShardedQueryResult {
     pub node: GlobalNodeId,
     /// BM25-style text relevance score from the seed selection phase.
     pub text_score: f64,
+    /// Cosine similarity to the query vector (0.0 when no vector query or no embedding).
+    pub vector_score: f64,
     /// Cumulative strength of the best graph path from a seed to this node.
     pub graph_strength: f64,
-    /// Final blended score (`text_score * text_weight + graph_strength * graph_weight`).
+    /// Final blended score using [`HybridWeights`] (or legacy FusionWeights for non-hybrid paths).
     pub fused_score: f64,
     /// Number of hops from the nearest seed node.
     pub depth: u32,
@@ -377,7 +379,7 @@ impl ShardRouter {
         let shard_id = self.shard_for_new_node(text);
         let shard = &mut self.shards[shard_id.0 as usize];
 
-        let local_id = shard.graph.add_node(text, label);
+        let local_id = shard.graph.add_node(text, label, None);
         Ok(GlobalNodeId {
             shard: shard_id,
             local: local_id,
@@ -773,6 +775,7 @@ impl ShardRouter {
             results.push(ShardedQueryResult {
                 node: e.gnode,
                 text_score: e.text_score,
+                vector_score: 0.0,
                 graph_strength: e.strength,
                 fused_score: e.text_score * weights.text + e.strength * weights.graph,
                 depth: e.depth,
@@ -850,6 +853,73 @@ impl ShardRouter {
         });
         results.truncate(max_results);
         results
+    }
+
+    /// Hybrid "text + vector + graph" search across the sharded cluster.
+    ///
+    /// For the initial implementation we run `search_and_traverse_hybrid` independently
+    /// on each shard (using the same query vector) and then merge the top results by
+    /// fused score. This is simple and gives good results for most workloads.
+    ///
+    /// A fully cross-shard best-first hybrid traversal is possible in a follow-up if needed.
+    pub fn search_and_traverse_hybrid(
+        &self,
+        text_query: &str,
+        vector: Option<&[f32]>,
+        max_seeds: usize,
+        property_names: &[&str],
+        min_strength: f64,
+        max_depth: u32,
+        max_results: usize,
+        weights: crate::index::HybridWeights,
+    ) -> Vec<ShardedQueryResult> {
+        let mut all_results: Vec<ShardedQueryResult> = Vec::new();
+
+        for (shard_idx, shard) in self.shards.iter().enumerate() {
+            let local_results = shard.graph.search_and_traverse_hybrid(
+                text_query,
+                vector,
+                max_seeds,
+                property_names,
+                min_strength,
+                max_depth,
+                max_results,
+                weights,
+            );
+
+            for cr in local_results {
+                // Convert local CombinedResult into ShardedQueryResult
+                let gnode = GlobalNodeId {
+                    shard: ShardId(shard_idx as u16),
+                    local: cr.graph_result.node_id,
+                };
+
+                // Build a minimal path (single shard for now)
+                // For the current per-shard hybrid implementation we return an empty path.
+                // A richer path reconstruction can be added later.
+                let path: Vec<ShardedPathHop> = Vec::new();
+
+                all_results.push(ShardedQueryResult {
+                    node: gnode,
+                    text_score: cr.text_score,
+                    vector_score: cr.vector_score,
+                    graph_strength: cr.graph_strength,
+                    fused_score: cr.fused_score,
+                    depth: cr.graph_result.depth,
+                    text: cr.text.to_string(),
+                    path,
+                });
+            }
+        }
+
+        // Global re-rank across shards
+        all_results.sort_by(|a, b| {
+            b.fused_score
+                .partial_cmp(&a.fused_score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+        all_results.truncate(max_results);
+        all_results
     }
 
     /// Compute which nodes would need to move if we changed the number of shards.
@@ -991,7 +1061,7 @@ impl ShardRouter {
 
             let new_local = self.shards[target_shard_id.0 as usize]
                 .graph
-                .add_node(&text, label.as_deref());
+                .add_node(&text, label.as_deref(), None);
 
             let new_gid = GlobalNodeId {
                 shard: target_shard_id,
@@ -1106,6 +1176,30 @@ impl ShardedGraph {
             max_depth,
             max_results,
             crate::index::FusionWeights::default(),
+        )
+    }
+
+    /// Hybrid text + vector + graph search over the sharded cluster (see [`ShardRouter::search_and_traverse_hybrid`]).
+    pub fn search_and_traverse_hybrid(
+        &self,
+        text_query: &str,
+        vector: Option<&[f32]>,
+        max_seeds: usize,
+        property_names: &[&str],
+        min_strength: f64,
+        max_depth: u32,
+        max_results: usize,
+        weights: crate::index::HybridWeights,
+    ) -> Vec<ShardedQueryResult> {
+        self.router.search_and_traverse_hybrid(
+            text_query,
+            vector,
+            max_seeds,
+            property_names,
+            min_strength,
+            max_depth,
+            max_results,
+            weights,
         )
     }
 

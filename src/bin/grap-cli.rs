@@ -384,7 +384,7 @@ fn run_add_file(graph_dir: &PathBuf, json: bool, args: AddFileArgs) {
             .map(|n| n.to_string_lossy().into_owned())
     });
 
-    let node_id = ig.add_node(&content, label.as_deref());
+    let node_id = ig.add_node(&content, label.as_deref(), None);
 
     if let Err(e) = ig.save_to_dir(graph_dir) {
         eprintln!("Failed to save after adding node: {}", e);

@@ -44,7 +44,7 @@ fn build_synthetic_graph(node_count: usize, edges_per_node: usize) -> IndexedKno
             i, i
         );
         let label = Some(format!("Node{}", i));
-        let id = g.add_node(&text, label.as_deref());
+        let id = g.add_node(&text, label.as_deref(), None);
         node_ids.push(id);
     }
 
@@ -137,7 +137,7 @@ fn build_graph_with_large_blobs(node_count: usize) -> IndexedKnowledgeGraph {
              Rust memory safety, ownership, borrowing, lifetimes, and fearless concurrency are \
              important topics in systems programming. ".repeat(40)
         );
-        g.add_node(&text, Some(&format!("LargeNode{}", i)));
+        g.add_node(&text, Some(&format!("LargeNode{}", i)), None);
     }
 
     // Add a modest number of edges so traversal has something to do

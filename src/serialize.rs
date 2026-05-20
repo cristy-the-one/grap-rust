@@ -34,6 +34,10 @@ pub(crate) struct SerializableNode {
     pub(crate) blob_global_offset: u64,
     pub(crate) blob_length: u32,
     pub(crate) blob_uncompressed_len: u32,
+    /// Optional embedding stored as a separate blob (same format as text blobs).
+    pub(crate) embedding_global_offset: Option<u64>,
+    pub(crate) embedding_length: Option<u32>,
+    pub(crate) embedding_uncompressed_len: Option<u32>,
     pub(crate) outgoing: Vec<u32>,
     pub(crate) incoming: Vec<u32>,
     pub(crate) label: Option<String>,
@@ -316,10 +320,21 @@ impl KnowledgeGraph {
 
                 let global_offset = chunk_base + node.blob.offset as u64;
 
+                let embedding_ref = node.embedding.as_ref().map(|e| {
+                    let emb_base = chunk_offsets
+                        .get(e.chunk_idx as usize)
+                        .copied()
+                        .expect("internal error: embedding blob chunk_idx out of range");
+                    (emb_base + e.offset as u64, e.length, e.uncompressed_len)
+                });
+
                 SerializableNode {
                     blob_global_offset: global_offset,
                     blob_length: node.blob.length,
                     blob_uncompressed_len: node.blob.uncompressed_len,
+                    embedding_global_offset: embedding_ref.map(|(off, _, _)| off),
+                    embedding_length: embedding_ref.map(|(_, len, _)| len),
+                    embedding_uncompressed_len: embedding_ref.map(|(_, _, ulen)| ulen),
                     outgoing: node.outgoing.iter().map(|e| e.0).collect(),
                     incoming: node.incoming.iter().map(|e| e.0).collect(),
                     label: node.label.clone(),
@@ -629,8 +644,29 @@ impl KnowledgeGraph {
                 uncompressed_len: sn.blob_uncompressed_len,
             };
 
+            let embedding = if let (Some(off), Some(len), Some(ulen)) =
+                (sn.embedding_global_offset, sn.embedding_length, sn.embedding_uncompressed_len)
+            {
+                let (e_chunk, e_off) = find_chunk_for_offset(&meta.chunk_boundaries, off)
+                    .ok_or_else(|| {
+                        io::Error::new(
+                            io::ErrorKind::InvalidData,
+                            format!("embedding offset {} out of range", off),
+                        )
+                    })?;
+                Some(BlobRef {
+                    chunk_idx: e_chunk,
+                    offset: e_off,
+                    length: len,
+                    uncompressed_len: ulen,
+                })
+            } else {
+                None
+            };
+
             rebuilt_nodes.push(crate::graph::Node {
                 blob,
+                embedding,
                 outgoing: sn.outgoing.into_iter().map(EdgeId).collect(),
                 incoming: sn.incoming.into_iter().map(EdgeId).collect(),
                 label: sn.label,
@@ -758,12 +794,13 @@ mod tests {
         let topic = g.properties.register("topic");
         let rel = g.properties.register("relation");
 
-        let n1 = g.add_node("Hello world from grap serialization test.", Some("first"));
+        let n1 = g.add_node("Hello world from grap serialization test.", Some("first"), None);
         let n2 = g.add_node(
             "Second document about graphs and persistence.",
             Some("second"),
+            None,
         );
-        let n3 = g.add_node("Third document on knowledge graphs.", Some("third"));
+        let n3 = g.add_node("Third document on knowledge graphs.", Some("third"), None);
 
         // Add edges with properties
         g.add_edge(
@@ -808,10 +845,12 @@ mod tests {
         let n1 = ig.add_node(
             "Rust ownership prevents data races at compile time.",
             Some("rust"),
+            None,
         );
         let n2 = ig.add_node(
             "Borrowing allows safe references without ownership transfer.",
             Some("borrow"),
+            None,
         );
 
         ig.add_edge(
@@ -844,10 +883,12 @@ mod tests {
         let n1 = g.add_node(
             "Large corpus document one about systems programming.",
             Some("doc1"),
+            None,
         );
         let n2 = g.add_node(
             "Large corpus document two about memory safety and ownership.",
             Some("doc2"),
+            None,
         );
 
         g.add_edge(
@@ -886,8 +927,8 @@ mod tests {
         let mut g = KnowledgeGraph::new();
         let topic = g.properties.register("topic");
 
-        let n1 = g.add_node("Document one for load_meta test.", Some("doc1"));
-        let n2 = g.add_node("Document two for load_meta test.", Some("doc2"));
+        let n1 = g.add_node("Document one for load_meta test.", Some("doc1"), None);
+        let n2 = g.add_node("Document two for load_meta test.", Some("doc2"), None);
 
         g.add_edge(
             n1,
@@ -949,9 +990,9 @@ mod tests {
     #[test]
     fn deleted_nodes_survive_save_load() {
         let mut g = KnowledgeGraph::new();
-        let n0 = g.add_node("Document zero.", Some("zero"));
-        let n1 = g.add_node("Document one.", Some("one"));
-        let n2 = g.add_node("Document two.", Some("two"));
+        let n0 = g.add_node("Document zero.", Some("zero"), None);
+        let n1 = g.add_node("Document one.", Some("one"), None);
+        let n2 = g.add_node("Document two.", Some("two"), None);
 
         // Delete the middle node
         assert!(g.remove_node(n1));
@@ -972,7 +1013,7 @@ mod tests {
     #[test]
     fn load_rejects_corrupt_blob_offset() {
         let mut g = KnowledgeGraph::new();
-        g.add_node("Hello.", None);
+        g.add_node("Hello.", None, None);
 
         let dir = tempdir().unwrap();
         g.save_to_disk(dir.path()).expect("save");
