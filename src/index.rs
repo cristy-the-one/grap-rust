@@ -194,6 +194,46 @@ pub struct TextSearchResult {
     pub matched_terms: Vec<String>,
 }
 
+/// Controls how the text retrieval score and the graph traversal strength
+/// are combined when producing final ranked results from the high-level
+/// search methods on [`IndexedKnowledgeGraph`].
+#[derive(Debug, Clone, Copy)]
+pub struct FusionWeights {
+    /// Relative weight given to the text / phrase search score (BM25 or hybrid).
+    /// Higher values make results more sensitive to how well documents match
+    /// the user's natural language query.
+    pub text: f64,
+    /// Relative weight given to the cumulative graph path strength.
+    /// Higher values favor nodes reached through strong relationship chains.
+    pub graph: f64,
+}
+
+impl Default for FusionWeights {
+    /// Slightly favors text relevance (common default for knowledge retrieval).
+    fn default() -> Self {
+        Self { text: 0.6, graph: 0.4 }
+    }
+}
+
+/// Rich result type returned by [`IndexedKnowledgeGraph::search_and_traverse`]
+/// and [`IndexedKnowledgeGraph::phrase_search_and_traverse`].
+///
+/// It carries both the original text search signal and the graph traversal
+/// signal, plus the final fused score used for ranking.
+#[derive(Debug, Clone)]
+pub struct CombinedResult<'a> {
+    /// Original score from the text or phrase search.
+    pub text_score: f64,
+    /// Cumulative strength of the path taken through the graph.
+    pub graph_strength: f64,
+    /// Final score after applying [`FusionWeights`] (what results are sorted by).
+    pub fused_score: f64,
+    /// Underlying graph traversal details (target node, path, depth, etc.).
+    pub graph_result: QueryResult,
+    /// The text content of the node (borrowed from the blob store).
+    pub text: &'a str,
+}
+
 #[derive(Debug, Clone)]
 pub struct IndexStats {
     pub unique_terms: usize,
@@ -512,9 +552,14 @@ impl IndexedKnowledgeGraph {
         self.graph.add_edge(source, target, strength, props)
     }
 
-    /// High-level API: text query → BM25 seed selection → property-filtered graph traversal.
+    /// High-level "text + graph" query.
     ///
-    /// This is the primary "find related content" method users are expected to call.
+    /// 1. Runs BM25 search to find high-quality seed nodes.
+    /// 2. Expands outward using the property-weighted graph traversal.
+    /// 3. Fuses the original text score with graph path strength using the supplied weights
+    ///    and re-ranks the final results.
+    ///
+    /// Returns rich [`CombinedResult`] entries so callers can see both signals.
     pub fn search_and_traverse(
         &self,
         text_query: &str,
@@ -523,14 +568,19 @@ impl IndexedKnowledgeGraph {
         min_strength: f64,
         max_depth: u32,
         max_results: usize,
-    ) -> Vec<(QueryResult, &str)> {
-        let seeds = self.text_index.search(text_query, max_seeds);
+        weights: FusionWeights,
+    ) -> Vec<CombinedResult> {
+        let text_results = self.text_index.search(text_query, max_seeds);
 
-        if seeds.is_empty() {
+        if text_results.is_empty() {
             return Vec::new();
         }
 
-        let seed_ids: Vec<NodeId> = seeds.iter().map(|r| r.node_id).collect();
+        let seed_ids: Vec<NodeId> = text_results.iter().map(|r| r.node_id).collect();
+
+        // Build a quick lookup for seed text scores
+        let seed_scores: std::collections::HashMap<NodeId, f64> =
+            text_results.iter().map(|r| (r.node_id, r.score)).collect();
 
         let mut builder = self
             .graph
@@ -544,14 +594,44 @@ impl IndexedKnowledgeGraph {
             builder = builder.with_property(name);
         }
 
-        builder.execute_with_text()
+        let graph_results = builder.execute_with_text();
+
+        // Convert to rich results and apply fusion
+        let mut combined: Vec<CombinedResult> = graph_results
+            .into_iter()
+            .map(|(gr, text)| {
+                let text_score = seed_scores.get(&gr.node_id).copied().unwrap_or(0.0);
+                let graph_strength = gr.cumulative_strength;
+                let fused_score = text_score * weights.text + graph_strength * weights.graph;
+
+                CombinedResult {
+                    text_score,
+                    graph_strength,
+                    fused_score,
+                    graph_result: gr,
+                    text,
+                }
+            })
+            .collect();
+
+        // Re-rank by fused score
+        combined.sort_by(|a, b| {
+            b.fused_score
+                .partial_cmp(&a.fused_score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+        combined.truncate(max_results);
+
+        combined
     }
 
     pub fn read_blob(&self, node: NodeId) -> &str {
         self.graph.read_blob(node)
     }
 
-    /// Phrase-aware search followed by graph traversal.
+    /// Phrase-aware high-level query (see [`search_and_traverse`] for details).
+    ///
+    /// Uses the hybrid phrase + BM25 scoring for seed selection.
     pub fn phrase_search_and_traverse(
         &self,
         phrase: &str,
@@ -561,14 +641,18 @@ impl IndexedKnowledgeGraph {
         min_strength: f64,
         max_depth: u32,
         max_results: usize,
-    ) -> Vec<(QueryResult, &str)> {
-        let seeds = self.text_index.phrase_search(phrase, max_gap, max_seeds);
+        weights: FusionWeights,
+    ) -> Vec<CombinedResult> {
+        let text_results = self.text_index.phrase_search(phrase, max_gap, max_seeds);
 
-        if seeds.is_empty() {
+        if text_results.is_empty() {
             return Vec::new();
         }
 
-        let seed_ids: Vec<NodeId> = seeds.iter().map(|r| r.node_id).collect();
+        let seed_ids: Vec<NodeId> = text_results.iter().map(|r| r.node_id).collect();
+
+        let seed_scores: std::collections::HashMap<NodeId, f64> =
+            text_results.iter().map(|r| (r.node_id, r.score)).collect();
 
         let mut builder = self
             .graph
@@ -582,7 +666,77 @@ impl IndexedKnowledgeGraph {
             builder = builder.with_property(name);
         }
 
-        builder.execute_with_text()
+        let graph_results = builder.execute_with_text();
+
+        let mut combined: Vec<CombinedResult> = graph_results
+            .into_iter()
+            .map(|(gr, text)| {
+                let text_score = seed_scores.get(&gr.node_id).copied().unwrap_or(0.0);
+                let graph_strength = gr.cumulative_strength;
+                let fused_score = text_score * weights.text + graph_strength * weights.graph;
+
+                CombinedResult {
+                    text_score,
+                    graph_strength,
+                    fused_score,
+                    graph_result: gr,
+                    text,
+                }
+            })
+            .collect();
+
+        combined.sort_by(|a, b| {
+            b.fused_score
+                .partial_cmp(&a.fused_score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+        combined.truncate(max_results);
+
+        combined
+    }
+
+    /// Convenience wrapper that uses [`FusionWeights::default()`].
+    pub fn search_and_traverse_default(
+        &self,
+        text_query: &str,
+        max_seeds: usize,
+        property_names: &[&str],
+        min_strength: f64,
+        max_depth: u32,
+        max_results: usize,
+    ) -> Vec<CombinedResult> {
+        self.search_and_traverse(
+            text_query,
+            max_seeds,
+            property_names,
+            min_strength,
+            max_depth,
+            max_results,
+            FusionWeights::default(),
+        )
+    }
+
+    /// Convenience wrapper that uses [`FusionWeights::default()`].
+    pub fn phrase_search_and_traverse_default(
+        &self,
+        phrase: &str,
+        max_gap: u32,
+        max_seeds: usize,
+        property_names: &[&str],
+        min_strength: f64,
+        max_depth: u32,
+        max_results: usize,
+    ) -> Vec<CombinedResult> {
+        self.phrase_search_and_traverse(
+            phrase,
+            max_gap,
+            max_seeds,
+            property_names,
+            min_strength,
+            max_depth,
+            max_results,
+            FusionWeights::default(),
+        )
     }
 
     pub fn index_stats(&self) -> IndexStats {
@@ -687,7 +841,7 @@ mod tests {
         );
 
         // Text query should surface n0 and n1 as seeds
-        let results = g.search_and_traverse(
+        let results = g.search_and_traverse_default(
             "ownership borrowing memory",
             5,
             &["topic"],
@@ -698,7 +852,7 @@ mod tests {
 
         assert!(!results.is_empty());
         // n0 (the seed with strongest text match) should be present
-        assert!(results.iter().any(|(r, _)| r.node_id == n0));
+        assert!(results.iter().any(|r| r.graph_result.node_id == n0));
     }
 
     #[test]

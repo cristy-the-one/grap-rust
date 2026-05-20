@@ -43,7 +43,8 @@ pub use query::{GraphQuery, QueryBuilder, QueryResult};
 
 // Index types (always available – makes the engine truly useful)
 pub use index::{
-    DefaultTokenizer, IndexedKnowledgeGraph, InvertedIndex, TextSearchResult, Tokenizer,
+    CombinedResult, DefaultTokenizer, FusionWeights, IndexedKnowledgeGraph, InvertedIndex,
+    TextSearchResult, Tokenizer,
 };
 
 // Feature-gated modules (stubs for now)
