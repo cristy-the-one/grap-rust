@@ -183,6 +183,10 @@ impl TextIndex for OnDiskTextIndex {
         Some(format!("seg-sample-tier{}-docs{}", info.tier, info.doc_count))
     }
 
+    fn segment_info(&self) -> Vec<crate::on_disk_index::SegmentInfo> {
+        self.engine.sealed_segment_info()
+    }
+
     // === Persistence (delegated to the inner OnDiskIndex) ===
 
     fn save_to_dir(&mut self, dir: &std::path::Path) -> Result<(), crate::GraphError> {

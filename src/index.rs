@@ -306,6 +306,13 @@ pub trait TextIndex: Send + Sync {
     fn sample_representative_for_segment(&self, _seg_idx: usize) -> Option<String> {
         None
     }
+
+    /// Returns per-segment information (doc counts, live counts, approximate sizes, tiers).
+    /// Memory backends return an empty vec. On-disk backends return one entry per sealed segment.
+    /// Useful for monitoring, cost-based rebalancing, and deciding when to vacuum.
+    fn segment_info(&self) -> Vec<crate::on_disk_index::SegmentInfo> {
+        vec![]
+    }
 }
 
 impl TextIndex for InvertedIndex {
@@ -1005,13 +1012,10 @@ impl IndexedKnowledgeGraph {
         Ok(Self { graph, text_index })
     }
 
-    /// Returns segment-level information from the text index, if it supports it
-    /// (i.e. when using the on-disk backend). Returns empty vec for memory backend.
+    /// Returns segment-level information from the text index (doc counts, live counts, sizes, tiers).
+    /// Memory backends return an empty list. On-disk backends return one entry per sealed segment.
     pub fn text_index_segment_info(&self) -> Vec<crate::on_disk_index::SegmentInfo> {
-        // For the on-disk case this will be populated; for memory it is empty.
-        // We use a small hack via downcast for now (proper solution: extend TextIndex trait).
-        // This is acceptable during the 0.2 integration spike.
-        vec![]
+        self.text_index.segment_info()
     }
 }
 

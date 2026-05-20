@@ -17,13 +17,34 @@ use serde::{Deserialize, Serialize};
 pub type LocalDocId = u32;
 
 /// Lightweight description of one sealed segment.
-/// Used by segment-aware rebalancing and vacuum planning.
+/// Used by segment-aware rebalancing, vacuum planning, and monitoring.
 #[derive(Debug, Clone, Copy)]
 pub struct SegmentInfo {
     pub doc_count: u32,
     pub tier: u32,
-    /// Live (non-deleted) document count in the segment. Useful for vacuum decisions and rebalancing.
+    /// Live (non-deleted) document count in the segment.
     pub live_doc_count: u32,
+    /// Approximate size in bytes of the segment data (postings + metadata + delete bitmap).
+    /// Useful for cost-based rebalancing decisions.
+    pub size_bytes: u64,
+}
+
+impl SegmentInfo {
+    /// Fraction of documents in this segment that have been deleted (tombstoned).
+    /// 0.0 = perfectly clean, 1.0 = all documents deleted.
+    pub fn delete_ratio(&self) -> f32 {
+        if self.doc_count == 0 {
+            0.0
+        } else {
+            let deleted = self.doc_count - self.live_doc_count;
+            deleted as f32 / self.doc_count as f32
+        }
+    }
+
+    /// Convenience: number of deleted documents in the segment.
+    pub fn deleted_count(&self) -> u32 {
+        self.doc_count - self.live_doc_count
+    }
 }
 
 const SEGMENT_MAGIC: [u8; 4] = *b"GRPI";
@@ -174,6 +195,16 @@ impl OnDiskSegment {
         if self.doc_count == 0 { return 0.0; }
         let deleted = self.doc_count - self.live_doc_count();
         deleted as f32 / self.doc_count as f32
+    }
+
+    /// Rough estimate of the on-disk / in-memory footprint of this segment.
+    /// Includes postings blob, term metadata, delete bitmap, and doc lengths.
+    pub fn approx_size_bytes(&self) -> u64 {
+        let postings = self.postings_blob.len() as u64;
+        let terms_meta = (self.terms.len() * 32) as u64; // rough: String + 3 u32s
+        let deletes = self.deleted.len() as u64;
+        let lengths = (self.doc_lengths.len() * 4) as u64;
+        postings + terms_meta + deletes + lengths
     }
 
     pub fn write_to_disk(&self, path: &Path) -> std::io::Result<()> {
@@ -437,10 +468,14 @@ impl OnDiskIndex {
     pub fn sealed_segment_info(&self) -> Vec<SegmentInfo> {
         self.sealed
             .iter()
-            .map(|s| SegmentInfo {
-                doc_count: s.segment.doc_count,
-                tier: s.tier,
-                live_doc_count: s.segment.live_doc_count(),
+            .map(|s| {
+                let live = s.segment.live_doc_count();
+                SegmentInfo {
+                    doc_count: s.segment.doc_count,
+                    tier: s.tier,
+                    live_doc_count: live,
+                    size_bytes: s.segment.approx_size_bytes(),
+                }
             })
             .collect()
     }
