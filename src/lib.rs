@@ -51,11 +51,9 @@ pub use index::{
 #[cfg(feature = "fulltext")]
 pub mod index;
 
-#[cfg(feature = "mmap")]
-pub mod serialize;
 
-#[cfg(feature = "sharding")]
-pub mod shard;
+
+pub mod shard; // Graph sharding (Phase 4)
 
 /// Crate-wide error type (will be expanded in later phases).
 #[derive(Debug, Clone, PartialEq, Eq)]

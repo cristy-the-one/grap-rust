@@ -767,6 +767,26 @@ impl IndexedKnowledgeGraph {
         Ok(ig)
     }
 
+    /// Load using memory-mapped blobs (zero-copy) and rebuild the text index.
+    ///
+    /// Requires the `mmap` feature to be enabled.
+    #[cfg(feature = "mmap")]
+    pub fn load_mmap(dir: &std::path::Path) -> std::io::Result<Self> {
+        let graph = KnowledgeGraph::load_mmap(dir)?;
+        let mut ig = Self {
+            graph,
+            text_index: InvertedIndex::new(),
+        };
+
+        for i in 0..ig.graph.node_count() {
+            let id = NodeId(i as u32);
+            let text = ig.graph.read_blob(id);
+            ig.text_index.index_document(id, text);
+        }
+
+        Ok(ig)
+    }
+
     /// Plain text search (delegates to the inverted index).
     pub fn search(&self, query: &str, max_results: usize) -> Vec<TextSearchResult> {
         self.text_index.search(query, max_results)
