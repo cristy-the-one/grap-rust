@@ -256,7 +256,7 @@ impl Default for HybridWeights {
 
 /// Cosine similarity between two vectors.
 /// Returns 0.0 if either vector is empty or they have different lengths.
-fn cosine_similarity(a: &[f32], b: &[f32]) -> f64 {
+pub(crate) fn cosine_similarity(a: &[f32], b: &[f32]) -> f64 {
     if a.len() != b.len() || a.is_empty() {
         return 0.0;
     }
@@ -745,6 +745,14 @@ pub struct IndexedKnowledgeGraph {
     /// or the persistent segmented `OnDiskTextIndex`.
     pub text_index: Box<dyn TextIndex>,
 
+    /// Vector / ANN index (optional).
+    /// When present, `search_and_traverse_hybrid` can use it for fast vector
+    /// candidate generation, and `vector_search` is available.
+    ///
+    /// Phase 0/1: populated with a `BruteForceVectorIndex` when the first
+    /// embedding is added. Later replaced by an HNSW (or other) implementation.
+    pub vector_index: Option<Box<dyn crate::vector_index::VectorIndex>>,
+
     /// Background merge/vacuum worker handles for on-disk text indexes.
     /// Stored here so they stay alive as long as the graph does.
     merge_workers: Vec<crate::MergeWorkerHandle>,
@@ -764,6 +772,7 @@ impl IndexedKnowledgeGraph {
         Self {
             graph: KnowledgeGraph::new(),
             text_index: Box::new(InvertedIndex::new()),
+            vector_index: None,
             merge_workers: Vec::new(),
         }
     }
@@ -773,6 +782,7 @@ impl IndexedKnowledgeGraph {
         Self {
             graph: KnowledgeGraph::new(),
             text_index: Box::new(InvertedIndex::with_tokenizer(tokenizer)),
+            vector_index: None,
             merge_workers: Vec::new(),
         }
     }
@@ -786,6 +796,7 @@ impl IndexedKnowledgeGraph {
         Self {
             graph: KnowledgeGraph::new(),
             text_index: Box::new(crate::on_disk_text_index::OnDiskTextIndex::new()),
+            vector_index: None,
             merge_workers: Vec::new(),
         }
     }
@@ -801,6 +812,7 @@ impl IndexedKnowledgeGraph {
             text_index: Box::new(
                 crate::on_disk_text_index::OnDiskTextIndex::new_with_merge_policy(segments_per_tier),
             ),
+            vector_index: None,
             merge_workers: Vec::new(),
         }
     }
@@ -812,6 +824,7 @@ impl IndexedKnowledgeGraph {
         Self {
             graph: KnowledgeGraph::new(),
             text_index: index,
+            vector_index: None,
             merge_workers: Vec::new(),
         }
     }
@@ -828,7 +841,33 @@ impl IndexedKnowledgeGraph {
     ) -> NodeId {
         let id = self.graph.add_node(text, label, embedding);
         self.text_index.index_document(id, text);
+
+        // Phase 0/1 vector index ingestion
+        if let Some(emb) = embedding {
+            if self.vector_index.is_none() {
+                self.vector_index = Some(Box::new(
+                    crate::vector_index::BruteForceVectorIndex::new(),
+                ));
+            }
+            if let Some(vidx) = &mut self.vector_index {
+                vidx.add_vector(id, emb);
+            }
+        }
+
         id
+    }
+
+    /// Perform a pure vector similarity search using the configured vector index
+    /// (or a brute-force fallback if none has been created yet).
+    ///
+    /// Returns up to `top_k` nodes ordered by descending similarity (cosine).
+    pub fn vector_search(&self, query: &[f32], top_k: usize) -> Vec<(NodeId, f64)> {
+        if let Some(vidx) = &self.vector_index {
+            vidx.search(query, top_k)
+        } else {
+            // No vectors have been indexed yet — return empty (graceful)
+            Vec::new()
+        }
     }
 
     /// Add a directed edge to the graph. Properties are encoded into the edge bitmask.
@@ -1172,6 +1211,7 @@ impl IndexedKnowledgeGraph {
         let mut ig = Self {
             graph,
             text_index: Box::new(InvertedIndex::new()),
+            vector_index: None,
             merge_workers: Vec::new(),
         };
 
@@ -1294,6 +1334,7 @@ impl IndexedKnowledgeGraph {
         Ok(Self {
             graph,
             text_index,
+            vector_index: None,
             merge_workers: Vec::new(),
         })
     }
@@ -1320,6 +1361,7 @@ impl IndexedKnowledgeGraph {
         Ok(Self {
             graph,
             text_index,
+            vector_index: None,
             merge_workers: Vec::new(),
         })
     }

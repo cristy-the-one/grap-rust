@@ -52,6 +52,7 @@ pub mod query; // Full-text BM25 index (Phase 2)
 // Power users can access the full modules at `grap::on_disk_index` and `grap::on_disk_text_index`.
 pub mod on_disk_index;
 pub mod on_disk_text_index;
+pub mod vector_index; // ANN / vector index (0.3/0.4 Phase 0+)
 
 pub mod serialize; // Persistence (save/load + optional mmap) - Phase 3 in progress
 
@@ -77,6 +78,8 @@ pub use index::{
     CombinedResult, DefaultTokenizer, FusionWeights, HybridWeights, IndexedKnowledgeGraph,
     InvertedIndex, TextSearchResult, Tokenizer,
 };
+
+pub use vector_index::{BruteForceVectorIndex, VectorIndex, VectorIndexStats};
 
 pub use shard::{
     GhostEdge, GlobalNodeId, RebalancePlan, ShardId, ShardRouter, ShardedGraph, ShardedQueryResult,
