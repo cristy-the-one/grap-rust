@@ -316,21 +316,48 @@ impl KnowledgeGraph {
         dir_file.sync_all()
     }
 
-    /// Load a graph from disk (portable path, no mmap).
-    pub fn load_from_disk(dir: &Path) -> Result<Self, GraphError> {
-        // Best-effort cleanup of failed previous saves (atomic save recovery)
+    /// Removes any stale temporary save directories left behind by interrupted
+    /// calls to `save_to_disk`.
+    ///
+    /// Returns the number of directories that were removed.
+    fn cleanup_stale_temp_saves(dir: &Path) -> usize {
+        let mut removed = 0;
         if let Some(parent) = dir.parent() {
             if let Ok(entries) = fs::read_dir(parent) {
                 for entry in entries.flatten() {
                     let name = entry.file_name();
                     if let Some(name_str) = name.to_str() {
                         if name_str.starts_with(".grap-save-") {
-                            let _ = fs::remove_dir_all(entry.path());
+                            if fs::remove_dir_all(entry.path()).is_ok() {
+                                removed += 1;
+                            }
                         }
                     }
                 }
             }
         }
+        removed
+    }
+
+    /// Attempts to repair a potentially corrupted graph directory.
+    ///
+    /// This is a best-effort operation. Currently it removes any stale
+    /// temporary directories that may have been left behind by a crashed or
+    /// interrupted `save_to_disk` call.
+    ///
+    /// It does **not** attempt to reconstruct lost data — it only cleans up
+    /// the side effects of failed atomic saves.
+    ///
+    /// Returns `Ok(())` if the repair attempt completed successfully.
+    pub fn repair(dir: &Path) -> Result<(), GraphError> {
+        Self::cleanup_stale_temp_saves(dir);
+        Ok(())
+    }
+
+    /// Load a graph from disk (portable path, no mmap).
+    pub fn load_from_disk(dir: &Path) -> Result<Self, GraphError> {
+        // Best-effort cleanup of failed previous saves (atomic save recovery)
+        Self::cleanup_stale_temp_saves(dir);
 
         // Read meta
         let meta_str = fs::read_to_string(dir.join("graph.meta"))?;
@@ -670,5 +697,18 @@ mod tests {
             }
             other => panic!("expected UnsupportedVersion, got {:?}", other),
         }
+    }
+
+    #[test]
+    fn repair_is_idempotent_and_safe() {
+        let dir = tempdir().unwrap();
+        let graph_dir = dir.path().join("test-graph");
+
+        // Calling repair on a non-existent directory should be safe
+        KnowledgeGraph::repair(&graph_dir).expect("repair on non-existent dir should not fail");
+
+        // Create an empty directory and repair it — should still succeed
+        fs::create_dir(&graph_dir).unwrap();
+        KnowledgeGraph::repair(&graph_dir).expect("repair on empty dir should succeed");
     }
 }

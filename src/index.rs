@@ -776,6 +776,13 @@ impl IndexedKnowledgeGraph {
         KnowledgeGraph::load_meta(dir)
     }
 
+    /// Attempts to repair a potentially corrupted graph directory.
+    ///
+    /// Delegates to [`KnowledgeGraph::repair`].
+    pub fn repair(dir: &std::path::Path) -> Result<(), GraphError> {
+        KnowledgeGraph::repair(dir)
+    }
+
     /// Load using memory-mapped blobs (zero-copy) and rebuild the text index.
     ///
     /// Requires the `mmap` feature to be enabled.
