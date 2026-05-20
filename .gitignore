@@ -1,0 +1,29 @@
+# Rust
+/target/
+**/*.rs.bk
+*.pdb
+Cargo.lock
+
+# IDE / editors
+.idea/
+.vscode/
+*.swp
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build artifacts
+*.o
+*.so
+*.dylib
+*.dll
+
+# Temporary / test data
+/tmp/
+*.tmp
+*.log
+
+# The ephemeral Grok session plans (only the committed docs/ version matters)
+# (nothing here - we will commit the copy under docs/)
