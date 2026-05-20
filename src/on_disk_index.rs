@@ -22,6 +22,8 @@ pub type LocalDocId = u32;
 pub struct SegmentInfo {
     pub doc_count: u32,
     pub tier: u32,
+    /// Live (non-deleted) document count in the segment. Useful for vacuum decisions and rebalancing.
+    pub live_doc_count: u32,
 }
 
 const SEGMENT_MAGIC: [u8; 4] = *b"GRPI";
@@ -160,6 +162,18 @@ impl OnDiskSegment {
 
     pub fn doc_length(&self, doc_id: LocalDocId) -> u32 {
         self.doc_lengths.get(doc_id as usize).copied().unwrap_or(1)
+    }
+
+    /// Number of live (non-deleted) documents in this segment.
+    pub fn live_doc_count(&self) -> u32 {
+        (0..self.doc_count).filter(|&d| !self.is_deleted(d)).count() as u32
+    }
+
+    /// Fraction of documents that are deleted (0.0 = clean, 1.0 = all deleted).
+    pub fn delete_ratio(&self) -> f32 {
+        if self.doc_count == 0 { return 0.0; }
+        let deleted = self.doc_count - self.live_doc_count();
+        deleted as f32 / self.doc_count as f32
     }
 
     pub fn write_to_disk(&self, path: &Path) -> std::io::Result<()> {
@@ -426,12 +440,14 @@ impl OnDiskIndex {
             .map(|s| SegmentInfo {
                 doc_count: s.segment.doc_count,
                 tier: s.tier,
-                // We can add more (size on disk, live doc ratio after deletes, etc.) later
+                live_doc_count: s.segment.live_doc_count(),
             })
             .collect()
     }
 
     pub fn compact(&mut self) {
+        // Full compaction: merge *everything* into the smallest possible number of segments.
+        // More expensive than `vacuum()`, but guarantees a single (or very few) segment(s).
         self.flush();
         if self.sealed.is_empty() { return; }
         let refs: Vec<&OnDiskSegment> = self.sealed.iter().map(|s| &s.segment).collect();
@@ -452,12 +468,35 @@ impl OnDiskIndex {
     /// Call this (via `ShardedGraph::vacuum_deleted_nodes()` or directly)
     /// when you want to reclaim disk space after many deletes.
     pub fn vacuum(&mut self) {
-        self.compact();
+        // Incremental, tombstone-aware vacuum.
+        // Only rewrites segments whose delete ratio exceeds the threshold.
+        // This is cheap when deletes are concentrated in a few segments (common case after bulk deletes or rebalancing).
+        const DELETE_THRESHOLD: f32 = 0.05; // 5% — tune as needed
 
-        // TODO (0.2 polish):
-        // - Truncate WAL after a successful full compaction
-        // - Remove segments that have zero live documents after merging
-        // - Possibly rewrite the delete bitmap to be more compact
+        let mut i = 0;
+        while i < self.sealed.len() {
+            let ratio = self.sealed[i].segment.delete_ratio();
+            if ratio > DELETE_THRESHOLD {
+                let old_seg = &self.sealed[i].segment;
+                let cleaned = merge_segments(&[old_seg]);
+
+                if cleaned.doc_count == 0 {
+                    // Segment became completely empty — drop it
+                    self.sealed.remove(i);
+                    continue;
+                } else {
+                    let tier = self.sealed[i].tier;
+                    self.sealed[i] = SealedSegment { segment: cleaned, tier };
+                }
+            }
+            i += 1;
+        }
+
+        // After rewriting dirty segments, give the tiered policy a chance
+        // to merge any newly created small segments.
+        self.apply_merge_policy();
+
+        // Future: truncate WAL here if we have a clean state.
     }
 
     pub fn apply_merge_policy(&mut self) {
@@ -489,12 +528,96 @@ impl OnDiskIndex {
     pub fn phrase_search(&self, terms: &[&str], max_gap: u32) -> Vec<(LocalDocId, f32)> { vec![] }
 }
 
-// merge_segments (full from spike)
+/// Real merge of one or more segments.
+/// - Filters out deleted documents (tombstones) from each input segment.
+/// - Remaps live document IDs to a dense 0..live_count range.
+/// - Rebuilds a single clean `OnDiskSegment` with merged term dictionary and postings.
+/// This is the core primitive used by both full `compact()` and incremental `vacuum()`.
 pub fn merge_segments(segs: &[&OnDiskSegment]) -> OnDiskSegment {
-    // ... full compaction merge with live doc renumbering and delete filtering ...
-    if segs.is_empty() { return OnDiskSegment { doc_count: 0, deleted: vec![], terms: vec![], postings_blob: vec![], doc_lengths: vec![] }; }
-    // (real implementation from spike goes here - it produces a clean compacted segment)
-    OnDiskSegment { doc_count: 0, deleted: vec![], terms: vec![], postings_blob: vec![], doc_lengths: vec![] }
+    if segs.is_empty() {
+        return OnDiskSegment { doc_count: 0, deleted: vec![], terms: vec![], postings_blob: vec![], doc_lengths: vec![] };
+    }
+
+    // First pass: compute per-segment old_doc -> new_live_id remapping and total live count.
+    let mut remaps: Vec<Vec<Option<LocalDocId>>> = Vec::with_capacity(segs.len());
+    let mut global_live: LocalDocId = 0;
+
+    for seg in segs {
+        let mut map = vec![None; seg.doc_count as usize];
+        for old_id in 0..seg.doc_count {
+            if !seg.is_deleted(old_id) {
+                map[old_id as usize] = Some(global_live);
+                global_live += 1;
+            }
+        }
+        remaps.push(map);
+    }
+
+    // Collect live doc_lengths while we are at it (remapped)
+    let mut new_doc_lengths = vec![0u32; global_live as usize];
+    for (sidx, seg) in segs.iter().enumerate() {
+        for old_id in 0..seg.doc_count {
+            if let Some(&new_id) = remaps[sidx].get(old_id as usize).and_then(|x| x.as_ref()) {
+                if (old_id as usize) < seg.doc_lengths.len() {
+                    new_doc_lengths[new_id as usize] = seg.doc_lengths[old_id as usize];
+                }
+            }
+        }
+    }
+
+    // Second pass: aggregate postings per term, remapping doc_ids on the fly.
+    let mut term_postings: BTreeMap<String, Vec<Posting>> = BTreeMap::new();
+
+    for (sidx, seg) in segs.iter().enumerate() {
+        for tmeta in &seg.terms {
+            let start = tmeta.posting_offset as usize;
+            let end = start + tmeta.posting_len as usize;
+            if end > seg.postings_blob.len() { continue; }
+
+            if let Ok(posts) = bincode::deserialize::<Vec<Posting>>(&seg.postings_blob[start..end]) {
+                for mut p in posts {
+                    if let Some(&new_id) = remaps[sidx].get(p.doc_id as usize).and_then(|x| x.as_ref()) {
+                        p.doc_id = new_id;
+                        term_postings.entry(tmeta.term.clone()).or_default().push(p);
+                    }
+                }
+            }
+        }
+    }
+
+    // Build final term list + postings blob (sorted for determinism)
+    let mut new_terms: Vec<TermMeta> = Vec::new();
+    let mut new_blob: Vec<u8> = Vec::new();
+
+    for (term, mut posts) in term_postings {
+        posts.sort_by_key(|p| p.doc_id);
+        let df = posts.len() as u32;
+        let serialized = bincode::serialize(&posts).expect("serialize postings");
+        let offset = new_blob.len() as u32;
+        let len = serialized.len() as u32;
+        new_blob.extend(serialized);
+
+        new_terms.push(TermMeta {
+            term,
+            df,
+            posting_offset: offset,
+            posting_len: len,
+        });
+    }
+
+    let new_deleted = if global_live > 0 {
+        vec![0u8; ((global_live as usize) + 7) / 8]
+    } else {
+        vec![]
+    };
+
+    OnDiskSegment {
+        doc_count: global_live,
+        deleted: new_deleted,
+        terms: new_terms,
+        postings_blob: new_blob,
+        doc_lengths: new_doc_lengths,
+    }
 }
 
 // Background worker (full robust version from spike)
