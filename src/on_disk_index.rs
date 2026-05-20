@@ -16,6 +16,14 @@ use serde::{Deserialize, Serialize};
 
 pub type LocalDocId = u32;
 
+/// Lightweight description of one sealed segment.
+/// Used by segment-aware rebalancing and vacuum planning.
+#[derive(Debug, Clone, Copy)]
+pub struct SegmentInfo {
+    pub doc_count: u32,
+    pub tier: u32,
+}
+
 const SEGMENT_MAGIC: [u8; 4] = *b"GRPI";
 const SEGMENT_VERSION: u16 = 1;
 
@@ -327,6 +335,18 @@ impl OnDiskIndex {
 
     pub fn sealed_segment_count(&self) -> usize { self.sealed.len() }
     pub fn approx_doc_count(&self) -> u64 { self.total_docs + self.active.doc_count() as u64 }
+
+    /// Returns basic info about each sealed segment (useful for segment-aware rebalancing).
+    pub fn sealed_segment_info(&self) -> Vec<SegmentInfo> {
+        self.sealed
+            .iter()
+            .map(|s| SegmentInfo {
+                doc_count: s.segment.doc_count,
+                tier: s.tier,
+                // We can add more (size on disk, live doc ratio after deletes, etc.) later
+            })
+            .collect()
+    }
 
     pub fn compact(&mut self) {
         self.flush();

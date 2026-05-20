@@ -144,6 +144,12 @@ impl TextIndex for OnDiskTextIndex {
         self.engine.compact();
     }
 
+    /// Returns segment-level information (doc counts, tiers, etc.).
+    /// Useful for segment-aware rebalancing decisions.
+    pub fn sealed_segment_info(&self) -> Vec<crate::on_disk_index::SegmentInfo> {
+        self.engine.sealed_segment_info()
+    }
+
     // === Persistence (delegated to the inner OnDiskIndex) ===
 
     pub fn save_to_dir(&mut self, dir: &std::path::Path) -> Result<(), crate::GraphError> {

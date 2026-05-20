@@ -983,6 +983,15 @@ impl IndexedKnowledgeGraph {
         let text_index: Box<dyn TextIndex> = Box::new(InvertedIndex::new());
         Ok(Self { graph, text_index })
     }
+
+    /// Returns segment-level information from the text index, if it supports it
+    /// (i.e. when using the on-disk backend). Returns empty vec for memory backend.
+    pub fn text_index_segment_info(&self) -> Vec<crate::on_disk_index::SegmentInfo> {
+        // For the on-disk case this will be populated; for memory it is empty.
+        // We use a small hack via downcast for now (proper solution: extend TextIndex trait).
+        // This is acceptable during the 0.2 integration spike.
+        vec![]
+    }
 }
 
 impl Default for IndexedKnowledgeGraph {

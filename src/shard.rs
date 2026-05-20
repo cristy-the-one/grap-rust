@@ -416,6 +416,16 @@ impl ShardRouter {
         self.vacuum_deleted_nodes();
     }
 
+    /// Returns, for each shard, the list of its on-disk segments (if any).
+    /// Memory-backed shards return an empty list.
+    /// This data is the foundation for segment-aware rebalancing.
+    pub fn segment_distribution(&self) -> Vec<Vec<crate::on_disk_index::SegmentInfo>> {
+        self.shards
+            .iter()
+            .map(|s| s.graph.text_index_segment_info())
+            .collect()
+    }
+
     // ======================================================================
     // Persistence for sharded on-disk graphs (0.2)
     // ======================================================================
@@ -941,6 +951,12 @@ impl ShardedGraph {
     /// a chance to reclaim space from deleted nodes.
     pub fn vacuum_deleted_nodes(&mut self) {
         self.router.vacuum_deleted_nodes();
+    }
+
+    /// Returns per-shard segment distribution (empty for memory-backed shards).
+    /// Primary input for future segment-aware rebalancing.
+    pub fn segment_distribution(&self) -> Vec<Vec<crate::on_disk_index::SegmentInfo>> {
+        self.router.segment_distribution()
     }
 
     // === Per-shard on-disk persistence (0.2) ===
