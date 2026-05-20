@@ -37,6 +37,14 @@ __pycache__/
 build/
 develop-eggs/
 dist/
+
+# Demo / visualization artifacts (generated at runtime)
+demo-graph/
+demo-graph-test/
+*.dot
+graph.png
+graph.svg
+graph.pdf
 downloads/
 eggs/
 .eggs/
