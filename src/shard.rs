@@ -437,11 +437,17 @@ impl ShardRouter {
         }
     }
 
-    /// Start merge workers for on-disk shards (delegation).
-    pub fn start_background_merge_workers(&mut self, interval: std::time::Duration) {
+    /// Start background merge + incremental vacuum workers for on-disk shards.
+    ///
+    /// Returns the number of workers started.
+    pub fn start_background_merge_workers(&mut self, interval: std::time::Duration) -> usize {
+        let mut total = 0;
         for shard in &mut self.shards {
-            let _ = shard.graph.start_merge_worker(interval);
+            if shard.graph.start_background_workers(interval) > 0 {
+                total += 1;
+            }
         }
+        total
     }
 
     /// Returns a serializable snapshot of all ghost edges (used by persistence).

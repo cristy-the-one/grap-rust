@@ -251,7 +251,7 @@ pub struct IndexStats {
 /// Both the classic `InvertedIndex` and future persistent implementations
 /// (see `on_disk_text_index`) will implement this trait. This allows
 /// `IndexedKnowledgeGraph` to be (mostly) backend-agnostic.
-pub trait TextIndex: Send + Sync {
+pub trait TextIndex: Send + Sync + std::any::Any {
     /// Index the text content of a node.
     fn index_document(&mut self, node: NodeId, text: &str);
 
@@ -623,6 +623,10 @@ pub struct IndexedKnowledgeGraph {
     /// or (when the `on-disk-index` feature is enabled) a persistent
     /// segmented implementation.
     pub text_index: Box<dyn TextIndex>,
+
+    /// Background merge/vacuum worker handles for on-disk text indexes.
+    /// Stored here so they stay alive as long as the graph does.
+    merge_workers: Vec<crate::on_disk_index::MergeWorkerHandle>,
 }
 
 impl IndexedKnowledgeGraph {
@@ -630,7 +634,7 @@ impl IndexedKnowledgeGraph {
         Self {
             graph: KnowledgeGraph::new(),
             text_index: Box::new(InvertedIndex::new()),
-
+            merge_workers: Vec::new(),
         }
     }
 
@@ -639,18 +643,21 @@ impl IndexedKnowledgeGraph {
         Self {
             graph: KnowledgeGraph::new(),
             text_index: Box::new(InvertedIndex::with_tokenizer(tokenizer)),
-
+            merge_workers: Vec::new(),
         }
     }
 
-    /// Create an `IndexedKnowledgeGraph` that uses the experimental on-disk
-    /// segmented inverted index (requires the `on-disk-index` feature).
+    /// Create an `IndexedKnowledgeGraph` that uses the on-disk segmented
+    /// inverted index (requires the `on-disk-index` feature).
+    ///
+    /// After construction, call `start_background_workers(...)` to enable
+    /// automatic incremental compaction / vacuum in the background.
     #[cfg(feature = "on-disk-index")]
     pub fn new_on_disk() -> Self {
         Self {
             graph: KnowledgeGraph::new(),
             text_index: Box::new(crate::on_disk_text_index::OnDiskTextIndex::new()),
-
+            merge_workers: Vec::new(),
         }
     }
 
@@ -661,7 +668,7 @@ impl IndexedKnowledgeGraph {
         Self {
             graph: KnowledgeGraph::new(),
             text_index: index,
-
+            merge_workers: Vec::new(),
         }
     }
 
@@ -885,6 +892,7 @@ impl IndexedKnowledgeGraph {
         let mut ig = Self {
             graph,
             text_index: Box::new(InvertedIndex::new()),
+            merge_workers: Vec::new(),
         };
 
         // Rebuild the index (simple and correct)
@@ -1016,7 +1024,7 @@ impl IndexedKnowledgeGraph {
             Box::new(InvertedIndex::new())
         };
 
-        Ok(Self { graph, text_index })
+        Ok(Self { graph, text_index, merge_workers: Vec::new() })
     }
 
     #[cfg(feature = "mmap")]
@@ -1041,7 +1049,7 @@ impl IndexedKnowledgeGraph {
             Box::new(InvertedIndex::new())
         };
 
-        Ok(Self { graph, text_index })
+        Ok(Self { graph, text_index, merge_workers: Vec::new() })
     }
 
     #[cfg(not(feature = "mmap"))]
@@ -1062,12 +1070,28 @@ impl IndexedKnowledgeGraph {
         self.text_index.vacuum();
     }
 
-    /// Hook for starting background merge/vacuum workers for on-disk text indexes.
+    /// Starts background merge + incremental vacuum workers for on-disk text indexes.
     ///
-    /// See `ShardedGraph::start_background_merge_workers` and the free function
-    /// `crate::on_disk_index::start_merge_worker` for the current recommended usage.
-    pub fn start_merge_worker(&mut self, _interval: std::time::Duration) -> bool {
-        false
+    /// This is the recommended high-level API for getting automatic background
+    /// compaction on a single graph. Worker handles are kept internally.
+    ///
+    /// Returns how many workers were started.
+    pub fn start_background_workers(&mut self, interval: std::time::Duration) -> usize {
+        let mut started = 0;
+
+        // Try to start a worker if we have an on-disk text index
+        #[cfg(feature = "on-disk-index")]
+        {
+            if let Some(ot) = (&mut *self.text_index as &mut dyn std::any::Any)
+                .downcast_mut::<crate::on_disk_text_index::OnDiskTextIndex>()
+            {
+                let handle = ot.start_merge_worker(interval);
+                self.merge_workers.push(handle);
+                started += 1;
+            }
+        }
+
+        started
     }
 }
 

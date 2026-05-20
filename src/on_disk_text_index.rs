@@ -1,39 +1,31 @@
-//! On-Disk / Persistent Text Index (thin bridge layer for 0.2).
+//! On-Disk Text Index Adapter
 //!
-//! This module is the start of the production integration of the segmented
-//! on-disk inverted index developed in `spikes/on_disk_index/`.
+//! This module provides [`OnDiskTextIndex`], a thin adapter that implements
+//! the [`TextIndex`] trait on top of the real on-disk engine
+//! (`on_disk_index` module).
 //!
-//! Current status (as of this commit):
-//! - Defines `OnDiskTextIndex`, a placeholder that will eventually wrap
-//!   the `OnDiskIndex` (or a cleaned-up version of it) from the spike.
-//! - Implements the common `TextIndex` trait defined in `index.rs`.
-//! - When the `on-disk-index` feature is enabled, `IndexedKnowledgeGraph`
-//!   can be constructed with a persistent backend.
+//! It is responsible for:
+//! - Tokenization
+//! - Mapping between `NodeId` and the engine's internal local document IDs
+//! - Delegation of search, phrase search, persistence, compaction, and
+//!   segment information
+//! - Starting background merge/vacuum workers
 //!
-//! Long-term plan:
-//! - Move the good parts of the spike (SegmentBuilder, OnDiskSegment,
-//!   tiered merge, WAL, phrase search with positions, manifest) into this
-//!   module (or a sibling `persistent_inverted_index`).
-//! - Make `OnDiskTextIndex` own one (or per-shard) `OnDiskIndex` instances.
-//! - Wire `GlobalNodeId` translation at this layer or above.
-//!
-//! For now this is intentionally a skeleton so the rest of the codebase
-//! can start depending on the `TextIndex` trait.
+//! Most of the heavy lifting (segment storage, tiered merging, WAL, etc.)
+//! lives in `on_disk_index.rs`. This module exists so the rest of the
+//! crate can stay backend-agnostic via the `TextIndex` trait.
 
 use crate::ids::NodeId;
 use crate::index::{DefaultTokenizer, IndexStats, TextIndex, Tokenizer};
 use crate::on_disk_index::{self as engine, OnDiskIndex};
 
-/// Placeholder for the persistent on-disk text index.
+/// Adapter that makes the on-disk engine usable through the `TextIndex` trait.
 ///
-/// In a full implementation this would contain:
-/// - One or more `OnDiskIndex` (from the spike design)
-/// - A tokenizer
-/// - Mapping from `NodeId` (or `GlobalNodeId`) to (segment, local_doc)
-/// - Background merge worker handle
-/// - WAL management, etc.
+/// See the module-level documentation for design rationale.
 pub struct OnDiskTextIndex {
-    engine: OnDiskIndex,
+    /// The engine is behind an Arc<Mutex<>> so that background merge/vacuum
+    /// workers can safely hold a reference to it.
+    engine: std::sync::Arc<std::sync::Mutex<OnDiskIndex>>,
     tokenizer: Box<dyn Tokenizer>,
     /// Simple mapping for non-sharded case: NodeId (as u32) -> local doc id inside the engine.
     /// In a real sharded setup this mapping lives per-shard.
@@ -44,7 +36,7 @@ pub struct OnDiskTextIndex {
 impl OnDiskTextIndex {
     pub fn new() -> Self {
         Self {
-            engine: OnDiskIndex::new(),
+            engine: std::sync::Arc::new(std::sync::Mutex::new(OnDiskIndex::new())),
             tokenizer: Box::new(DefaultTokenizer::new()),
             node_to_local: std::collections::HashMap::new(),
             next_local_id: 0,
@@ -70,23 +62,31 @@ impl OnDiskTextIndex {
 
     // Public inherent API (so callers can do idx.vacuum() directly on the concrete type)
     pub fn vacuum(&mut self) {
-        self.engine.vacuum();
+        self.engine.lock().unwrap().vacuum();
     }
     pub fn compact(&mut self) {
-        self.engine.compact();
+        self.engine.lock().unwrap().compact();
     }
     pub fn remove_sealed_segment(&mut self, index: usize) -> Option<(crate::on_disk_index::OnDiskSegment, u32)> {
-        self.engine.remove_sealed_segment(index)
+        self.engine.lock().unwrap().remove_sealed_segment(index)
     }
     pub fn add_sealed_segment(&mut self, seg: crate::on_disk_index::OnDiskSegment, tier: u32) {
-        self.engine.add_sealed_segment(seg, tier);
+        self.engine.lock().unwrap().add_sealed_segment(seg, tier);
         self.node_to_local.clear();
         self.next_local_id = 0;
     }
     pub fn save_to_dir(&mut self, dir: &std::path::Path) -> Result<(), crate::GraphError> {
         self.engine
+            .lock()
+            .unwrap()
             .save_to_dir(dir)
             .map_err(|e| crate::GraphError::Other(e.to_string()))
+    }
+
+    /// Start a background merge + incremental vacuum worker for this on-disk index.
+    /// Keep the returned handle alive for as long as you want the worker running.
+    pub fn start_merge_worker(&self, interval: std::time::Duration) -> crate::on_disk_index::MergeWorkerHandle {
+        crate::on_disk_index::start_merge_worker(self.engine.clone(), interval)
     }
 }
 
@@ -103,13 +103,13 @@ impl TextIndex for OnDiskTextIndex {
         let positions: Vec<Vec<u32>> = tokens.iter().map(|(_, pos)| vec![*pos]).collect();
 
         let local = self.ensure_local(node);
-        let _ = self.engine.add_document(&terms, &positions);
+        let _ = self.engine.lock().unwrap().add_document(&terms, &positions);
         // For simplicity in this step we just use the engine's own local ids.
         // A production version would maintain a bidirectional map.
     }
 
     fn search(&self, query: &str, max_results: usize) -> Vec<(NodeId, f64)> {
-        let raw = self.engine.search(&[query]);
+        let raw = self.engine.lock().unwrap().search(&[query]);
         raw.into_iter()
             .take(max_results)
             .filter_map(|(local, score)| {
@@ -120,22 +120,23 @@ impl TextIndex for OnDiskTextIndex {
 
     fn phrase_search(&self, phrase: &str, max_gap: u32, max_results: usize) -> Vec<(NodeId, f64)> {
         let terms: Vec<&str> = phrase.split_whitespace().collect();
-        let raw = self.engine.phrase_search(&terms, max_gap);
+        let raw = self.engine.lock().unwrap().phrase_search(&terms, max_gap);
         raw.into_iter().take(max_results).map(|(local, sc)| (NodeId(local), sc as f64)).collect()
     }
 
     fn stats(&self) -> IndexStats {
+        let g = self.engine.lock().unwrap();
         crate::index::IndexStats {
             unique_terms: 0,
             total_postings: 0,
-            document_count: self.engine.approx_doc_count() as u32,
+            document_count: g.approx_doc_count() as u32,
             avg_doc_length: 0.0,
         }
     }
 
     fn delete_document(&mut self, node: NodeId) {
         if let Some(&local) = self.node_to_local.get(&node.0) {
-            self.engine.delete(local);
+            self.engine.lock().unwrap().delete(local);
         }
     }
 
@@ -151,36 +152,36 @@ impl TextIndex for OnDiskTextIndex {
     // The trait now declares vacuum/compact/take/add/sample as defaulted methods.
     // We only override the ones we actually need for the on-disk backend.
     fn vacuum(&mut self) {
-        self.engine.vacuum();
+        self.engine.lock().unwrap().vacuum();
     }
     fn compact(&mut self) {
-        self.engine.compact();
+        self.engine.lock().unwrap().compact();
     }
 
-    // Trait overrides for rebalancer (these provide the TextIndex trait methods)
+    // Trait overrides for rebalancer
     fn take_sealed_segment(&mut self, index: usize) -> Option<(crate::on_disk_index::OnDiskSegment, u32)> {
-        self.engine.remove_sealed_segment(index)
+        self.engine.lock().unwrap().remove_sealed_segment(index)
     }
     fn add_sealed_segment(&mut self, seg: crate::on_disk_index::OnDiskSegment, tier: u32) {
-        self.engine.add_sealed_segment(seg, tier);
+        self.engine.lock().unwrap().add_sealed_segment(seg, tier);
         self.node_to_local.clear();
         self.next_local_id = 0;
     }
     fn sample_representative_for_segment(&self, seg_idx: usize) -> Option<String> {
-        let infos = self.engine.sealed_segment_info();
+        let infos = self.engine.lock().unwrap().sealed_segment_info();
         if seg_idx >= infos.len() { return None; }
         let info = &infos[seg_idx];
         Some(format!("seg-sample-tier{}-docs{}", info.tier, info.doc_count))
     }
 
     fn segment_info(&self) -> Vec<crate::on_disk_index::SegmentInfo> {
-        self.engine.sealed_segment_info()
+        self.engine.lock().unwrap().sealed_segment_info()
     }
-
-    // === Persistence (delegated to the inner OnDiskIndex) ===
 
     fn save_to_dir(&mut self, dir: &std::path::Path) -> Result<(), crate::GraphError> {
         self.engine
+            .lock()
+            .unwrap()
             .save_to_dir(dir)
             .map_err(|e| crate::GraphError::Other(e.to_string()))
     }
@@ -192,7 +193,7 @@ impl TextIndex for OnDiskTextIndex {
             .map_err(|e| crate::GraphError::Other(format!("failed to load on-disk index: {}", e)))?;
 
         let idx = Self {
-            engine,
+            engine: std::sync::Arc::new(std::sync::Mutex::new(engine)),
             tokenizer: Box::new(crate::index::DefaultTokenizer::new()),
             node_to_local: std::collections::HashMap::new(),
             next_local_id: 0,
