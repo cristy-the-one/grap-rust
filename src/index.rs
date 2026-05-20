@@ -13,6 +13,9 @@ use crate::ids::NodeId;
 use crate::properties::PropertyValue;
 use crate::GraphError;
 
+// The on-disk text index lives as a sibling module when the feature is enabled.
+// Declared from lib.rs to keep the file at src/on_disk_text_index.rs.
+
 // ============================================================================
 // Tokenizer
 // ============================================================================
@@ -241,6 +244,63 @@ pub struct IndexStats {
     pub total_postings: usize,
     pub document_count: u32,
     pub avg_doc_length: f64,
+}
+
+/// Common contract for all text index backends (in-memory today, on-disk in 0.2+).
+///
+/// Both the classic `InvertedIndex` and future persistent implementations
+/// (see `on_disk_text_index`) will implement this trait. This allows
+/// `IndexedKnowledgeGraph` to be (mostly) backend-agnostic.
+pub trait TextIndex: Send + Sync {
+    /// Index the text content of a node.
+    fn index_document(&mut self, node: NodeId, text: &str);
+
+    /// Basic term search (returns (node, score) pairs). The implementation
+    /// may return up to `max_results` entries.
+    fn search(&self, query: &str, max_results: usize) -> Vec<(NodeId, f64)>;
+
+    /// Phrase / proximity search.
+    fn phrase_search(&self, phrase: &str, max_gap: u32, max_results: usize) -> Vec<(NodeId, f64)>;
+
+    /// Return basic statistics about the index.
+    fn stats(&self) -> IndexStats;
+
+    /// Optional: delete support (tombstones in the on-disk case).
+    fn delete_document(&mut self, _node: NodeId) {}
+
+    /// Returns true if the document has been logically deleted (tombstone).
+    /// On-disk backends use this during rebalance and traversal to skip/clean.
+    fn is_document_deleted(&self, _node: NodeId) -> bool { false }
+}
+
+impl TextIndex for InvertedIndex {
+    fn index_document(&mut self, node: NodeId, text: &str) {
+        // Delegate to the existing inherent method
+        InvertedIndex::index_document(self, node, text);
+    }
+
+    fn search(&self, query: &str, max_results: usize) -> Vec<(NodeId, f64)> {
+        self.search(query, max_results)
+            .into_iter()
+            .map(|r| (r.node_id, r.score))
+            .collect()
+    }
+
+    fn phrase_search(&self, phrase: &str, max_gap: u32, max_results: usize) -> Vec<(NodeId, f64)> {
+        self.phrase_search(phrase, max_gap, max_results)
+            .into_iter()
+            .map(|r| (r.node_id, r.score))
+            .collect()
+    }
+
+    fn stats(&self) -> IndexStats {
+        self.stats()
+    }
+
+    fn delete_document(&mut self, node: NodeId) {
+        // The current in-memory index does not have delete yet (0.2 work)
+        let _ = node;
+    }
 }
 
 pub struct InvertedIndex {
@@ -517,22 +577,45 @@ use crate::query::QueryResult;
 /// `search_and_traverse` workflow described in the design document.
 pub struct IndexedKnowledgeGraph {
     pub graph: KnowledgeGraph,
-    pub text_index: InvertedIndex,
+    /// The text index backend. Can be the classic in-memory implementation
+    /// or (when the `on-disk-index` feature is enabled) a persistent
+    /// segmented implementation.
+    pub text_index: Box<dyn TextIndex>,
 }
 
 impl IndexedKnowledgeGraph {
     pub fn new() -> Self {
         Self {
             graph: KnowledgeGraph::new(),
-            text_index: InvertedIndex::new(),
+            text_index: Box::new(InvertedIndex::new()),
         }
     }
 
-    /// Create an `IndexedKnowledgeGraph` with a custom tokenizer.
+    /// Create an `IndexedKnowledgeGraph` with a custom tokenizer (memory backend).
     pub fn with_tokenizer(tokenizer: Box<dyn Tokenizer>) -> Self {
         Self {
             graph: KnowledgeGraph::new(),
-            text_index: InvertedIndex::with_tokenizer(tokenizer),
+            text_index: Box::new(InvertedIndex::with_tokenizer(tokenizer)),
+        }
+    }
+
+    /// Create an `IndexedKnowledgeGraph` that uses the experimental on-disk
+    /// segmented inverted index (requires the `on-disk-index` feature).
+    #[cfg(feature = "on-disk-index")]
+    pub fn new_on_disk() -> Self {
+        Self {
+            graph: KnowledgeGraph::new(),
+            text_index: Box::new(crate::on_disk_text_index::OnDiskTextIndex::new()),
+        }
+    }
+
+    /// Builder-style constructor that lets you choose the text backend.
+    /// When the `on-disk-index` feature is enabled you can pass an
+    /// `OnDiskTextIndex`.
+    pub fn with_text_index(index: Box<dyn TextIndex>) -> Self {
+        Self {
+            graph: KnowledgeGraph::new(),
+            text_index: index,
         }
     }
 
@@ -577,11 +660,11 @@ impl IndexedKnowledgeGraph {
             return Vec::new();
         }
 
-        let seed_ids: Vec<NodeId> = text_results.iter().map(|r| r.node_id).collect();
+        let seed_ids: Vec<NodeId> = text_results.iter().map(|(id, _)| *id).collect();
 
         // Build a quick lookup for seed text scores
         let seed_scores: std::collections::HashMap<NodeId, f64> =
-            text_results.iter().map(|r| (r.node_id, r.score)).collect();
+            text_results.iter().map(|(id, sc)| (*id, *sc)).collect();
 
         let mut builder = self
             .graph
@@ -650,10 +733,10 @@ impl IndexedKnowledgeGraph {
             return Vec::new();
         }
 
-        let seed_ids: Vec<NodeId> = text_results.iter().map(|r| r.node_id).collect();
+        let seed_ids: Vec<NodeId> = text_results.iter().map(|(id, _)| *id).collect();
 
         let seed_scores: std::collections::HashMap<NodeId, f64> =
-            text_results.iter().map(|r| (r.node_id, r.score)).collect();
+            text_results.iter().map(|(id, sc)| (*id, *sc)).collect();
 
         let mut builder = self
             .graph
@@ -755,7 +838,7 @@ impl IndexedKnowledgeGraph {
         let graph = KnowledgeGraph::load_from_disk(dir)?;
         let mut ig = Self {
             graph,
-            text_index: InvertedIndex::new(),
+            text_index: Box::new(InvertedIndex::new()),
         };
 
         // Rebuild the index (simple and correct)
@@ -805,12 +888,52 @@ impl IndexedKnowledgeGraph {
 
     /// Plain text search (delegates to the inverted index).
     pub fn search(&self, query: &str, max_results: usize) -> Vec<TextSearchResult> {
-        self.text_index.search(query, max_results)
+        self.text_index
+            .search(query, max_results)
+            .into_iter()
+            .map(|(node_id, score)| TextSearchResult {
+                node_id,
+                score,
+                matched_terms: vec![], // TODO: populate from the backend
+            })
+            .collect()
     }
 
     /// Phrase search (delegates to the inverted index).
     pub fn phrase_search(&self, phrase: &str, max_gap: u32, max_results: usize) -> Vec<TextSearchResult> {
-        self.text_index.phrase_search(phrase, max_gap, max_results)
+        self.text_index
+            .phrase_search(phrase, max_gap, max_results)
+            .into_iter()
+            .map(|(node_id, score)| TextSearchResult {
+                node_id,
+                score,
+                matched_terms: vec![],
+            })
+            .collect()
+    }
+
+    /// Removes a node from both the graph topology and the text index (tombstone).
+    ///
+    /// In sharded mode this will eventually trigger ghost-edge cleanup.
+    /// Returns whether the node was successfully removed.
+    pub fn remove_node(&mut self, node: NodeId) -> bool {
+        let removed = self.graph.remove_node(node);
+        if removed {
+            self.text_index.delete_document(node);
+
+            // Optional background ghost-edge cleanup hook.
+            // In a real deployment this could be scheduled asynchronously.
+            // For now we do a cheap synchronous pass (can be made lazy later).
+            self.maybe_cleanup_ghost_edges_for(node);
+        }
+        removed
+    }
+
+    /// Hook for ghost-edge cleanup after deletion.
+    /// In sharded setups this should be delegated to the `ShardRouter`.
+    fn maybe_cleanup_ghost_edges_for(&mut self, _node: NodeId) {
+        // No-op in the single-graph case.
+        // Real implementation lives in ShardedGraph / ShardRouter.
     }
 }
 

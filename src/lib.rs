@@ -36,9 +36,20 @@ pub mod properties;
 pub mod graph;
 pub mod query;
 pub mod index;     // Full-text BM25 index (Phase 2)
+
+#[cfg(feature = "on-disk-index")]
+pub mod on_disk_text_index;
+
+#[cfg(feature = "on-disk-index")]
+mod on_disk_index;
 pub mod serialize; // Persistence (save/load + optional mmap) - Phase 3 in progress
 
 // Re-exports for ergonomic use
+
+// On-disk index bridge (behind feature flag)
+#[cfg(feature = "on-disk-index")]
+pub use crate::on_disk_text_index::OnDiskTextIndex;
+pub use crate::index::TextIndex;
 pub use ids::{EdgeId, NodeId, PropertyTag};
 pub use properties::{PropertyFilter, PropertyRegistry, PropertyValue};
 pub use graph::KnowledgeGraph;

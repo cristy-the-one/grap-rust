@@ -55,6 +55,10 @@ pub struct KnowledgeGraph {
     pub(crate) blobs: BlobStore,
     /// Public property registry. Register names here before using them on edges.
     pub properties: PropertyRegistry,
+    /// Tombstone markers for soft deletes (critical for sharding + ghost edges).
+    /// A node that is `true` here is logically deleted and should be skipped
+    /// by traversal, search, and rebalancing.
+    pub(crate) deleted: Vec<bool>,
 }
 
 impl KnowledgeGraph {
@@ -65,6 +69,7 @@ impl KnowledgeGraph {
             edges: Vec::new(),
             blobs: BlobStore::new(),
             properties: PropertyRegistry::new(),
+            deleted: Vec::new(),
         }
     }
 
@@ -82,7 +87,58 @@ impl KnowledgeGraph {
             label: label.map(|s| s.to_string()),
             outgoing_property_mask: 0,
         });
+        self.deleted.push(false);
         id
+    }
+
+    /// Logically removes a node and all its incident edges (soft delete / tombstone).
+    ///
+    /// The `NodeId` remains valid but the node is marked deleted. This is
+    /// required for correct behavior with sharding and ghost edges.
+    ///
+    /// Returns `true` if the node existed and was removed.
+    pub fn remove_node(&mut self, node: NodeId) -> bool {
+        let idx = node.0 as usize;
+        if idx >= self.nodes.len() || self.deleted.get(idx).copied().unwrap_or(true) {
+            return false;
+        }
+
+        // Mark as deleted (tombstone)
+        self.deleted[idx] = true;
+
+        // Remove from neighbors' edge lists and clear this node's lists
+        let outgoing = std::mem::take(&mut self.nodes[idx].outgoing);
+        let incoming = std::mem::take(&mut self.nodes[idx].incoming);
+
+        for eid in &outgoing {
+            if let Some(e) = self.edges.get(eid.0 as usize) {
+                // Remove from target's incoming list
+                if let Some(target_incoming) = self.nodes.get_mut(e.target.0 as usize) {
+                    target_incoming.incoming.retain(|&x| x != *eid);
+                }
+            }
+        }
+
+        for eid in &incoming {
+            if let Some(e) = self.edges.get(eid.0 as usize) {
+                // Remove from source's outgoing list
+                if let Some(source_outgoing) = self.nodes.get_mut(e.source.0 as usize) {
+                    source_outgoing.outgoing.retain(|&x| x != *eid);
+                }
+            }
+        }
+
+        // Optionally clear property mask
+        if let Some(n) = self.nodes.get_mut(idx) {
+            n.outgoing_property_mask = 0;
+        }
+
+        true
+    }
+
+    /// Returns true if the node has been logically deleted (tombstone).
+    pub fn is_node_deleted(&self, node: NodeId) -> bool {
+        self.deleted.get(node.0 as usize).copied().unwrap_or(true)
     }
 
     /// Returns the full text blob associated with a node (zero-copy when possible).
@@ -174,11 +230,13 @@ impl KnowledgeGraph {
         blobs: BlobStore,
         properties: PropertyRegistry,
     ) -> Self {
+        let n = nodes.len();
         Self {
             nodes,
             edges,
             blobs,
             properties,
+            deleted: vec![false; n],
         }
     }
 }

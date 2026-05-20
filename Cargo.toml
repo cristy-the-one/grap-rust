@@ -51,6 +51,7 @@ mmap = ["memmap2", "crc32fast"]
 fulltext = []
 sharding = []
 telemetry = []  # Enables the Telemetry trait and observability hooks
+on-disk-index = []  # Experimental: use segmented on-disk inverted index (0.2 work)
 
 [dev-dependencies]
 criterion = { version = "0.5", features = ["html_reports"] }

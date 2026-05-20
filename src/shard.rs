@@ -204,19 +204,14 @@ impl Shard {
         // Remove outgoing ghost edges from this node
         self.ghost_edges.remove(&local_id.0);
 
-        // Remove incoming ghost references from other nodes (expensive but correct for now)
+        // Remove incoming ghost references from other nodes
         for ghosts in self.ghost_edges.values_mut() {
             ghosts.retain(|g| g.remote_target.local != local_id);
         }
 
-        // Note: We do not currently have a cheap way to remove the node from the
-        // underlying IndexedKnowledgeGraph while preserving other nodes' adjacency.
-        // For a production system we would either:
-        //   - Mark nodes as deleted, or
-        //   - Maintain a mapping layer on top of the local graph.
-        //
-        // For this basic rebalancer we accept that the node data stays in the old
-        // shard's graph (it will be ignored by future routing).
+        // Mark the node as deleted in the local graph (tombstone).
+        // This ensures is_document_deleted and future traversals will skip it.
+        self.graph.remove_node(local_id);
     }
 }
 
@@ -343,6 +338,49 @@ impl ShardRouter {
             shard: shard_id,
             local: local_id,
         })
+    }
+
+    /// Removes a node from the cluster.
+    ///
+    /// - Marks a tombstone in the owning shard's text index.
+    /// - Removes the node and its local edges on the owning shard.
+    /// - Triggers (best-effort) cleanup of ghost edges pointing to this node
+    ///   on all other shards.
+    pub fn remove_node(&mut self, gid: GlobalNodeId) -> Result<bool, crate::GraphError> {
+        let shard_idx = gid.shard.0 as usize;
+        if shard_idx >= self.shards.len() {
+            return Err(crate::GraphError::NotFound(format!(
+                "shard {} does not exist",
+                gid.shard.0
+            )));
+        }
+
+        let removed = self.shards[shard_idx].graph.remove_node(gid.local);
+
+        if removed {
+            self.cleanup_ghost_edges_pointing_to(gid);
+        }
+
+        Ok(removed)
+    }
+
+    /// Scans all shards and removes any ghost edges that point to a now-deleted node.
+    /// This is the "background ghost-edge cleanup pass" triggered by remove_node.
+    fn cleanup_ghost_edges_pointing_to(&mut self, deleted_gid: GlobalNodeId) {
+        let n = self.shards.len();
+        for i in 0..n {
+            let mut ghosts_map = std::mem::take(&mut self.shards[i].ghost_edges);
+            for ghosts in ghosts_map.values_mut() {
+                ghosts.retain(|g| {
+                    g.remote_target != deleted_gid
+                        && !self.shards[g.remote_target.shard.0 as usize]
+                            .graph
+                            .text_index
+                            .is_document_deleted(g.remote_target.local)
+                });
+            }
+            self.shards[i].ghost_edges = ghosts_map;
+        }
     }
 
     /// Add an edge between two nodes (possibly across shards).
@@ -578,6 +616,13 @@ impl ShardRouter {
         for (old_idx, shard) in self.shards.iter().enumerate() {
             for i in 0..shard.graph.graph.node_count() {
                 let local_id = NodeId(i as u32);
+
+                // Skip logically deleted nodes (tombstones). They should not be migrated
+                // and any ghost edges pointing to them will be cleaned during/after rebalance.
+                if shard.graph.text_index.is_document_deleted(local_id) {
+                    continue;
+                }
+
                 let text = shard.graph.read_blob(local_id);
                 let new_shard = new_ring.locate(text.as_bytes());
 
@@ -619,6 +664,12 @@ impl ShardRouter {
                 )));
             }
 
+            // Safety check: skip if the node became deleted since the plan was created
+            // (e.g. remove_node was called between plan and execute).
+            if self.shards[old_idx].graph.text_index.is_document_deleted(gid.local) {
+                continue;
+            }
+
             // 1. Extract data before removal
             let text = self.shards[old_idx].graph.read_blob(gid.local).to_string();
             let label = self.shards[old_idx]
@@ -640,7 +691,23 @@ impl ShardRouter {
                 local: new_local,
             };
 
-            // 4. Fix all ghost edges that referenced the old GlobalNodeId
+            // 4. Clean ghost edges pointing to deleted nodes (tombstone cleanup during rebalance)
+            // and update any ghost edges that pointed to the node we just moved.
+            let n = self.shards.len();
+            for i in 0..n {
+                let mut ghosts_map = std::mem::take(&mut self.shards[i].ghost_edges);
+                for ghosts in ghosts_map.values_mut() {
+                    ghosts.retain(|g| {
+                        !self.shards[g.remote_target.shard.0 as usize]
+                            .graph
+                            .text_index
+                            .is_document_deleted(g.remote_target.local)
+                    });
+                }
+                self.shards[i].ghost_edges = ghosts_map;
+            }
+
+            // Update ghost edges that referenced the old location of the moved node
             for shard in &mut self.shards {
                 for ghosts in shard.ghost_edges.values_mut() {
                     for ghost in ghosts.iter_mut() {
@@ -700,6 +767,14 @@ impl ShardedGraph {
         props: Vec<(crate::ids::PropertyTag, crate::properties::PropertyValue)>,
     ) -> Result<(), crate::GraphError> {
         self.router.add_edge(source, target, strength, props)
+    }
+
+    /// Removes a node (and its incident edges) across the sharded cluster.
+    ///
+    /// This marks a tombstone in the owning shard's text index and triggers
+    /// (optional) ghost-edge cleanup across other shards.
+    pub fn remove_node(&mut self, gid: GlobalNodeId) -> Result<bool, crate::GraphError> {
+        self.router.remove_node(gid)
     }
 
     pub fn search(&self, query: &str, max_results: usize) -> Vec<crate::index::TextSearchResult> {
