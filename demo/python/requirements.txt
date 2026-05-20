@@ -1,0 +1,7 @@
+rich>=13.0
+typer>=0.9
+python-dotenv>=1.0
+# Optional but recommended for better demos
+pypdf>=4.0
+# For future visualization
+# graphviz>=0.20
