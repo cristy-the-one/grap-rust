@@ -4,6 +4,18 @@ This guide shows you how to run an impressive, self-contained demonstration of t
 
 The demo is designed to be run live (with pauses for explanation) or in "auto" mode for recordings.
 
+## What the Demo Showcases
+
+The interactive demo is designed to highlight the strongest parts of `grap`:
+
+- **On-disk segmented text index** (WAL, tiered merging, incremental vacuum)
+- **Rich observability** (`SegmentInfo` with live counts, delete ratios, sizes)
+- **Hybrid search + graph traversal**
+- **Live mutation** (add + delete with real tombstones)
+- **Incremental vacuum** (not just full compaction)
+- **Persistence** roundtrips
+- **Visualization** (new in Phase 4)
+
 ## Prerequisites
 
 - Rust toolchain (the project uses MSRV 1.81)
@@ -92,12 +104,45 @@ You can also force a specific binary with the environment variable:
 export GRAP_CLI_PATH=target/release/grap-cli
 ```
 
+## Troubleshooting
+
+**"grap-cli binary not found"**
+
+Make sure you built the release binary:
+
+```bash
+cargo build --release --bin grap-cli --features "fulltext,sharding"
+```
+
+You can force a specific binary with:
+
+```bash
+export GRAP_CLI_PATH=target/release/grap-cli
+```
+
+**Windows encoding issues**
+
+Some terminals have trouble with Unicode. The demo tries to degrade gracefully. Using Windows Terminal instead of the old `cmd.exe` usually helps.
+
+## CI
+
+A smoke test that exercises ingestion, stats, query, and the new export/visualization path runs on every push/PR:
+
+- Workflow: `.github/workflows/demo-smoke.yml`
+- Script: `demo/python/smoke_test.py`
+
+You can run it locally with:
+
+```bash
+python -m demo.python.smoke_test
+```
+
 ## Future Enhancements (Ideas)
 
-- Full document chunking + relationship extraction in `ingest.py`
-- Sharded rebalance live demonstration
-- Simple graph visualization
-- Pre-built binaries + one-command setup for workshops
+- Full document chunking + LLM-based relationship extraction in `ingest.py`
+- Live sharded rebalance demonstration
+- Pre-built binaries + one-command setup script
+- Video / terminal recording of the full demo
 
 ---
 

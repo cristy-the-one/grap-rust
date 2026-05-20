@@ -38,6 +38,38 @@ def _export_graph(graph_dir: Path) -> dict[str, Any]:
     return json.loads(result.stdout)
 
 
+def generate_dot(graph_dir: Path) -> str:
+    """Generate Graphviz DOT content for a grap graph. Reusable from other scripts."""
+    data = _export_graph(graph_dir)
+
+    nodes = data.get("nodes", [])
+    edges = data.get("edges", [])
+
+    dot_lines = ["digraph G {", '  rankdir=LR;', '  node [shape=box, style=rounded];']
+
+    for n in nodes:
+        nid = n["id"]
+        label = n.get("label") or f"Node {nid}"
+        snippet = n.get("snippet", "").replace('"', "'").replace("\n", " ")[:60]
+        dot_lines.append(f'  {nid} [label="{label}\\n{snippet}"];')
+
+    for e in edges:
+        src = e["source"]
+        tgt = e["target"]
+        strength = e.get("strength", 0.5)
+        dot_lines.append(f'  {src} -> {tgt} [label="{strength:.2f}"];')
+
+    dot_lines.append("}")
+    return "\n".join(dot_lines)
+
+
+def write_dot(graph_dir: Path, output_path: Path) -> Path:
+    """Generate and write a .dot file for the given graph. Returns the path written."""
+    dot_content = generate_dot(graph_dir)
+    output_path.write_text(dot_content, encoding="utf-8")
+    return output_path
+
+
 @app.command()
 def main(
     graph_dir: str = typer.Option(..., "--graph-dir", "-g"),

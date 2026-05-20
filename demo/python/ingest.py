@@ -14,11 +14,12 @@ Features:
 
 from __future__ import annotations
 
+import re
 import shutil
-import typer
 from pathlib import Path
 from typing import Dict
 
+import typer
 from rich.console import Console
 from rich.progress import track
 
@@ -86,47 +87,73 @@ def main(
     console.print(f"\n[green][OK][/green] Successfully ingested {len(node_map)} documents into the graph.")
     console.print(f"Graph location: [cyan]{graph_path}[/cyan]")
 
-    # --- Basic relationship inference ---
+    # --- Improved relationship inference ---
     if len(node_map) > 1:
-        console.print("[yellow]Inferring simple relationships...[/yellow]")
+        console.print("[yellow]Inferring relationships (titles + Markdown links)...[/yellow]")
         edges_added = 0
 
-        # Build a reverse map: stem/title -> node_id
-        title_to_id: Dict[str, int] = {}
+        # Map: lowercase stem → node_id
+        stem_to_id: Dict[str, int] = {}
         for path, nid in node_map.items():
-            stem = path.stem.lower()
-            title_to_id[stem] = nid
-            # Also try the label if we had one (we used filename as label in add-file)
+            stem_to_id[path.stem.lower()] = nid
+
+        link_pattern = re.compile(r'\[([^\]]+)\]\(([^)]+)\)', re.IGNORECASE)
 
         for path, source_id in node_map.items():
             try:
-                content = path.read_text(encoding="utf-8", errors="ignore").lower()
+                content = path.read_text(encoding="utf-8", errors="ignore")
             except Exception:
                 continue
 
-            for other_stem, target_id in title_to_id.items():
-                if other_stem == path.stem.lower():
+            content_lower = content.lower()
+            candidates: set[str] = set()
+
+            # 1. Simple title/filename mention (loose but effective)
+            for stem in stem_to_id:
+                if stem != path.stem.lower() and stem in content_lower:
+                    candidates.add(stem)
+
+            # 2. Proper Markdown links: [text](file.md) or [text](../dir/file.md)
+            for match in link_pattern.finditer(content):
+                target = match.group(2).split('#')[0].strip()
+                # Remove query strings and anchors
+                target = target.split('?')[0]
+                if not target:
                     continue
-                if other_stem in content or f"{other_stem}.md" in content:
-                    # Add a weak edge
-                    run_grap_cli(
-                        [
-                            "add-edge",
-                            "--graph-dir", str(graph_path),
-                            "--source", str(source_id),
-                            "--target", str(target_id),
-                            "--strength", "0.4",
-                            "--json",
-                        ],
-                        json_output=True,
-                        check=False,  # don't fail the whole ingest if one edge fails
-                    )
-                    edges_added += 1
+
+                # Resolve relative to current file
+                try:
+                    resolved = (path.parent / target).resolve()
+                    target_stem = resolved.stem.lower()
+                    if target_stem in stem_to_id and target_stem != path.stem.lower():
+                        candidates.add(target_stem)
+                except Exception:
+                    # Fallback: just take the stem of the link target
+                    target_stem = Path(target).stem.lower()
+                    if target_stem in stem_to_id and target_stem != path.stem.lower():
+                        candidates.add(target_stem)
+
+            # Create edges for all discovered targets
+            for target_stem in candidates:
+                target_id = stem_to_id[target_stem]
+                run_grap_cli(
+                    [
+                        "add-edge",
+                        "--graph-dir", str(graph_path),
+                        "--source", str(source_id),
+                        "--target", str(target_id),
+                        "--strength", "0.55",
+                        "--json",
+                    ],
+                    json_output=True,
+                    check=False,
+                )
+                edges_added += 1
 
         if edges_added:
             console.print(f"[green]Added {edges_added} inferred relationships.[/green]")
         else:
-            console.print("[dim]No obvious relationships found between documents.[/dim]")
+            console.print("[dim]No relationships found between documents.[/dim]")
 
 
 if __name__ == "__main__":

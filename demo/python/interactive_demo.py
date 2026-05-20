@@ -174,10 +174,31 @@ def main(
     )
     console.print(f"\nYou can now exit and later continue with:\n  python -m demo.python.interactive_demo --graph-dir {graph_path}")
 
+    if not auto:
+        pause()
+
+    # === Step 7: Visualization (new in Phase 4) ===
+    console.print("\n[bold yellow]Step 7: Generating graph visualization[/bold yellow]")
+    try:
+        from . import visualize as viz
+
+        dot_path = graph_path / "demo-graph.dot"
+        viz.write_dot(graph_path, dot_path)
+
+        console.print(f"[green]✓[/green] Visualization DOT file generated:")
+        console.print(f"  {dot_path}")
+        console.print("\nYou can render it with:")
+        console.print(f"  python -m demo.python.visualize --graph-dir {graph_path} --render graph.png")
+
+    except Exception as e:
+        console.print(f"[yellow]Visualization step skipped:[/yellow] {e}")
+        console.print("You can still generate it manually with:")
+        console.print(f"  python -m demo.python.visualize --graph-dir {graph_path} --output demo-graph.dot")
+
     console.print("\n[bold green]Demo complete![/bold green]")
     console.print(
         "You have experienced: document ingestion → rich observability → hybrid search → "
-        "live modification → delete + real incremental vacuum → persistence."
+        "live modification → delete + real incremental vacuum → persistence + visualization."
     )
 
 
