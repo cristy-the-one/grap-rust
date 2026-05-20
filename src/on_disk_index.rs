@@ -338,6 +338,14 @@ impl OnDiskIndex {
         if merged.doc_count > 0 { self.add_sealed_segment(merged, 0); }
     }
 
+    /// Full vacuum / space reclamation for the on-disk index.
+    /// Currently delegates to `compact()` but is the extension point for
+    /// more aggressive reclamation (WAL truncation, empty segment removal, etc.).
+    pub fn vacuum(&mut self) {
+        self.compact();
+        // TODO: add WAL truncation after full compaction, drop empty segments, etc.
+    }
+
     pub fn apply_merge_policy(&mut self) {
         // Full tiered merge logic from spike (simplified but correct for integration)
         let policy = match &self.merge_policy { Some(p) => p.clone(), None => return };

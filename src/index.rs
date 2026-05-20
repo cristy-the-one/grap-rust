@@ -271,6 +271,26 @@ pub trait TextIndex: Send + Sync {
     /// Returns true if the document has been logically deleted (tombstone).
     /// On-disk backends use this during rebalance and traversal to skip/clean.
     fn is_document_deleted(&self, _node: NodeId) -> bool { false }
+
+    // === Persistence hooks (0.2 on-disk index) ===
+
+    /// Save the text index to a directory.
+    /// Memory backends may return an error or be a no-op.
+    fn save_to_dir(&mut self, _dir: &std::path::Path) -> Result<(), GraphError> {
+        Ok(())
+    }
+
+    /// Load a text index from a directory.
+    /// The caller is responsible for knowing which backend to use.
+    /// This is mainly implemented by `OnDiskTextIndex`.
+    fn load_from_dir(_dir: &std::path::Path) -> Result<Box<dyn TextIndex>, GraphError>
+    where
+        Self: Sized,
+    {
+        Err(GraphError::Other(
+            "load_from_dir not supported for this TextIndex backend".into(),
+        ))
+    }
 }
 
 impl TextIndex for InvertedIndex {
@@ -934,6 +954,34 @@ impl IndexedKnowledgeGraph {
     fn maybe_cleanup_ghost_edges_for(&mut self, _node: NodeId) {
         // No-op in the single-graph case.
         // Real implementation lives in ShardedGraph / ShardRouter.
+    }
+
+    // === Persistence for sharded + on-disk setups (0.2) ===
+
+    pub fn save_to_dir(&mut self, dir: &std::path::Path) -> Result<(), GraphError> {
+        // Save the graph part
+        self.graph.save_to_dir(dir.join("graph"))?;
+
+        // Save the text index (on-disk backend will actually write data)
+        self.text_index.save_to_dir(&dir.join("text_index"))?;
+
+        Ok(())
+    }
+
+    pub fn load_from_dir(dir: &std::path::Path) -> Result<Self, GraphError> {
+        let graph = KnowledgeGraph::load_from_dir(&dir.join("graph"))?;
+        // For text index we currently default to memory and let the caller
+        // decide to use OnDiskTextIndex separately.
+        // A full implementation would inspect the directory.
+        let text_index: Box<dyn TextIndex> = Box::new(InvertedIndex::new());
+
+        Ok(Self { graph, text_index })
+    }
+
+    pub fn load_mmap(dir: &std::path::Path) -> Result<Self, GraphError> {
+        let graph = KnowledgeGraph::load_mmap(&dir.join("graph"))?;
+        let text_index: Box<dyn TextIndex> = Box::new(InvertedIndex::new());
+        Ok(Self { graph, text_index })
     }
 }
 

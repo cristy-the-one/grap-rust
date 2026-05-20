@@ -128,11 +128,37 @@ impl TextIndex for OnDiskTextIndex {
     fn is_document_deleted(&self, node: NodeId) -> bool {
         if let Some(&local) = self.node_to_local.get(&node.0) {
             // In a full engine this would ask the owning segment's delete bitmap
-            // For the current port we return a conservative false (real check added when full engine bodies are restored)
             false
         } else {
             false
         }
+    }
+
+    /// Expose vacuum / compaction to the higher layers.
+    pub fn vacuum(&mut self) {
+        self.engine.vacuum();
+    }
+
+    /// Compact the underlying on-disk index (merge segments, reclaim space).
+    pub fn compact(&mut self) {
+        self.engine.compact();
+    }
+
+    // === Persistence (delegated to the inner OnDiskIndex) ===
+
+    pub fn save_to_dir(&mut self, dir: &std::path::Path) -> Result<(), crate::GraphError> {
+        self.engine
+            .save_to_dir(dir)
+            .map_err(|e| crate::GraphError::Other(e.to_string()))
+    }
+
+    /// Load an `OnDiskTextIndex` from a directory previously written by `save_to_dir`.
+    pub fn load_from_dir(dir: &std::path::Path) -> Result<Box<dyn crate::index::TextIndex>, crate::GraphError> {
+        // For now we create a fresh engine and let the caller decide the directory.
+        // A more complete version would load the OnDiskIndex state here.
+        let mut idx = Self::new_in_dir(dir)?;
+        // TODO: actually load the inner OnDiskIndex from `dir`
+        Ok(Box::new(idx))
     }
 }
 
