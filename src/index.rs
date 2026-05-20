@@ -199,6 +199,7 @@ pub struct IndexStats {
     pub unique_terms: usize,
     pub total_postings: usize,
     pub document_count: u32,
+    pub avg_doc_length: f64,
 }
 
 pub struct InvertedIndex {
@@ -327,12 +328,98 @@ impl InvertedIndex {
         results
     }
 
+    /// BM25 search for a phrase. Returns nodes where the terms appear close together.
+    ///
+    /// Falls back to regular `search()` if the phrase has fewer than 2 terms.
+    pub fn phrase_search(
+        &self,
+        phrase: &str,
+        max_gap: u32,
+        max_results: usize,
+    ) -> Vec<TextSearchResult> {
+        let tokens = self.tokenizer.tokenize(phrase);
+        let terms: Vec<String> = tokens
+            .iter()
+            .map(|(w, _)| w.to_lowercase())
+            .collect();
+
+        if terms.len() < 2 {
+            return self.search(phrase, max_results);
+        }
+
+        let posting_lists: Vec<Option<&PostingList>> = terms
+            .iter()
+            .map(|t| self.interner.get(t).and_then(|id| self.index.get(&id)))
+            .collect();
+
+        if posting_lists.iter().any(|pl| pl.is_none()) {
+            return Vec::new();
+        }
+
+        let lists: Vec<&PostingList> = posting_lists.into_iter().map(|pl| pl.unwrap()).collect();
+
+        let mut results = Vec::new();
+
+        // Start with shortest posting list for efficiency
+        let shortest_idx = lists
+            .iter()
+            .enumerate()
+            .min_by_key(|(_, pl)| pl.postings.len())
+            .map(|(i, _)| i)
+            .unwrap_or(0);
+
+        for posting in &lists[shortest_idx].postings {
+            let node_id = posting.node_id;
+
+            let all_present = lists.iter().enumerate().all(|(i, pl)| {
+                i == shortest_idx
+                    || pl.postings
+                        .binary_search_by_key(&node_id.0, |p| p.node_id.0)
+                        .is_ok()
+            });
+
+            if !all_present {
+                continue;
+            }
+
+            let term_positions: Vec<&[u32]> = lists
+                .iter()
+                .map(|pl| {
+                    let idx = pl
+                        .postings
+                        .binary_search_by_key(&node_id.0, |p| p.node_id.0)
+                        .unwrap();
+                    pl.postings[idx].positions.as_slice()
+                })
+                .collect();
+
+            let proximity_score = compute_proximity_score(&term_positions, max_gap);
+
+            if proximity_score > 0.0 {
+                results.push(TextSearchResult {
+                    node_id,
+                    score: proximity_score,
+                    matched_terms: terms.clone(),
+                });
+            }
+        }
+
+        results.sort_by(|a, b| {
+            b.score
+                .partial_cmp(&a.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+        results.truncate(max_results);
+        results
+    }
+
     pub fn stats(&self) -> IndexStats {
-        let total_postings = self.index.values().map(|pl| pl.postings.len()).sum();
+        let total_postings: usize = self.index.values().map(|pl| pl.postings.len()).sum();
         IndexStats {
             unique_terms: self.index.len(),
             total_postings,
             document_count: self.document_count,
+            avg_doc_length: self.avg_doc_length,
         }
     }
 }
@@ -364,6 +451,14 @@ impl IndexedKnowledgeGraph {
         Self {
             graph: KnowledgeGraph::new(),
             text_index: InvertedIndex::new(),
+        }
+    }
+
+    /// Create an `IndexedKnowledgeGraph` with a custom tokenizer.
+    pub fn with_tokenizer(tokenizer: Box<dyn Tokenizer>) -> Self {
+        Self {
+            graph: KnowledgeGraph::new(),
+            text_index: InvertedIndex::with_tokenizer(tokenizer),
         }
     }
 
@@ -422,12 +517,97 @@ impl IndexedKnowledgeGraph {
     pub fn read_blob(&self, node: NodeId) -> &str {
         self.graph.read_blob(node)
     }
+
+    /// Phrase-aware search followed by graph traversal.
+    pub fn phrase_search_and_traverse(
+        &self,
+        phrase: &str,
+        max_gap: u32,
+        max_seeds: usize,
+        property_names: &[&str],
+        min_strength: f64,
+        max_depth: u32,
+        max_results: usize,
+    ) -> Vec<(QueryResult, &str)> {
+        let seeds = self.text_index.phrase_search(phrase, max_gap, max_seeds);
+
+        if seeds.is_empty() {
+            return Vec::new();
+        }
+
+        let seed_ids: Vec<NodeId> = seeds.iter().map(|r| r.node_id).collect();
+
+        let mut builder = self
+            .graph
+            .find()
+            .from_nodes(&seed_ids)
+            .min_strength(min_strength)
+            .depth(max_depth)
+            .limit(max_results);
+
+        for name in property_names {
+            builder = builder.with_property(name);
+        }
+
+        builder.execute_with_text()
+    }
+
+    pub fn index_stats(&self) -> IndexStats {
+        self.text_index.stats()
+    }
 }
 
 impl Default for IndexedKnowledgeGraph {
     fn default() -> Self {
         Self::new()
     }
+}
+
+/// Score how well term positions form a near-consecutive phrase.
+/// Ported from core_graph_design.md.
+fn compute_proximity_score(term_positions: &[&[u32]], max_gap: u32) -> f64 {
+    if term_positions.is_empty() {
+        return 0.0;
+    }
+    if term_positions.len() == 1 {
+        return 1.0;
+    }
+
+    let first_positions = term_positions[0];
+    let mut best_score = 0.0f64;
+
+    for &start_pos in first_positions {
+        let mut current_pos = start_pos;
+        let mut matched = 1u32;
+
+        for i in 1..term_positions.len() {
+            let next_positions = term_positions[i];
+            let search = next_positions.binary_search(&(current_pos + 1));
+            let candidate_idx = match search {
+                Ok(idx) => idx,
+                Err(idx) => idx,
+            };
+
+            if candidate_idx < next_positions.len() {
+                let candidate = next_positions[candidate_idx];
+                if candidate <= current_pos + max_gap {
+                    current_pos = candidate;
+                    matched += 1;
+                } else {
+                    break;
+                }
+            } else {
+                break;
+            }
+        }
+
+        let coverage = matched as f64 / term_positions.len() as f64;
+        if coverage > best_score {
+            best_score = coverage;
+        }
+    }
+
+    best_score
 }
 
 // ============================================================================
@@ -475,5 +655,18 @@ mod tests {
         assert!(!results.is_empty());
         // n0 (the seed with strongest text match) should be present
         assert!(results.iter().any(|(r, _)| r.node_id == n0));
+    }
+
+    #[test]
+    fn phrase_search_basic() {
+        let mut idx = InvertedIndex::new();
+
+        idx.index_document(NodeId(0), "the quick brown fox jumps over the lazy dog");
+        idx.index_document(NodeId(1), "a quick fox and a lazy dog are friends");
+
+        // "quick fox" should match both, but "quick brown fox" should strongly prefer doc 0
+        let phrase_results = idx.phrase_search("quick brown fox", 10, 5);
+        assert!(!phrase_results.is_empty());
+        assert_eq!(phrase_results[0].node_id, NodeId(0));
     }
 }
