@@ -8,7 +8,7 @@
 
 use std::collections::HashMap;
 use std::sync::atomic::AtomicBool;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
 
@@ -1050,6 +1050,11 @@ impl ShardedGraph {
         self.router.vacuum_deleted_nodes();
     }
 
+    /// Run a full maintenance cycle (ghost cleanup + incremental vacuum on on-disk shards).
+    pub fn run_maintenance_cycle(&mut self) {
+        self.router.run_maintenance_cycle();
+    }
+
     /// Returns per-shard segment distribution (empty for memory-backed shards).
     /// Primary input for future segment-aware rebalancing.
     pub fn segment_distribution(&self) -> Vec<Vec<crate::on_disk_index::SegmentInfo>> {
@@ -1084,7 +1089,22 @@ impl ShardedGraph {
     /// `Arc<Mutex<ShardedGraph>>` to the worker. The current implementation
     /// demonstrates the pattern and is sufficient for the 0.2 spike.
     pub fn start_background_maintenance(&mut self, interval: Duration) -> MaintenanceHandle {
+        // For simple use cases, users are expected to call run_maintenance_cycle()
+        // periodically from their own event loop / timer.
+        // For true fire-and-forget background behavior, use
+        // start_background_maintenance_with_shared with an Arc<Mutex<Self>>.
         MaintenanceHandle::start(interval, &mut self.router)
+    }
+
+    /// Start background maintenance when the caller holds the `ShardedGraph` in an
+    /// `Arc<Mutex<...>>`. The background thread will periodically lock and call
+    /// `run_maintenance_cycle()` (which runs ghost cleanup + real incremental vacuum).
+    pub fn start_background_maintenance_with_shared(
+        &self,
+        graph: Arc<Mutex<Self>>,
+        interval: Duration,
+    ) -> MaintenanceHandle {
+        MaintenanceHandle::start_shared(interval, graph)
     }
 
     /// Explicitly trigger a compaction / vacuum pass on all shards that use
@@ -1248,13 +1268,28 @@ impl MaintenanceHandle {
         let stop = Arc::new(AtomicBool::new(false));
         let stop2 = stop.clone();
 
-        // For the 0.2 spike we spawn a no-op thread so the API shape is correct.
-        // A real version would either take Arc<Mutex<ShardedGraph>> or communicate
-        // via channels. The router.clone() requirement is intentionally avoided here.
+        // Legacy / simple path: the thread is mostly a lifetime holder.
+        // Users should call run_maintenance_cycle() themselves on a timer.
         let handle = thread::spawn(move || {
             while !stop2.load(std::sync::atomic::Ordering::SeqCst) {
                 thread::sleep(interval);
-                // In a full impl: router_clone.run_maintenance_cycle();
+            }
+        });
+
+        MaintenanceHandle { stop, join: Some(handle) }
+    }
+
+    fn start_shared(interval: Duration, graph: Arc<Mutex<ShardedGraph>>) -> Self {
+        let stop = Arc::new(AtomicBool::new(false));
+        let stop2 = stop.clone();
+
+        let handle = thread::spawn(move || {
+            while !stop2.load(std::sync::atomic::Ordering::SeqCst) {
+                thread::sleep(interval);
+
+                if let Ok(mut g) = graph.lock() {
+                    g.run_maintenance_cycle(); // ghost cleanup + real incremental vacuum()
+                }
             }
         });
 
