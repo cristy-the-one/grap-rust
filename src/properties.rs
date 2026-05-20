@@ -44,7 +44,12 @@ pub enum PropertyFilter {
     /// The property must equal the given value.
     Equals(PropertyValue),
     /// Numeric range filter (currently only meaningful for `Float`/`Int`).
-    Range { min: f64, max: f64 },
+    Range {
+        /// Lower bound (inclusive).
+        min: f64,
+        /// Upper bound (inclusive).
+        max: f64,
+    },
     /// Minimum strength threshold (used for edge pruning).
     MinStrength(f64),
 }

@@ -2,10 +2,6 @@
 name = "grap"
 version = "0.1.0"
 edition = "2021"
-
-[workspace]
-members = ["spikes/on_disk_index"]
-resolver = "2"
 rust-version = "1.81"
 authors = ["The grap Contributors"]
 description = "A fast, read-optimized Rust knowledge graph engine with property bitmask pruning, BM25 full-text search, sharding with ghost edges, and atomic persistence."
@@ -24,6 +20,10 @@ exclude = [
     "benches/",
     "examples/",
 ]
+
+[workspace]
+members = ["spikes/on_disk_index"]
+resolver = "2"
 
 [lib]
 name = "grap"

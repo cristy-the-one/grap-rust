@@ -7,11 +7,18 @@
 
 const CHUNK_SIZE: usize = 4 * 1024 * 1024;
 
+/// Lightweight handle into a [`BlobStore`] chunk.
+///
+/// All fields are `u32` to keep the struct small (16 bytes).
 #[derive(Debug, Clone)]
 pub struct BlobRef {
+    /// Index of the chunk inside the `BlobStore`.
     pub chunk_idx: u32,
+    /// Byte offset within that chunk where this blob starts.
     pub offset: u32,
+    /// Length of the stored (possibly compressed) bytes.
     pub length: u32,
+    /// Original (uncompressed) length in bytes.
     pub uncompressed_len: u32,
 }
 
@@ -37,12 +44,18 @@ impl Storage {
     }
 }
 
+/// Arena-based storage for large immutable text payloads (node blobs).
+///
+/// Blobs are appended to fixed-size chunks and referenced by [`BlobRef`].
+/// In-memory mode (always available) stores chunks as plain `Vec<u8>`.
+/// The `mmap` feature adds a read-only memory-mapped backend for large corpora.
 #[derive(Debug, Default)]
 pub struct BlobStore {
     pub(crate) storage: Storage,
 }
 
 impl BlobStore {
+    /// Creates an empty `BlobStore` with a single empty in-memory chunk.
     pub fn new() -> Self {
         Self {
             storage: Storage::default(),
@@ -52,35 +65,47 @@ impl BlobStore {
     /// Append text, return lightweight BlobRef.
     /// Only supported in in-memory mode (writing while using mmap mode is not intended).
     pub fn store(&mut self, text: &str) -> BlobRef {
-        // Ensure we are in chunks mode for writing
-        if let Storage::Chunks(chunks) = &mut self.storage {
-            let bytes = text.as_bytes();
-            let len = bytes.len();
-
-            let chunk_idx = {
-                let last = chunks.len() - 1;
-                if chunks[last].len() + len > CHUNK_SIZE && !chunks[last].is_empty() {
-                    chunks.push(Vec::with_capacity(CHUNK_SIZE.max(len)));
-                    chunks.len() - 1
-                } else {
-                    last
-                }
-            };
-
-            let offset = chunks[chunk_idx].len();
-            chunks[chunk_idx].extend_from_slice(bytes);
-
-            return BlobRef {
-                chunk_idx: chunk_idx as u32,
-                offset: offset as u32,
-                length: len as u32,
-                uncompressed_len: len as u32,
-            };
+        // When `mmap` is enabled and the storage is a Mmap backend, log a warning and
+        // fall back to an in-memory Chunks store before writing.
+        #[cfg(feature = "mmap")]
+        if matches!(self.storage, Storage::Mmap(_)) {
+            log::warn!(
+                "BlobStore::store called on a memory-mapped store; \
+                 switching to in-memory Chunks backend (existing mmap data is no longer accessible)"
+            );
+            self.storage = Storage::default();
         }
 
-        // If we are in mmap mode (should not normally happen during writes), fall back
-        self.storage = Storage::default();
-        self.store(text)
+        // At this point the storage is always Chunks (either originally or after the
+        // fallback above).
+        let chunks = match &mut self.storage {
+            Storage::Chunks(chunks) => chunks,
+            #[cfg(feature = "mmap")]
+            Storage::Mmap(_) => unreachable!("mmap was already converted to Chunks above"),
+        };
+
+        let bytes = text.as_bytes();
+        let len = bytes.len();
+
+        let chunk_idx = {
+            let last = chunks.len() - 1;
+            if chunks[last].len() + len > CHUNK_SIZE && !chunks[last].is_empty() {
+                chunks.push(Vec::with_capacity(CHUNK_SIZE.max(len)));
+                chunks.len() - 1
+            } else {
+                last
+            }
+        };
+
+        let offset = chunks[chunk_idx].len();
+        chunks[chunk_idx].extend_from_slice(bytes);
+
+        BlobRef {
+            chunk_idx: chunk_idx as u32,
+            offset: offset as u32,
+            length: len as u32,
+            uncompressed_len: len as u32,
+        }
     }
 
     /// Zero-copy read. Works for both in-memory and memory-mapped backends.

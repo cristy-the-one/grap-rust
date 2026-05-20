@@ -157,6 +157,7 @@ pub struct ShardedQueryResult {
 /// This is an internal optimization used by [`ShardRouter`] to reduce
 /// cross-shard fetches when following ghost edges.
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub(crate) struct CachedRemoteNode {
     /// Optional human-readable label of the remote node.
     pub label: Option<String>,
@@ -174,6 +175,7 @@ pub(crate) struct CachedRemoteNode {
 /// [`ShardRouter`].
 pub(crate) struct Shard {
     /// Identifier of this shard.
+    #[allow(dead_code)]
     pub id: ShardId,
     /// The actual graph + inverted index living on this shard.
     pub graph: IndexedKnowledgeGraph,
@@ -203,6 +205,7 @@ impl Shard {
     /// Ensure a remote node is present in the cache.
     /// This is the recommended way to populate the cache during traversal.
     /// Ensure we have a cached copy of a remote node (best-effort).
+    #[allow(dead_code)]
     pub(crate) fn ensure_remote_node_cached(
         &mut self,
         target: GlobalNodeId,
@@ -312,6 +315,14 @@ pub struct ShardRouter {
     hash_ring: ConsistentHashRing,
     /// User-provided telemetry hook (defaults to no-op).
     telemetry: std::sync::Arc<dyn crate::Telemetry>,
+}
+
+impl std::fmt::Debug for ShardRouter {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ShardRouter")
+            .field("shard_count", &self.shards.len())
+            .finish_non_exhaustive()
+    }
 }
 
 impl ShardRouter {
@@ -426,6 +437,7 @@ impl ShardRouter {
 
     /// Legacy / targeted version kept for backward compatibility with
     /// the remove_node path. Now delegates to the full aggressive cleanup.
+    #[allow(dead_code)]
     fn cleanup_ghost_edges_pointing_to(&mut self, _deleted_gid: GlobalNodeId) {
         // For simplicity and correctness we now always do the full pass.
         // A more sophisticated version could do a targeted retain only for
@@ -565,7 +577,14 @@ impl ShardRouter {
         // Read manifest
         let manifest_data = std::fs::read(dir.join("manifest.json"))?;
         let manifest: serde_json::Value = serde_json::from_slice(&manifest_data)?;
-        let shard_count = manifest["shard_count"].as_u64().unwrap_or(1) as u16;
+        // A missing or non-integer shard_count is a corrupt manifest, not a
+        // defaultable situation — silently creating a 1-shard router and then
+        // trying to load N shard directories would produce confusing errors.
+        let shard_count = manifest["shard_count"]
+            .as_u64()
+            .ok_or_else(|| crate::GraphError::Other(
+                "manifest.json is missing or has an invalid 'shard_count' field".to_string(),
+            ))? as u16;
 
         let mut router = Self::new(shard_count);
 
@@ -1013,6 +1032,14 @@ pub struct ShardedGraph {
     router: ShardRouter,
 }
 
+impl std::fmt::Debug for ShardedGraph {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ShardedGraph")
+            .field("router", &self.router)
+            .finish()
+    }
+}
+
 impl ShardedGraph {
     /// Create a new sharded graph with the given number of shards.
     pub fn new(shard_count: u16) -> Self {
@@ -1026,6 +1053,7 @@ impl ShardedGraph {
         self.router.set_telemetry(telemetry);
     }
 
+    /// Adds a new node with the given text and optional label, routing it to the appropriate shard.
     pub fn add_node(
         &mut self,
         text: &str,
@@ -1034,6 +1062,7 @@ impl ShardedGraph {
         self.router.add_node(text, label)
     }
 
+    /// Adds a directed edge between two globally-addressed nodes with the given strength and properties.
     pub fn add_edge(
         &mut self,
         source: GlobalNodeId,
@@ -1052,10 +1081,14 @@ impl ShardedGraph {
         self.router.remove_node(gid)
     }
 
+    /// Performs a full-text search across all shards and returns ranked results.
     pub fn search(&self, query: &str, max_results: usize) -> Vec<crate::index::TextSearchResult> {
         self.router.search(query, max_results)
     }
 
+    /// Full text-search + graph traversal: finds seed nodes matching `text_query`, then
+    /// traverses outgoing edges up to `max_depth` hops, filtering by `property_names`
+    /// and `min_strength`, and returns the top `max_results` combined results.
     pub fn search_and_traverse(
         &self,
         text_query: &str,
@@ -1347,6 +1380,14 @@ pub struct MaintenanceHandle {
     join: Option<thread::JoinHandle<()>>,
 }
 
+impl std::fmt::Debug for MaintenanceHandle {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("MaintenanceHandle")
+            .field("running", &!self.stop.load(std::sync::atomic::Ordering::Relaxed))
+            .finish_non_exhaustive()
+    }
+}
+
 impl MaintenanceHandle {
     fn start(interval: Duration, _router: &mut ShardRouter) -> Self {
         let stop = Arc::new(AtomicBool::new(false));
@@ -1386,6 +1427,7 @@ impl MaintenanceHandle {
         }
     }
 
+    /// Signals the background worker to stop and waits for the thread to exit.
     pub fn shutdown(mut self) {
         self.stop.store(true, std::sync::atomic::Ordering::SeqCst);
         if let Some(h) = self.join.take() {

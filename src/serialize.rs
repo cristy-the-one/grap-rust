@@ -49,6 +49,10 @@ pub(crate) struct SerializableEdge {
     pub(crate) property_mask: u64,
 }
 
+/// Metadata header persisted alongside every saved `KnowledgeGraph`.
+///
+/// Stored as JSON in `graph.meta` and used to verify format compatibility
+/// and locate data in the accompanying `graph.topo` and `graph.blobs` files.
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct GraphMeta {
     /// On-disk format version. See [`CURRENT_GRAPH_FORMAT_VERSION`].
@@ -80,8 +84,11 @@ pub struct RepairReport {
     pub graph_files_present: bool,
 
     /// Individual file presence flags.
+    /// Whether `graph.meta` is present in the directory.
     pub meta_present: bool,
+    /// Whether `graph.topo` is present in the directory.
     pub topo_present: bool,
+    /// Whether `graph.blobs` is present in the directory.
     pub blobs_present: bool,
 
     /// The format version found in `graph.meta`, if the file could be read and parsed.

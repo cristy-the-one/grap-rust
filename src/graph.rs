@@ -23,10 +23,14 @@ pub(crate) struct Node {
     pub(crate) outgoing_property_mask: u64,
 }
 
+/// A directed, weighted, property-carrying edge between two nodes.
 #[derive(Debug)]
 pub struct Edge {
+    /// The node this edge originates from.
     pub source: NodeId,
+    /// The node this edge points to.
     pub target: NodeId,
+    /// Semantic strength of the connection (typically in `[0.0, 1.0]`).
     pub strength: f64,
     pub(crate) properties: Vec<(PropertyTag, PropertyValue)>,
     pub(crate) property_mask: u64,
@@ -219,11 +223,12 @@ impl KnowledgeGraph {
         edge_id
     }
 
-    // Stubs for the rest of the API (implemented in Phase 1 query work)
+    /// Returns the `strength` of an edge (typically in `[0.0, 1.0]`).
     pub fn edge_strength(&self, edge: EdgeId) -> f64 {
         self.edges[edge.0 as usize].strength
     }
 
+    /// Returns the value of a specific property on an edge, or `None` if not present.
     pub fn edge_property(&self, edge: EdgeId, tag: PropertyTag) -> Option<&PropertyValue> {
         self.edges[edge.0 as usize]
             .properties
@@ -232,6 +237,7 @@ impl KnowledgeGraph {
             .map(|(_, v)| v)
     }
 
+    /// Returns the `(source, target)` node pair for an edge.
     pub fn edge_endpoints(&self, edge: EdgeId) -> (NodeId, NodeId) {
         let e = &self.edges[edge.0 as usize];
         (e.source, e.target)
@@ -287,6 +293,7 @@ impl KnowledgeGraph {
     }
 
     /// Convenience wrapper that starts with all nodes alive.
+    #[allow(dead_code)]
     pub(crate) fn from_parts(
         nodes: Vec<Node>,
         edges: Vec<Edge>,

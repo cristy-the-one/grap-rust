@@ -20,12 +20,19 @@ use std::collections::BinaryHeap;
 /// Low-level query descriptor (mostly used internally by the traversal engine).
 #[derive(Debug, Clone)]
 pub struct GraphQuery {
+    /// Nodes to start the traversal from.
     pub seeds: Vec<NodeId>,
+    /// Per-edge property filters applied during traversal.
     pub property_filters: Vec<(PropertyTag, PropertyFilter)>,
+    /// Bitmask of required property tags (derived from `property_filters`).
     pub required_mask: u64,
+    /// Edges with strength below this threshold are skipped.
     pub min_strength: f64,
+    /// Maximum number of hops from any seed node.
     pub max_depth: u32,
+    /// Maximum number of results to return.
     pub max_results: usize,
+    /// If `true`, results are sorted by cumulative path strength (highest first).
     pub sort_by_strength: bool,
 }
 
@@ -56,6 +63,17 @@ pub struct QueryBuilder<'g> {
     max_depth: u32,
     max_results: usize,
     sort_by_strength: bool,
+}
+
+impl std::fmt::Debug for QueryBuilder<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("QueryBuilder")
+            .field("seeds", &self.seeds)
+            .field("min_strength", &self.min_strength)
+            .field("max_depth", &self.max_depth)
+            .field("max_results", &self.max_results)
+            .finish_non_exhaustive()
+    }
 }
 
 impl KnowledgeGraph {
@@ -165,6 +183,7 @@ impl<'g> QueryBuilder<'g> {
         self.graph.query(&q)
     }
 
+    /// Like [`execute`] but also returns the text content of each result node.
     pub fn execute_with_text(self) -> Vec<(QueryResult, &'g str)> {
         let g = self.graph;
         self.execute()

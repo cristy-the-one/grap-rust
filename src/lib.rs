@@ -173,7 +173,7 @@ impl From<bincode::Error> for GraphError {
 /// ```
 pub trait Telemetry: Send + Sync + 'static {
     /// Called for every node visited during a `search_and_traverse` call.
-    fn record_traversal_nodes_visited(&self, count: u64) {}
+    fn record_traversal_nodes_visited(&self, _count: u64) {}
 
     /// Called when the 64-bit property mask causes early pruning of edges.
     fn record_mask_prune(&self, _pruned: u64) {}

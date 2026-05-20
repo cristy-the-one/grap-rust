@@ -31,13 +31,16 @@ use std::time::Duration;
 use bincode;
 use serde::{Deserialize, Serialize};
 
+/// A doc-local identifier within a single segment (`u32` alias for readability).
 pub type LocalDocId = u32;
 
 /// Lightweight description of one sealed segment.
 /// Used by segment-aware rebalancing, vacuum planning, and monitoring.
 #[derive(Debug, Clone, Copy)]
 pub struct SegmentInfo {
+    /// Total (including deleted) document count in this segment.
     pub doc_count: u32,
+    /// Merge tier (0 = freshly sealed, higher = more merges).
     pub tier: u32,
     /// Live (non-deleted) document count in the segment.
     pub live_doc_count: u32,
@@ -139,7 +142,8 @@ impl SimpleWal {
 
     fn append(&mut self, op: &WalOp) -> std::io::Result<()> {
         if let Some(f) = &mut self.file {
-            let bytes = bincode::serialize(op).unwrap();
+            let bytes = bincode::serialize(op)
+                .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
             let len = bytes.len() as u32;
             use std::io::Write;
             f.write_all(&len.to_le_bytes())?;
@@ -191,10 +195,15 @@ impl SimpleWal {
     }
 }
 
+/// One entry in a posting list: records which document contains a term,
+/// how many times, and at which byte positions.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Posting {
+    /// The local document id within the segment.
     pub doc_id: LocalDocId,
+    /// Number of times the term appears in this document.
     pub term_freq: u32,
+    /// Byte positions of each occurrence (used for phrase queries).
     pub positions: Vec<u32>,
 }
 
@@ -206,9 +215,16 @@ struct TermMeta {
     posting_len: u32,
 }
 
+/// A sealed, immutable segment of the on-disk inverted index.
+///
+/// Produced by [`ActiveBuffer::seal`] or [`merge_segments_with_offsets`].
+/// Once sealed, postings are read-only; deletions are tracked via the
+/// `deleted` bitmap.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct OnDiskSegment {
+    /// Total number of documents (including deleted ones) in this segment.
     pub doc_count: u32,
+    /// Bit-packed tombstone array (`bit i` set → document `i` is deleted).
     pub deleted: Vec<u8>,
     terms: Vec<TermMeta>,
     postings_blob: Vec<u8>,
@@ -220,6 +236,7 @@ pub struct OnDiskSegment {
 }
 
 impl OnDiskSegment {
+    /// Returns `true` if the given local doc id has been tombstoned.
     pub fn is_deleted(&self, doc_id: LocalDocId) -> bool {
         let byte = (doc_id as usize) / 8;
         let bit = (doc_id as usize) % 8;
@@ -244,6 +261,7 @@ impl OnDiskSegment {
         }
     }
 
+    /// Returns the live (non-deleted) posting list for `term`, or `None` if the term is absent.
     pub fn get_postings(&self, term: &str) -> Option<Vec<Posting>> {
         let pos = self
             .terms
@@ -261,6 +279,7 @@ impl OnDiskSegment {
         Some(p)
     }
 
+    /// Returns the token count for `doc_id` (used for BM25 length normalization).
     pub fn doc_length(&self, doc_id: LocalDocId) -> u32 {
         self.doc_lengths.get(doc_id as usize).copied().unwrap_or(1)
     }
@@ -289,6 +308,7 @@ impl OnDiskSegment {
         postings + terms_meta + deletes + lengths
     }
 
+    /// Serialize this segment to a binary file at `path`.
     pub fn write_to_disk(&self, path: &Path) -> std::io::Result<()> {
         let mut w = BufWriter::new(File::create(path)?);
         let h = SegmentFileHeader {
@@ -305,6 +325,7 @@ impl OnDiskSegment {
         Ok(())
     }
 
+    /// Deserialize a segment from a binary file written by [`write_to_disk`].
     pub fn load_from_disk(path: &Path) -> std::io::Result<Self> {
         let mut r = BufReader::new(File::open(path)?);
         let mut buf = Vec::new();
@@ -336,6 +357,8 @@ impl OnDiskSegment {
     }
 }
 
+/// Accumulates documents into an in-memory inverted index structure before sealing
+/// them into an immutable [`OnDiskSegment`].
 #[derive(Debug)]
 pub struct SegmentBuilder {
     doc_count: u32,
@@ -345,6 +368,7 @@ pub struct SegmentBuilder {
 }
 
 impl SegmentBuilder {
+    /// Creates a new empty builder.
     pub fn new() -> Self {
         Self {
             doc_count: 0,
@@ -354,6 +378,7 @@ impl SegmentBuilder {
         }
     }
 
+    /// Index one document. Returns the segment-local doc id assigned to it.
     pub fn add_document(&mut self, terms: &[&str], positions: &[Vec<u32>]) -> LocalDocId {
         let doc_id = self.doc_count;
         self.doc_count += 1;
@@ -374,6 +399,7 @@ impl SegmentBuilder {
         doc_id
     }
 
+    /// Mark a document as deleted in this builder's tombstone bitmap.
     pub fn delete(&mut self, doc_id: LocalDocId) {
         let b = (doc_id as usize) / 8;
         let bit = (doc_id as usize) % 8;
@@ -382,6 +408,7 @@ impl SegmentBuilder {
         }
     }
 
+    /// Consume this builder and produce an immutable [`OnDiskSegment`].
     pub fn into_on_disk_segment(mut self) -> OnDiskSegment {
         let mut terms = vec![];
         let mut blob = vec![];
@@ -412,6 +439,10 @@ impl SegmentBuilder {
     }
 }
 
+/// Wraps a [`SegmentBuilder`] with optional write-ahead logging.
+///
+/// Documents are added here first; when the buffer grows large enough (or on
+/// explicit [`OnDiskIndex::flush`]) it is sealed into an [`OnDiskSegment`].
 #[derive(Debug)]
 pub struct ActiveBuffer {
     pub(crate) builder: SegmentBuilder,
@@ -420,6 +451,7 @@ pub struct ActiveBuffer {
 }
 
 impl ActiveBuffer {
+    /// Creates a new empty active buffer (no WAL).
     pub fn new() -> Self {
         Self {
             builder: SegmentBuilder::new(),
@@ -433,6 +465,7 @@ impl ActiveBuffer {
         self
     }
 
+    /// Add a document to the buffer (optionally writing a WAL record first).
     pub fn add_document(&mut self, terms: &[&str], pos: &[Vec<u32>]) -> LocalDocId {
         if let Some(w) = &mut self.wal {
             let _ = w.append(&WalOp::AddDocument {
@@ -444,6 +477,7 @@ impl ActiveBuffer {
         self.builder.add_document(terms, pos)
     }
 
+    /// Mark a document deleted in the buffer (optionally writing a WAL record first).
     pub fn delete(&mut self, id: LocalDocId) {
         if let Some(w) = &mut self.wal {
             let _ = w.append(&WalOp::Delete { doc_id: id });
@@ -451,15 +485,18 @@ impl ActiveBuffer {
         self.builder.delete(id);
     }
 
+    /// Returns the number of documents in the buffer (including deleted ones).
     pub fn doc_count(&self) -> u32 {
         self.builder.doc_count
     }
+    /// Seal the buffer into an immutable [`OnDiskSegment`], truncating the WAL.
     pub fn seal(self) -> OnDiskSegment {
         if let Some(mut w) = self.wal {
             let _ = w.truncate();
         }
         self.builder.into_on_disk_segment()
     }
+    /// Returns all non-deleted postings for `term` from the active buffer.
     pub fn get_live_postings(&self, term: &str) -> Vec<Posting> {
         if let Some(p) = self.builder.postings.get(term) {
             p.iter()
@@ -476,6 +513,7 @@ impl ActiveBuffer {
             vec![]
         }
     }
+    /// Returns the token count (document length) for normalization in BM25.
     pub fn doc_length(&self, id: LocalDocId) -> u32 {
         self.builder
             .doc_lengths
@@ -485,8 +523,13 @@ impl ActiveBuffer {
     }
 }
 
+/// Controls when the engine merges sealed segments together.
+///
+/// When the number of segments at a given tier reaches `segments_per_tier`,
+/// they are merged into a single segment at the next tier.
 #[derive(Debug, Clone)]
 pub struct TieredMergePolicy {
+    /// Trigger a merge when this many segments accumulate at the same tier.
     pub segments_per_tier: usize,
 }
 impl Default for TieredMergePolicy {
@@ -506,6 +549,14 @@ pub(crate) struct SealedSegment {
     start_global_id: u32,
 }
 
+/// The main on-disk inverted index engine.
+///
+/// Documents are added to an in-memory [`ActiveBuffer`] which is periodically
+/// flushed into immutable [`SealedSegment`]s. A configurable [`TieredMergePolicy`]
+/// merges small segments together to keep query performance high.
+///
+/// Use [`OnDiskIndex::new`] for a simple in-memory-only index, or pair it with
+/// an explicit [`save_to_dir`] / [`load_from_dir`] round-trip for durability.
 #[derive(Debug)]
 pub struct OnDiskIndex {
     active: ActiveBuffer,
@@ -520,6 +571,7 @@ pub struct OnDiskIndex {
 }
 
 impl OnDiskIndex {
+    /// Creates an empty index with no merge policy (segments are never merged automatically).
     pub fn new() -> Self {
         Self {
             active: ActiveBuffer::new(),
@@ -531,11 +583,23 @@ impl OnDiskIndex {
             merge_policy: None,
         }
     }
+    /// Creates an empty index with automatic tiered merging enabled.
     pub fn with_merge_policy(p: TieredMergePolicy) -> Self {
         let mut s = Self::new();
         s.merge_policy = Some(p);
         s
     }
+    /// Enable write-ahead logging for the active buffer.
+    ///
+    /// # Warning
+    ///
+    /// This method replaces the current active buffer with a new one that has
+    /// WAL enabled. Any documents added **before** calling `enable_wal` are
+    /// **not** replayed from the WAL on recovery — only documents added after
+    /// this call are durable via the WAL.
+    ///
+    /// To avoid this pitfall, enable the WAL at construction time by calling
+    /// `enable_wal` immediately after `new()`, before adding any documents.
     pub fn enable_wal(&mut self, p: &Path) -> std::io::Result<()> {
         let w = SimpleWal::create(p)?;
         self.active = std::mem::replace(&mut self.active, ActiveBuffer::new()).with_wal(w);
@@ -613,6 +677,12 @@ impl OnDiskIndex {
         false
     }
 
+    /// Seal the active buffer into a new `SealedSegment`.
+    ///
+    /// Returns `Some(segment_index)` — the index of the newly created segment in
+    /// `self.sealed` — or `None` if the active buffer was empty (nothing to flush).
+    /// The returned index is informational; callers that only need to know whether
+    /// a segment was created can treat `Some(_)` as `true`.
     pub fn flush(&mut self) -> Option<usize> {
         if self.active.doc_count() == 0 {
             return None;
@@ -691,7 +761,7 @@ impl OnDiskIndex {
         }
 
         let manifest = IndexManifest {
-            version: 1,
+            version: MANIFEST_VERSION,
             segments: entries,
             total_docs: self.total_docs,
             total_tokens: self.total_tokens,
@@ -755,9 +825,11 @@ impl OnDiskIndex {
         Ok(idx)
     }
 
+    /// Returns the number of sealed (immutable) segments currently held by this index.
     pub fn sealed_segment_count(&self) -> usize {
         self.sealed.len()
     }
+    /// Returns an approximate total document count (sealed + active buffer).
     pub fn approx_doc_count(&self) -> u64 {
         self.total_docs + self.active.doc_count() as u64
     }
@@ -778,6 +850,11 @@ impl OnDiskIndex {
             .collect()
     }
 
+    /// Full compaction: merges all sealed segments into a single segment.
+    ///
+    /// More expensive than [`OnDiskIndex::vacuum`] but guarantees the smallest possible
+    /// segment count. Call this when you want a one-time deep compaction rather than
+    /// the incremental vacuum.
     pub fn compact(&mut self) {
         // Full compaction: merge *everything* into the smallest possible number of segments.
         // More expensive than `vacuum()`, but guarantees a single (or very few) segment(s).
@@ -850,6 +927,12 @@ impl OnDiskIndex {
         // Future: truncate WAL here if we have a clean state.
     }
 
+    /// Runs one round of the configured tiered merge policy.
+    ///
+    /// Scans sealed segments grouped by tier; when a tier has at least
+    /// `segments_per_tier` segments they are merged into a single segment
+    /// promoted to the next tier. The loop repeats until no tier is over-full.
+    /// Does nothing if no merge policy was set at construction time.
     pub fn apply_merge_policy(&mut self) {
         let policy = match &self.merge_policy {
             Some(p) => p.clone(),
@@ -1122,24 +1205,46 @@ pub fn merge_segments(segs: &[&OnDiskSegment]) -> OnDiskSegment {
     }
 }
 
-// Background worker (full robust version from spike)
+/// Handle to the background merge/vacuum worker thread.
+///
+/// Drop this handle (or call [`MergeWorkerHandle::shutdown`]) to stop the worker.
 pub struct MergeWorkerHandle {
     tx: mpsc::Sender<MergeCommand>,
     join: Option<thread::JoinHandle<()>>,
     stats: Arc<Mutex<MergeStats>>,
 }
+
+impl std::fmt::Debug for MergeWorkerHandle {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("MergeWorkerHandle")
+            .field("stats", &self.stats.lock().ok())
+            .finish_non_exhaustive()
+    }
+}
+/// Commands that can be sent to a running [`MergeWorkerHandle`].
 #[derive(Debug, Clone, Copy)]
 pub enum MergeCommand {
+    /// Trigger an immediate vacuum/merge cycle without waiting for the next interval.
     MergeNow,
+    /// Instruct the worker thread to stop after the current cycle completes.
     Shutdown,
 }
+/// Metrics collected by the background merge worker.
 #[derive(Debug, Default, Clone)]
 pub struct MergeStats {
+    /// Total number of vacuum/merge cycles completed since the worker started.
     pub merges_performed: u64,
+    /// Wall-clock time of the most recent vacuum/merge cycle, in milliseconds.
     pub last_merge_duration_ms: u64,
+    /// If the most recent cycle produced an error, its description is stored here.
     pub last_error: Option<String>,
 }
 
+/// Spawns a background thread that calls [`OnDiskIndex::vacuum`] on `index`
+/// every `interval`, and whenever a [`MergeCommand::MergeNow`] message is sent.
+///
+/// Returns a [`MergeWorkerHandle`] — keep it alive for as long as merging should run.
+/// Dropping the handle or calling [`MergeWorkerHandle::shutdown`] stops the thread.
 pub fn start_merge_worker(index: Arc<Mutex<OnDiskIndex>>, interval: Duration) -> MergeWorkerHandle {
     let (tx, rx) = mpsc::channel();
     let stats = Arc::new(Mutex::new(MergeStats::default()));
@@ -1169,6 +1274,9 @@ pub fn start_merge_worker(index: Arc<Mutex<OnDiskIndex>>, interval: Duration) ->
 }
 
 impl MergeWorkerHandle {
+    /// Sends a shutdown signal to the background worker thread and waits for it to finish.
+    ///
+    /// Returns the final [`MergeStats`] collected by the worker.
     pub fn shutdown(mut self) -> MergeStats {
         let _ = self.tx.send(MergeCommand::Shutdown);
         if let Some(j) = self.join.take() {
@@ -1178,6 +1286,12 @@ impl MergeWorkerHandle {
     }
 }
 
+/// Merge multiple segments into one, compacting away deleted documents.
+///
+/// This is a thin wrapper around the internal `merge_segments` helper.
+/// The resulting segment does **not** preserve original global doc IDs —
+/// use [`merge_segments_with_offsets`] when you need to maintain the
+/// global-id mapping for live search.
 pub fn merge_segments_full(segs: &[&OnDiskSegment]) -> OnDiskSegment {
     merge_segments(segs)
 }

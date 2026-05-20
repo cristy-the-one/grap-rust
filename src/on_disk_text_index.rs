@@ -20,7 +20,7 @@
 
 use crate::ids::NodeId;
 use crate::index::{DefaultTokenizer, IndexStats, TextIndex, Tokenizer};
-use crate::on_disk_index::{self as engine, OnDiskIndex};
+use crate::on_disk_index::OnDiskIndex;
 
 /// Adapter that makes the on-disk engine usable through the `TextIndex` trait.
 ///
@@ -35,7 +35,16 @@ pub struct OnDiskTextIndex {
     node_to_global: std::collections::HashMap<u32, u32>,
 }
 
+impl std::fmt::Debug for OnDiskTextIndex {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("OnDiskTextIndex")
+            .field("indexed_nodes", &self.node_to_global.len())
+            .finish_non_exhaustive()
+    }
+}
+
 impl OnDiskTextIndex {
+    /// Creates a new in-memory `OnDiskTextIndex` with the default tokenizer.
     pub fn new() -> Self {
         Self {
             engine: std::sync::Arc::new(std::sync::Mutex::new(OnDiskIndex::new())),
@@ -57,28 +66,50 @@ impl OnDiskTextIndex {
         }
     }
 
+    /// Create a new in-memory `OnDiskTextIndex` and ensure `dir` exists on disk.
+    ///
+    /// **Note:** This method does *not* associate the index with the directory —
+    /// it is only a convenience for callers that want to pre-create the target
+    /// directory before calling [`save_to_dir`]. The index data is kept in memory
+    /// until an explicit call to [`save_to_dir`] is made.
+    ///
+    /// To load an existing index from disk, use [`TextIndex::load_from_dir`] instead.
     pub fn new_in_dir(dir: &std::path::Path) -> std::io::Result<Self> {
         std::fs::create_dir_all(dir)?;
         Ok(Self::new())
     }
 
     // Public inherent API (so callers can do idx.vacuum() directly on the concrete type)
+
+    /// Runs an incremental vacuum, rewriting segments whose delete ratio exceeds the threshold.
     pub fn vacuum(&mut self) {
         self.engine.lock().unwrap().vacuum();
     }
+
+    /// Merges all sealed segments into a single segment (full compaction).
     pub fn compact(&mut self) {
         self.engine.lock().unwrap().compact();
     }
+
+    /// Removes and returns the sealed segment at `index` together with its tier.
+    ///
+    /// Returns `None` if `index` is out of range.
     pub fn remove_sealed_segment(
         &mut self,
         index: usize,
     ) -> Option<(crate::on_disk_index::OnDiskSegment, u32)> {
         self.engine.lock().unwrap().remove_sealed_segment(index)
     }
+
+    /// Inserts an externally-produced sealed segment at the given tier.
     pub fn add_sealed_segment(&mut self, seg: crate::on_disk_index::OnDiskSegment, tier: u32) {
         // Do NOT clear node_to_global — existing mappings remain valid (C4 fix).
         self.engine.lock().unwrap().add_sealed_segment(seg, tier);
     }
+
+    /// Persists the index (engine state + node map) to `dir`.
+    ///
+    /// Delegates to the `TextIndex::save_to_dir` implementation.
     pub fn save_to_dir(&mut self, dir: &std::path::Path) -> Result<(), crate::GraphError> {
         TextIndex::save_to_dir(self, dir)
     }

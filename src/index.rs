@@ -39,11 +39,13 @@ pub trait Tokenizer: Send + Sync {
 /// - Drops tokens shorter than 2 characters
 /// - Drops pure-numeric tokens
 /// - Drops a curated list of English stop words
+#[derive(Debug)]
 pub struct DefaultTokenizer {
     stop_words: HashSet<&'static str>,
 }
 
 impl DefaultTokenizer {
+    /// Creates a new tokenizer with the built-in English stop-word list.
     pub fn new() -> Self {
         let stop_words: HashSet<&'static str> = [
             "the", "a", "an", "is", "are", "was", "were", "be", "been", "being", "have", "has",
@@ -101,6 +103,7 @@ impl Tokenizer for DefaultTokenizer {
 // Term Interning
 // ============================================================================
 
+/// A compact numeric identifier for an interned term string.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct TermId(u32);
 
@@ -192,10 +195,14 @@ impl PostingList {
 // InvertedIndex
 // ============================================================================
 
+/// A ranked match returned by [`InvertedIndex::search`] and related methods.
 #[derive(Debug, Clone)]
 pub struct TextSearchResult {
+    /// The node that matched the query.
     pub node_id: NodeId,
+    /// BM25-style relevance score (higher is better).
     pub score: f64,
+    /// The query terms that were found in this document.
     pub matched_terms: Vec<String>,
 }
 
@@ -242,11 +249,16 @@ pub struct CombinedResult<'a> {
     pub text: &'a str,
 }
 
+/// Diagnostic statistics about the current state of a text index backend.
 #[derive(Debug, Clone)]
 pub struct IndexStats {
+    /// Number of distinct terms in the index vocabulary.
     pub unique_terms: usize,
+    /// Total number of (term, document) posting entries.
     pub total_postings: usize,
+    /// Number of documents (nodes) currently indexed.
     pub document_count: u32,
+    /// Average document length in tokens.
     pub avg_doc_length: f64,
 }
 
@@ -306,10 +318,23 @@ pub trait TextIndex: Send + Sync + std::any::Any {
 
     // Segment migration & content-aware rebalancing support.
     // Default implementations are no-ops; only `OnDiskTextIndex` provides real behavior.
+
+    /// Removes and returns the sealed segment at `index`, together with its tier number.
+    ///
+    /// Default (in-memory) implementation always returns `None`.
     fn take_sealed_segment(&mut self, _index: usize) -> Option<(crate::OnDiskSegment, u32)> {
         None
     }
+
+    /// Inserts an externally-produced segment (e.g. from a rebalance) at the given tier.
+    ///
+    /// Default (in-memory) implementation is a no-op.
     fn add_sealed_segment(&mut self, _seg: crate::OnDiskSegment, _tier: u32) {}
+
+    /// Returns a short string describing the content of the segment at `seg_idx`.
+    ///
+    /// Used by rebalancing logic to pick a representative for cluster labelling.
+    /// Default (in-memory) implementation returns `None`.
     fn sample_representative_for_segment(&self, _seg_idx: usize) -> Option<String> {
         None
     }
@@ -352,6 +377,13 @@ impl TextIndex for InvertedIndex {
     }
 }
 
+/// In-memory BM25 inverted index over node blobs.
+///
+/// This is the default text backend for [`IndexedKnowledgeGraph`] when no
+/// on-disk persistence is needed. It keeps all postings in heap memory and
+/// does not survive a process restart.
+///
+/// For persistence use `OnDiskTextIndex` (requires the `fulltext` feature).
 pub struct InvertedIndex {
     interner: StringInterner,
     index: HashMap<TermId, PostingList>,
@@ -362,10 +394,12 @@ pub struct InvertedIndex {
 }
 
 impl InvertedIndex {
+    /// Creates a new empty `InvertedIndex` with the default [`DefaultTokenizer`].
     pub fn new() -> Self {
         Self::with_tokenizer(Box::new(DefaultTokenizer::new()))
     }
 
+    /// Creates a new empty `InvertedIndex` with a custom tokenizer.
     pub fn with_tokenizer(tokenizer: Box<dyn Tokenizer>) -> Self {
         Self {
             interner: StringInterner::new(),
@@ -477,6 +511,14 @@ impl InvertedIndex {
     /// BM25 search for a phrase. Returns nodes where the terms appear close together.
     ///
     /// Falls back to regular `search()` if the phrase has fewer than 2 terms.
+    /// Search for documents where the given `phrase` terms appear within `max_gap`
+    /// positions of each other, then rank by a blended BM25 + proximity score.
+    ///
+    /// # Single-term phrases
+    ///
+    /// When `phrase` tokenises to fewer than two terms (after stop-word removal),
+    /// the method falls back to a plain [`search`] call. The result ranking is
+    /// identical to calling `search` directly — there is no proximity penalty.
     pub fn phrase_search(
         &self,
         phrase: &str,
@@ -487,6 +529,7 @@ impl InvertedIndex {
         let terms: Vec<String> = tokens.iter().map(|(w, _)| w.to_lowercase()).collect();
 
         if terms.len() < 2 {
+            // Single token (or empty) — fall back to normal BM25 search.
             return self.search(phrase, max_results);
         }
 
@@ -528,12 +571,18 @@ impl InvertedIndex {
 
             let term_positions: Vec<&[u32]> = lists
                 .iter()
-                .map(|pl| {
-                    let idx = pl
+                .filter_map(|pl| {
+                    // Safe: all_present already confirmed this succeeds. Use
+                    // if-let rather than .unwrap() to guard against any future
+                    // ordering inconsistency.
+                    if let Ok(idx) = pl
                         .postings
                         .binary_search_by_key(&node_id.0, |p| p.node_id.0)
-                        .unwrap();
-                    pl.postings[idx].positions.as_slice()
+                    {
+                        Some(pl.postings[idx].positions.as_slice())
+                    } else {
+                        None
+                    }
                 })
                 .collect();
 
@@ -601,6 +650,7 @@ impl InvertedIndex {
         score
     }
 
+    /// Returns diagnostic statistics about the current state of the index.
     pub fn stats(&self) -> IndexStats {
         let total_postings: usize = self.index.values().map(|pl| pl.postings.len()).sum();
         IndexStats {
@@ -618,6 +668,15 @@ impl Default for InvertedIndex {
     }
 }
 
+impl std::fmt::Debug for InvertedIndex {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("InvertedIndex")
+            .field("document_count", &self.document_count)
+            .field("unique_terms", &self.index.len())
+            .finish_non_exhaustive()
+    }
+}
+
 // ============================================================================
 // IndexedKnowledgeGraph – the main high-level type users will interact with
 // ============================================================================
@@ -630,6 +689,7 @@ use crate::query::QueryResult;
 /// Adding a node automatically indexes its text. This enables the powerful
 /// `search_and_traverse` workflow described in the design document.
 pub struct IndexedKnowledgeGraph {
+    /// The underlying knowledge graph (nodes, edges, properties).
     pub graph: KnowledgeGraph,
     /// The text index backend. Can be the classic in-memory `InvertedIndex`
     /// or the persistent segmented `OnDiskTextIndex`.
@@ -640,7 +700,16 @@ pub struct IndexedKnowledgeGraph {
     merge_workers: Vec<crate::MergeWorkerHandle>,
 }
 
+impl std::fmt::Debug for IndexedKnowledgeGraph {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("IndexedKnowledgeGraph")
+            .field("graph", &self.graph)
+            .finish_non_exhaustive()
+    }
+}
+
 impl IndexedKnowledgeGraph {
+    /// Creates a new empty `IndexedKnowledgeGraph` with the in-memory `InvertedIndex` backend.
     pub fn new() -> Self {
         Self {
             graph: KnowledgeGraph::new(),
@@ -704,6 +773,7 @@ impl IndexedKnowledgeGraph {
         id
     }
 
+    /// Add a directed edge to the graph. Properties are encoded into the edge bitmask.
     pub fn add_edge(
         &mut self,
         source: NodeId,
@@ -731,7 +801,7 @@ impl IndexedKnowledgeGraph {
         max_depth: u32,
         max_results: usize,
         weights: FusionWeights,
-    ) -> Vec<CombinedResult> {
+    ) -> Vec<CombinedResult<'_>> {
         let text_results = self.text_index.search(text_query, max_seeds);
 
         if text_results.is_empty() {
@@ -787,6 +857,7 @@ impl IndexedKnowledgeGraph {
         combined
     }
 
+    /// Returns the full text content of a node's blob (zero-copy).
     pub fn read_blob(&self, node: NodeId) -> &str {
         self.graph.read_blob(node)
     }
@@ -804,7 +875,7 @@ impl IndexedKnowledgeGraph {
         max_depth: u32,
         max_results: usize,
         weights: FusionWeights,
-    ) -> Vec<CombinedResult> {
+    ) -> Vec<CombinedResult<'_>> {
         let text_results = self.text_index.phrase_search(phrase, max_gap, max_seeds);
 
         if text_results.is_empty() {
@@ -866,7 +937,7 @@ impl IndexedKnowledgeGraph {
         min_strength: f64,
         max_depth: u32,
         max_results: usize,
-    ) -> Vec<CombinedResult> {
+    ) -> Vec<CombinedResult<'_>> {
         self.search_and_traverse(
             text_query,
             max_seeds,
@@ -888,7 +959,7 @@ impl IndexedKnowledgeGraph {
         min_strength: f64,
         max_depth: u32,
         max_results: usize,
-    ) -> Vec<CombinedResult> {
+    ) -> Vec<CombinedResult<'_>> {
         self.phrase_search_and_traverse(
             phrase,
             max_gap,
@@ -901,6 +972,7 @@ impl IndexedKnowledgeGraph {
         )
     }
 
+    /// Returns diagnostic statistics about the current text index state.
     pub fn index_stats(&self) -> IndexStats {
         self.text_index.stats()
     }
@@ -1007,6 +1079,9 @@ impl IndexedKnowledgeGraph {
 
     // === Persistence for sharded + on-disk setups (0.2) ===
 
+    /// Save the graph topology and the text index to a directory.
+    ///
+    /// Creates two subdirectories: `graph/` and `text_index/`.
     pub fn save_to_dir(&mut self, dir: &std::path::Path) -> Result<(), GraphError> {
         // Save the graph part (KnowledgeGraph uses the established save_to_disk name)
         self.graph.save_to_disk(&dir.join("graph"))?;
@@ -1017,6 +1092,10 @@ impl IndexedKnowledgeGraph {
         Ok(())
     }
 
+    /// Load a previously saved `IndexedKnowledgeGraph` from `dir`.
+    ///
+    /// Auto-detects whether `text_index/manifest.json` is present and chooses
+    /// the on-disk backend; otherwise falls back to the in-memory `InvertedIndex`.
     pub fn load_from_dir(dir: &std::path::Path) -> Result<Self, GraphError> {
         // Load the graph topology + blobs (use the established portable loader)
         let graph = KnowledgeGraph::load_from_disk(&dir.join("graph"))?;
@@ -1041,6 +1120,10 @@ impl IndexedKnowledgeGraph {
         })
     }
 
+    /// Loads an `IndexedKnowledgeGraph` from `dir` using memory-mapped I/O for the graph data.
+    ///
+    /// Requires the `mmap` feature. Falls back to an empty in-memory text index when no
+    /// on-disk text-index manifest is found.
     #[cfg(feature = "mmap")]
     pub fn load_mmap(dir: &std::path::Path) -> Result<Self, GraphError> {
         // When the mmap feature is enabled, use the real mmap loader for the graph part.
@@ -1063,6 +1146,11 @@ impl IndexedKnowledgeGraph {
         })
     }
 
+    /// Loads an `IndexedKnowledgeGraph` from `dir`.
+    ///
+    /// This is the non-`mmap` fallback — it simply delegates to [`Self::load_from_dir`].
+    /// Provided so call sites can always write `load_mmap` and the right implementation
+    /// is chosen at compile time via the `mmap` feature flag.
     #[cfg(not(feature = "mmap"))]
     pub fn load_mmap(dir: &std::path::Path) -> Result<Self, GraphError> {
         // Fallback: when mmap feature is not compiled in, behave like load_from_dir.
