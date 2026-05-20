@@ -427,4 +427,59 @@ impl ShardedGraph {
     pub fn router_mut(&mut self) -> &mut ShardRouter {
         &mut self.router
     }
+
+    // === Convenience methods that make the facade pleasant to use ===
+
+    /// Read the text of a node given its global identifier.
+    pub fn read_blob(&self, gid: GlobalNodeId) -> &str {
+        let shard = &self.router.shards[gid.shard.0 as usize];
+        shard.graph.read_blob(gid.local)
+    }
+
+    /// Get a node label by global id (if present).
+    pub fn node_label(&self, gid: GlobalNodeId) -> Option<&str> {
+        let shard = &self.router.shards[gid.shard.0 as usize];
+        shard.graph.graph.node_label(gid.local)
+    }
+
+    /// Distributed phrase search (text only).
+    pub fn phrase_search(
+        &self,
+        phrase: &str,
+        max_gap: u32,
+        max_results: usize,
+    ) -> Vec<crate::index::TextSearchResult> {
+        let mut all = Vec::new();
+        for shard in &self.router.shards {
+            let mut local = shard.graph.phrase_search(phrase, max_gap, max_results);
+            all.append(&mut local);
+        }
+        all.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+        all.truncate(max_results);
+        all
+    }
+
+    /// Distributed phrase + graph traversal with the default fusion weights.
+    pub fn phrase_search_and_traverse(
+        &self,
+        phrase: &str,
+        max_gap: u32,
+        max_seeds: usize,
+        property_names: &[&str],
+        min_strength: f64,
+        max_depth: u32,
+        max_results: usize,
+    ) -> Vec<crate::index::CombinedResult> {
+        // For now we reuse the text search + traverse path.
+        // A dedicated phrase-aware version can be added later.
+        self.router.search_and_traverse(
+            phrase,
+            max_seeds,
+            property_names,
+            min_strength,
+            max_depth,
+            max_results,
+            crate::index::FusionWeights::default(),
+        )
+    }
 }
