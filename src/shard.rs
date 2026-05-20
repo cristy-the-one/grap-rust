@@ -18,7 +18,9 @@ use crate::index::IndexedKnowledgeGraph;
 /// Identifies one shard inside a [`ShardRouter`] or [`ShardedGraph`].
 ///
 /// Shard IDs are dense integers from `0` to `shard_count-1`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, serde::Serialize, serde::Deserialize,
+)]
 pub struct ShardId(pub u16);
 
 /// A node identifier that is unique across an entire sharded cluster.
@@ -210,7 +212,10 @@ impl Shard {
             return;
         }
 
-        let label = remote_shard.graph.node_label(target.local).map(|s| s.to_string());
+        let label = remote_shard
+            .graph
+            .node_label(target.local)
+            .map(|s| s.to_string());
         let text = remote_shard.read_blob(target.local);
         let snippet = text.chars().take(120).collect::<String>();
 
@@ -343,7 +348,8 @@ impl ShardRouter {
         if idx >= self.shards.len() {
             Err(crate::GraphError::NotFound(format!(
                 "shard {} does not exist (have {} shards)",
-                id.0, self.shards.len()
+                id.0,
+                self.shards.len()
             )))
         } else {
             Ok(&self.shards[idx])
@@ -460,7 +466,7 @@ impl ShardRouter {
     }
 
     /// Restores ghost edges from a previously saved snapshot (used by load).
-    pub fn restore_ghost_edges(&mut self, data: Vec<(u16, HashMap<u32, Vec<GhostEdge>>)> ) {
+    pub fn restore_ghost_edges(&mut self, data: Vec<(u16, HashMap<u32, Vec<GhostEdge>>)>) {
         for (sid, map) in data {
             if (sid as usize) < self.shards.len() {
                 self.shards[sid as usize].ghost_edges = map;
@@ -516,10 +522,14 @@ impl ShardRouter {
             "shard_count": self.shards.len(),
             "version": 1,
         });
-        std::fs::write(dir.join("manifest.json"), serde_json::to_string_pretty(&manifest)?)?;
+        std::fs::write(
+            dir.join("manifest.json"),
+            serde_json::to_string_pretty(&manifest)?,
+        )?;
 
         // Persist ghost edges for exact round-trip (including after rebalancing)
-        let ghost_data: Vec<(u16, HashMap<u32, Vec<GhostEdge>>)> = self.shards
+        let ghost_data: Vec<(u16, HashMap<u32, Vec<GhostEdge>>)> = self
+            .shards
             .iter()
             .enumerate()
             .map(|(i, s)| (i as u16, s.ghost_edges.clone()))
@@ -554,7 +564,9 @@ impl ShardRouter {
 
         // Restore ghost edges (critical for cross-shard queries after load)
         if let Ok(ghost_data) = std::fs::read(dir.join("ghost_edges.json")) {
-            if let Ok(ghosts) = serde_json::from_slice::<Vec<(u16, HashMap<u32, Vec<GhostEdge>>)>>(&ghost_data) {
+            if let Ok(ghosts) =
+                serde_json::from_slice::<Vec<(u16, HashMap<u32, Vec<GhostEdge>>)>>(&ghost_data)
+            {
                 for (sid, map) in ghosts {
                     if (sid as usize) < router.shards.len() {
                         router.shards[sid as usize].ghost_edges = map;
@@ -596,7 +608,9 @@ impl ShardRouter {
         if source.shard == target.shard {
             // Local edge
             let shard = &mut self.shards[src_idx];
-            shard.graph.add_edge(source.local, target.local, strength, props);
+            shard
+                .graph
+                .add_edge(source.local, target.local, strength, props);
         } else {
             // Cross-shard edge → create ghost edge on the source shard
             let shard = &mut self.shards[src_idx];
@@ -647,8 +661,8 @@ impl ShardRouter {
         max_results: usize,
         weights: crate::index::FusionWeights,
     ) -> Vec<ShardedQueryResult> {
-        use std::collections::{BinaryHeap, HashSet};
         use std::cmp::Ordering;
+        use std::collections::{BinaryHeap, HashSet};
 
         // --- 1. Distributed seed selection ---
         let mut seed_list = Vec::new();
@@ -672,7 +686,9 @@ impl ShardRouter {
         }
 
         impl PartialEq for Entry {
-            fn eq(&self, other: &Self) -> bool { self.strength == other.strength }
+            fn eq(&self, other: &Self) -> bool {
+                self.strength == other.strength
+            }
         }
         impl Eq for Entry {}
         impl PartialOrd for Entry {
@@ -690,7 +706,10 @@ impl ShardRouter {
         let mut visited: HashSet<(u16, u32)> = HashSet::new(); // (shard, local)
 
         for (shard_id, seed) in &seed_list {
-            let gnode = GlobalNodeId { shard: *shard_id, local: seed.node_id };
+            let gnode = GlobalNodeId {
+                shard: *shard_id,
+                local: seed.node_id,
+            };
             visited.insert((shard_id.0, seed.node_id.0));
             pq.push(Entry {
                 gnode,
@@ -832,7 +851,10 @@ impl ShardRouter {
             let seg_infos = shard.graph.text_index_segment_info();
 
             for (seg_idx, info) in seg_infos.iter().enumerate() {
-                let sample = shard.graph.text_index.sample_representative_for_segment(seg_idx);
+                let sample = shard
+                    .graph
+                    .text_index
+                    .sample_representative_for_segment(seg_idx);
                 let seg_key = match &sample {
                     Some(s) if !s.is_empty() => format!("content-{}-seg-{}", s, seg_idx),
                     _ => format!(
@@ -877,10 +899,15 @@ impl ShardRouter {
                 let src = mig.source_shard.0 as usize;
                 let tgt = mig.target_shard.0 as usize;
                 if src < self.shards.len() && tgt < self.shards.len() {
-                    if let Some((seg, tier)) =
-                        self.shards[src].graph.text_index.take_sealed_segment(mig.segment_index)
+                    if let Some((seg, tier)) = self.shards[src]
+                        .graph
+                        .text_index
+                        .take_sealed_segment(mig.segment_index)
                     {
-                        self.shards[tgt].graph.text_index.add_sealed_segment(seg, tier);
+                        self.shards[tgt]
+                            .graph
+                            .text_index
+                            .add_sealed_segment(seg, tier);
                     }
                 }
             }
@@ -909,7 +936,11 @@ impl ShardRouter {
                 )));
             }
 
-            if self.shards[old_idx].graph.text_index.is_document_deleted(gid.local) {
+            if self.shards[old_idx]
+                .graph
+                .text_index
+                .is_document_deleted(gid.local)
+            {
                 continue;
             }
 
@@ -1087,10 +1118,9 @@ impl ShardedGraph {
     }
 
     /// Restores ghost edges from a snapshot (used during load).
-    pub fn restore_ghost_edges(&mut self, data: Vec<(u16, HashMap<u32, Vec<GhostEdge>>)> ) {
+    pub fn restore_ghost_edges(&mut self, data: Vec<(u16, HashMap<u32, Vec<GhostEdge>>)>) {
         self.router.restore_ghost_edges(data);
     }
-
 
     /// Run a full maintenance cycle (ghost cleanup + incremental vacuum on on-disk shards).
     pub fn run_maintenance_cycle(&mut self) {
@@ -1187,7 +1217,11 @@ impl ShardedGraph {
             let mut local = shard.graph.phrase_search(phrase, max_gap, max_results);
             all.append(&mut local);
         }
-        all.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+        all.sort_by(|a, b| {
+            b.score
+                .partial_cmp(&a.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         all.truncate(max_results);
         all
     }
@@ -1260,12 +1294,7 @@ impl ShardedGraph {
         self.router
             .shards
             .iter()
-            .map(|s| {
-                s.ghost_edges
-                    .values()
-                    .map(|v| v.len())
-                    .sum::<usize>()
-            })
+            .map(|s| s.ghost_edges.values().map(|v| v.len()).sum::<usize>())
             .collect()
     }
 
@@ -1318,7 +1347,10 @@ impl MaintenanceHandle {
             }
         });
 
-        MaintenanceHandle { stop, join: Some(handle) }
+        MaintenanceHandle {
+            stop,
+            join: Some(handle),
+        }
     }
 
     fn start_shared(interval: Duration, graph: Arc<Mutex<ShardedGraph>>) -> Self {
@@ -1335,7 +1367,10 @@ impl MaintenanceHandle {
             }
         });
 
-        MaintenanceHandle { stop, join: Some(handle) }
+        MaintenanceHandle {
+            stop,
+            join: Some(handle),
+        }
     }
 
     pub fn shutdown(mut self) {

@@ -14,8 +14,10 @@ fn main() {
     let confidence = g.properties.register("confidence");
     let relation_type = g.properties.register("relation_type");
 
-    println!("Registered properties: topic={:?}, confidence={:?}, relation_type={:?}",
-             topic, confidence, relation_type);
+    println!(
+        "Registered properties: topic={:?}, confidence={:?}, relation_type={:?}",
+        topic, confidence, relation_type
+    );
 
     // Add nodes with realistic Rust text (the "blobs")
     let rust_node = g.add_node(
@@ -53,7 +55,11 @@ fn main() {
         Some("Concurrency"),
     );
 
-    println!("Added {} nodes, {} edges so far", g.node_count(), g.edge_count());
+    println!(
+        "Added {} nodes, {} edges so far",
+        g.node_count(),
+        g.edge_count()
+    );
 
     // Add edges with strength + property tuples (bitmask built automatically)
     g.add_edge(
@@ -63,7 +69,10 @@ fn main() {
         vec![
             (topic, PropertyValue::Label("memory_safety".to_string())),
             (confidence, PropertyValue::Float(0.99)),
-            (relation_type, PropertyValue::Label("core_concept".to_string())),
+            (
+                relation_type,
+                PropertyValue::Label("core_concept".to_string()),
+            ),
         ],
     );
 
@@ -111,7 +120,11 @@ fn main() {
         ],
     );
 
-    println!("Graph now has {} nodes, {} edges\n", g.node_count(), g.edge_count());
+    println!(
+        "Graph now has {} nodes, {} edges\n",
+        g.node_count(),
+        g.edge_count()
+    );
 
     // THE KEY QUERY from the design doc:
     // "Find all nodes connected to Rust via memory_safety with high confidence, up to 3 hops"
@@ -138,10 +151,17 @@ fn main() {
         );
     }
 
-    println!("\nGraph stats: {} nodes, {} edges", g.node_count(), g.edge_count());
+    println!(
+        "\nGraph stats: {} nodes, {} edges",
+        g.node_count(),
+        g.edge_count()
+    );
 
     // Verify the important semantic properties from the design
-    assert!(results.len() >= 3, "Expected at least rust + ownership + borrowing");
+    assert!(
+        results.len() >= 3,
+        "Expected at least rust + ownership + borrowing"
+    );
     assert!(g.read_blob(rust_node).contains("systems programming"));
     assert!(g.read_blob(ownership_node).contains("exactly one owner"));
 

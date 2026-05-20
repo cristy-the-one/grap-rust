@@ -27,15 +27,14 @@
 #![deny(unsafe_code)]
 // The design (core_graph_design.md) intentionally uses one unsafe block for zero-copy UTF-8
 // in BlobStore::read. It is isolated, documented, and only constructs from known-valid &str.
-
 #![warn(missing_docs, missing_debug_implementations)]
 
-pub mod ids;
 pub mod blob_store;
-pub mod properties;
 pub mod graph;
-pub mod query;
-pub mod index;     // Full-text BM25 index (Phase 2)
+pub mod ids;
+pub mod index;
+pub mod properties;
+pub mod query; // Full-text BM25 index (Phase 2)
 
 #[cfg(feature = "on-disk-index")]
 pub mod on_disk_text_index;
@@ -47,12 +46,12 @@ pub mod serialize; // Persistence (save/load + optional mmap) - Phase 3 in progr
 // Re-exports for ergonomic use
 
 // On-disk index bridge (behind feature flag)
+pub use crate::index::TextIndex;
 #[cfg(feature = "on-disk-index")]
 pub use crate::on_disk_text_index::OnDiskTextIndex;
-pub use crate::index::TextIndex;
+pub use graph::KnowledgeGraph;
 pub use ids::{EdgeId, NodeId, PropertyTag};
 pub use properties::{PropertyFilter, PropertyRegistry, PropertyValue};
-pub use graph::KnowledgeGraph;
 pub use query::{GraphQuery, QueryBuilder, QueryResult};
 
 // Index types (always available – makes the engine truly useful)
@@ -62,7 +61,7 @@ pub use index::{
 };
 
 pub use shard::{
-    GhostEdge, GlobalNodeId, RebalancePlan, ShardedGraph, ShardedQueryResult, ShardId, ShardRouter,
+    GhostEdge, GlobalNodeId, RebalancePlan, ShardId, ShardRouter, ShardedGraph, ShardedQueryResult,
 };
 
 pub use serialize::{GraphMeta, RepairReport, CURRENT_GRAPH_FORMAT_VERSION};

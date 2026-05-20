@@ -18,8 +18,14 @@ fn ghost_edges_survive_rebalance_and_manual_roundtrip() {
     // Add edges between them
     for i in 0..19 {
         let _ = sg.add_edge(
-            GlobalNodeId { shard: ShardId(0), local: NodeId(i) },
-            GlobalNodeId { shard: ShardId(1), local: NodeId(i + 1) },
+            GlobalNodeId {
+                shard: ShardId(0),
+                local: NodeId(i),
+            },
+            GlobalNodeId {
+                shard: ShardId(1),
+                local: NodeId(i + 1),
+            },
             0.7,
             vec![],
         );
@@ -39,6 +45,9 @@ fn ghost_edges_survive_rebalance_and_manual_roundtrip() {
     let mut fresh = ShardedGraph::new(3);
     fresh.restore_ghost_edges(snapshot);
 
-    assert_eq!(fresh.ghost_edge_count(), sg.ghost_edge_count(),
-               "ghost edges must round-trip after rebalance using the public persistence helpers");
+    assert_eq!(
+        fresh.ghost_edge_count(),
+        sg.ghost_edge_count(),
+        "ghost edges must round-trip after rebalance using the public persistence helpers"
+    );
 }

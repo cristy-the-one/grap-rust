@@ -12,10 +12,10 @@ use serde::{Deserialize, Serialize};
 
 use crate::blob_store::BlobRef;
 use crate::graph::KnowledgeGraph;
-use crate::ids::{EdgeId, NodeId};
-use crate::GraphError;
 use crate::ids::PropertyTag;
+use crate::ids::{EdgeId, NodeId};
 use crate::properties::PropertyValue;
+use crate::GraphError;
 
 // ============================================================================
 // Serializable mirror types
@@ -185,7 +185,8 @@ impl From<SerializablePropertyValue> for PropertyValue {
             SerializablePropertyValue::Bool(b) => PropertyValue::Bool(b),
             SerializablePropertyValue::Label(bytes) => {
                 // Best effort – fall back to lossy if needed
-                let s = String::from_utf8(bytes).unwrap_or_else(|e| String::from_utf8_lossy(&e.into_bytes()).into_owned());
+                let s = String::from_utf8(bytes)
+                    .unwrap_or_else(|e| String::from_utf8_lossy(&e.into_bytes()).into_owned());
                 PropertyValue::Label(s)
             }
         }
@@ -315,12 +316,9 @@ impl KnowledgeGraph {
         // 3. Write topology (bincode)
         let topo_path = dir.join("graph.topo");
         let property_names = self.properties.property_names().to_vec();
-        let topo_data = bincode::serialize(&(
-            serializable_nodes,
-            serializable_edges,
-            property_names,
-        ))
-        .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+        let topo_data =
+            bincode::serialize(&(serializable_nodes, serializable_edges, property_names))
+                .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
         fs::write(&topo_path, &topo_data)?;
 
         // 4. Write meta
@@ -456,7 +454,10 @@ impl KnowledgeGraph {
                             }
                         }
                         Err(_) => {
-                            report.notes.push("Failed to parse graph.meta (corrupted or invalid JSON)".to_string());
+                            report.notes.push(
+                                "Failed to parse graph.meta (corrupted or invalid JSON)"
+                                    .to_string(),
+                            );
                         }
                     }
                 }
@@ -602,7 +603,6 @@ fn find_chunk_for_offset(boundaries: &[u64], global_offset: u64) -> (u32, u32) {
     (0, 0)
 }
 
-
 impl KnowledgeGraph {
     /// Load only the metadata for a graph on disk without reading the
     /// topology or blobs.
@@ -665,7 +665,10 @@ mod tests {
         let rel = g.properties.register("relation");
 
         let n1 = g.add_node("Hello world from grap serialization test.", Some("first"));
-        let n2 = g.add_node("Second document about graphs and persistence.", Some("second"));
+        let n2 = g.add_node(
+            "Second document about graphs and persistence.",
+            Some("second"),
+        );
         let n3 = g.add_node("Third document on knowledge graphs.", Some("third"));
 
         // Add edges with properties
@@ -708,8 +711,14 @@ mod tests {
         let mut ig = IndexedKnowledgeGraph::new();
         let topic = ig.graph.properties.register("topic");
 
-        let n1 = ig.add_node("Rust ownership prevents data races at compile time.", Some("rust"));
-        let n2 = ig.add_node("Borrowing allows safe references without ownership transfer.", Some("borrow"));
+        let n1 = ig.add_node(
+            "Rust ownership prevents data races at compile time.",
+            Some("rust"),
+        );
+        let n2 = ig.add_node(
+            "Borrowing allows safe references without ownership transfer.",
+            Some("borrow"),
+        );
 
         ig.add_edge(
             n1,
@@ -721,8 +730,8 @@ mod tests {
         let dir = tempdir().unwrap();
         ig.save_to_disk(dir.path()).expect("save should succeed");
 
-        let loaded = IndexedKnowledgeGraph::load_from_disk(dir.path())
-            .expect("load should succeed");
+        let loaded =
+            IndexedKnowledgeGraph::load_from_disk(dir.path()).expect("load should succeed");
 
         assert_eq!(loaded.graph.node_count(), 2);
         assert_eq!(loaded.graph.edge_count(), 1);
@@ -738,8 +747,14 @@ mod tests {
         let mut g = KnowledgeGraph::new();
         let topic = g.properties.register("topic");
 
-        let n1 = g.add_node("Large corpus document one about systems programming.", Some("doc1"));
-        let n2 = g.add_node("Large corpus document two about memory safety and ownership.", Some("doc2"));
+        let n1 = g.add_node(
+            "Large corpus document one about systems programming.",
+            Some("doc1"),
+        );
+        let n2 = g.add_node(
+            "Large corpus document two about memory safety and ownership.",
+            Some("doc2"),
+        );
 
         g.add_edge(
             n1,
@@ -826,12 +841,14 @@ mod tests {
         let graph_dir = dir.path().join("test-graph");
 
         // Calling repair on a non-existent directory should be safe
-        let report = KnowledgeGraph::repair(&graph_dir).expect("repair on non-existent dir should not fail");
+        let report =
+            KnowledgeGraph::repair(&graph_dir).expect("repair on non-existent dir should not fail");
         assert_eq!(report.removed_temp_dirs, 0);
 
         // Create an empty directory and repair it — should still succeed
         fs::create_dir(&graph_dir).unwrap();
-        let report2 = KnowledgeGraph::repair(&graph_dir).expect("repair on empty dir should succeed");
+        let report2 =
+            KnowledgeGraph::repair(&graph_dir).expect("repair on empty dir should succeed");
         assert_eq!(report2.removed_temp_dirs, 0);
     }
 }

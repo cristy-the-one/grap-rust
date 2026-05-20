@@ -10,7 +10,9 @@ use std::fmt;
 ///
 /// `NodeId`s are cheap, `Copy`, and stable for the lifetime of the graph
 /// (they are indices into internal `Vec`s).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, serde::Serialize, serde::Deserialize,
+)]
 pub struct NodeId(pub u32);
 
 /// A handle to an edge inside a [`KnowledgeGraph`](crate::KnowledgeGraph).

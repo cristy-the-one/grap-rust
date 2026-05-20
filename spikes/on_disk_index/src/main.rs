@@ -307,14 +307,14 @@ impl OnDiskSegment {
 
     /// Returns the stored length for a document, or 1 if unknown / out of range.
     pub fn doc_length(&self, doc_id: LocalDocId) -> u32 {
-        self.doc_lengths
-            .get(doc_id as usize)
-            .copied()
-            .unwrap_or(1)
+        self.doc_lengths.get(doc_id as usize).copied().unwrap_or(1)
     }
 
     pub fn get_postings(&self, term: &str) -> Option<Vec<Posting>> {
-        let pos = self.terms.binary_search_by(|t| t.term.as_str().cmp(term)).ok()?;
+        let pos = self
+            .terms
+            .binary_search_by(|t| t.term.as_str().cmp(term))
+            .ok()?;
         let meta = &self.terms[pos];
 
         let start = meta.posting_offset as usize;
@@ -472,7 +472,11 @@ impl ActiveBuffer {
     }
 
     fn doc_length(&self, doc_id: LocalDocId) -> u32 {
-        self.builder.doc_lengths.get(doc_id as usize).copied().unwrap_or(1)
+        self.builder
+            .doc_lengths
+            .get(doc_id as usize)
+            .copied()
+            .unwrap_or(1)
     }
 }
 
@@ -493,7 +497,9 @@ pub struct TieredMergePolicy {
 
 impl Default for TieredMergePolicy {
     fn default() -> Self {
-        Self { segments_per_tier: 4 }
+        Self {
+            segments_per_tier: 4,
+        }
     }
 }
 
@@ -553,8 +559,7 @@ impl OnDiskIndex {
     /// On clean `flush()` the WAL is truncated.
     pub fn enable_wal(&mut self, wal_path: &Path) -> std::io::Result<()> {
         let wal = SimpleWal::create(wal_path)?;
-        self.active = std::mem::replace(&mut self.active, ActiveBuffer::new())
-            .with_wal(wal);
+        self.active = std::mem::replace(&mut self.active, ActiveBuffer::new()).with_wal(wal);
         Ok(())
     }
 
@@ -581,7 +586,10 @@ impl OnDiskIndex {
         self.total_docs += seg.doc_count as u64;
         self.total_tokens += seg.doc_lengths.iter().map(|&l| l as u64).sum::<u64>();
 
-        self.sealed.push(SealedSegment { segment: seg, tier: 0 });
+        self.sealed.push(SealedSegment {
+            segment: seg,
+            tier: 0,
+        });
 
         let inserted_idx = self.sealed.len() - 1;
 
@@ -618,8 +626,7 @@ impl OnDiskIndex {
             return;
         }
 
-        let seg_refs: Vec<&OnDiskSegment> =
-            self.sealed.iter().map(|s| &s.segment).collect();
+        let seg_refs: Vec<&OnDiskSegment> = self.sealed.iter().map(|s| &s.segment).collect();
         let merged = merge_segments(&seg_refs);
 
         self.sealed.clear();
@@ -646,7 +653,8 @@ impl OnDiskIndex {
 
         loop {
             // Group segments by tier (we keep them in insertion order within tier)
-            let mut tiers: std::collections::BTreeMap<u32, Vec<usize>> = std::collections::BTreeMap::new();
+            let mut tiers: std::collections::BTreeMap<u32, Vec<usize>> =
+                std::collections::BTreeMap::new();
             for (i, s) in self.sealed.iter().enumerate() {
                 tiers.entry(s.tier).or_default().push(i);
             }
@@ -656,7 +664,11 @@ impl OnDiskIndex {
             for (&tier, indices) in &tiers {
                 if indices.len() >= policy.segments_per_tier {
                     // Take the oldest N in this tier (they appear first in the vec)
-                    let to_merge: Vec<usize> = indices.iter().take(policy.segments_per_tier).copied().collect();
+                    let to_merge: Vec<usize> = indices
+                        .iter()
+                        .take(policy.segments_per_tier)
+                        .copied()
+                        .collect();
 
                     // Collect the actual segment references
                     let seg_refs: Vec<&OnDiskSegment> =
@@ -691,7 +703,10 @@ impl OnDiskIndex {
 
     /// Debug helper: returns (tier, doc_count) for each sealed segment in order.
     pub fn debug_segment_tiers(&self) -> Vec<(u32, u32)> {
-        self.sealed.iter().map(|s| (s.tier, s.segment.doc_count)).collect()
+        self.sealed
+            .iter()
+            .map(|s| (s.tier, s.segment.doc_count))
+            .collect()
     }
 
     // ---------------------------------------------------------------------
@@ -886,7 +901,11 @@ pub fn search(index: &OnDiskIndex, terms: &[&str]) -> Vec<SearchHit> {
     }
 
     // Final ranking
-    merged.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+    merged.sort_by(|a, b| {
+        b.score
+            .partial_cmp(&a.score)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
     merged
 }
 
@@ -900,13 +919,19 @@ pub fn phrase_search(index: &OnDiskIndex, phrase: &[&str], max_gap: u32) -> Vec<
 
     let mut results = Vec::new();
     let total_docs = index.approx_doc_count();
-    let avgdl = if total_docs > 0 { index.total_tokens as f32 / total_docs as f32 } else { 1.0 };
+    let avgdl = if total_docs > 0 {
+        index.total_tokens as f32 / total_docs as f32
+    } else {
+        1.0
+    };
 
     // For each sealed segment
     for (seg_idx, sealed) in index.sealed.iter().enumerate() {
         let seg = &sealed.segment;
         // Get postings for the first term
-        let Some(first_posts) = seg.get_postings(phrase[0]) else { continue };
+        let Some(first_posts) = seg.get_postings(phrase[0]) else {
+            continue;
+        };
 
         for p in first_posts {
             let mut ok = true;
@@ -919,10 +944,12 @@ pub fn phrase_search(index: &OnDiskIndex, phrase: &[&str], max_gap: u32) -> Vec<
                 };
                 // Find a posting in the same doc with a position >= last_pos and within window
                 let found = more.iter().any(|pp| {
-                    if pp.doc_id != p.doc_id { return false; }
-                    pp.positions.iter().any(|&pos| {
-                        pos >= last_pos && pos <= last_pos + max_gap
-                    })
+                    if pp.doc_id != p.doc_id {
+                        return false;
+                    }
+                    pp.positions
+                        .iter()
+                        .any(|&pos| pos >= last_pos && pos <= last_pos + max_gap)
                 });
                 if !found {
                     ok = false;
@@ -949,10 +976,15 @@ pub fn phrase_search(index: &OnDiskIndex, phrase: &[&str], max_gap: u32) -> Vec<
     }
 
     // --- Also search the active buffer using positions ---
-    let active_phrase = phrase_search_active_buffer(&index.active, phrase, max_gap, total_docs, avgdl);
+    let active_phrase =
+        phrase_search_active_buffer(&index.active, phrase, max_gap, total_docs, avgdl);
     results.extend(active_phrase);
 
-    results.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+    results.sort_by(|a, b| {
+        b.score
+            .partial_cmp(&a.score)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
     results
 }
 
@@ -994,7 +1026,9 @@ fn phrase_search_active_buffer(
                 if pp.doc_id != p.doc_id {
                     return false;
                 }
-                pp.positions.iter().any(|&pos| pos >= last_pos && pos <= last_pos + max_gap)
+                pp.positions
+                    .iter()
+                    .any(|&pos| pos >= last_pos && pos <= last_pos + max_gap)
             });
             if !found {
                 ok = false;
@@ -1230,10 +1264,7 @@ pub fn merge_segments(segments: &[&OnDiskSegment]) -> OnDiskSegment {
                         id
                     });
                     p.doc_id = new_id;
-                    term_postings
-                        .entry(tmeta.term.clone())
-                        .or_default()
-                        .push(p);
+                    term_postings.entry(tmeta.term.clone()).or_default().push(p);
                 }
             }
         }
@@ -1283,7 +1314,9 @@ fn main() {
     println!("=== On-Disk Inverted Index Spike v5 (manifest + tiered merge policy) ===\n");
 
     // Use a very aggressive policy (merge every 2 segments in a tier) so the demo is short
-    let policy = TieredMergePolicy { segments_per_tier: 2 };
+    let policy = TieredMergePolicy {
+        segments_per_tier: 2,
+    };
     let mut index = OnDiskIndex::with_merge_policy(policy);
 
     println!("Created index with tiered merge policy (2 segments per tier)\n");
@@ -1321,7 +1354,13 @@ fn main() {
     let index_dir = temp_dir.path().join("my_index");
     index.save_to_dir(&index_dir).unwrap();
     println!("\nSaved whole index to {:?}", index_dir);
-    println!("Contents: {:?}", std::fs::read_dir(&index_dir).unwrap().map(|e| e.unwrap().file_name()).collect::<Vec<_>>());
+    println!(
+        "Contents: {:?}",
+        std::fs::read_dir(&index_dir)
+            .unwrap()
+            .map(|e| e.unwrap().file_name())
+            .collect::<Vec<_>>()
+    );
 
     // Load it back — this exercises the manifest + per-segment header loading
     let mut loaded = OnDiskIndex::load_from_dir(&index_dir).unwrap();
@@ -1333,13 +1372,18 @@ fn main() {
 
     // Search still works after round-trip
     let hits = search(&loaded, &["rust", "memory"]);
-    println!("Search 'rust'+'memory' on loaded index: {} hits", hits.len());
+    println!(
+        "Search 'rust'+'memory' on loaded index: {} hits",
+        hits.len()
+    );
     for h in hits.iter().take(5) {
         println!("  {:?}", h);
     }
 
     // We can attach a merge policy to the loaded index too
-    loaded.merge_policy = Some(TieredMergePolicy { segments_per_tier: 3 });
+    loaded.merge_policy = Some(TieredMergePolicy {
+        segments_per_tier: 3,
+    });
 
     println!("\nSpike v6 (WAL + background sketch + phrase + integration) completed successfully.");
 }

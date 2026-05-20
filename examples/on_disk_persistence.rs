@@ -51,8 +51,8 @@ fn main() {
     println!("Saved on-disk graph to {:?}", on_disk_dir);
 
     // Load — because we detect manifest.json, we get back an OnDiskTextIndex, not memory!
-    let mut loaded = IndexedKnowledgeGraph::load_from_dir(&on_disk_dir)
-        .expect("load on-disk graph");
+    let mut loaded =
+        IndexedKnowledgeGraph::load_from_dir(&on_disk_dir).expect("load on-disk graph");
     println!(
         "Loaded graph has {} nodes (text index is on-disk: {})",
         loaded.graph.node_count(),
@@ -78,8 +78,12 @@ fn main() {
 
     let mut sg = ShardedGraph::new(3);
 
-    let n1: GlobalNodeId = sg.add_node("Node that will live on one shard", None).unwrap();
-    let n2: GlobalNodeId = sg.add_node("Node that may live on a different shard", None).unwrap();
+    let n1: GlobalNodeId = sg
+        .add_node("Node that will live on one shard", None)
+        .unwrap();
+    let n2: GlobalNodeId = sg
+        .add_node("Node that may live on a different shard", None)
+        .unwrap();
     let _ = sg.add_edge(n1, n2, 0.85, vec![]);
 
     println!(

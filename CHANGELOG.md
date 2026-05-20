@@ -5,6 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] - 2026-05
+
+### Added
+- **`on-disk-index` feature** — Full segmented on-disk inverted index:
+  - WAL for the active buffer
+  - Tiered merge policy with background `MergeWorker`
+  - Real incremental `vacuum()` / compaction (tombstone-aware, not just full merge)
+  - `save_to_dir` / `load_from_dir` on `OnDiskIndex` and `OnDiskTextIndex`
+- `IndexedKnowledgeGraph::new_on_disk()` + automatic backend detection on `load_from_dir` / `load_mmap`
+- `ShardedGraph` / `ShardRouter` now support full persistence round-trips, including:
+  - Per-shard on-disk text indexes
+  - Persisted ghost edges (`ghost_edges.json`)
+- `start_background_workers()` on `IndexedKnowledgeGraph` and `start_background_merge_workers()` on `ShardedGraph` for easy background compaction
+- Richer `SegmentInfo` (live counts, approximate sizes, delete ratios) exposed via the `TextIndex` trait and `segment_distribution()`
+- Real execution of `SegmentMigration` during rebalancing (bulk segment moves + compaction side-effects)
+- New example: `cargo run --example on_disk_persistence --features "fulltext,on-disk-index,sharding"`
+- New integration test covering sharded persistence + ghost edges + rebalance round-trips
+
+### Changed
+- `vacuum()` on on-disk indexes is now truly incremental instead of always doing a full compaction
+- Background maintenance is now capable of driving real space reclamation
+
+### Notes
+- The combination of `fulltext + on-disk-index + sharding` is now the recommended path for large, persistent, horizontally scalable deployments.
+- The documented 0.2 on-disk, deletes, sharded persistence, real compaction/vacuum, and background maintenance plan is complete. Nothing major remains from the original 0.2 roadmap.
+
 ## [0.1.0] - 2026-04
 
 ### Added

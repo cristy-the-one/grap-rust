@@ -315,13 +315,23 @@ impl KnowledgeGraph {
                     }
                 }
                 PropertyFilter::Equals(expected) => {
-                    match edge.properties.iter().find(|(t, _)| t == tag).map(|(_, v)| v) {
+                    match edge
+                        .properties
+                        .iter()
+                        .find(|(t, _)| t == tag)
+                        .map(|(_, v)| v)
+                    {
                         Some(val) if val == expected => {}
                         _ => return false,
                     }
                 }
                 PropertyFilter::Range { min, max } => {
-                    match edge.properties.iter().find(|(t, _)| t == tag).map(|(_, v)| v) {
+                    match edge
+                        .properties
+                        .iter()
+                        .find(|(t, _)| t == tag)
+                        .map(|(_, v)| v)
+                    {
                         Some(PropertyValue::Float(v)) if *v >= *min && *v <= *max => {}
                         Some(PropertyValue::Int(v))
                             if (*v as f64) >= *min && (*v as f64) <= *max => {}

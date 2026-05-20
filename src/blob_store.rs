@@ -5,8 +5,6 @@
 //! - In-memory chunks (always available)
 //! - Memory-mapped file (when the `mmap` feature is enabled) for very large corpora.
 
-
-
 const CHUNK_SIZE: usize = 4 * 1024 * 1024;
 
 #[derive(Debug, Clone)]
@@ -101,7 +99,7 @@ impl BlobStore {
                 // The saved BlobRef's "chunk_idx + offset" is interpreted as an absolute offset
                 // into the mapped file (this is how save_to_disk + load_mmap work together).
                 let start = r.offset as usize; // For mmap loads we currently store global offset in .offset
-                // If we ever want true chunked mmap we can reinterpret chunk_idx, but flat is simpler and fast.
+                                               // If we ever want true chunked mmap we can reinterpret chunk_idx, but flat is simpler and fast.
                 let end = start + r.length as usize;
 
                 // SAFETY: The mmap is owned by this BlobStore and lives at least as long as the &str.

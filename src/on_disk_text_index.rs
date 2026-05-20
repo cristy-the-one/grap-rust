@@ -67,7 +67,10 @@ impl OnDiskTextIndex {
     pub fn compact(&mut self) {
         self.engine.lock().unwrap().compact();
     }
-    pub fn remove_sealed_segment(&mut self, index: usize) -> Option<(crate::on_disk_index::OnDiskSegment, u32)> {
+    pub fn remove_sealed_segment(
+        &mut self,
+        index: usize,
+    ) -> Option<(crate::on_disk_index::OnDiskSegment, u32)> {
         self.engine.lock().unwrap().remove_sealed_segment(index)
     }
     pub fn add_sealed_segment(&mut self, seg: crate::on_disk_index::OnDiskSegment, tier: u32) {
@@ -85,7 +88,10 @@ impl OnDiskTextIndex {
 
     /// Start a background merge + incremental vacuum worker for this on-disk index.
     /// Keep the returned handle alive for as long as you want the worker running.
-    pub fn start_merge_worker(&self, interval: std::time::Duration) -> crate::on_disk_index::MergeWorkerHandle {
+    pub fn start_merge_worker(
+        &self,
+        interval: std::time::Duration,
+    ) -> crate::on_disk_index::MergeWorkerHandle {
         crate::on_disk_index::start_merge_worker(self.engine.clone(), interval)
     }
 }
@@ -113,7 +119,10 @@ impl TextIndex for OnDiskTextIndex {
         raw.into_iter()
             .take(max_results)
             .filter_map(|(local, score)| {
-                self.node_to_local.iter().find(|(_, &v)| v == local).map(|(&nid, _)| (NodeId(nid), score as f64))
+                self.node_to_local
+                    .iter()
+                    .find(|(_, &v)| v == local)
+                    .map(|(&nid, _)| (NodeId(nid), score as f64))
             })
             .collect()
     }
@@ -121,7 +130,10 @@ impl TextIndex for OnDiskTextIndex {
     fn phrase_search(&self, phrase: &str, max_gap: u32, max_results: usize) -> Vec<(NodeId, f64)> {
         let terms: Vec<&str> = phrase.split_whitespace().collect();
         let raw = self.engine.lock().unwrap().phrase_search(&terms, max_gap);
-        raw.into_iter().take(max_results).map(|(local, sc)| (NodeId(local), sc as f64)).collect()
+        raw.into_iter()
+            .take(max_results)
+            .map(|(local, sc)| (NodeId(local), sc as f64))
+            .collect()
     }
 
     fn stats(&self) -> IndexStats {
@@ -159,7 +171,10 @@ impl TextIndex for OnDiskTextIndex {
     }
 
     // Trait overrides for rebalancer
-    fn take_sealed_segment(&mut self, index: usize) -> Option<(crate::on_disk_index::OnDiskSegment, u32)> {
+    fn take_sealed_segment(
+        &mut self,
+        index: usize,
+    ) -> Option<(crate::on_disk_index::OnDiskSegment, u32)> {
         self.engine.lock().unwrap().remove_sealed_segment(index)
     }
     fn add_sealed_segment(&mut self, seg: crate::on_disk_index::OnDiskSegment, tier: u32) {
@@ -169,9 +184,14 @@ impl TextIndex for OnDiskTextIndex {
     }
     fn sample_representative_for_segment(&self, seg_idx: usize) -> Option<String> {
         let infos = self.engine.lock().unwrap().sealed_segment_info();
-        if seg_idx >= infos.len() { return None; }
+        if seg_idx >= infos.len() {
+            return None;
+        }
         let info = &infos[seg_idx];
-        Some(format!("seg-sample-tier{}-docs{}", info.tier, info.doc_count))
+        Some(format!(
+            "seg-sample-tier{}-docs{}",
+            info.tier, info.doc_count
+        ))
     }
 
     fn segment_info(&self) -> Vec<crate::on_disk_index::SegmentInfo> {
@@ -187,10 +207,13 @@ impl TextIndex for OnDiskTextIndex {
     }
 
     /// Load an `OnDiskTextIndex` from a directory previously written by `save_to_dir`.
-    fn load_from_dir(dir: &std::path::Path) -> Result<Box<dyn crate::index::TextIndex>, crate::GraphError> {
+    fn load_from_dir(
+        dir: &std::path::Path,
+    ) -> Result<Box<dyn crate::index::TextIndex>, crate::GraphError> {
         // Load the real engine state (this is the important part that was missing).
-        let engine = crate::on_disk_index::OnDiskIndex::load_from_dir(dir)
-            .map_err(|e| crate::GraphError::Other(format!("failed to load on-disk index: {}", e)))?;
+        let engine = crate::on_disk_index::OnDiskIndex::load_from_dir(dir).map_err(|e| {
+            crate::GraphError::Other(format!("failed to load on-disk index: {}", e))
+        })?;
 
         let idx = Self {
             engine: std::sync::Arc::new(std::sync::Mutex::new(engine)),

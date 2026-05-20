@@ -85,14 +85,7 @@ fn main() {
 
     // === Example 1: Default balanced search ===
     println!("--- 1. Balanced search (default weights) ---");
-    let results = g.search_and_traverse_default(
-        "ownership borrowing",
-        5,
-        &["topic"],
-        0.7,
-        3,
-        10,
-    );
+    let results = g.search_and_traverse_default("ownership borrowing", 5, &["topic"], 0.7, 3, 10);
 
     for (i, r) in results.iter().enumerate().take(5) {
         println!(
@@ -108,16 +101,12 @@ fn main() {
 
     // === Example 2: Bias strongly toward text relevance ===
     println!("\n--- 2. Text-heavy fusion (text=0.9, graph=0.1) ---");
-    let text_heavy = FusionWeights { text: 0.9, graph: 0.1 };
-    let results = g.search_and_traverse(
-        "ownership borrowing",
-        5,
-        &["topic"],
-        0.7,
-        3,
-        10,
-        text_heavy,
-    );
+    let text_heavy = FusionWeights {
+        text: 0.9,
+        graph: 0.1,
+    };
+    let results =
+        g.search_and_traverse("ownership borrowing", 5, &["topic"], 0.7, 3, 10, text_heavy);
 
     for (i, r) in results.iter().enumerate().take(4) {
         println!(
@@ -131,16 +120,11 @@ fn main() {
 
     // === Example 3: Bias toward strong graph paths ===
     println!("\n--- 3. Graph-heavy fusion (text=0.2, graph=0.8) ---");
-    let graph_heavy = FusionWeights { text: 0.2, graph: 0.8 };
-    let results = g.search_and_traverse(
-        "memory safety",
-        5,
-        &["topic"],
-        0.6,
-        3,
-        10,
-        graph_heavy,
-    );
+    let graph_heavy = FusionWeights {
+        text: 0.2,
+        graph: 0.8,
+    };
+    let results = g.search_and_traverse("memory safety", 5, &["topic"], 0.6, 3, 10, graph_heavy);
 
     for (i, r) in results.iter().enumerate().take(4) {
         println!(
@@ -152,5 +136,7 @@ fn main() {
         );
     }
 
-    println!("\n✅ Both text relevance and graph relationship strength are now visible and tunable!");
+    println!(
+        "\n✅ Both text relevance and graph relationship strength are now visible and tunable!"
+    );
 }

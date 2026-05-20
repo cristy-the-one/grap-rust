@@ -7,7 +7,7 @@
 //! The implementation is a faithful port of the design document, with small
 //! ergonomic improvements (better docs, `IndexStats`, etc.).
 
-use std::collections::{HashMap, HashSet, BTreeMap};
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 use crate::ids::NodeId;
 use crate::properties::PropertyValue;
@@ -46,14 +46,12 @@ pub struct DefaultTokenizer {
 impl DefaultTokenizer {
     pub fn new() -> Self {
         let stop_words: HashSet<&'static str> = [
-            "the", "a", "an", "is", "are", "was", "were", "be", "been",
-            "being", "have", "has", "had", "do", "does", "did", "will",
-            "would", "could", "should", "may", "might", "shall", "can",
-            "to", "of", "in", "for", "on", "with", "at", "by", "from",
-            "as", "into", "through", "during", "before", "after", "and",
-            "but", "or", "nor", "not", "so", "if", "then", "than",
-            "that", "this", "it", "its", "they", "them", "we", "you",
-            "he", "she", "his", "her", "my", "your", "our", "their",
+            "the", "a", "an", "is", "are", "was", "were", "be", "been", "being", "have", "has",
+            "had", "do", "does", "did", "will", "would", "could", "should", "may", "might",
+            "shall", "can", "to", "of", "in", "for", "on", "with", "at", "by", "from", "as",
+            "into", "through", "during", "before", "after", "and", "but", "or", "nor", "not", "so",
+            "if", "then", "than", "that", "this", "it", "its", "they", "them", "we", "you", "he",
+            "she", "his", "her", "my", "your", "our", "their",
         ]
         .iter()
         .copied()
@@ -215,7 +213,10 @@ pub struct FusionWeights {
 impl Default for FusionWeights {
     /// Slightly favors text relevance (common default for knowledge retrieval).
     fn default() -> Self {
-        Self { text: 0.6, graph: 0.4 }
+        Self {
+            text: 0.6,
+            graph: 0.4,
+        }
     }
 }
 
@@ -270,7 +271,9 @@ pub trait TextIndex: Send + Sync + std::any::Any {
 
     /// Returns true if the document has been logically deleted (tombstone).
     /// On-disk backends use this during rebalance and traversal to skip/clean.
-    fn is_document_deleted(&self, _node: NodeId) -> bool { false }
+    fn is_document_deleted(&self, _node: NodeId) -> bool {
+        false
+    }
 
     // === Persistence hooks (0.2 on-disk index) ===
 
@@ -299,7 +302,10 @@ pub trait TextIndex: Send + Sync + std::any::Any {
     fn compact(&mut self) {}
 
     // Segment migration & content-aware rebalancing support (0.2)
-    fn take_sealed_segment(&mut self, _index: usize) -> Option<(crate::on_disk_index::OnDiskSegment, u32)> {
+    fn take_sealed_segment(
+        &mut self,
+        _index: usize,
+    ) -> Option<(crate::on_disk_index::OnDiskSegment, u32)> {
         None
     }
     fn add_sealed_segment(&mut self, _seg: crate::on_disk_index::OnDiskSegment, _tier: u32) {}
@@ -434,11 +440,7 @@ impl InvertedIndex {
             for posting in &pl.postings {
                 let doc_id = posting.node_id.0;
                 let tf = posting.frequency as f64;
-                let dl = self
-                    .doc_lengths
-                    .get(doc_id as usize)
-                    .copied()
-                    .unwrap_or(1) as f64;
+                let dl = self.doc_lengths.get(doc_id as usize).copied().unwrap_or(1) as f64;
 
                 let tf_norm = (tf * (K1 + 1.0))
                     / (tf + K1 * (1.0 - B + B * dl / self.avg_doc_length.max(1.0)));
@@ -481,10 +483,7 @@ impl InvertedIndex {
         max_results: usize,
     ) -> Vec<TextSearchResult> {
         let tokens = self.tokenizer.tokenize(phrase);
-        let terms: Vec<String> = tokens
-            .iter()
-            .map(|(w, _)| w.to_lowercase())
-            .collect();
+        let terms: Vec<String> = tokens.iter().map(|(w, _)| w.to_lowercase()).collect();
 
         if terms.len() < 2 {
             return self.search(phrase, max_results);
@@ -516,7 +515,8 @@ impl InvertedIndex {
 
             let all_present = lists.iter().enumerate().all(|(i, pl)| {
                 i == shortest_idx
-                    || pl.postings
+                    || pl
+                        .postings
                         .binary_search_by_key(&node_id.0, |p| p.node_id.0)
                         .is_ok()
             });
@@ -569,16 +569,27 @@ impl InvertedIndex {
         let mut score = 0.0;
 
         for term in terms {
-            let Some(term_id) = self.interner.get(term) else { continue };
-            let Some(pl) = self.index.get(&term_id) else { continue };
+            let Some(term_id) = self.interner.get(term) else {
+                continue;
+            };
+            let Some(pl) = self.index.get(&term_id) else {
+                continue;
+            };
 
             let df = pl.postings.len() as f64;
             let idf = ((n - df + 0.5) / (df + 0.5) + 1.0).ln();
 
-            if let Ok(idx) = pl.postings.binary_search_by_key(&node_id.0, |p| p.node_id.0) {
+            if let Ok(idx) = pl
+                .postings
+                .binary_search_by_key(&node_id.0, |p| p.node_id.0)
+            {
                 let posting = &pl.postings[idx];
                 let tf = posting.frequency as f64;
-                let dl = self.doc_lengths.get(node_id.0 as usize).copied().unwrap_or(1) as f64;
+                let dl = self
+                    .doc_lengths
+                    .get(node_id.0 as usize)
+                    .copied()
+                    .unwrap_or(1) as f64;
 
                 let tf_norm = (tf * (K1 + 1.0))
                     / (tf + K1 * (1.0 - B + B * dl / self.avg_doc_length.max(1.0)));
@@ -920,26 +931,6 @@ impl IndexedKnowledgeGraph {
         KnowledgeGraph::repair(dir)
     }
 
-    /// Load using memory-mapped blobs (zero-copy) and rebuild the text index.
-    ///
-    /// Requires the `mmap` feature to be enabled.
-    #[cfg(feature = "mmap")]
-    pub fn load_mmap(dir: &std::path::Path) -> Result<Self, GraphError> {
-        let graph = KnowledgeGraph::load_mmap(dir)?;
-        let mut ig = Self {
-            graph,
-            text_index: InvertedIndex::new(),
-        };
-
-        for i in 0..ig.graph.node_count() {
-            let id = NodeId(i as u32);
-            let text = ig.graph.read_blob(id);
-            ig.text_index.index_document(id, text);
-        }
-
-        Ok(ig)
-    }
-
     /// Plain text search (delegates to the inverted index).
     pub fn search(&self, query: &str, max_results: usize) -> Vec<TextSearchResult> {
         self.text_index
@@ -954,7 +945,12 @@ impl IndexedKnowledgeGraph {
     }
 
     /// Phrase search (delegates to the inverted index).
-    pub fn phrase_search(&self, phrase: &str, max_gap: u32, max_results: usize) -> Vec<TextSearchResult> {
+    pub fn phrase_search(
+        &self,
+        phrase: &str,
+        max_gap: u32,
+        max_results: usize,
+    ) -> Vec<TextSearchResult> {
         self.text_index
             .phrase_search(phrase, max_gap, max_results)
             .into_iter()
@@ -1024,13 +1020,17 @@ impl IndexedKnowledgeGraph {
             Box::new(InvertedIndex::new())
         };
 
-        Ok(Self { graph, text_index, merge_workers: Vec::new() })
+        Ok(Self {
+            graph,
+            text_index,
+            merge_workers: Vec::new(),
+        })
     }
 
     #[cfg(feature = "mmap")]
     pub fn load_mmap(dir: &std::path::Path) -> Result<Self, GraphError> {
         // When the mmap feature is enabled, use the real mmap loader for the graph part.
-        let graph = crate::load_mmap(&dir.join("graph"))?;
+        let graph = KnowledgeGraph::load_mmap(&dir.join("graph"))?;
 
         let text_dir = dir.join("text_index");
         let text_index: Box<dyn TextIndex> = if text_dir.join("manifest.json").exists() {
@@ -1049,7 +1049,11 @@ impl IndexedKnowledgeGraph {
             Box::new(InvertedIndex::new())
         };
 
-        Ok(Self { graph, text_index, merge_workers: Vec::new() })
+        Ok(Self {
+            graph,
+            text_index,
+            merge_workers: Vec::new(),
+        })
     }
 
     #[cfg(not(feature = "mmap"))]
@@ -1148,7 +1152,6 @@ fn compute_proximity_score(term_positions: &[&[u32]], max_gap: u32) -> f64 {
     best_score
 }
 
-
 // ============================================================================
 // Basic smoke test for the index + traversal integration
 // ============================================================================
@@ -1164,9 +1167,18 @@ mod tests {
 
         let topic = g.graph.properties.register("topic");
 
-        let n0 = g.add_node("Rust ownership and borrowing are fundamental to memory safety.", Some("rust"));
-        let n1 = g.add_node("The borrow checker enforces rules about references and lifetimes.", Some("borrow"));
-        let n2 = g.add_node("Concurrency in Rust is fearless thanks to the ownership model.", Some("concurrency"));
+        let n0 = g.add_node(
+            "Rust ownership and borrowing are fundamental to memory safety.",
+            Some("rust"),
+        );
+        let n1 = g.add_node(
+            "The borrow checker enforces rules about references and lifetimes.",
+            Some("borrow"),
+        );
+        let n2 = g.add_node(
+            "Concurrency in Rust is fearless thanks to the ownership model.",
+            Some("concurrency"),
+        );
 
         g.add_edge(
             n0,
@@ -1182,14 +1194,8 @@ mod tests {
         );
 
         // Text query should surface n0 and n1 as seeds
-        let results = g.search_and_traverse_default(
-            "ownership borrowing memory",
-            5,
-            &["topic"],
-            0.5,
-            2,
-            10,
-        );
+        let results =
+            g.search_and_traverse_default("ownership borrowing memory", 5, &["topic"], 0.5, 2, 10);
 
         assert!(!results.is_empty());
         // n0 (the seed with strongest text match) should be present
@@ -1214,8 +1220,14 @@ mod tests {
     fn phrase_vs_keyword_ranking() {
         let mut g = IndexedKnowledgeGraph::new();
 
-        g.add_node("Rust ownership model prevents data races effectively", Some("a"));
-        g.add_node("Effective data race prevention using Rust ownership", Some("b"));
+        g.add_node(
+            "Rust ownership model prevents data races effectively",
+            Some("a"),
+        );
+        g.add_node(
+            "Effective data race prevention using Rust ownership",
+            Some("b"),
+        );
 
         // Keyword search may rank "b" higher or equal
         let keyword = g.search("data race prevention", 2);

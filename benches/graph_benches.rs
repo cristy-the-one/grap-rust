@@ -10,9 +10,7 @@
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 
-use grap::{
-    FusionWeights, IndexedKnowledgeGraph, PropertyValue, ShardedGraph,
-};
+use grap::{FusionWeights, IndexedKnowledgeGraph, PropertyValue, ShardedGraph};
 
 /// Build a medium-sized synthetic graph with several properties.
 /// This is used to demonstrate bitmask pruning effectiveness.
@@ -24,7 +22,14 @@ fn build_synthetic_graph(node_count: usize, edges_per_node: usize) -> IndexedKno
     let category = g.graph.properties.register("category");
     let relation = g.graph.properties.register("relation");
 
-    let topics = ["rust", "memory", "safety", "concurrency", "performance", "ownership"];
+    let topics = [
+        "rust",
+        "memory",
+        "safety",
+        "concurrency",
+        "performance",
+        "ownership",
+    ];
     let categories = ["core", "advanced", "tooling", "ecosystem"];
 
     let mut node_ids = Vec::with_capacity(node_count);
@@ -90,8 +95,12 @@ fn build_synthetic_sharded_graph(
     // Property registration is done lazily inside each shard for this benchmark.
     let mut ids = Vec::new();
     for i in 0..node_count {
-        let text = format!("Sharded doc {} - Rust memory safety and concurrency {}", i, i);
-        let id = sg.add_node(&text, Some(&format!("SNode{}", i)))
+        let text = format!(
+            "Sharded doc {} - Rust memory safety and concurrency {}",
+            i, i
+        );
+        let id = sg
+            .add_node(&text, Some(&format!("SNode{}", i)))
             .expect("add_node failed in benchmark setup");
         ids.push(id);
     }
@@ -127,7 +136,10 @@ fn bench_bitmask_pruning(c: &mut Criterion) {
                 0.3,
                 4,
                 200,
-                FusionWeights { text: 0.5, graph: 0.5 },
+                FusionWeights {
+                    text: 0.5,
+                    graph: 0.5,
+                },
             );
             black_box(results.len())
         })
@@ -143,7 +155,10 @@ fn bench_bitmask_pruning(c: &mut Criterion) {
                 0.3,
                 4,
                 200,
-                FusionWeights { text: 0.5, graph: 0.5 },
+                FusionWeights {
+                    text: 0.5,
+                    graph: 0.5,
+                },
             );
             black_box(results.len())
         })
@@ -177,14 +192,7 @@ fn bench_sharded_vs_monolithic(c: &mut Criterion) {
 
     group.bench_function("4_shard_distributed_search", |b| {
         b.iter(|| {
-            let res = sharded.search_and_traverse(
-                "rust concurrency",
-                10,
-                &[],
-                0.4,
-                3,
-                80,
-            );
+            let res = sharded.search_and_traverse("rust concurrency", 10, &[], 0.4, 3, 80);
             black_box(res.len())
         })
     });

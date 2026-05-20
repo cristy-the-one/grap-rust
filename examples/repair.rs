@@ -16,7 +16,12 @@ fn main() {
     let n1 = g.add_node("Document about Rust memory safety.", Some("rust-memory"));
     let n2 = g.add_node("Document about ownership and borrowing.", Some("ownership"));
 
-    g.add_edge(n1, n2, 0.91, vec![(topic, grap::PropertyValue::Label("memory".to_string()))]);
+    g.add_edge(
+        n1,
+        n2,
+        0.91,
+        vec![(topic, grap::PropertyValue::Label("memory".to_string()))],
+    );
 
     // Create a directory and save the graph normally
     let base = std::env::temp_dir().join("grap-repair-demo");
@@ -24,7 +29,8 @@ fn main() {
     let _ = fs::remove_dir_all(&base); // clean previous runs
     fs::create_dir_all(&graph_dir).unwrap();
 
-    g.save_to_disk(&graph_dir).expect("initial save should succeed");
+    g.save_to_disk(&graph_dir)
+        .expect("initial save should succeed");
     println!("✓ Saved graph to {:?}", graph_dir);
 
     // Simulate a crashed save by manually creating a stale temp directory
@@ -53,8 +59,12 @@ fn main() {
     }
 
     // Verify we can still load the graph
-    let reloaded = KnowledgeGraph::load_from_disk(&graph_dir).expect("load after repair should work");
-    println!("\n✓ Successfully reloaded graph after repair ({} nodes)", reloaded.node_count());
+    let reloaded =
+        KnowledgeGraph::load_from_disk(&graph_dir).expect("load after repair should work");
+    println!(
+        "\n✓ Successfully reloaded graph after repair ({} nodes)",
+        reloaded.node_count()
+    );
 
     // Cleanup
     let _ = fs::remove_dir_all(&base);
