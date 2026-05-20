@@ -63,15 +63,28 @@ fn main() {
 }
 ```
 
-Run the built-in demo:
+### Try the Holistic Demo
+
+The best way to experience `grap` is through the Python-driven demo:
+
+```bash
+# One-time setup
+cargo build --release --bin grap-cli --features "fulltext,sharding"
+pip install -r demo/python/requirements.txt
+
+# Run the full interactive story
+python -m demo.python.interactive_demo --graph-dir demo-graph --reset
+```
+
+See [`DEMO.md`](./DEMO.md) for detailed instructions, what the demo showcases, and how to run it in recording mode (`--auto`).
+
+Smaller Rust-only examples are also available:
 
 ```bash
 cargo run --example demo
 cargo run --example hybrid_search
 cargo run --example on_disk_persistence --features "fulltext,sharding"
 ```
-
-For a more complete, Python-driven holistic experience (ingestion, live vacuum, statistics, etc.), see [`DEMO.md`](./DEMO.md).
 
 ## Feature Flags
 
