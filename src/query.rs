@@ -1,5 +1,15 @@
-//! GraphQuery, QueryBuilder, priority traversal with bitmask pruning.
-//! Core algorithm from core_graph_design.md:536-699 (with documented PORT NOTES).
+//! Ergonomic query builder and best-first priority traversal.
+//!
+//! The main entry point is [`KnowledgeGraph::find`], which returns a
+//! [`QueryBuilder`]. The builder lets you express:
+//!
+//! - Seed nodes (or start from text search via `IndexedKnowledgeGraph`)
+//! - Required properties (turned into bitmasks for O(1) pruning)
+//! - Minimum strength, max depth, result limit
+//!
+//! The actual traversal uses a `BinaryHeap` ordered by cumulative path
+//! strength and performs aggressive early pruning using node-level
+//! `outgoing_property_mask` checks.
 
 use crate::graph::KnowledgeGraph;
 use crate::ids::{EdgeId, NodeId, PropertyTag};
@@ -7,7 +17,7 @@ use crate::properties::{PropertyFilter, PropertyValue};
 use std::cmp::Ordering;
 use std::collections::BinaryHeap;
 
-/// A filter predicate on a single property (or strength).
+/// Low-level query descriptor (mostly used internally by the traversal engine).
 #[derive(Debug, Clone)]
 pub struct GraphQuery {
     pub seeds: Vec<NodeId>,
@@ -19,15 +29,25 @@ pub struct GraphQuery {
     pub sort_by_strength: bool,
 }
 
+/// A single result returned by a graph traversal.
 #[derive(Debug, Clone)]
 pub struct QueryResult {
+    /// The reached node.
     pub node_id: NodeId,
+    /// The sequence of edges that formed the best path from a seed to this node.
     pub path: Vec<EdgeId>,
+    /// Product of edge strengths along the path (higher is better).
     pub cumulative_strength: f64,
+    /// Number of hops from the seed.
     pub depth: u32,
 }
 
-/// Ergonomic builder (see KnowledgeGraph::find).
+/// Ergonomic builder for graph traversals.
+///
+/// Obtain one via [`KnowledgeGraph::find`].
+///
+/// The builder is consumed by [`QueryBuilder::execute`], which runs a
+/// best-first priority traversal with aggressive bitmask-based pruning.
 pub struct QueryBuilder<'g> {
     graph: &'g KnowledgeGraph,
     seeds: Vec<NodeId>,
@@ -39,6 +59,26 @@ pub struct QueryBuilder<'g> {
 }
 
 impl KnowledgeGraph {
+    /// Starts building a graph traversal query.
+    ///
+    /// This is the main entry point for the low-level graph query API.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use grap::{KnowledgeGraph, NodeId};
+    ///
+    /// let mut g = KnowledgeGraph::new();
+    /// // In real code you would obtain a real NodeId first.
+    /// let dummy = g.add_node("example", None);
+    /// let results = g.find()
+    ///     .from_node(dummy)
+    ///     .with_property("topic")
+    ///     .min_strength(0.7)
+    ///     .depth(3)
+    ///     .limit(20)
+    ///     .execute();
+    /// ```
     pub fn find(&self) -> QueryBuilder<'_> {
         QueryBuilder {
             graph: self,
@@ -53,45 +93,61 @@ impl KnowledgeGraph {
 }
 
 impl<'g> QueryBuilder<'g> {
+    /// Use a specific node as a traversal seed.
     pub fn from_node(mut self, node: NodeId) -> Self {
         self.seeds.push(node);
         self
     }
+
+    /// Use multiple nodes as traversal seeds.
     pub fn from_nodes(mut self, nodes: &[NodeId]) -> Self {
         self.seeds.extend_from_slice(nodes);
         self
     }
+
+    /// Require that every edge on the path has the named property.
     pub fn with_property(mut self, name: &str) -> Self {
         if let Some(tag) = self.graph.properties.get_tag(name) {
             self.filters.push((tag, PropertyFilter::Exists));
         }
         self
     }
+
+    /// Require that a property equals a specific value.
     pub fn where_property(mut self, name: &str, value: PropertyValue) -> Self {
         if let Some(tag) = self.graph.properties.get_tag(name) {
             self.filters.push((tag, PropertyFilter::Equals(value)));
         }
         self
     }
+
+    /// Require that a numeric property falls inside a range.
     pub fn where_in_range(mut self, name: &str, min: f64, max: f64) -> Self {
         if let Some(tag) = self.graph.properties.get_tag(name) {
             self.filters.push((tag, PropertyFilter::Range { min, max }));
         }
         self
     }
+
+    /// Set the minimum cumulative path strength required to keep expanding.
     pub fn min_strength(mut self, s: f64) -> Self {
         self.min_strength = s;
         self
     }
+
+    /// Maximum number of hops from any seed.
     pub fn depth(mut self, d: u32) -> Self {
         self.max_depth = d;
         self
     }
+
+    /// Maximum number of results to return.
     pub fn limit(mut self, n: usize) -> Self {
         self.max_results = n;
         self
     }
 
+    /// Execute the traversal and return ranked results.
     pub fn execute(self) -> Vec<QueryResult> {
         let mut required_mask = 0u64;
         for (tag, _) in &self.filters {

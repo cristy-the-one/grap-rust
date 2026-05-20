@@ -18,8 +18,8 @@
 //! (see `docs/implementation-plan.md` and the original design doc).
 //!
 //! ## Status
-//! This is an in-progress faithful port of the prototype in the design document.
-//! Phase 1 (Core `KnowledgeGraph` + `QueryBuilder`) is the current focus.
+//! Phases 1–4 are complete (core graph, full-text index, persistence + mmap, sharding + ghost edges + rebalancing).
+//! Phase 5 (production hardening, documentation, benchmarks, error types) is in progress toward a 0.1 release.
 
 #![deny(unsafe_code)]
 // The design (core_graph_design.md) intentionally uses one unsafe block for zero-copy UTF-8
@@ -47,30 +47,69 @@ pub use index::{
     TextSearchResult, Tokenizer,
 };
 
-// Feature-gated modules (stubs for now)
-#[cfg(feature = "fulltext")]
-pub mod index;
+pub use shard::{
+    GlobalNodeId, RebalancePlan, ShardedGraph, ShardedQueryResult, ShardId, ShardRouter,
+};
 
-
+pub use serialize::CURRENT_GRAPH_FORMAT_VERSION;
 
 pub mod shard; // Graph sharding (Phase 4)
 
-/// Crate-wide error type (will be expanded in later phases).
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// Crate-wide error type for all fallible operations in `grap`.
+///
+/// This type is used (or will be used) by persistence, sharding, and
+/// property registry operations.
+#[derive(thiserror::Error, Debug, Clone, PartialEq, Eq)]
 pub enum GraphError {
-    /// Generic I/O or serialization failure.
+    /// I/O or (de)serialization failure.
+    #[error("I/O error: {0}")]
     Io(String),
-    /// Attempted to use more than 64 distinct property types.
+
+    /// The file was written with a newer (or unknown) format version.
+    #[error("unsupported graph format version {found} (supported: {supported})")]
+    UnsupportedVersion {
+        /// Version found in the on-disk file.
+        found: u16,
+        /// Highest version this library understands.
+        supported: u16,
+    },
+
+    /// CRC32 checksum did not match — file is likely corrupted.
+    #[error("data corruption detected (checksum mismatch)")]
+    ChecksumMismatch,
+
+    /// Attempted to register more than 64 distinct property types.
+    #[error("maximum of 64 property types exceeded (bitmask limit)")]
     TooManyProperties,
+
+    /// A requested node or shard does not exist in the current graph.
+    #[error("not found: {0}")]
+    NotFound(String),
+
+    /// A sharding or distributed query operation failed.
+    #[error("sharding error: {0}")]
+    Sharding(String),
+
+    /// Generic error with a message (used as a last resort during early Phase 5).
+    #[error("{0}")]
+    Other(String),
 }
 
-impl std::fmt::Display for GraphError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            GraphError::Io(s) => write!(f, "graph io error: {}", s),
-            GraphError::TooManyProperties => write!(f, "maximum of 64 property types exceeded"),
-        }
+// Allow easy conversion from io::Error in save/load paths.
+impl From<std::io::Error> for GraphError {
+    fn from(e: std::io::Error) -> Self {
+        GraphError::Io(e.to_string())
     }
 }
 
-impl std::error::Error for GraphError {}
+impl From<serde_json::Error> for GraphError {
+    fn from(e: serde_json::Error) -> Self {
+        GraphError::Io(format!("json error: {}", e))
+    }
+}
+
+impl From<bincode::Error> for GraphError {
+    fn from(e: bincode::Error) -> Self {
+        GraphError::Io(format!("bincode error: {}", e))
+    }
+}

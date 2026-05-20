@@ -5,7 +5,7 @@
 //! - Fast load: memory-mapped blobs when the `mmap` feature is enabled
 
 use std::fs::{self, File};
-use std::io::{self, BufReader, BufWriter, Read, Write};
+use std::io::{self, BufWriter, Write};
 use std::path::Path;
 
 use serde::{Deserialize, Serialize};
@@ -13,6 +13,7 @@ use serde::{Deserialize, Serialize};
 use crate::blob_store::BlobRef;
 use crate::graph::KnowledgeGraph;
 use crate::ids::{EdgeId, NodeId};
+use crate::GraphError;
 use crate::ids::PropertyTag;
 use crate::properties::PropertyValue;
 
@@ -48,9 +49,10 @@ pub struct SerializableEdge {
     pub property_mask: u64,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct GraphMeta {
-    pub version: u32,
+    /// On-disk format version. See [`CURRENT_GRAPH_FORMAT_VERSION`].
+    pub version: u16,
     pub node_count: u32,
     pub edge_count: u32,
     pub blob_total_bytes: u64,
@@ -58,6 +60,13 @@ pub struct GraphMeta {
     pub chunk_checksums: Vec<u32>,
     pub created_timestamp: u64,
 }
+
+/// Current on-disk format version for grap graphs.
+///
+/// When breaking changes are made to the persisted layout, this number is
+/// bumped. Loaders will reject files with a different version using
+/// [`GraphError::UnsupportedVersion`].
+pub const CURRENT_GRAPH_FORMAT_VERSION: u16 = 1;
 
 // ============================================================================
 // CRC32 (we prefer crc32fast when available via the mmap feature)
@@ -126,7 +135,7 @@ impl KnowledgeGraph {
     /// - `graph.topo`   — bincode of nodes + edges + registry
     /// - `graph.blobs`  — concatenated raw blob chunks
     /// - `graph.meta`   — JSON metadata + checksums
-    pub fn save_to_disk(&self, dir: &Path) -> io::Result<()> {
+    pub fn save_to_disk(&self, dir: &Path) -> Result<(), GraphError> {
         fs::create_dir_all(dir)?;
 
         let chunk_offsets = self.compute_chunk_offsets();
@@ -186,7 +195,7 @@ impl KnowledgeGraph {
             .collect();
 
         let meta = GraphMeta {
-            version: 1,
+            version: CURRENT_GRAPH_FORMAT_VERSION,
             node_count: self.nodes.len() as u32,
             edge_count: self.edges.len() as u32,
             blob_total_bytes: total_blob_bytes,
@@ -228,11 +237,18 @@ impl KnowledgeGraph {
     }
 
     /// Load a graph from disk (portable path, no mmap).
-    pub fn load_from_disk(dir: &Path) -> io::Result<Self> {
+    pub fn load_from_disk(dir: &Path) -> Result<Self, GraphError> {
         // Read meta
         let meta_str = fs::read_to_string(dir.join("graph.meta"))?;
         let meta: GraphMeta =
             serde_json::from_str(&meta_str).map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+
+        if meta.version != CURRENT_GRAPH_FORMAT_VERSION {
+            return Err(GraphError::UnsupportedVersion {
+                found: meta.version,
+                supported: CURRENT_GRAPH_FORMAT_VERSION,
+            });
+        }
 
         // Read blobs
         let blob_data = fs::read(dir.join("graph.blobs"))?;
@@ -247,10 +263,7 @@ impl KnowledgeGraph {
             let chunk_slice = &blob_data[boundary as usize..end];
             let computed = crc32(chunk_slice);
             if computed != meta.chunk_checksums[i] {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    format!("Checksum mismatch for chunk {}", i),
-                ));
+                return Err(GraphError::ChecksumMismatch);
             }
         }
 
@@ -354,13 +367,13 @@ impl KnowledgeGraph {
     /// This is the high-performance path described in the design document.
     /// Requires the `mmap` feature.
     #[cfg(feature = "mmap")]
-    pub fn load_mmap(dir: &Path) -> io::Result<Self> {
+    pub fn load_mmap(dir: &Path) -> Result<Self, GraphError> {
         load_mmap(dir)
     }
 }
 
 #[cfg(feature = "mmap")]
-pub fn load_mmap(dir: &Path) -> io::Result<KnowledgeGraph> {
+pub fn load_mmap(dir: &Path) -> Result<KnowledgeGraph, GraphError> {
     // For now we use the proven portable loader under the hood.
     // The full zero-copy mmap storage backend (`Storage::Mmap`) and
     // `BlobStore::from_mmap` are already implemented and ready for when

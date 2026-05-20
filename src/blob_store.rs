@@ -80,7 +80,7 @@ impl BlobStore {
             };
         }
 
-        // If somehow in mmap mode, fall back to creating a new in-memory store (shouldn't normally happen)
+        // If we are in mmap mode (should not normally happen during writes), fall back
         self.storage = Storage::default();
         self.store(text)
     }
@@ -112,6 +112,7 @@ impl BlobStore {
     }
 
     /// Returns true if this BlobStore is backed by a memory map.
+    #[cfg(feature = "mmap")]
     pub fn is_mapped(&self) -> bool {
         matches!(self.storage, Storage::Mmap(_))
     }

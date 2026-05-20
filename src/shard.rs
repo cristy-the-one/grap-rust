@@ -11,18 +11,30 @@ use std::collections::HashMap;
 use crate::ids::{EdgeId, NodeId};
 use crate::index::IndexedKnowledgeGraph;
 
-/// Identifies a shard within a `ShardRouter`.
+/// Identifies one shard inside a [`ShardRouter`] or [`ShardedGraph`].
+///
+/// Shard IDs are dense integers from `0` to `shard_count-1`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct ShardId(pub u16);
 
-/// A node identifier that is globally unique across all shards.
+/// A node identifier that is unique across an entire sharded cluster.
+///
+/// Contains both the shard that owns the node and the local `NodeId` inside
+/// that shard. This is the primary handle returned by [`ShardedGraph::add_node`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct GlobalNodeId {
+    /// Which shard the node lives on.
     pub shard: ShardId,
+    /// The local node identifier inside that shard.
     pub local: NodeId,
 }
 
-/// Represents an edge that points to a node on a different shard.
+/// Represents a cross-shard reference ("ghost edge").
+///
+/// When a logical edge would connect two nodes that hash to different shards,
+/// the source shard stores a `GhostEdge` pointing at the remote target.
+/// During distributed traversal the system follows these ghost edges by
+/// fetching data from the target shard (with caching).
 #[derive(Debug, Clone)]
 pub struct GhostEdge {
     pub local_source: NodeId,
@@ -31,12 +43,12 @@ pub struct GhostEdge {
     // In a real system we would also store serialized properties here.
 }
 
-/// A single hop in a path that may cross shards.
+/// One hop in a path that may have crossed shard boundaries.
 #[derive(Debug, Clone)]
 pub enum ShardedPathHop {
-    /// A normal edge within one shard.
+    /// A normal local edge (no shard crossing).
     Local(EdgeId),
-    /// A cross-shard hop via a ghost edge.
+    /// A hop that followed a ghost edge into another shard.
     CrossShard {
         from: GlobalNodeId,
         to: GlobalNodeId,
@@ -44,7 +56,9 @@ pub enum ShardedPathHop {
     },
 }
 
-/// Describes the migrations needed when changing the number of shards.
+/// The result of calling [`ShardRouter::plan_rebalance`].
+///
+/// Describes which nodes would need to move if the cluster changed size.
 #[derive(Debug, Clone)]
 pub struct RebalancePlan {
     pub old_shard_count: u16,
@@ -53,7 +67,7 @@ pub struct RebalancePlan {
     pub node_migrations: Vec<(GlobalNodeId, ShardId)>,
 }
 
-/// Snapshot of useful metrics about a sharded graph.
+/// Aggregate statistics for a [`ShardedGraph`].
 #[derive(Debug, Clone)]
 pub struct ShardedGraphStats {
     pub shard_count: usize,
@@ -63,19 +77,25 @@ pub struct ShardedGraphStats {
     pub ghost_edges_per_shard: Vec<usize>,
 }
 
-/// Result of a query executed on a `ShardedGraph`.
+/// Result row returned from a distributed `search_and_traverse` on a sharded graph.
 ///
-/// Contains both relevance signals and the actual path taken, which may
-/// include cross-shard (`CrossShard`) hops.
+/// Contains the fused text + graph score, the path taken (which may cross shards),
+/// and a text snippet of the node.
 #[derive(Debug, Clone)]
 pub struct ShardedQueryResult {
+    /// The global identifier of the reached node.
     pub node: GlobalNodeId,
+    /// BM25 / text relevance score of the node.
     pub text_score: f64,
+    /// Cumulative graph strength along the best path.
     pub graph_strength: f64,
+    /// Combined score using the supplied [`FusionWeights`](crate::FusionWeights).
     pub fused_score: f64,
+    /// Distance from the nearest seed.
     pub depth: u32,
-    /// The path from a seed to this node. May contain `CrossShard` hops.
+    /// The path from a seed to this node. May contain [`ShardedPathHop::CrossShard`] entries.
     pub path: Vec<ShardedPathHop>,
+    /// A prefix of the node's text content (for display).
     pub text: String,
 }
 
@@ -110,18 +130,17 @@ impl Shard {
         }
     }
 
-    /// Fetch a remote node (with caching). Returns a reference to the cached entry.
-    /// This is the main entry point used by the router when following ghost edges.
-    pub fn fetch_remote_node(
+    /// Ensure a remote node is present in the cache.
+    /// This is the recommended way to populate the cache during traversal.
+    pub fn ensure_remote_node_cached(
         &mut self,
         target: GlobalNodeId,
-        remote_shard: &IndexedKnowledgeGraph, // passed in because ShardRouter has all shards
-    ) -> Option<&CachedRemoteNode> {
-        if let Some(cached) = self.remote_cache.get(&target) {
-            return Some(cached);
+        remote_shard: &IndexedKnowledgeGraph,
+    ) {
+        if self.remote_cache.contains_key(&target) {
+            return;
         }
 
-        // In-process fetch (we have direct access to the remote shard)
         let label = remote_shard.graph.node_label(target.local).map(|s| s.to_string());
         let text = remote_shard.read_blob(target.local);
         let snippet = text.chars().take(120).collect::<String>();
@@ -134,7 +153,6 @@ impl Shard {
         };
 
         self.remote_cache.insert(target, cached);
-        self.remote_cache.get(&target)
     }
 
     /// Remove a local node and clean up its ghost edges.
@@ -229,34 +247,66 @@ impl ShardRouter {
         self.hash_ring.locate(text.as_bytes())
     }
 
+    /// Safe accessor for a shard by id. Returns a clear error for bad GIDs.
+    fn shard(&self, id: ShardId) -> Result<&Shard, crate::GraphError> {
+        let idx = id.0 as usize;
+        if idx >= self.shards.len() {
+            Err(crate::GraphError::NotFound(format!(
+                "shard {} does not exist (have {} shards)",
+                id.0, self.shards.len()
+            )))
+        } else {
+            Ok(&self.shards[idx])
+        }
+    }
+
     /// Add a node to the appropriate shard and return its global identifier.
-    pub fn add_node(&mut self, text: &str, label: Option<&str>) -> GlobalNodeId {
+    ///
+    /// Returns `Err(GraphError::TooManyProperties)` if the internal shard
+    /// would exceed the 64-property limit.
+    pub fn add_node(
+        &mut self,
+        text: &str,
+        label: Option<&str>,
+    ) -> Result<GlobalNodeId, crate::GraphError> {
         let shard_id = self.shard_for_new_node(text);
         let shard = &mut self.shards[shard_id.0 as usize];
 
         let local_id = shard.graph.add_node(text, label);
-        GlobalNodeId {
+        Ok(GlobalNodeId {
             shard: shard_id,
             local: local_id,
-        }
+        })
     }
 
     /// Add a (possibly cross-shard) edge.
     /// If the source and target are on different shards, a ghost edge is created on the source shard.
+    ///
+    /// Returns error if either shard index is invalid.
     pub fn add_edge(
         &mut self,
         source: GlobalNodeId,
         target: GlobalNodeId,
         strength: f64,
         props: Vec<(crate::ids::PropertyTag, crate::properties::PropertyValue)>,
-    ) {
+    ) -> Result<(), crate::GraphError> {
+        let src_idx = source.shard.0 as usize;
+        let tgt_idx = target.shard.0 as usize;
+
+        if src_idx >= self.shards.len() || tgt_idx >= self.shards.len() {
+            return Err(crate::GraphError::Sharding(format!(
+                "invalid shard index in edge: source={} target={}",
+                source.shard.0, target.shard.0
+            )));
+        }
+
         if source.shard == target.shard {
             // Local edge
-            let shard = &mut self.shards[source.shard.0 as usize];
+            let shard = &mut self.shards[src_idx];
             shard.graph.add_edge(source.local, target.local, strength, props);
         } else {
             // Cross-shard edge → create ghost edge on the source shard
-            let shard = &mut self.shards[source.shard.0 as usize];
+            let shard = &mut self.shards[src_idx];
             let ghost = GhostEdge {
                 local_source: source.local,
                 remote_target: target,
@@ -267,10 +317,9 @@ impl ShardRouter {
                 .entry(source.local.0)
                 .or_default()
                 .push(ghost);
-
-            // We could also store a "remote reference" on the target shard if needed,
-            // but for traversal from the source side, the ghost edge is sufficient.
         }
+
+        Ok(())
     }
 
     /// Perform a distributed text search across all shards.
@@ -299,7 +348,7 @@ impl ShardRouter {
         &self,
         text_query: &str,
         max_seeds: usize,
-        property_names: &[&str],
+        _property_names: &[&str],
         min_strength: f64,
         max_depth: u32,
         max_results: usize,
@@ -367,13 +416,16 @@ impl ShardRouter {
 
             let text = shard.graph.read_blob(node);
 
+            // Clone the (usually short) path so we can still use e.path for ghost expansion below.
+            let result_path = e.path.clone();
+
             results.push(ShardedQueryResult {
                 node: e.gnode,
                 text_score: e.text_score,
                 graph_strength: e.strength,
                 fused_score: e.text_score * weights.text + e.strength * weights.graph,
                 depth: e.depth,
-                path: e.path,
+                path: result_path,
                 text: text.to_string(),
             });
 
@@ -480,12 +532,22 @@ impl ShardRouter {
     /// - Updates all ghost edges in the system that pointed to the moved node.
     /// - Adds the node to the target shard.
     ///
+    /// Returns `Err` on serious structural problems (bad shard indices, etc.).
     /// Full local edge rewiring between moved nodes is still simplified.
-    pub fn execute_rebalance(&mut self, plan: RebalancePlan) {
+    pub fn execute_rebalance(&mut self, plan: RebalancePlan) -> Result<(), crate::GraphError> {
         for (gid, target_shard_id) in plan.node_migrations {
             let old_idx = gid.shard.0 as usize;
             if old_idx >= self.shards.len() {
-                continue;
+                return Err(crate::GraphError::Sharding(format!(
+                    "source shard {} out of range during rebalance",
+                    old_idx
+                )));
+            }
+            if target_shard_id.0 as usize >= self.shards.len() {
+                return Err(crate::GraphError::Sharding(format!(
+                    "target shard {} out of range during rebalance",
+                    target_shard_id.0
+                )));
             }
 
             // 1. Extract data before removal
@@ -516,20 +578,11 @@ impl ShardRouter {
                         if ghost.remote_target == gid {
                             ghost.remote_target = new_gid;
                         }
-                        // Also fix the source side if the ghost was emitted by the moved node
-                        if ghost.local_source == gid.local
-                            && ghost.remote_target.shard == target_shard_id
-                        {
-                            // This ghost can now become a local edge (best effort)
-                            // For simplicity we leave it as a ghost for now.
-                        }
                     }
                 }
             }
-
-            // 5. If the moved node had outgoing ghost edges, they are still valid
-            // (their remote targets didn't move in this simple pass).
         }
+        Ok(())
     }
 }
 
@@ -548,7 +601,11 @@ impl ShardedGraph {
         }
     }
 
-    pub fn add_node(&mut self, text: &str, label: Option<&str>) -> GlobalNodeId {
+    pub fn add_node(
+        &mut self,
+        text: &str,
+        label: Option<&str>,
+    ) -> Result<GlobalNodeId, crate::GraphError> {
         self.router.add_node(text, label)
     }
 
@@ -558,7 +615,7 @@ impl ShardedGraph {
         target: GlobalNodeId,
         strength: f64,
         props: Vec<(crate::ids::PropertyTag, crate::properties::PropertyValue)>,
-    ) {
+    ) -> Result<(), crate::GraphError> {
         self.router.add_edge(source, target, strength, props)
     }
 
@@ -600,22 +657,26 @@ impl ShardedGraph {
         self.router.plan_rebalance(new_shard_count)
     }
 
-    pub fn execute_rebalance(&mut self, plan: RebalancePlan) {
+    pub fn execute_rebalance(&mut self, plan: RebalancePlan) -> Result<(), crate::GraphError> {
         self.router.execute_rebalance(plan)
     }
 
     // === Convenience methods that make the facade pleasant to use ===
 
     /// Read the text of a node given its global identifier.
-    pub fn read_blob(&self, gid: GlobalNodeId) -> &str {
-        let shard = &self.router.shards[gid.shard.0 as usize];
-        shard.graph.read_blob(gid.local)
+    ///
+    /// Returns an error if the `GlobalNodeId` refers to a non-existent shard.
+    pub fn read_blob(&self, gid: GlobalNodeId) -> Result<&str, crate::GraphError> {
+        let shard = self.router.shard(gid.shard)?;
+        Ok(shard.graph.read_blob(gid.local))
     }
 
     /// Get a node label by global id (if present).
-    pub fn node_label(&self, gid: GlobalNodeId) -> Option<&str> {
-        let shard = &self.router.shards[gid.shard.0 as usize];
-        shard.graph.graph.node_label(gid.local)
+    ///
+    /// Returns an error if the `GlobalNodeId` refers to a non-existent shard.
+    pub fn node_label(&self, gid: GlobalNodeId) -> Result<Option<&str>, crate::GraphError> {
+        let shard = self.router.shard(gid.shard)?;
+        Ok(shard.graph.graph.node_label(gid.local))
     }
 
     /// Distributed phrase search (text only).
@@ -639,7 +700,7 @@ impl ShardedGraph {
     pub fn phrase_search_and_traverse(
         &self,
         phrase: &str,
-        max_gap: u32,
+        _max_gap: u32,
         max_seeds: usize,
         property_names: &[&str],
         min_strength: f64,

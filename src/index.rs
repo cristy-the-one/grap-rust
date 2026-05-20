@@ -10,7 +10,8 @@
 use std::collections::{HashMap, HashSet, BTreeMap};
 
 use crate::ids::NodeId;
-use crate::properties::PropertyValue; // only for re-exports if needed later
+use crate::properties::PropertyValue;
+use crate::GraphError;
 
 // ============================================================================
 // Tokenizer
@@ -745,12 +746,12 @@ impl IndexedKnowledgeGraph {
 
     /// Saves the underlying graph to disk (the inverted index is not persisted;
     /// it will be rebuilt on load).
-    pub fn save_to_disk(&self, dir: &std::path::Path) -> std::io::Result<()> {
+    pub fn save_to_disk(&self, dir: &std::path::Path) -> Result<(), GraphError> {
         self.graph.save_to_disk(dir)
     }
 
     /// Loads a graph from disk and rebuilds the full-text inverted index.
-    pub fn load_from_disk(dir: &std::path::Path) -> std::io::Result<Self> {
+    pub fn load_from_disk(dir: &std::path::Path) -> Result<Self, GraphError> {
         let graph = KnowledgeGraph::load_from_disk(dir)?;
         let mut ig = Self {
             graph,
@@ -771,7 +772,7 @@ impl IndexedKnowledgeGraph {
     ///
     /// Requires the `mmap` feature to be enabled.
     #[cfg(feature = "mmap")]
-    pub fn load_mmap(dir: &std::path::Path) -> std::io::Result<Self> {
+    pub fn load_mmap(dir: &std::path::Path) -> Result<Self, GraphError> {
         let graph = KnowledgeGraph::load_mmap(dir)?;
         let mut ig = Self {
             graph,
