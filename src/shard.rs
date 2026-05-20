@@ -31,12 +31,14 @@ pub struct GhostEdge {
     // In a real system we would also store serialized properties here.
 }
 
-/// Cached information about a remote node fetched from another shard.
+/// Cached information about a remote node fetched from another shard during traversal.
 #[derive(Debug, Clone)]
 pub struct CachedRemoteNode {
     pub label: Option<String>,
-    pub blob_snippet: String, // we usually don't need the full text
+    pub blob_snippet: String,
     pub outgoing_edge_count: u32,
+    /// Whether this remote node has any outgoing ghost edges (useful for pruning).
+    pub has_outgoing_ghosts: bool,
 }
 
 /// A single shard holding a partition of the overall graph.
@@ -60,16 +62,33 @@ impl Shard {
         }
     }
 
-    /// Try to resolve a ghost edge by fetching the remote node (with caching).
-    pub fn resolve_remote_node(&mut self, target: GlobalNodeId) -> Option<&CachedRemoteNode> {
-        if self.remote_cache.contains_key(&target) {
-            return self.remote_cache.get(&target);
+    /// Fetch a remote node (with caching). Returns a reference to the cached entry.
+    /// This is the main entry point used by the router when following ghost edges.
+    pub fn fetch_remote_node(
+        &mut self,
+        target: GlobalNodeId,
+        remote_shard: &IndexedKnowledgeGraph, // passed in because ShardRouter has all shards
+    ) -> Option<&CachedRemoteNode> {
+        if let Some(cached) = self.remote_cache.get(&target) {
+            return Some(cached);
         }
 
-        // In-process access: we can reach the other shard directly via the router later.
-        // For now we just record that we would need to fetch it.
-        // Real fetching will be orchestrated by ShardRouter.
-        None
+        // In-process fetch (we have direct access to the remote shard)
+        let label = remote_shard.graph.node_label(target.local).map(|s| s.to_string());
+        let text = remote_shard.read_blob(target.local);
+        let snippet = text.chars().take(120).collect::<String>();
+
+        // We don't have cheap access to "does this node have ghost edges" without the router,
+        // so we set a conservative default. The router can override if needed.
+        let cached = CachedRemoteNode {
+            label,
+            blob_snippet: snippet,
+            outgoing_edge_count: 0,
+            has_outgoing_ghosts: false,
+        };
+
+        self.remote_cache.insert(target, cached);
+        self.remote_cache.get(&target)
     }
 }
 
@@ -292,34 +311,41 @@ impl ShardRouter {
                 text,
             });
 
-            if out.len() >= max_results { break; }
-            if e.depth >= max_depth { continue; }
+            if out.len() >= max_results {
+                break;
+            }
+            if e.depth >= max_depth {
+                continue;
+            }
 
-            // --- Follow real GhostEdges ---
+            // --- Hardened real ghost-edge following ---
+            // We check the ghost edges of the current node and cross shards when needed,
+            // using the per-shard remote cache to avoid repeated work.
             if let Some(ghosts) = shard.ghost_edges.get(&node.0) {
-                for g in ghosts {
-                    if g.strength < min_strength { continue; }
+                for ghost in ghosts {
+                    if ghost.strength < min_strength {
+                        continue;
+                    }
 
-                    let r = g.remote_target;
-                    let key = (r.shard.0, r.local.0);
-                    if visited.contains(&key) { continue; }
-                    visited.insert(key);
+                    let remote = ghost.remote_target;
+                    let remote_key = (remote.shard.0, remote.local.0);
 
-                    // Fetch remote node (in-process direct access)
-                    let remote_shard = &self.shards[r.shard.0 as usize];
-                    let remote_text = remote_shard.graph.read_blob(r.local);
+                    if visited.contains(&remote_key) {
+                        continue;
+                    }
+                    visited.insert(remote_key);
 
-                    // Simple cache
-                    remote_shard.remote_cache.insert(r, CachedRemoteNode {
-                        label: remote_shard.graph.graph.node_label(r.local).map(|s| s.to_string()),
-                        blob_snippet: remote_text.chars().take(100).collect(),
-                        outgoing_edge_count: 0,
-                    });
+                    // Use the hardened fetch helper (checks cache first, then fetches)
+                    let remote_shard_ref = &self.shards[remote.shard.0 as usize];
+                    let src_shard = &mut self.shards[e.gnode.shard.0 as usize]; // mutable borrow for cache
 
-                    let new_strength = e.strength * g.strength;
+                    // This will populate the cache on the source shard if not already present
+                    src_shard.fetch_remote_node(remote, &remote_shard_ref.graph);
+
+                    let new_strength = e.strength * ghost.strength;
                     if new_strength >= min_strength {
                         pq.push(Entry {
-                            gnode: r,
+                            gnode: remote,
                             strength: new_strength,
                             depth: e.depth + 1,
                             text_score: e.text_score,
@@ -329,7 +355,12 @@ impl ShardRouter {
             }
         }
 
-        out.sort_by(|a, b| b.fused_score.partial_cmp(&a.fused_score).unwrap_or(Ordering::Equal));
+        // Final ranking by fused score (text relevance + graph strength)
+        out.sort_by(|a, b| {
+            b.fused_score
+                .partial_cmp(&a.fused_score)
+                .unwrap_or(Ordering::Equal)
+        });
         out.truncate(max_results);
         out
     }
