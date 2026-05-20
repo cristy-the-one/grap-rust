@@ -339,11 +339,22 @@ impl OnDiskIndex {
     }
 
     /// Full vacuum / space reclamation for the on-disk index.
-    /// Currently delegates to `compact()` but is the extension point for
-    /// more aggressive reclamation (WAL truncation, empty segment removal, etc.).
+    ///
+    /// Currently this is mostly a synonym for `compact()`, but it is the
+    /// official extension point for more aggressive reclamation work:
+    /// - WAL truncation after a full compaction
+    /// - Dropping completely empty / tombstoned segments
+    /// - Future: defragmentation, roaring bitmap compaction for deletes, etc.
+    ///
+    /// Call this (via `ShardedGraph::vacuum_deleted_nodes()` or directly)
+    /// when you want to reclaim disk space after many deletes.
     pub fn vacuum(&mut self) {
         self.compact();
-        // TODO: add WAL truncation after full compaction, drop empty segments, etc.
+
+        // TODO (0.2 polish):
+        // - Truncate WAL after a successful full compaction
+        // - Remove segments that have zero live documents after merging
+        // - Possibly rewrite the delete bitmap to be more compact
     }
 
     pub fn apply_merge_policy(&mut self) {
