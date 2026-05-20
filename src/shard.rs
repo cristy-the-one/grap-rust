@@ -36,22 +36,28 @@ pub struct GlobalNodeId {
 /// During distributed traversal the system follows these ghost edges by
 /// fetching data from the target shard (with caching).
 #[derive(Debug, Clone)]
-pub struct GhostEdge {
+pub(crate) struct GhostEdge {
+    /// The local node (on this shard) that has an outgoing cross-shard reference.
     pub local_source: NodeId,
+    /// The target node living on a different shard.
     pub remote_target: GlobalNodeId,
+    /// Strength of the relationship.
     pub strength: f64,
     // In a real system we would also store serialized properties here.
 }
 
 /// One hop in a path that may have crossed shard boundaries.
 #[derive(Debug, Clone)]
-pub enum ShardedPathHop {
+pub(crate) enum ShardedPathHop {
     /// A normal local edge (no shard crossing).
     Local(EdgeId),
     /// A hop that followed a ghost edge into another shard.
     CrossShard {
+        /// The node we came from (on the previous shard).
         from: GlobalNodeId,
+        /// The node we arrived at (on the remote shard).
         to: GlobalNodeId,
+        /// Strength of the ghost edge that was followed.
         strength: f64,
     },
 }
@@ -59,69 +65,92 @@ pub enum ShardedPathHop {
 /// The result of calling [`ShardRouter::plan_rebalance`].
 ///
 /// Describes which nodes would need to move if the cluster changed size.
+/// The plan is safe to execute later via [`ShardedGraph::execute_rebalance`].
 #[derive(Debug, Clone)]
 pub struct RebalancePlan {
+    /// Number of shards the cluster currently has.
     pub old_shard_count: u16,
+    /// Target number of shards after rebalancing.
     pub new_shard_count: u16,
-    /// Nodes that need to move to a different shard under the new hash ring.
+    /// List of nodes that must migrate, together with their new target shard.
     pub node_migrations: Vec<(GlobalNodeId, ShardId)>,
 }
 
 /// Aggregate statistics for a [`ShardedGraph`].
+///
+/// Obtained via [`ShardedGraph::stats`]. Useful for monitoring and dashboards.
 #[derive(Debug, Clone)]
 pub struct ShardedGraphStats {
+    /// Total number of shards in the cluster.
     pub shard_count: usize,
+    /// Total nodes across all shards.
     pub total_nodes: usize,
+    /// Total ghost edges in the cluster (cross-shard references).
     pub total_ghost_edges: usize,
+    /// Per-shard node counts (index corresponds to shard id).
     pub nodes_per_shard: Vec<usize>,
+    /// Per-shard ghost edge counts.
     pub ghost_edges_per_shard: Vec<usize>,
 }
 
-/// Result row returned from a distributed `search_and_traverse` on a sharded graph.
+/// Result row returned from a distributed `search_and_traverse` (or phrase variant)
+/// on a sharded graph.
 ///
-/// Contains the fused text + graph score, the path taken (which may cross shards),
-/// and a text snippet of the node.
+/// Contains both relevance signals and the actual path taken, which may
+/// include cross-shard hops.
 #[derive(Debug, Clone)]
 pub struct ShardedQueryResult {
     /// The global identifier of the reached node.
     pub node: GlobalNodeId,
-    /// BM25 / text relevance score of the node.
+    /// BM25-style text relevance score from the seed selection phase.
     pub text_score: f64,
-    /// Cumulative graph strength along the best path.
+    /// Cumulative strength of the best graph path from a seed to this node.
     pub graph_strength: f64,
-    /// Combined score using the supplied [`FusionWeights`](crate::FusionWeights).
+    /// Final blended score (`text_score * text_weight + graph_strength * graph_weight`).
     pub fused_score: f64,
-    /// Distance from the nearest seed.
+    /// Number of hops from the nearest seed node.
     pub depth: u32,
-    /// The path from a seed to this node. May contain [`ShardedPathHop::CrossShard`] entries.
+    /// The path taken. May contain [`ShardedPathHop::CrossShard`] entries when
+    /// the query crossed shard boundaries via ghost edges.
     pub path: Vec<ShardedPathHop>,
-    /// A prefix of the node's text content (for display).
+    /// A short prefix of the node's text content (useful for display / debugging).
     pub text: String,
 }
 
 /// Cached information about a remote node fetched from another shard during traversal.
+///
+/// This is an internal optimization used by [`ShardRouter`] to reduce
+/// cross-shard fetches when following ghost edges.
 #[derive(Debug, Clone)]
-pub struct CachedRemoteNode {
+pub(crate) struct CachedRemoteNode {
+    /// Optional human-readable label of the remote node.
     pub label: Option<String>,
+    /// A short prefix of the node's text content (for display / debugging).
     pub blob_snippet: String,
+    /// Number of outgoing edges from this remote node (cached for pruning decisions).
     pub outgoing_edge_count: u32,
-    /// Whether this remote node has any outgoing ghost edges (useful for pruning).
+    /// Whether this remote node currently has any outgoing ghost edges.
     pub has_outgoing_ghosts: bool,
 }
 
-/// A single shard holding a partition of the overall graph.
-pub struct Shard {
+/// Internal representation of one shard.
+///
+/// Most users interact with this only indirectly through [`ShardedGraph`] or
+/// [`ShardRouter`].
+pub(crate) struct Shard {
+    /// Identifier of this shard.
     pub id: ShardId,
+    /// The actual graph + inverted index living on this shard.
     pub graph: IndexedKnowledgeGraph,
-    /// Edges that point to nodes on other shards.
+    /// Outgoing cross-shard references ("ghost edges").
     pub ghost_edges: HashMap<u32, Vec<GhostEdge>>,
-    /// Cache of recently fetched remote nodes to avoid repeated cross-shard lookups
-    /// during a single query.
+    /// Cache of remote node data fetched during distributed traversals.
     remote_cache: HashMap<GlobalNodeId, CachedRemoteNode>,
 }
 
 impl Shard {
-    pub fn new(id: ShardId) -> Self {
+    /// Create an empty shard with the given id.
+    pub(crate) fn new(id: ShardId) -> Self {
         Self {
             id,
             graph: IndexedKnowledgeGraph::new(),
@@ -132,7 +161,8 @@ impl Shard {
 
     /// Ensure a remote node is present in the cache.
     /// This is the recommended way to populate the cache during traversal.
-    pub fn ensure_remote_node_cached(
+    /// Ensure we have a cached copy of a remote node (best-effort).
+    pub(crate) fn ensure_remote_node_cached(
         &mut self,
         target: GlobalNodeId,
         remote_shard: &IndexedKnowledgeGraph,
@@ -157,7 +187,8 @@ impl Shard {
 
     /// Remove a local node and clean up its ghost edges.
     /// Used during rebalancing.
-    pub fn remove_local_node(&mut self, local_id: NodeId) {
+    /// Remove a node from this shard (used during rebalancing).
+    pub(crate) fn remove_local_node(&mut self, local_id: NodeId) {
         // Remove outgoing ghost edges from this node
         self.ghost_edges.remove(&local_id.0);
 
@@ -177,13 +208,20 @@ impl Shard {
     }
 }
 
-/// Simple consistent hash ring (FNV-1a inspired, as described in the design doc).
-pub struct ConsistentHashRing {
+/// Simple consistent hash ring used to assign nodes to shards.
+///
+/// Uses FNV-1a hashing + virtual nodes for good distribution (as described
+/// in the original design document).
+pub(crate) struct ConsistentHashRing {
     ring: Vec<(u64, ShardId)>,
 }
 
 impl ConsistentHashRing {
-    pub fn new(shard_count: u16, virtual_nodes: u16) -> Self {
+    /// Create a new ring for the given number of shards.
+    ///
+    /// `virtual_nodes` controls how many virtual nodes each real shard gets
+    /// (higher = better balance, more memory).
+    pub(crate) fn new(shard_count: u16, virtual_nodes: u16) -> Self {
         let mut ring = Vec::new();
 
         for s in 0..shard_count {
@@ -198,7 +236,7 @@ impl ConsistentHashRing {
         Self { ring }
     }
 
-    pub fn locate(&self, key: &[u8]) -> ShardId {
+    pub(crate) fn locate(&self, key: &[u8]) -> ShardId {
         let h = fxhash64(key);
         // Binary search for the first entry >= h (with wrap-around)
         match self.ring.binary_search_by_key(&h, |&(k, _)| k) {
@@ -224,13 +262,21 @@ fn fxhash64(data: &[u8]) -> u64 {
     hash
 }
 
-/// Coordinates multiple shards and routes operations.
+/// Low-level coordinator that manages a set of shards and routes operations across them.
+///
+/// Most users should prefer the higher-level [`ShardedGraph`] facade.
+/// `ShardRouter` is exposed for advanced scenarios where more control is needed
+/// (direct access to per-shard graphs, custom property registration, etc.).
 pub struct ShardRouter {
-    pub shards: Vec<Shard>,
+    /// Direct access to the individual shards (advanced use only).
+    pub(crate) shards: Vec<Shard>,
     hash_ring: ConsistentHashRing,
 }
 
 impl ShardRouter {
+    /// Create a new router with the given number of shards.
+    ///
+    /// Nodes are distributed using consistent hashing based on their content.
     pub fn new(shard_count: u16) -> Self {
         let mut shards = Vec::new();
         for i in 0..shard_count {
@@ -260,10 +306,8 @@ impl ShardRouter {
         }
     }
 
-    /// Add a node to the appropriate shard and return its global identifier.
-    ///
-    /// Returns `Err(GraphError::TooManyProperties)` if the internal shard
-    /// would exceed the 64-property limit.
+    /// Add a node to the appropriate shard (chosen via consistent hashing)
+    /// and return its [`GlobalNodeId`].
     pub fn add_node(
         &mut self,
         text: &str,
@@ -279,10 +323,10 @@ impl ShardRouter {
         })
     }
 
-    /// Add a (possibly cross-shard) edge.
-    /// If the source and target are on different shards, a ghost edge is created on the source shard.
+    /// Add an edge between two nodes (possibly across shards).
     ///
-    /// Returns error if either shard index is invalid.
+    /// If the nodes live on different shards, a ghost edge is automatically
+    /// created. Returns an error if either `GlobalNodeId` is invalid.
     pub fn add_edge(
         &mut self,
         source: GlobalNodeId,
@@ -322,7 +366,7 @@ impl ShardRouter {
         Ok(())
     }
 
-    /// Perform a distributed text search across all shards.
+    /// Perform a distributed text search across all shards and merge the results.
     pub fn search(&self, query: &str, max_results: usize) -> Vec<crate::index::TextSearchResult> {
         let mut all = Vec::new();
         for shard in &self.shards {
@@ -494,8 +538,7 @@ impl ShardRouter {
         results
     }
 
-    /// Compute a basic rebalance plan for changing the number of shards.
-    /// Returns which nodes would need to move under a new consistent hash ring.
+    /// Compute which nodes would need to move if we changed the number of shards.
     pub fn plan_rebalance(&self, new_shard_count: u16) -> RebalancePlan {
         let new_ring = ConsistentHashRing::new(new_shard_count, 150);
         let mut migrations = Vec::new();
@@ -525,15 +568,7 @@ impl ShardRouter {
         }
     }
 
-    /// Execute a rebalance plan.
-    ///
-    /// This version is more complete than the first draft:
-    /// - Removes the node (and its ghost edges) from the old shard.
-    /// - Updates all ghost edges in the system that pointed to the moved node.
-    /// - Adds the node to the target shard.
-    ///
-    /// Returns `Err` on serious structural problems (bad shard indices, etc.).
-    /// Full local edge rewiring between moved nodes is still simplified.
+    /// Apply a rebalance plan, moving nodes between shards and repairing ghost edges.
     pub fn execute_rebalance(&mut self, plan: RebalancePlan) -> Result<(), crate::GraphError> {
         for (gid, target_shard_id) in plan.node_migrations {
             let old_idx = gid.shard.0 as usize;
@@ -648,15 +683,28 @@ impl ShardedGraph {
         &self.router
     }
 
+    /// Returns a mutable reference to the underlying `ShardRouter`.
+    ///
+    /// This is an escape hatch for advanced use cases (e.g. registering
+    /// properties on all shards before adding nodes, or direct access to
+    /// per-shard `IndexedKnowledgeGraph` instances).
     pub fn router_mut(&mut self) -> &mut ShardRouter {
         &mut self.router
     }
 
     // Re-export some router functionality for convenience
+
+    /// Compute a rebalance plan for changing the number of shards.
+    ///
+    /// See [`ShardRouter::plan_rebalance`] for details.
     pub fn plan_rebalance(&self, new_shard_count: u16) -> RebalancePlan {
         self.router.plan_rebalance(new_shard_count)
     }
 
+    /// Execute a previously computed rebalance plan.
+    ///
+    /// Returns an error if the plan references invalid shards or if
+    /// migration encounters structural problems.
     pub fn execute_rebalance(&mut self, plan: RebalancePlan) -> Result<(), crate::GraphError> {
         self.router.execute_rebalance(plan)
     }
@@ -679,7 +727,9 @@ impl ShardedGraph {
         Ok(shard.graph.graph.node_label(gid.local))
     }
 
-    /// Distributed phrase search (text only).
+    /// Distributed phrase search across all shards (text only).
+    ///
+    /// Results are merged and globally ranked by BM25-style score.
     pub fn phrase_search(
         &self,
         phrase: &str,
@@ -696,7 +746,11 @@ impl ShardedGraph {
         all
     }
 
-    /// Distributed phrase + graph traversal with the default fusion weights.
+    /// Distributed phrase search followed by graph traversal.
+    ///
+    /// Currently reuses the normal `search_and_traverse` path after
+    /// performing phrase search on each shard. A dedicated phrase-aware
+    /// traversal may be added later.
     pub fn phrase_search_and_traverse(
         &self,
         phrase: &str,
@@ -722,10 +776,12 @@ impl ShardedGraph {
 
     // === Introspection ===
 
+    /// Returns the number of shards in this cluster.
     pub fn shard_count(&self) -> usize {
         self.router.shards.len()
     }
 
+    /// Returns the total number of nodes across all shards.
     pub fn global_node_count(&self) -> usize {
         self.router
             .shards
@@ -734,6 +790,7 @@ impl ShardedGraph {
             .sum()
     }
 
+    /// Returns the total number of ghost edges across the entire cluster.
     pub fn ghost_edge_count(&self) -> usize {
         self.router
             .shards
@@ -742,6 +799,7 @@ impl ShardedGraph {
             .sum()
     }
 
+    /// Returns a vector with the node count of each shard (index = shard id).
     pub fn nodes_per_shard(&self) -> Vec<usize> {
         self.router
             .shards
@@ -750,6 +808,7 @@ impl ShardedGraph {
             .collect()
     }
 
+    /// Returns a vector with the ghost edge count of each shard.
     pub fn ghost_edges_per_shard(&self) -> Vec<usize> {
         self.router
             .shards
@@ -764,6 +823,9 @@ impl ShardedGraph {
     }
 
     /// Returns a convenient snapshot of the sharded graph's state.
+    ///
+    /// This is the recommended way to get an overview for monitoring,
+    /// dashboards, or logging.
     pub fn stats(&self) -> ShardedGraphStats {
         ShardedGraphStats {
             shard_count: self.shard_count(),

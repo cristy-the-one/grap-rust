@@ -22,42 +22,48 @@ use crate::properties::PropertyValue;
 // ============================================================================
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
-pub enum SerializablePropertyValue {
+pub(crate) enum SerializablePropertyValue {
     Float(f64),
     Int(i64),
     Bool(bool),
-    Label(Vec<u8>), // store as bytes for robustness
+    Label(Vec<u8>),
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct SerializableNode {
-    pub blob_global_offset: u64,
-    pub blob_length: u32,
-    pub blob_uncompressed_len: u32,
-    pub outgoing: Vec<u32>,
-    pub incoming: Vec<u32>,
-    pub label: Option<String>,
-    pub outgoing_property_mask: u64,
+pub(crate) struct SerializableNode {
+    pub(crate) blob_global_offset: u64,
+    pub(crate) blob_length: u32,
+    pub(crate) blob_uncompressed_len: u32,
+    pub(crate) outgoing: Vec<u32>,
+    pub(crate) incoming: Vec<u32>,
+    pub(crate) label: Option<String>,
+    pub(crate) outgoing_property_mask: u64,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct SerializableEdge {
-    pub source: u32,
-    pub target: u32,
-    pub strength: f64,
-    pub properties: Vec<(u16, SerializablePropertyValue)>,
-    pub property_mask: u64,
+pub(crate) struct SerializableEdge {
+    pub(crate) source: u32,
+    pub(crate) target: u32,
+    pub(crate) strength: f64,
+    pub(crate) properties: Vec<(u16, SerializablePropertyValue)>,
+    pub(crate) property_mask: u64,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct GraphMeta {
     /// On-disk format version. See [`CURRENT_GRAPH_FORMAT_VERSION`].
     pub version: u16,
+    /// Total number of nodes in the graph.
     pub node_count: u32,
+    /// Total number of edges in the graph.
     pub edge_count: u32,
+    /// Total size in bytes of all node blobs.
     pub blob_total_bytes: u64,
+    /// Cumulative offsets where each blob chunk starts in the flat blobs file.
     pub chunk_boundaries: Vec<u64>,
+    /// CRC32 checksum for each blob chunk (for integrity verification).
     pub chunk_checksums: Vec<u32>,
+    /// Unix timestamp when the graph was originally saved.
     pub created_timestamp: u64,
 }
 
