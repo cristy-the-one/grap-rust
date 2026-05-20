@@ -729,6 +729,11 @@ impl KnowledgeGraph {
     }
 }
 
+/// Internal implementation backing `KnowledgeGraph::load_mmap` when the `mmap` feature is enabled.
+///
+/// Currently this delegates to the portable `load_from_disk` implementation.
+/// The true zero-copy `Storage::Mmap` reconstruction path (via `BlobStore`) is prepared
+/// in the codebase and will be activated in a future change.
 #[cfg(feature = "mmap")]
 pub fn load_mmap(dir: &Path) -> Result<KnowledgeGraph, GraphError> {
     // For now we use the proven portable loader under the hood.
