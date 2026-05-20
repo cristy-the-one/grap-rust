@@ -779,7 +779,7 @@ impl IndexedKnowledgeGraph {
     /// Attempts to repair a potentially corrupted graph directory.
     ///
     /// Delegates to [`KnowledgeGraph::repair`].
-    pub fn repair(dir: &std::path::Path) -> Result<(), GraphError> {
+    pub fn repair(dir: &std::path::Path) -> Result<crate::serialize::RepairReport, GraphError> {
         KnowledgeGraph::repair(dir)
     }
 

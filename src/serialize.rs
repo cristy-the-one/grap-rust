@@ -67,6 +67,18 @@ pub struct GraphMeta {
     pub created_timestamp: u64,
 }
 
+/// Report returned by [`KnowledgeGraph::repair`].
+#[derive(Debug, Clone, Default)]
+pub struct RepairReport {
+    /// Number of stale temporary save directories that were successfully removed.
+    pub removed_temp_dirs: usize,
+    /// Whether the core graph files (`graph.meta`, `graph.topo`, `graph.blobs`) appear to exist
+    /// after the repair attempt.
+    pub graph_files_present: bool,
+    /// Any informational notes collected during the repair process.
+    pub notes: Vec<String>,
+}
+
 impl GraphMeta {
     /// The on-disk format version that this version of the library writes
     /// and fully supports.
@@ -341,17 +353,39 @@ impl KnowledgeGraph {
 
     /// Attempts to repair a potentially corrupted graph directory.
     ///
-    /// This is a best-effort operation. Currently it removes any stale
-    /// temporary directories that may have been left behind by a crashed or
-    /// interrupted `save_to_disk` call.
+    /// This is a best-effort operation. It currently:
+    /// - Removes any stale temporary directories left behind by interrupted `save_to_disk` calls.
+    /// - Checks for the presence of the main graph files.
     ///
-    /// It does **not** attempt to reconstruct lost data — it only cleans up
-    /// the side effects of failed atomic saves.
-    ///
-    /// Returns `Ok(())` if the repair attempt completed successfully.
-    pub fn repair(dir: &Path) -> Result<(), GraphError> {
-        Self::cleanup_stale_temp_saves(dir);
-        Ok(())
+    /// It does **not** attempt to reconstruct lost data.
+    pub fn repair(dir: &Path) -> Result<RepairReport, GraphError> {
+        let removed = Self::cleanup_stale_temp_saves(dir);
+
+        let graph_files_present = dir.join("graph.meta").exists()
+            && dir.join("graph.topo").exists()
+            && dir.join("graph.blobs").exists();
+
+        let mut report = RepairReport {
+            removed_temp_dirs: removed,
+            graph_files_present,
+            notes: Vec::new(),
+        };
+
+        if removed > 0 {
+            report.notes.push(format!(
+                "Removed {} stale temporary save director{}",
+                removed,
+                if removed == 1 { "y" } else { "ies" }
+            ));
+        }
+
+        if !graph_files_present && removed == 0 {
+            report.notes.push(
+                "No graph files found and no stale temp directories were present".to_string(),
+            );
+        }
+
+        Ok(report)
     }
 
     /// Load a graph from disk (portable path, no mmap).
@@ -705,10 +739,12 @@ mod tests {
         let graph_dir = dir.path().join("test-graph");
 
         // Calling repair on a non-existent directory should be safe
-        KnowledgeGraph::repair(&graph_dir).expect("repair on non-existent dir should not fail");
+        let report = KnowledgeGraph::repair(&graph_dir).expect("repair on non-existent dir should not fail");
+        assert_eq!(report.removed_temp_dirs, 0);
 
         // Create an empty directory and repair it — should still succeed
         fs::create_dir(&graph_dir).unwrap();
-        KnowledgeGraph::repair(&graph_dir).expect("repair on empty dir should succeed");
+        let report2 = KnowledgeGraph::repair(&graph_dir).expect("repair on empty dir should succeed");
+        assert_eq!(report2.removed_temp_dirs, 0);
     }
 }

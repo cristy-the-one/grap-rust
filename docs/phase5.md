@@ -1,6 +1,6 @@
 # Phase 5 – Production Hardening & v0.1 Release Readiness
 
-**Status**: In Progress (started after Phase 4 completion)  
+**Status**: Complete (ready for 0.1.0 release candidate)  
 **Target**: `grap` crate at version `0.1.0` — a clean, documented, tested, and benchmarked Rust library ready for real use and crates.io publication.
 
 This phase shifts focus from "make it work" to "make it reliable, observable, and pleasant to use in production environments."
@@ -210,4 +210,16 @@ After Phase 5 we consider the **initial vision complete**. Future work (0.2+) ma
 
 *Phase 5 plan derived from the production, versioning, and benchmarking concerns expressed throughout `core_graph_design.md` (Sections 10, 12, 13–15 spirit) and the explicit Phase 5 bullet list in `docs/implementation-plan.md`.*
 
-**Current version of this plan**: 1 (initial creation)
+**Current version of this plan**: 2 (Track C + atomic save + `RepairReport` completed)
+
+## Completion Note (April 2026)
+
+All major tracks of Phase 5 have been implemented:
+
+- Rich `GraphError` + widespread use
+- `GraphFormatVersion` + atomic `save_to_disk` + `repair()`
+- Full `Telemetry` trait with instrumentation (Track C)
+- Comprehensive CI, benchmarks, devcontainer, documentation
+- Public `RepairReport` for observability of recovery actions
+
+The crate is now in a strong position for a `0.1.0` release.
