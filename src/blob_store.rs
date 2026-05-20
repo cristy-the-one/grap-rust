@@ -13,7 +13,7 @@ pub struct BlobRef {
 
 #[derive(Debug, Default)]
 pub struct BlobStore {
-    chunks: Vec<Vec<u8>>,
+    pub(crate) chunks: Vec<Vec<u8>>,
 }
 
 impl BlobStore {

@@ -26,8 +26,8 @@ pub enum PropertyFilter {
 /// Bidirectional name <-> u16 tag registry. Max 64 tags (bitmask limit).
 #[derive(Debug, Default)]
 pub struct PropertyRegistry {
-    name_to_tag: HashMap<String, PropertyTag>,
-    tag_to_name: Vec<String>,
+    pub(crate) name_to_tag: HashMap<String, PropertyTag>,
+    pub(crate) tag_to_name: Vec<String>,
 }
 
 impl PropertyRegistry {

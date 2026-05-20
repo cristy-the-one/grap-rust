@@ -32,7 +32,8 @@ pub mod blob_store;
 pub mod properties;
 pub mod graph;
 pub mod query;
-pub mod index; // Full-text BM25 index (Phase 2)
+pub mod index;     // Full-text BM25 index (Phase 2)
+pub mod serialize; // Persistence (save/load + optional mmap) - Phase 3 in progress
 
 // Re-exports for ergonomic use
 pub use ids::{EdgeId, NodeId, PropertyTag};
