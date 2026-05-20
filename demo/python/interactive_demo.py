@@ -69,19 +69,47 @@ def main(
     # === Step 1: Create initial graph by ingesting curated docs ===
     console.print("\n[bold yellow]Step 1: Ingesting curated documents[/bold yellow]")
 
+    # Build a set of existing labels so repeated runs without --reset are idempotent
+    existing_labels: set[str] = set()
+    try:
+        export_result = run_grap_cli(
+            ["export", "--graph-dir", str(graph_path), "--format", "json"],
+            json_output=True,
+            check=False,
+        )
+        if export_result and "nodes" in export_result:
+            for node in export_result.get("nodes", []):
+                if lbl := node.get("label"):
+                    existing_labels.add(lbl)
+    except Exception:
+        pass  # brand new or empty graph
+
     created_nodes = []
+    skipped = 0
     for doc in sorted(SAMPLE_DOCS.glob("*.md")):
+        label = doc.name  # add-file uses filename as label when none is provided
+        if label in existing_labels:
+            skipped += 1
+            continue
+
         result = run_grap_cli(
             ["add-file", "--graph-dir", str(graph_path), "--path", str(doc), "--json"],
             json_output=True,
-            check=True,   # Surface errors during ingestion
+            check=True,
         )
         if result and "node_id" in result:
             created_nodes.append((doc.stem, result["node_id"]))
+            existing_labels.add(label)
 
-    console.print(f"[green][OK][/green] Ingested {len(created_nodes)} documents into the knowledge graph.")
     if created_nodes:
-        console.print("[dim]Node IDs:[/dim]", [nid for _, nid in created_nodes])
+        console.print(f"[green][OK][/green] Ingested {len(created_nodes)} new documents into the knowledge graph.")
+        if created_nodes:
+            console.print("[dim]New node IDs:[/dim]", [nid for _, nid in created_nodes])
+    else:
+        console.print("[dim]Curated documents already present — skipping re-ingestion.[/dim]")
+
+    if skipped:
+        console.print(f"[dim]Skipped {skipped} already-ingested document(s).[/dim]")
 
     if not auto:
         pause()
