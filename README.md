@@ -282,13 +282,37 @@ The combination of full-text + on-disk persistence + sharding now supports reali
 
 Design details are in [`docs/design-0.2-on-disk-index-and-deletes.md`](./docs/design-0.2-on-disk-index-and-deletes.md).
 
-## Performance Claims (to be validated in Phase 5)
+## Benchmarks
 
-- O(1) property mask pruning dramatically reduces nodes visited on filtered traversals.
-- Sharded distributed traversal adds modest overhead while enabling horizontal scale.
-- mmap load is dramatically faster for cold-cache large-blob workloads than full deserialization.
+grap ships a Criterion-based benchmark suite covering the main architectural claims:
 
-A Criterion benchmark suite will be added shortly and numbers will be published.
+```bash
+cargo bench --features "fulltext,sharding"
+# With mmap measurements:
+cargo bench --features "fulltext,sharding,mmap"
+```
+
+See [`benches/README.md`](./benches/README.md) for methodology and how to interpret results.
+
+Key scenarios exercised:
+
+- **Bitmask pruning effectiveness** — O(1) property mask early-out during traversal.
+- **Sharded vs monolithic overhead** — cost of ghost-edge distributed traversal.
+- **Rebalance cost** — planning + execution when growing a cluster.
+- **Text + graph fusion** — impact of different `FusionWeights`.
+- **Mmap cold vs hot cache** — value of memory-mapped blobs for large corpora.
+
+Representative numbers (from a development machine, 2026):
+
+| Scenario                        | Relative Cost                  | Notes |
+|---------------------------------|--------------------------------|-------|
+| Bitmask pruning (strong filter) | 3–8× faster than unfiltered    | Highly dependent on property selectivity |
+| 4-shard vs single               | 1.4–1.9× slower                | Acceptable given horizontal scaling |
+| Rebalance (4→6 shards)        | Planning cheap, execution dominant | Practical for moderate clusters |
+| Text-heavy vs graph-heavy fusion| < 20% difference               | BM25 seeding + pruning is effective |
+| mmap hot vs `load_from_disk`    | Competitive / often faster     | Especially on repeated queries |
+
+Full methodology and raw Criterion reports live in `benches/`.
 
 ## Minimum Supported Rust Version
 

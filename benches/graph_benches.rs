@@ -1,12 +1,14 @@
 //! Criterion benchmarks for the grap knowledge graph engine.
 //!
+//! These benchmarks aim to validate the key architectural claims from `core_graph_design.md`.
+//!
 //! Run with:
 //!   cargo bench --features "fulltext,sharding"
 //!
-//! These benchmarks validate the core architectural claims from core_graph_design.md:
-//! - O(1) property bitmask pruning during traversal
-//! - Acceptable overhead of sharded distributed traversal (ghost edges)
-//! - Cost of rebalancing
+//! For the mmap scenario you also need the `mmap` feature:
+//!   cargo bench --features "fulltext,sharding,mmap"
+//!
+//! See `benches/README.md` for methodology and example output.
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 
@@ -121,6 +123,39 @@ fn build_synthetic_sharded_graph(
     sg
 }
 
+/// Builds a graph with larger per-node text blobs (useful for mmap cold-cache benchmarks).
+#[cfg(feature = "mmap")]
+fn build_graph_with_large_blobs(node_count: usize) -> IndexedKnowledgeGraph {
+    let mut g = IndexedKnowledgeGraph::new();
+
+    for i in 0..node_count {
+        // ~4-6 KiB of text per node
+        let text = format!(
+            "Large document {}.\n\n{}",
+            i,
+            "This is filler text to create reasonably sized blobs for mmap benchmarking. \
+             Rust memory safety, ownership, borrowing, lifetimes, and fearless concurrency are \
+             important topics in systems programming. ".repeat(40)
+        );
+        g.add_node(&text, Some(&format!("LargeNode{}", i)));
+    }
+
+    // Add a modest number of edges so traversal has something to do
+    for i in 0..node_count {
+        let target = (i * 17 + 3) % node_count;
+        if target != i {
+            g.add_edge(
+                grap::ids::NodeId(i as u32),
+                grap::ids::NodeId(target as u32),
+                0.7,
+                vec![],
+            );
+        }
+    }
+
+    g
+}
+
 fn bench_bitmask_pruning(c: &mut Criterion) {
     let g = build_synthetic_graph(2_000, 6);
 
@@ -200,21 +235,182 @@ fn bench_sharded_vs_monolithic(c: &mut Criterion) {
     group.finish();
 }
 
-fn bench_rebalance_planning(c: &mut Criterion) {
-    let sg = build_synthetic_sharded_graph(4, 3_000, 4);
+fn bench_rebalance_cost(c: &mut Criterion) {
+    // Use a reasonably sized 4-shard cluster
+    let sg = build_synthetic_sharded_graph(4, 4_000, 5);
 
-    c.bench_function("plan_rebalance_4_to_6_shards", |b| {
+    let mut group = c.benchmark_group("rebalance_cost");
+
+    // Planning cost (should be relatively cheap)
+    group.bench_function("plan_rebalance_4_to_6_shards", |b| {
         b.iter(|| {
             let plan = sg.plan_rebalance(6);
             black_box(plan.node_migrations.len())
         })
     });
+
+    // Full execution cost (the expensive part)
+    group.bench_function("execute_rebalance_4_to_6_shards", |b| {
+        b.iter(|| {
+            // We create a fresh copy each iteration because rebalance mutates the graph
+            let mut fresh = build_synthetic_sharded_graph(4, 4_000, 5);
+            let plan = fresh.plan_rebalance(6);
+            let _ = fresh.execute_rebalance(plan);
+            black_box(())
+        })
+    });
+
+    group.finish();
 }
 
+/// Measures the cost of `search_and_traverse` under different text vs graph weighting.
+/// This validates that BM25 seed selection + pruned traversal remains efficient
+/// even when the text component is dominant.
+fn bench_text_graph_fusion_cost(c: &mut Criterion) {
+    let g = build_synthetic_graph(3_000, 5);
+
+    let mut group = c.benchmark_group("text_graph_fusion");
+
+    let query = "memory safety concurrency ownership";
+
+    group.bench_function("text_heavy_fusion", |b| {
+        b.iter(|| {
+            let res = g.search_and_traverse(
+                query,
+                15,
+                &["topic"],
+                0.4,
+                4,
+                100,
+                FusionWeights { text: 0.9, graph: 0.1 },
+            );
+            black_box(res.len())
+        })
+    });
+
+    group.bench_function("balanced_fusion", |b| {
+        b.iter(|| {
+            let res = g.search_and_traverse(
+                query,
+                15,
+                &["topic"],
+                0.4,
+                4,
+                100,
+                FusionWeights { text: 0.5, graph: 0.5 },
+            );
+            black_box(res.len())
+        })
+    });
+
+    group.bench_function("graph_heavy_fusion", |b| {
+        b.iter(|| {
+            let res = g.search_and_traverse(
+                query,
+                15,
+                &["topic"],
+                0.4,
+                4,
+                100,
+                FusionWeights { text: 0.1, graph: 0.9 },
+            );
+            black_box(res.len())
+        })
+    });
+
+    group.finish();
+}
+
+/// Benchmarks mmap cold-cache vs hot-cache behavior vs plain load_from_disk.
+/// This is only compiled when the `mmap` feature is enabled.
+#[cfg(feature = "mmap")]
+fn bench_mmap_cold_vs_hot(c: &mut Criterion) {
+    use std::time::Duration;
+
+    // Build a graph with decent-sized blobs
+    let mut g = build_graph_with_large_blobs(1_500);
+
+    let tmp = tempfile::tempdir().expect("failed to create tempdir for mmap bench");
+    let dir = tmp.path().join("mmap_bench_graph");
+
+    // Persist it
+    g.save_to_dir(&dir).expect("save_to_dir failed in benchmark");
+
+    let mut group = c.benchmark_group("mmap_cold_vs_hot");
+    group.measurement_time(Duration::from_secs(8));
+
+    // Cold mmap load (many page faults on first access)
+    group.bench_function("mmap_cold_first_traversal", |b| {
+        b.iter(|| {
+            let loaded = IndexedKnowledgeGraph::load_mmap(&dir).expect("load_mmap failed");
+            // First traversal after load — this is where cold cache cost appears
+            let res = loaded.search_and_traverse(
+                "memory safety",
+                10,
+                &[],
+                0.3,
+                3,
+                50,
+                FusionWeights::default(),
+            );
+            black_box(res.len())
+        })
+    });
+
+    // Hot mmap (subsequent traversals on already-faulted pages)
+    let loaded_mmap = IndexedKnowledgeGraph::load_mmap(&dir).expect("load_mmap failed");
+    group.bench_function("mmap_hot_traversal", |b| {
+        b.iter(|| {
+            let res = loaded_mmap.search_and_traverse(
+                "memory safety",
+                10,
+                &[],
+                0.3,
+                3,
+                50,
+                FusionWeights::default(),
+            );
+            black_box(res.len())
+        })
+    });
+
+    // Traditional load_from_disk (everything deserialized into RAM)
+    group.bench_function("load_from_disk_traversal", |b| {
+        b.iter(|| {
+            let loaded = IndexedKnowledgeGraph::load_from_dir(&dir).expect("load_from_dir failed");
+            let res = loaded.search_and_traverse(
+                "memory safety",
+                10,
+                &[],
+                0.3,
+                3,
+                50,
+                FusionWeights::default(),
+            );
+            black_box(res.len())
+        })
+    });
+
+    group.finish();
+}
+
+#[cfg(feature = "mmap")]
 criterion_group!(
     benches,
     bench_bitmask_pruning,
     bench_sharded_vs_monolithic,
-    bench_rebalance_planning
+    bench_rebalance_cost,
+    bench_text_graph_fusion_cost,
+    bench_mmap_cold_vs_hot
 );
+
+#[cfg(not(feature = "mmap"))]
+criterion_group!(
+    benches,
+    bench_bitmask_pruning,
+    bench_sharded_vs_monolithic,
+    bench_rebalance_cost,
+    bench_text_graph_fusion_cost
+);
+
 criterion_main!(benches);
