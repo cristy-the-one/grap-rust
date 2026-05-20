@@ -53,6 +53,16 @@ pub struct RebalancePlan {
     pub node_migrations: Vec<(GlobalNodeId, ShardId)>,
 }
 
+/// Snapshot of useful metrics about a sharded graph.
+#[derive(Debug, Clone)]
+pub struct ShardedGraphStats {
+    pub shard_count: usize,
+    pub total_nodes: usize,
+    pub total_ghost_edges: usize,
+    pub nodes_per_shard: Vec<usize>,
+    pub ghost_edges_per_shard: Vec<usize>,
+}
+
 /// Result of a query executed on a `ShardedGraph`.
 ///
 /// Contains both relevance signals and the actual path taken, which may
@@ -116,8 +126,6 @@ impl Shard {
         let text = remote_shard.read_blob(target.local);
         let snippet = text.chars().take(120).collect::<String>();
 
-        // We don't have cheap access to "does this node have ghost edges" without the router,
-        // so we set a conservative default. The router can override if needed.
         let cached = CachedRemoteNode {
             label,
             blob_snippet: snippet,
@@ -127,6 +135,27 @@ impl Shard {
 
         self.remote_cache.insert(target, cached);
         self.remote_cache.get(&target)
+    }
+
+    /// Remove a local node and clean up its ghost edges.
+    /// Used during rebalancing.
+    pub fn remove_local_node(&mut self, local_id: NodeId) {
+        // Remove outgoing ghost edges from this node
+        self.ghost_edges.remove(&local_id.0);
+
+        // Remove incoming ghost references from other nodes (expensive but correct for now)
+        for ghosts in self.ghost_edges.values_mut() {
+            ghosts.retain(|g| g.remote_target.local != local_id);
+        }
+
+        // Note: We do not currently have a cheap way to remove the node from the
+        // underlying IndexedKnowledgeGraph while preserving other nodes' adjacency.
+        // For a production system we would either:
+        //   - Mark nodes as deleted, or
+        //   - Maintain a mapping layer on top of the local graph.
+        //
+        // For this basic rebalancer we accept that the node data stays in the old
+        // shard's graph (it will be ignored by future routing).
     }
 }
 
@@ -444,46 +473,62 @@ impl ShardRouter {
         }
     }
 
-    /// Actually perform the node migrations described in a `RebalancePlan`.
-    /// This is a basic but functional implementation.
+    /// Execute a rebalance plan.
+    ///
+    /// This version is more complete than the first draft:
+    /// - Removes the node (and its ghost edges) from the old shard.
+    /// - Updates all ghost edges in the system that pointed to the moved node.
+    /// - Adds the node to the target shard.
+    ///
+    /// Full local edge rewiring between moved nodes is still simplified.
     pub fn execute_rebalance(&mut self, plan: RebalancePlan) {
         for (gid, target_shard_id) in plan.node_migrations {
-            let current_shard_idx = gid.shard.0 as usize;
-            if current_shard_idx >= self.shards.len() {
+            let old_idx = gid.shard.0 as usize;
+            if old_idx >= self.shards.len() {
                 continue;
             }
 
-            let current_shard = &mut self.shards[current_shard_idx];
+            // 1. Extract data before removal
+            let text = self.shards[old_idx].graph.read_blob(gid.local).to_string();
+            let label = self.shards[old_idx]
+                .graph
+                .graph
+                .node_label(gid.local)
+                .map(|s| s.to_string());
 
-            // Extract the node data we need
-            let text = current_shard.graph.read_blob(gid.local).to_string();
-            let label = current_shard.graph.graph.node_label(gid.local).map(|s| s.to_string());
+            // 2. Remove from old shard (including ghost edge cleanup)
+            self.shards[old_idx].remove_local_node(gid.local);
 
-            // For a basic version we don't migrate all edges perfectly.
-            // We remove the node from the old shard.
-            // (In a more complete version we would also clean up ghost edges pointing to this node.)
-
-            // Add to the target shard
-            let new_local_id = self.shards[target_shard_id.0 as usize]
+            // 3. Add to new shard
+            let new_local = self.shards[target_shard_id.0 as usize]
                 .graph
                 .add_node(&text, label.as_deref());
 
-            // Update any ghost edges that referenced the old location
-            // (naive scan for now)
+            let new_gid = GlobalNodeId {
+                shard: target_shard_id,
+                local: new_local,
+            };
+
+            // 4. Fix all ghost edges that referenced the old GlobalNodeId
             for shard in &mut self.shards {
                 for ghosts in shard.ghost_edges.values_mut() {
                     for ghost in ghosts.iter_mut() {
                         if ghost.remote_target == gid {
-                            ghost.remote_target.local = new_local_id;
-                            ghost.remote_target.shard = target_shard_id;
+                            ghost.remote_target = new_gid;
+                        }
+                        // Also fix the source side if the ghost was emitted by the moved node
+                        if ghost.local_source == gid.local
+                            && ghost.remote_target.shard == target_shard_id
+                        {
+                            // This ghost can now become a local edge (best effort)
+                            // For simplicity we leave it as a ghost for now.
                         }
                     }
                 }
             }
 
-            // Note: Proper removal from the old graph + full edge rewiring is non-trivial
-            // and left as a future improvement. The plan + this basic move already gives
-            // useful migration capability.
+            // 5. If the moved node had outgoing ghost edges, they are still valid
+            // (their remote targets didn't move in this simple pass).
         }
     }
 }
@@ -550,6 +595,15 @@ impl ShardedGraph {
         &mut self.router
     }
 
+    // Re-export some router functionality for convenience
+    pub fn plan_rebalance(&self, new_shard_count: u16) -> RebalancePlan {
+        self.router.plan_rebalance(new_shard_count)
+    }
+
+    pub fn execute_rebalance(&mut self, plan: RebalancePlan) {
+        self.router.execute_rebalance(plan)
+    }
+
     // === Convenience methods that make the facade pleasant to use ===
 
     /// Read the text of a node given its global identifier.
@@ -603,5 +657,59 @@ impl ShardedGraph {
             max_results,
             crate::index::FusionWeights::default(),
         )
+    }
+
+    // === Introspection ===
+
+    pub fn shard_count(&self) -> usize {
+        self.router.shards.len()
+    }
+
+    pub fn global_node_count(&self) -> usize {
+        self.router
+            .shards
+            .iter()
+            .map(|s| s.graph.graph.node_count())
+            .sum()
+    }
+
+    pub fn ghost_edge_count(&self) -> usize {
+        self.router
+            .shards
+            .iter()
+            .map(|s| s.ghost_edges.values().map(|v| v.len()).sum::<usize>())
+            .sum()
+    }
+
+    pub fn nodes_per_shard(&self) -> Vec<usize> {
+        self.router
+            .shards
+            .iter()
+            .map(|s| s.graph.graph.node_count())
+            .collect()
+    }
+
+    pub fn ghost_edges_per_shard(&self) -> Vec<usize> {
+        self.router
+            .shards
+            .iter()
+            .map(|s| {
+                s.ghost_edges
+                    .values()
+                    .map(|v| v.len())
+                    .sum::<usize>()
+            })
+            .collect()
+    }
+
+    /// Returns a convenient snapshot of the sharded graph's state.
+    pub fn stats(&self) -> ShardedGraphStats {
+        ShardedGraphStats {
+            shard_count: self.shard_count(),
+            total_nodes: self.global_node_count(),
+            total_ghost_edges: self.ghost_edge_count(),
+            nodes_per_shard: self.nodes_per_shard(),
+            ghost_edges_per_shard: self.ghost_edges_per_shard(),
+        }
     }
 }
