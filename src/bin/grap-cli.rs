@@ -61,6 +61,9 @@ enum Commands {
 
     /// Add an edge between two existing nodes.
     AddEdge(AddEdgeArgs),
+
+    /// Keep background merge/vacuum workers running for a graph (useful for demos).
+    StartWorkers(WorkerArgs),
 }
 
 /// Arguments for the `stats` subcommand.
@@ -132,6 +135,14 @@ struct AddEdgeArgs {
     strength: f64,
 }
 
+/// Arguments for the `start-workers` subcommand (keeps merge/vacuum threads alive).
+#[derive(Parser)]
+struct WorkerArgs {
+    /// How often the background worker wakes up to check for merges/vacuum (in milliseconds).
+    #[arg(long, default_value_t = 1500)]
+    interval: u64,
+}
+
 fn main() {
     let cli = Cli::parse();
 
@@ -147,6 +158,7 @@ fn main() {
         Commands::Vacuum(args) => run_vacuum(&graph_dir, cli.json, args),
         Commands::Export(args) => run_export(&graph_dir, cli.json, args),
         Commands::AddEdge(args) => run_add_edge(&graph_dir, cli.json, args),
+        Commands::StartWorkers(args) => run_start_workers(&graph_dir, args),
     }
 }
 
@@ -545,5 +557,39 @@ fn run_add_edge(graph_dir: &PathBuf, json: bool, args: AddEdgeArgs) {
         }));
     } else {
         println!("Added edge {} -> {} (strength={:.2})", args.source, args.target, args.strength);
+    }
+}
+
+/// Long-running command that loads a graph (respecting GRAP_MERGE_POLICY)
+/// and keeps background merge/vacuum workers alive.
+/// Useful for demos so that tiered merging happens visibly in the background.
+fn run_start_workers(graph_dir: &PathBuf, args: WorkerArgs) {
+    let mut ig = match IndexedKnowledgeGraph::load_from_dir(graph_dir) {
+        Ok(g) => g,
+        Err(e) => {
+            eprintln!("Failed to load graph: {}", e);
+            std::process::exit(1);
+        }
+    };
+
+    let started = ig.start_background_workers(std::time::Duration::from_millis(args.interval));
+
+    if started == 0 {
+        eprintln!(
+            "No background workers were started.\n\
+             Make sure the graph was created with a merge policy (set GRAP_MERGE_POLICY=<n> or use --merge-policy in the demo)."
+        );
+        std::process::exit(1);
+    }
+
+    println!(
+        "Background merge/vacuum workers started ({} worker(s), interval {}ms).\n\
+         Press Ctrl+C to stop.",
+        started, args.interval
+    );
+
+    // Keep the process (and its threads) alive
+    loop {
+        std::thread::sleep(std::time::Duration::from_secs(3600));
     }
 }

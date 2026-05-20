@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import os
 import shutil
+import subprocess
 import time
 from pathlib import Path
 
@@ -59,9 +60,31 @@ def main(
 
     graph_path = ensure_graph_dir(graph_path)
 
+    worker_proc: subprocess.Popen | None = None
+
     if merge_policy is not None and merge_policy > 0:
         os.environ["GRAP_MERGE_POLICY"] = str(merge_policy)
-        console.print(f"[cyan]Merge policy enabled[/cyan] (segments_per_tier={merge_policy}) — background merging will occur.")
+        console.print(f"[cyan]Merge policy enabled[/cyan] (segments_per_tier={merge_policy})")
+
+        # Launch a long-lived CLI process that keeps background merge workers alive.
+        # This makes tier promotion and segment merging visible during the demo.
+        try:
+            cli_path = find_grap_cli()
+            worker_proc = subprocess.Popen(
+                [
+                    str(cli_path),
+                    "start-workers",
+                    "--graph-dir",
+                    str(graph_path),
+                    "--interval",
+                    "1200",
+                ],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+            console.print("[dim]Background merge worker process started.[/dim]")
+        except Exception as e:
+            console.print(f"[yellow]Could not start background worker process: {e}[/yellow]")
 
     console.print(Panel.fit(
         "[bold cyan]grap Holistic Demo[/bold cyan]\n\n"
@@ -248,6 +271,17 @@ def main(
         console.print(f"[yellow]Visualization step skipped:[/yellow] {e}")
         console.print("You can still generate it manually with:")
         console.print(f"  python -m demo.python.visualize --graph-dir {graph_path} --output demo-graph.dot")
+
+    # Clean up the background merge worker process if we started one
+    if worker_proc is not None:
+        try:
+            worker_proc.terminate()
+            worker_proc.wait(timeout=2)
+        except Exception:
+            try:
+                worker_proc.kill()
+            except Exception:
+                pass
 
     console.print("\n[bold green]Demo complete![/bold green]")
     console.print(
