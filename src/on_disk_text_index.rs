@@ -4,7 +4,7 @@
 //! of the real segmented on-disk engine in [`crate::on_disk_index`].
 //!
 //! It handles:
-//! - Tokenization and `NodeId` ↔ local doc id mapping
+//! - Tokenization and `NodeId` ↔ global doc id mapping (persisted to `node_map.json`)
 //! - Search / phrase search delegation
 //! - Persistence (`save_to_dir` / `load_from_dir`)
 //! - Incremental `vacuum` / `compact`
@@ -30,10 +30,9 @@ pub struct OnDiskTextIndex {
     /// workers can safely hold a reference to it.
     engine: std::sync::Arc<std::sync::Mutex<OnDiskIndex>>,
     tokenizer: Box<dyn Tokenizer>,
-    /// Simple mapping for non-sharded case: NodeId (as u32) -> local doc id inside the engine.
-    /// In a real sharded setup this mapping lives per-shard.
-    node_to_local: std::collections::HashMap<u32, engine::LocalDocId>,
-    next_local_id: engine::LocalDocId,
+    /// Maps NodeId.0 → global doc id returned by the engine.
+    /// Persisted to `node_map.json` on save, restored on load.
+    node_to_global: std::collections::HashMap<u32, u32>,
 }
 
 impl OnDiskTextIndex {
@@ -41,8 +40,7 @@ impl OnDiskTextIndex {
         Self {
             engine: std::sync::Arc::new(std::sync::Mutex::new(OnDiskIndex::new())),
             tokenizer: Box::new(DefaultTokenizer::new()),
-            node_to_local: std::collections::HashMap::new(),
-            next_local_id: 0,
+            node_to_global: std::collections::HashMap::new(),
         }
     }
 
@@ -55,26 +53,13 @@ impl OnDiskTextIndex {
         Self {
             engine: std::sync::Arc::new(std::sync::Mutex::new(engine)),
             tokenizer: Box::new(DefaultTokenizer::new()),
-            node_to_local: std::collections::HashMap::new(),
-            next_local_id: 0,
+            node_to_global: std::collections::HashMap::new(),
         }
     }
 
     pub fn new_in_dir(dir: &std::path::Path) -> std::io::Result<Self> {
-        let mut s = Self::new();
         std::fs::create_dir_all(dir)?;
-        Ok(s)
-    }
-
-    fn ensure_local(&mut self, node: NodeId) -> engine::LocalDocId {
-        let key = node.0;
-        if let Some(&lid) = self.node_to_local.get(&key) {
-            return lid;
-        }
-        let lid = self.next_local_id;
-        self.next_local_id += 1;
-        self.node_to_local.insert(key, lid);
-        lid
+        Ok(Self::new())
     }
 
     // Public inherent API (so callers can do idx.vacuum() directly on the concrete type)
@@ -91,16 +76,11 @@ impl OnDiskTextIndex {
         self.engine.lock().unwrap().remove_sealed_segment(index)
     }
     pub fn add_sealed_segment(&mut self, seg: crate::on_disk_index::OnDiskSegment, tier: u32) {
+        // Do NOT clear node_to_global — existing mappings remain valid (C4 fix).
         self.engine.lock().unwrap().add_sealed_segment(seg, tier);
-        self.node_to_local.clear();
-        self.next_local_id = 0;
     }
     pub fn save_to_dir(&mut self, dir: &std::path::Path) -> Result<(), crate::GraphError> {
-        self.engine
-            .lock()
-            .unwrap()
-            .save_to_dir(dir)
-            .map_err(|e| crate::GraphError::Other(e.to_string()))
+        TextIndex::save_to_dir(self, dir)
     }
 
     /// Start a background merge + incremental vacuum worker for this on-disk index.
@@ -124,32 +104,38 @@ impl TextIndex for OnDiskTextIndex {
         let tokens = self.tokenizer.tokenize(text);
         let terms: Vec<&str> = tokens.iter().map(|(t, _)| *t).collect();
         let positions: Vec<Vec<u32>> = tokens.iter().map(|(_, pos)| vec![*pos]).collect();
-
-        let local = self.ensure_local(node);
-        let _ = self.engine.lock().unwrap().add_document(&terms, &positions);
-        // For simplicity in this step we just use the engine's own local ids.
-        // A production version would maintain a bidirectional map.
+        let global_id = self.engine.lock().unwrap().add_document(&terms, &positions);
+        self.node_to_global.insert(node.0, global_id);
     }
 
     fn search(&self, query: &str, max_results: usize) -> Vec<(NodeId, f64)> {
-        let raw = self.engine.lock().unwrap().search(&[query]);
+        let tokens = self.tokenizer.tokenize(query);
+        let terms: Vec<&str> = tokens.iter().map(|(t, _)| *t).collect();
+        if terms.is_empty() { return vec![]; }
+        let raw = self.engine.lock().unwrap().search(&terms);
+        // Build reverse map: global_id → NodeId
+        let reverse: std::collections::HashMap<u32, u32> =
+            self.node_to_global.iter().map(|(&nid, &gid)| (gid, nid)).collect();
         raw.into_iter()
             .take(max_results)
-            .filter_map(|(local, score)| {
-                self.node_to_local
-                    .iter()
-                    .find(|(_, &v)| v == local)
-                    .map(|(&nid, _)| (NodeId(nid), score as f64))
+            .filter_map(|(global_id, score)| {
+                reverse.get(&global_id).map(|&nid| (NodeId(nid), score as f64))
             })
             .collect()
     }
 
     fn phrase_search(&self, phrase: &str, max_gap: u32, max_results: usize) -> Vec<(NodeId, f64)> {
-        let terms: Vec<&str> = phrase.split_whitespace().collect();
+        let tokens = self.tokenizer.tokenize(phrase);
+        let terms: Vec<&str> = tokens.iter().map(|(t, _)| *t).collect();
+        if terms.is_empty() { return vec![]; }
         let raw = self.engine.lock().unwrap().phrase_search(&terms, max_gap);
+        let reverse: std::collections::HashMap<u32, u32> =
+            self.node_to_global.iter().map(|(&nid, &gid)| (gid, nid)).collect();
         raw.into_iter()
             .take(max_results)
-            .map(|(local, sc)| (NodeId(local), sc as f64))
+            .filter_map(|(global_id, score)| {
+                reverse.get(&global_id).map(|&nid| (NodeId(nid), score as f64))
+            })
             .collect()
     }
 
@@ -164,22 +150,19 @@ impl TextIndex for OnDiskTextIndex {
     }
 
     fn delete_document(&mut self, node: NodeId) {
-        if let Some(&local) = self.node_to_local.get(&node.0) {
-            self.engine.lock().unwrap().delete(local);
+        if let Some(&global_id) = self.node_to_global.get(&node.0) {
+            self.engine.lock().unwrap().delete(global_id);
         }
     }
 
     fn is_document_deleted(&self, node: NodeId) -> bool {
-        if let Some(&local) = self.node_to_local.get(&node.0) {
-            // In a full engine this would ask the owning segment's delete bitmap
-            false
+        if let Some(&global_id) = self.node_to_global.get(&node.0) {
+            self.engine.lock().unwrap().is_deleted_global(global_id)
         } else {
             false
         }
     }
 
-    // The trait now declares vacuum/compact/take/add/sample as defaulted methods.
-    // We only override the ones we actually need for the on-disk backend.
     fn vacuum(&mut self) {
         self.engine.lock().unwrap().vacuum();
     }
@@ -187,18 +170,19 @@ impl TextIndex for OnDiskTextIndex {
         self.engine.lock().unwrap().compact();
     }
 
-    // Trait overrides for rebalancer
     fn take_sealed_segment(
         &mut self,
         index: usize,
     ) -> Option<(crate::on_disk_index::OnDiskSegment, u32)> {
         self.engine.lock().unwrap().remove_sealed_segment(index)
     }
+
     fn add_sealed_segment(&mut self, seg: crate::on_disk_index::OnDiskSegment, tier: u32) {
+        // Do NOT clear node_to_global — existing mappings remain valid (C4 fix).
+        // New segments from the rebalancer have global_id_map populated, so search still works.
         self.engine.lock().unwrap().add_sealed_segment(seg, tier);
-        self.node_to_local.clear();
-        self.next_local_id = 0;
     }
+
     fn sample_representative_for_segment(&self, seg_idx: usize) -> Option<String> {
         let infos = self.engine.lock().unwrap().sealed_segment_info();
         if seg_idx >= infos.len() {
@@ -220,36 +204,114 @@ impl TextIndex for OnDiskTextIndex {
             .lock()
             .unwrap()
             .save_to_dir(dir)
-            .map_err(|e| crate::GraphError::Other(e.to_string()))
+            .map_err(|e| crate::GraphError::Other(e.to_string()))?;
+        // Persist the NodeId→GlobalId map alongside the text index
+        let map_json = serde_json::to_string_pretty(&self.node_to_global)
+            .map_err(|e| crate::GraphError::Other(e.to_string()))?;
+        std::fs::write(dir.join("node_map.json"), map_json)
+            .map_err(crate::GraphError::from)?;
+        Ok(())
     }
 
-    /// Load an `OnDiskTextIndex` from a directory previously written by `save_to_dir`.
     fn load_from_dir(
         dir: &std::path::Path,
     ) -> Result<Box<dyn crate::index::TextIndex>, crate::GraphError> {
-        // Load the real engine state (this is the important part that was missing).
+        // Load the real engine state
         let engine = crate::on_disk_index::OnDiskIndex::load_from_dir(dir).map_err(|e| {
             crate::GraphError::Other(format!("failed to load on-disk index: {}", e))
         })?;
 
-        let idx = Self {
-            engine: std::sync::Arc::new(std::sync::Mutex::new(engine)),
-            tokenizer: Box::new(crate::index::DefaultTokenizer::new()),
-            node_to_local: std::collections::HashMap::new(),
-            next_local_id: 0,
+        // Restore NodeId → GlobalId mapping
+        let node_to_global: std::collections::HashMap<u32, u32> = {
+            let map_path = dir.join("node_map.json");
+            if map_path.exists() {
+                let bytes = std::fs::read(&map_path).map_err(crate::GraphError::from)?;
+                serde_json::from_slice(&bytes)
+                    .map_err(|e| crate::GraphError::Other(e.to_string()))?
+            } else {
+                std::collections::HashMap::new()
+            }
         };
 
-        Ok(Box::new(idx))
+        Ok(Box::new(Self {
+            engine: std::sync::Arc::new(std::sync::Mutex::new(engine)),
+            tokenizer: Box::new(crate::index::DefaultTokenizer::new()),
+            node_to_global,
+        }))
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::ids::NodeId;
+    use crate::index::TextIndex;
+    use tempfile::tempdir;
 
     #[test]
-    fn placeholder_compiles_and_implements_trait() {
-        let idx = OnDiskTextIndex::new();
-        let _s = idx.stats();
+    fn search_finds_indexed_node() {
+        let mut idx = OnDiskTextIndex::new();
+        idx.index_document(NodeId(0), "rust ownership memory safety");
+        idx.index_document(NodeId(1), "python garbage collection");
+        idx.index_document(NodeId(2), "rust borrow checker lifetime");
+
+        let results = idx.search("rust", 10);
+        let ids: Vec<u32> = results.iter().map(|(n, _)| n.0).collect();
+        assert!(ids.contains(&0), "NodeId(0) should be found");
+        assert!(ids.contains(&2), "NodeId(2) should be found");
+        assert!(!ids.contains(&1), "NodeId(1) should NOT appear for 'rust'");
+    }
+
+    #[test]
+    fn search_survives_save_load_cycle() {
+        let dir = tempdir().unwrap();
+
+        let mut idx = OnDiskTextIndex::new();
+        idx.index_document(NodeId(0), "knowledge graph engine");
+        idx.index_document(NodeId(1), "text search bm25");
+        idx.save_to_dir(dir.path()).unwrap();
+
+        let loaded_box = OnDiskTextIndex::load_from_dir(dir.path()).unwrap();
+        let results = loaded_box.search("knowledge", 10);
+        let ids: Vec<u32> = results.iter().map(|(n, _)| n.0).collect();
+        assert!(ids.contains(&0), "NodeId(0) must survive save/load");
+        assert!(!ids.contains(&1));
+    }
+
+    #[test]
+    fn delete_hides_node_from_search() {
+        let mut idx = OnDiskTextIndex::new();
+        idx.index_document(NodeId(0), "rust programming language");
+        idx.index_document(NodeId(1), "rust memory safety");
+        idx.delete_document(NodeId(0));
+
+        let results = idx.search("rust", 10);
+        let ids: Vec<u32> = results.iter().map(|(n, _)| n.0).collect();
+        assert!(!ids.contains(&0), "deleted node should not appear");
+        assert!(ids.contains(&1));
+    }
+
+    #[test]
+    fn is_document_deleted_reflects_deletes() {
+        let mut idx = OnDiskTextIndex::new();
+        idx.index_document(NodeId(3), "some content");
+        assert!(!idx.is_document_deleted(NodeId(3)));
+        idx.delete_document(NodeId(3));
+        assert!(idx.is_document_deleted(NodeId(3)));
+    }
+
+    #[test]
+    fn is_document_deleted_after_save_load() {
+        let dir = tempdir().unwrap();
+
+        let mut idx = OnDiskTextIndex::new();
+        idx.index_document(NodeId(0), "document zero content");
+        idx.index_document(NodeId(1), "document one content");
+        idx.delete_document(NodeId(0));
+        idx.save_to_dir(dir.path()).unwrap();
+
+        let loaded = OnDiskTextIndex::load_from_dir(dir.path()).unwrap();
+        assert!(loaded.is_document_deleted(NodeId(0)), "deleted status must survive save/load");
+        assert!(!loaded.is_document_deleted(NodeId(1)));
     }
 }
