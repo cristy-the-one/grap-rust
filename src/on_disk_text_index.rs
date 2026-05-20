@@ -69,6 +69,30 @@ impl OnDiskTextIndex {
         self.node_to_local.insert(key, lid);
         lid
     }
+
+    // Public inherent API (so callers can do idx.vacuum() directly on the concrete type)
+    pub fn vacuum(&mut self) {
+        self.engine.vacuum();
+    }
+    pub fn compact(&mut self) {
+        self.engine.compact();
+    }
+    pub fn sealed_segment_info(&self) -> Vec<crate::on_disk_index::SegmentInfo> {
+        self.engine.sealed_segment_info()
+    }
+    pub fn remove_sealed_segment(&mut self, index: usize) -> Option<(crate::on_disk_index::OnDiskSegment, u32)> {
+        self.engine.remove_sealed_segment(index)
+    }
+    pub fn add_sealed_segment(&mut self, seg: crate::on_disk_index::OnDiskSegment, tier: u32) {
+        self.engine.add_sealed_segment(seg, tier);
+        self.node_to_local.clear();
+        self.next_local_id = 0;
+    }
+    pub fn save_to_dir(&mut self, dir: &std::path::Path) -> Result<(), crate::GraphError> {
+        self.engine
+            .save_to_dir(dir)
+            .map_err(|e| crate::GraphError::Other(e.to_string()))
+    }
 }
 
 impl Default for OnDiskTextIndex {
@@ -134,33 +158,16 @@ impl TextIndex for OnDiskTextIndex {
         }
     }
 
-    /// Expose vacuum / compaction to the higher layers.
-    pub fn vacuum(&mut self) {
+    // The trait now declares vacuum/compact/take/add/sample as defaulted methods.
+    // We only override the ones we actually need for the on-disk backend.
+    fn vacuum(&mut self) {
         self.engine.vacuum();
     }
-
-    /// Compact the underlying on-disk index (merge segments, reclaim space).
-    pub fn compact(&mut self) {
+    fn compact(&mut self) {
         self.engine.compact();
     }
 
-    /// Returns segment-level information (doc counts, tiers, etc.).
-    /// Useful for segment-aware rebalancing decisions.
-    pub fn sealed_segment_info(&self) -> Vec<crate::on_disk_index::SegmentInfo> {
-        self.engine.sealed_segment_info()
-    }
-
-    pub fn remove_sealed_segment(&mut self, index: usize) -> Option<(crate::on_disk_index::OnDiskSegment, u32)> {
-        self.engine.remove_sealed_segment(index)
-    }
-
-    pub fn add_sealed_segment(&mut self, seg: crate::on_disk_index::OnDiskSegment, tier: u32) {
-        self.engine.add_sealed_segment(seg, tier);
-        self.node_to_local.clear();
-        self.next_local_id = 0;
-    }
-
-    // Trait overrides for rebalancer
+    // Trait overrides for rebalancer (these provide the TextIndex trait methods)
     fn take_sealed_segment(&mut self, index: usize) -> Option<(crate::on_disk_index::OnDiskSegment, u32)> {
         self.engine.remove_sealed_segment(index)
     }
@@ -178,14 +185,14 @@ impl TextIndex for OnDiskTextIndex {
 
     // === Persistence (delegated to the inner OnDiskIndex) ===
 
-    pub fn save_to_dir(&mut self, dir: &std::path::Path) -> Result<(), crate::GraphError> {
+    fn save_to_dir(&mut self, dir: &std::path::Path) -> Result<(), crate::GraphError> {
         self.engine
             .save_to_dir(dir)
             .map_err(|e| crate::GraphError::Other(e.to_string()))
     }
 
     /// Load an `OnDiskTextIndex` from a directory previously written by `save_to_dir`.
-    pub fn load_from_dir(dir: &std::path::Path) -> Result<Box<dyn crate::index::TextIndex>, crate::GraphError> {
+    fn load_from_dir(dir: &std::path::Path) -> Result<Box<dyn crate::index::TextIndex>, crate::GraphError> {
         // Load the real engine state (this is the important part that was missing).
         let engine = crate::on_disk_index::OnDiskIndex::load_from_dir(dir)
             .map_err(|e| crate::GraphError::Other(format!("failed to load on-disk index: {}", e)))?;

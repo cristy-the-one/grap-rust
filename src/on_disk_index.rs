@@ -347,21 +347,6 @@ impl OnDiskIndex {
         Some((removed.segment, removed.tier))
     }
 
-    /// Remove and return a sealed segment by index (used by the rebalancer for bulk segment moves).
-    /// Returns the segment and its tier so the receiver can preserve tier information.
-    pub fn remove_sealed_segment(&mut self, index: usize) -> Option<(OnDiskSegment, u32)> {
-        if index >= self.sealed.len() {
-            return None;
-        }
-        let removed = self.sealed.remove(index);
-        // Adjust global counters (best effort; exact subtraction is not critical for rebalance)
-        self.total_docs = self.total_docs.saturating_sub(removed.segment.doc_count as u64);
-        self.total_tokens = self.total_tokens.saturating_sub(
-            removed.segment.doc_lengths.iter().map(|&l| l as u64).sum::<u64>(),
-        );
-        Some((removed.segment, removed.tier))
-    }
-
     pub fn sealed_segment_count(&self) -> usize { self.sealed.len() }
     pub fn approx_doc_count(&self) -> u64 { self.total_docs + self.active.doc_count() as u64 }
 

@@ -7,6 +7,10 @@
 //! single-machine memory while keeping a unified query API.
 
 use std::collections::HashMap;
+use std::sync::atomic::AtomicBool;
+use std::sync::Arc;
+use std::thread;
+use std::time::Duration;
 
 use crate::ids::{EdgeId, NodeId};
 use crate::index::IndexedKnowledgeGraph;
@@ -1058,7 +1062,7 @@ impl ShardedGraph {
     /// `Arc<Mutex<ShardedGraph>>` to the worker. The current implementation
     /// demonstrates the pattern and is sufficient for the 0.2 spike.
     pub fn start_background_maintenance(&mut self, interval: Duration) -> MaintenanceHandle {
-        MaintenanceHandle::start(interval, self)
+        MaintenanceHandle::start(interval, &mut self.router)
     }
 
     /// Explicitly trigger a compaction / vacuum pass on all shards that use
@@ -1066,7 +1070,6 @@ impl ShardedGraph {
     pub fn compact(&mut self) {
         self.router.vacuum_deleted_nodes();
     }
-}
 
     // === Convenience methods that make the facade pleasant to use ===
 
@@ -1133,54 +1136,8 @@ impl ShardedGraph {
         )
     }
 
-    // === Background Maintenance ===
-
-/// Handle returned by `ShardedGraph::start_background_maintenance`.
-/// Drop it or call `shutdown()` to stop the periodic vacuum + compaction worker.
-pub struct MaintenanceHandle {
-    stop: Arc<AtomicBool>,
-    join: Option<thread::JoinHandle<()>>,
-}
-
-impl MaintenanceHandle {
-    fn start(interval: Duration, router: &mut ShardRouter) -> Self {
-        let stop = Arc::new(AtomicBool::new(false));
-        let stop2 = stop.clone();
-
-        // We need shared mutable access. The simplest safe way for the spike/prototype
-        // is to give the worker its own clone of the router (expensive but correct).
-        // In production you would use Arc<Mutex<ShardRouter>> or a channel-driven actor.
-        let router_clone = router.clone(); // requires ShardRouter: Clone (we can derive or implement cheaply later)
-
-        let handle = thread::spawn(move || {
-            while !stop2.load(Ordering::SeqCst) {
-                thread::sleep(interval);
-                // This clone approach has ownership issues in the current design.
-                // For a real implementation we would hold Arc<Mutex<ShardRouter>> from the beginning.
-                // For now we just demonstrate the intent.
-                // router_clone.run_maintenance_cycle();
-            }
-        });
-
-        MaintenanceHandle { stop, join: Some(handle) }
-    }
-
-    pub fn shutdown(mut self) {
-        self.stop.store(true, Ordering::SeqCst);
-        if let Some(h) = self.join.take() {
-            let _ = h.join();
-        }
-    }
-}
-
-impl Drop for MaintenanceHandle {
-    fn drop(&mut self) {
-        self.stop.store(true, Ordering::SeqCst);
-        if let Some(h) = self.join.take() {
-            let _ = h.join();
-        }
-    }
-}
+    // Background maintenance is implemented by the MaintenanceHandle type
+    // defined at the end of the module (after the impl block).
 
     /// Returns the number of shards in this cluster.
     pub fn shard_count(&self) -> usize {
@@ -1252,3 +1209,49 @@ impl Drop for MaintenanceHandle {
             remote_cache_per_shard,
         }
     }
+}
+
+// === Background Maintenance (defined at module level so it can be named
+// from inside impl ShardedGraph) ===
+
+/// Handle returned by `ShardedGraph::start_background_maintenance`.
+/// Drop it or call `shutdown()` to stop the periodic vacuum + compaction worker.
+pub struct MaintenanceHandle {
+    stop: Arc<AtomicBool>,
+    join: Option<thread::JoinHandle<()>>,
+}
+
+impl MaintenanceHandle {
+    fn start(interval: Duration, _router: &mut ShardRouter) -> Self {
+        let stop = Arc::new(AtomicBool::new(false));
+        let stop2 = stop.clone();
+
+        // For the 0.2 spike we spawn a no-op thread so the API shape is correct.
+        // A real version would either take Arc<Mutex<ShardedGraph>> or communicate
+        // via channels. The router.clone() requirement is intentionally avoided here.
+        let handle = thread::spawn(move || {
+            while !stop2.load(std::sync::atomic::Ordering::SeqCst) {
+                thread::sleep(interval);
+                // In a full impl: router_clone.run_maintenance_cycle();
+            }
+        });
+
+        MaintenanceHandle { stop, join: Some(handle) }
+    }
+
+    pub fn shutdown(mut self) {
+        self.stop.store(true, std::sync::atomic::Ordering::SeqCst);
+        if let Some(h) = self.join.take() {
+            let _ = h.join();
+        }
+    }
+}
+
+impl Drop for MaintenanceHandle {
+    fn drop(&mut self) {
+        self.stop.store(true, std::sync::atomic::Ordering::SeqCst);
+        if let Some(h) = self.join.take() {
+            let _ = h.join();
+        }
+    }
+}
