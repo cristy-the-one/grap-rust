@@ -229,6 +229,8 @@ impl KnowledgeGraph {
         // Stage new files into `dir/.grap-new/`, then rename each into place.
         // Using a staging subdirectory INSIDE the target keeps source and destination
         // on the same filesystem (rename is always atomic within one volume).
+        // Remove any stale staging dir left by a previous interrupted save first.
+        let _ = fs::remove_dir_all(dir.join(".grap-new"));
         let staging = dir.join(".grap-new");
         self.write_graph_to_dir(&staging)?;
         let _ = Self::sync_directory(&staging);
@@ -381,12 +383,22 @@ impl KnowledgeGraph {
     /// Returns the number of directories that were removed.
     fn cleanup_stale_temp_saves(dir: &Path) -> usize {
         let mut removed = 0;
+
+        // Clean staging dir INSIDE dir itself (current save strategy)
+        let staging = dir.join(".grap-new");
+        if staging.exists() {
+            if fs::remove_dir_all(&staging).is_ok() {
+                removed += 1;
+            }
+        }
+
+        // Clean sibling temp dirs (from old atomic-rename approach)
         if let Some(parent) = dir.parent() {
             if let Ok(entries) = fs::read_dir(parent) {
                 for entry in entries.flatten() {
                     let name = entry.file_name();
                     if let Some(name_str) = name.to_str() {
-                        if name_str.starts_with(".grap-save-") || name_str.starts_with(".grap-old-") || name_str == ".grap-new" {
+                        if name_str.starts_with(".grap-save-") || name_str.starts_with(".grap-old-") {
                             if fs::remove_dir_all(entry.path()).is_ok() {
                                 removed += 1;
                             }

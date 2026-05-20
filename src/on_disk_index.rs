@@ -1148,13 +1148,16 @@ pub fn start_merge_worker(index: Arc<Mutex<OnDiskIndex>>, interval: Duration) ->
         loop {
             match rx.recv_timeout(interval) {
                 Ok(MergeCommand::Shutdown) => break,
-                Ok(MergeCommand::MergeNow) => { /* perform */ }
-                Err(_) => {}
+                Ok(MergeCommand::MergeNow) | Err(_) => {}
             }
-            // periodic apply
             if let Ok(mut g) = index.lock() {
-                // Call the real incremental vacuum (which also runs apply_merge_policy internally)
+                let t0 = std::time::Instant::now();
                 g.vacuum();
+                let elapsed = t0.elapsed().as_millis() as u64;
+                if let Ok(mut s) = stats2.lock() {
+                    s.merges_performed += 1;
+                    s.last_merge_duration_ms = elapsed;
+                }
             }
         }
     });

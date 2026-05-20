@@ -54,7 +54,7 @@ pub struct GhostEdge {
 
 /// One hop in a path that may have crossed shard boundaries.
 #[derive(Debug, Clone)]
-pub(crate) enum ShardedPathHop {
+pub enum ShardedPathHop {
     /// A normal local edge (no shard crossing).
     Local(EdgeId),
     /// A hop that followed a ghost edge into another shard.
@@ -962,21 +962,7 @@ impl ShardRouter {
                 local: new_local,
             };
 
-            // Ghost cleanup (tombstone + rewrite)
-            let n = self.shards.len();
-            for i in 0..n {
-                let mut ghosts_map = std::mem::take(&mut self.shards[i].ghost_edges);
-                for ghosts in ghosts_map.values_mut() {
-                    ghosts.retain(|g| {
-                        !self.shards[g.remote_target.shard.0 as usize]
-                            .graph
-                            .text_index
-                            .is_document_deleted(g.remote_target.local)
-                    });
-                }
-                self.shards[i].ghost_edges = ghosts_map;
-            }
-
+            // Update remote-target references in all shards: old gid → new_gid
             for shard in &mut self.shards {
                 for ghosts in shard.ghost_edges.values_mut() {
                     for ghost in ghosts.iter_mut() {
@@ -987,6 +973,9 @@ impl ShardRouter {
                 }
             }
         }
+
+        // Single ghost-edge cleanup pass after all migrations are done (O(S×E) not O(N×S×E))
+        self.cleanup_ghost_edges();
 
         self.telemetry.record_rebalance(nodes_moved);
         log::info!(
@@ -1160,11 +1149,18 @@ impl ShardedGraph {
     /// For a fully robust implementation in a real deployment, pass an
     /// `Arc<Mutex<ShardedGraph>>` to the worker. The current implementation
     /// demonstrates the pattern and is sufficient for the 0.2 spike.
+    /// Start a background maintenance worker.
+    ///
+    /// **Deprecated:** This variant holds a `&mut self` reference, so the background
+    /// thread cannot actually mutate the graph. It only sleeps in a loop and performs
+    /// no real work (vacuum, compaction, ghost-edge cleanup).
+    ///
+    /// Use [`start_background_maintenance_with_shared`] with an `Arc<Mutex<ShardedGraph>>`
+    /// for a worker that actually runs maintenance.
+    #[deprecated(
+        note = "This variant performs no maintenance work. Use start_background_maintenance_with_shared instead."
+    )]
     pub fn start_background_maintenance(&mut self, interval: Duration) -> MaintenanceHandle {
-        // For simple use cases, users are expected to call run_maintenance_cycle()
-        // periodically from their own event loop / timer.
-        // For true fire-and-forget background behavior, use
-        // start_background_maintenance_with_shared with an Arc<Mutex<Self>>.
         MaintenanceHandle::start(interval, &mut self.router)
     }
 
