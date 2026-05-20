@@ -183,9 +183,12 @@ No existing code to "reuse" from the workspace — the entire implementation is 
 - Verification: synthetic multi-shard test (create nodes on different shards, add cross edges, query from one side).
 
 **Phase 5 – Production Hardening**
-- Error handling, docs, README, clippy --all-targets, `cargo test --all-features`.
-- Optional: simple CLI (`grap build`, `grap query`) or HTTP server example.
-- Benchmarks showing O(1) mask benefit.
+- See the dedicated plan in [docs/phase5.md](phase5.md).
+- Error handling (`GraphError`), full documentation, root README, `cargo clippy --all-targets -- -D warnings`, `cargo test --all-features`.
+- Atomic save, `GraphFormatVersion`, repair story.
+- Criterion benchmark suite proving the O(1) mask benefit, sharded overhead, mmap wins, etc.
+- Optional: small CLI or HTTP server example demonstrating production usage.
+- Target: publishable `0.1.0` crate with excellent first-time experience.
 
 **End-to-end user validation after Phase 1+2**:
 ```rust
