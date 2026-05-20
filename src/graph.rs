@@ -79,7 +79,10 @@ impl KnowledgeGraph {
     /// for the rest of the graph's lifetime.
     pub fn add_node(&mut self, text: &str, label: Option<&str>) -> NodeId {
         let blob = self.blobs.store(text);
-        let id = NodeId(self.nodes.len() as u32);
+        let id = NodeId(
+            u32::try_from(self.nodes.len())
+                .expect("node count exceeds u32::MAX — graph too large"),
+        );
         self.nodes.push(Node {
             blob,
             outgoing: Vec::new(),
@@ -146,9 +149,20 @@ impl KnowledgeGraph {
         self.blobs.read(&self.nodes[node.0 as usize].blob)
     }
 
+    /// Bounds-checked variant of [`read_blob`]. Returns `None` if the node id is out of range.
+    pub fn try_read_blob(&self, node: NodeId) -> Option<&str> {
+        let n = self.nodes.get(node.0 as usize)?;
+        Some(self.blobs.read(&n.blob))
+    }
+
     /// Returns the optional human-readable label of a node, if one was provided.
     pub fn node_label(&self, node: NodeId) -> Option<&str> {
         self.nodes[node.0 as usize].label.as_deref()
+    }
+
+    /// Bounds-checked variant of [`node_label`]. Returns `None` if id is out of range.
+    pub fn try_node_label(&self, node: NodeId) -> Option<Option<&str>> {
+        self.nodes.get(node.0 as usize).map(|n| n.label.as_deref())
     }
 
     /// Number of nodes currently in the graph.
@@ -186,7 +200,10 @@ impl KnowledgeGraph {
         }
         props.sort_by_key(|(t, _)| t.0);
 
-        let edge_id = EdgeId(self.edges.len() as u32);
+        let edge_id = EdgeId(
+            u32::try_from(self.edges.len())
+                .expect("edge count exceeds u32::MAX — graph too large"),
+        );
         self.edges.push(Edge {
             source,
             target,
@@ -224,6 +241,31 @@ impl KnowledgeGraph {
 impl Default for KnowledgeGraph {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn try_read_blob_returns_none_for_invalid_id() {
+        let g = KnowledgeGraph::new();
+        assert!(g.try_read_blob(NodeId(99)).is_none());
+    }
+
+    #[test]
+    fn try_node_label_returns_none_for_invalid_id() {
+        let g = KnowledgeGraph::new();
+        assert!(g.try_node_label(NodeId(99)).is_none());
+    }
+
+    #[test]
+    fn try_read_blob_returns_some_for_valid_id() {
+        let mut g = KnowledgeGraph::new();
+        let n = g.add_node("hello world", Some("test"));
+        assert_eq!(g.try_read_blob(n), Some("hello world"));
+        assert_eq!(g.try_node_label(n), Some(Some("test")));
     }
 }
 

@@ -135,4 +135,43 @@ impl PropertyRegistry {
     pub(crate) fn property_names(&self) -> &[String] {
         &self.tag_to_name
     }
+
+    /// Like [`register`] but returns `Err(GraphError::TooManyProperties)` instead of panicking
+    /// when the 64-property limit is reached.
+    pub fn try_register(&mut self, name: &str) -> Result<PropertyTag, crate::GraphError> {
+        if let Some(&tag) = self.name_to_tag.get(name) {
+            return Ok(tag);
+        }
+        if self.tag_to_name.len() >= 64 {
+            return Err(crate::GraphError::TooManyProperties);
+        }
+        let tag = PropertyTag(self.tag_to_name.len() as u16);
+        self.tag_to_name.push(name.to_string());
+        self.name_to_tag.insert(name.to_string(), tag);
+        Ok(tag)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn try_register_returns_error_at_limit() {
+        let mut reg = PropertyRegistry::new();
+        for i in 0..64 {
+            reg.register(&format!("prop_{}", i));
+        }
+        // 65th registration must return Err
+        let result = reg.try_register("one_too_many");
+        assert!(result.is_err(), "should return Err at the 64-property limit");
+    }
+
+    #[test]
+    fn try_register_is_idempotent() {
+        let mut reg = PropertyRegistry::new();
+        let t1 = reg.try_register("topic").unwrap();
+        let t2 = reg.try_register("topic").unwrap();
+        assert_eq!(t1, t2);
+    }
 }
