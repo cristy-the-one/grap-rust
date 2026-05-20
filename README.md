@@ -73,7 +73,7 @@ cargo build --release --bin grap-cli --features "fulltext,sharding"
 pip install -r demo/python/requirements.txt
 
 # Run the full story (ingestion → search → live vacuum → persistence)
-python -m demo.python.interactive_demo --graph-dir demo-graph --reset
+python -m demo.python.interactive_demo --graph-dir demo-graph --reset --merge-policy 3
 ```
 
 See [`DEMO.md`](./DEMO.md) for a complete guide, including visualization and how to run the demo in non-interactive mode.
@@ -85,6 +85,12 @@ python -m demo.python.stats   --graph-dir demo-graph --segments
 python -m demo.python.query   --graph-dir demo-graph "ownership" --traverse
 python -m demo.python.ingest  --input ./my-docs --graph-dir demo-graph
 python -m demo.python.visualize --graph-dir demo-graph --output graph.dot
+```
+
+To experience real background tiered merging during the demo, use `--merge-policy`:
+
+```bash
+python -m demo.python.interactive_demo --graph-dir demo-graph --reset --merge-policy 3
 ```
 
 Smaller pure-Rust examples:
@@ -183,8 +189,9 @@ grap includes a production segmented on-disk inverted index that is always avail
 
 Key capabilities:
 
-- `IndexedKnowledgeGraph::new_on_disk()` for a persistent text backend
+- `IndexedKnowledgeGraph::new_on_disk()` and `new_on_disk_with_merge_policy(segments_per_tier)` for a persistent text backend
 - `OnDiskTextIndex`, `OnDiskIndex`, `OnDiskSegment`, `SegmentInfo`, `MergeWorkerHandle`, and `TieredMergePolicy` are first-class public types
+- `grap-cli start-workers` for long-running background maintenance
 - Real incremental `vacuum()` (not just full compaction) + background merge workers
 - Automatic backend detection on `load_from_dir` / `load_mmap` (manifest.json → on-disk engine)
 - Full integration with `ShardedGraph` (per-shard on-disk indexes + ghost edge persistence)
@@ -192,9 +199,17 @@ Key capabilities:
 
 ```rust
 let mut g = IndexedKnowledgeGraph::new_on_disk();
-// ... build graph ...
-g.start_background_workers(std::time::Duration::from_secs(30));
+// or with automatic background merging enabled:
+let mut g = IndexedKnowledgeGraph::new_on_disk_with_merge_policy(4);
+
+g.start_background_workers(std::time::Duration::from_secs(5));
 g.save_to_dir("my-persistent-graph/")?;
+```
+
+The CLI also ships a long-running worker mode:
+
+```bash
+grap-cli --graph-dir my-index/ start-workers --interval 1500
 ```
 
 See the crate documentation and the design doc for details.
@@ -220,7 +235,7 @@ g.save_to_dir("my-index/")?;
 let g2 = IndexedKnowledgeGraph::load_from_dir("my-index/")?;
 ```
 
-`save_to_dir` / `load_from_dir` automatically persist and restore segmented on-disk text indexes (when using `new_on_disk()` or `OnDiskTextIndex`), including after rebalancing. `ShardedGraph` also persists its ghost edges and ring configuration.
+`save_to_dir` / `load_from_dir` use a robust per-file atomic strategy (staging inside `.grap-new/`, rename with `manifest.json` last as the commit record). This works reliably for both single graphs and `ShardedGraph` (including per-shard on-disk indexes and ghost edges).
 
 ## Architecture at a Glance
 
@@ -249,14 +264,21 @@ The design is described in detail in [`core_graph_design.md`](./core_graph_desig
 ## Status & Roadmap
 
 - **Core engine + full-text + sharding** are stable.
+- **Sharded + on-disk integration** has been significantly hardened:
+  - Globally-unique document IDs in the on-disk index (correct across flushes, merges, and shards)
+  - Proper persistence of sharded on-disk indexes (`node_map.json` + per-shard text indexes)
+  - Atomic saves for `ShardRouter` (manifest + ghost edges)
+  - Correct BM25 search, term frequency, and delete handling across shards
+  - Many safety guards (blob offsets, overflow, corrupt data, etc.)
+
 - **On-disk segmented text index** is fully integrated (no separate feature flag):
   - Segmented immutable on-disk text index with WAL, tiered merging, and incremental vacuum
-  - `IndexedKnowledgeGraph::new_on_disk()` + `save_to_dir` / `load_from_dir` with automatic backend detection
-  - Background maintenance workers (`start_background_workers`)
-  - Rich segment statistics (`SegmentInfo`) and segment-aware rebalancing in `ShardedGraph`
+  - `IndexedKnowledgeGraph::new_on_disk()` and `new_on_disk_with_merge_policy(n)`
+  - `start_background_workers` + `grap-cli start-workers` for long-running merge/vacuum threads
+  - Rich segment statistics (`SegmentInfo`) and segment-aware rebalancing
   - Full support for per-shard on-disk indexes + persisted ghost edges
 
-The combination of full-text + on-disk persistence + sharding supports realistic large-scale deployments.
+The combination of full-text + on-disk persistence + sharding now supports realistic large-scale deployments.
 
 Design details are in [`docs/design-0.2-on-disk-index-and-deletes.md`](./docs/design-0.2-on-disk-index-and-deletes.md).
 

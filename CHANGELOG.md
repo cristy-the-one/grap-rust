@@ -5,6 +5,34 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- `IndexedKnowledgeGraph::new_on_disk_with_merge_policy(segments_per_tier)` — convenient constructor for on-disk graphs with tiered merging enabled from the start.
+- `grap-cli start-workers` subcommand — long-running process that keeps background merge/vacuum workers alive (very useful for demos and light production use).
+- `--merge-policy <n>` flag to the interactive demo. When used, the demo automatically spawns a background worker process so real tiered merging can be observed during the run.
+- `tests/persistence_roundtrip.rs` — regression test that verifies full node text + label round-trips after `save_to_dir`/`load_from_dir` (catches the previous blob offset corruption bug).
+
+### Fixed / Hardened (Sharded + On-Disk)
+- Globally-unique document IDs are now correctly maintained in the on-disk text index across flushes, merges, vacuum, and sharding.
+- Sharded on-disk indexes now persist `node_map.json` so the mapping from global `NodeId` to (shard, local_doc) survives restarts.
+- `ShardRouter::save_to_dir` is now atomic (uses per-file staging + rename with `manifest.json` last as the commit record).
+- BM25 scoring, term frequency aggregation, and phrase search now work correctly when using sharded on-disk indexes.
+- Deleted-node bitmaps are properly persisted and respected during search and vacuum in the on-disk backend.
+- Fixed a critical blob offset serialization bug that caused nodes beyond the first chunk to return the wrong text after a persistence round-trip.
+- Many safety improvements: overflow guards, bounds-checked `try_read_blob`/`try_node_label`, corrupt blob offset detection, proper error propagation instead of unwraps, etc.
+- Large batch of minor correctness and robustness fixes (I1–I13, C1–C6, M1–M10) across the on-disk index, sharding layer, serialization, and query paths.
+- All compiler warnings eliminated and test suite expanded.
+
+### Changed
+- The interactive demo is now idempotent: running it multiple times without `--reset` no longer duplicates documents.
+- Windows persistence is significantly more reliable. Directory-level atomic rename was replaced by a per-file staging strategy (`.grap-new/`) that is far more tolerant of antivirus, file watchers, and concurrent access.
+- `start_background_workers` + merge policy combination is now much easier to exercise and observe via the demo.
+
+### Notes
+- The combination of `fulltext + sharding + on-disk` is now substantially more mature and has survived extensive correctness hardening.
+- Many previously partial or placeholder behaviors in the sharded on-disk path (global IDs, cross-shard search, persistence of mappings, atomic saves) are now properly implemented.
+
 ## [0.2.0] - 2026-05
 
 ### Added
