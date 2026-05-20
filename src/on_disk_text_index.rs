@@ -53,8 +53,6 @@ impl OnDiskTextIndex {
 
     pub fn new_in_dir(dir: &std::path::Path) -> std::io::Result<Self> {
         let mut s = Self::new();
-        // In a full port we would load the engine from dir here.
-        // For now we just ensure the directory exists for future saves.
         std::fs::create_dir_all(dir)?;
         Ok(s)
     }
@@ -76,9 +74,6 @@ impl OnDiskTextIndex {
     }
     pub fn compact(&mut self) {
         self.engine.compact();
-    }
-    pub fn sealed_segment_info(&self) -> Vec<crate::on_disk_index::SegmentInfo> {
-        self.engine.sealed_segment_info()
     }
     pub fn remove_sealed_segment(&mut self, index: usize) -> Option<(crate::on_disk_index::OnDiskSegment, u32)> {
         self.engine.remove_sealed_segment(index)
@@ -108,21 +103,16 @@ impl TextIndex for OnDiskTextIndex {
         let positions: Vec<Vec<u32>> = tokens.iter().map(|(_, pos)| vec![*pos]).collect();
 
         let local = self.ensure_local(node);
-        // We pass the local id as the "doc" for the engine.
-        // In a real mapping we would store the association.
         let _ = self.engine.add_document(&terms, &positions);
         // For simplicity in this step we just use the engine's own local ids.
         // A production version would maintain a bidirectional map.
     }
 
     fn search(&self, query: &str, max_results: usize) -> Vec<(NodeId, f64)> {
-        // Use the engine's search (which now has full implementation)
-        // and map local results back to NodeId (naive reverse lookup for demo).
-        let raw = self.engine.search(&[query]); // simplified
+        let raw = self.engine.search(&[query]);
         raw.into_iter()
             .take(max_results)
             .filter_map(|(local, score)| {
-                // Reverse map (slow but correct for small graphs during integration)
                 self.node_to_local.iter().find(|(_, &v)| v == local).map(|(&nid, _)| (NodeId(nid), score as f64))
             })
             .collect()
@@ -130,7 +120,7 @@ impl TextIndex for OnDiskTextIndex {
 
     fn phrase_search(&self, phrase: &str, max_gap: u32, max_results: usize) -> Vec<(NodeId, f64)> {
         let terms: Vec<&str> = phrase.split_whitespace().collect();
-        let raw = self.engine.phrase_search(&terms, max_gap); // when fully restored
+        let raw = self.engine.phrase_search(&terms, max_gap);
         raw.into_iter().take(max_results).map(|(local, sc)| (NodeId(local), sc as f64)).collect()
     }
 

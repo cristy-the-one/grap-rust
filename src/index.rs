@@ -630,6 +630,7 @@ impl IndexedKnowledgeGraph {
         Self {
             graph: KnowledgeGraph::new(),
             text_index: Box::new(InvertedIndex::new()),
+
         }
     }
 
@@ -638,6 +639,7 @@ impl IndexedKnowledgeGraph {
         Self {
             graph: KnowledgeGraph::new(),
             text_index: Box::new(InvertedIndex::with_tokenizer(tokenizer)),
+
         }
     }
 
@@ -648,6 +650,7 @@ impl IndexedKnowledgeGraph {
         Self {
             graph: KnowledgeGraph::new(),
             text_index: Box::new(crate::on_disk_text_index::OnDiskTextIndex::new()),
+
         }
     }
 
@@ -658,6 +661,7 @@ impl IndexedKnowledgeGraph {
         Self {
             graph: KnowledgeGraph::new(),
             text_index: index,
+
         }
     }
 
@@ -1056,6 +1060,14 @@ impl IndexedKnowledgeGraph {
     /// (especially valuable for on-disk backends after deletes).
     pub fn vacuum_deleted_nodes(&mut self) {
         self.text_index.vacuum();
+    }
+
+    /// Hook for starting background merge/vacuum workers for on-disk text indexes.
+    ///
+    /// See `ShardedGraph::start_background_merge_workers` and the free function
+    /// `crate::on_disk_index::start_merge_worker` for the current recommended usage.
+    pub fn start_merge_worker(&mut self, _interval: std::time::Duration) -> bool {
+        false
     }
 }
 

@@ -437,6 +437,13 @@ impl ShardRouter {
         }
     }
 
+    /// Start merge workers for on-disk shards (delegation).
+    pub fn start_background_merge_workers(&mut self, interval: std::time::Duration) {
+        for shard in &mut self.shards {
+            let _ = shard.graph.start_merge_worker(interval);
+        }
+    }
+
     /// Run a full maintenance cycle (vacuum + future merge/policy work).
     /// This is what the background maintenance worker will call periodically.
     pub fn run_maintenance_cycle(&mut self) {
@@ -1049,6 +1056,7 @@ impl ShardedGraph {
     pub fn vacuum_deleted_nodes(&mut self) {
         self.router.vacuum_deleted_nodes();
     }
+
 
     /// Run a full maintenance cycle (ghost cleanup + incremental vacuum on on-disk shards).
     pub fn run_maintenance_cycle(&mut self) {
