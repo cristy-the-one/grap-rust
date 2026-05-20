@@ -637,7 +637,10 @@ pub fn start_merge_worker(index: Arc<Mutex<OnDiskIndex>>, interval: Duration) ->
                 Err(_) => {}
             }
             // periodic apply
-            if let Ok(mut g) = index.lock() { g.apply_merge_policy(); }
+            if let Ok(mut g) = index.lock() { 
+                // Call the real incremental vacuum (which also runs apply_merge_policy internally)
+                g.vacuum(); 
+            }
         }
     });
     MergeWorkerHandle { tx, join: Some(h), stats }

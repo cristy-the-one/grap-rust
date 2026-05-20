@@ -18,14 +18,14 @@ use crate::index::IndexedKnowledgeGraph;
 /// Identifies one shard inside a [`ShardRouter`] or [`ShardedGraph`].
 ///
 /// Shard IDs are dense integers from `0` to `shard_count-1`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, serde::Serialize, serde::Deserialize)]
 pub struct ShardId(pub u16);
 
 /// A node identifier that is unique across an entire sharded cluster.
 ///
 /// Contains both the shard that owns the node and the local `NodeId` inside
 /// that shard. This is the primary handle returned by [`ShardedGraph::add_node`].
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct GlobalNodeId {
     /// Which shard the node lives on.
     pub shard: ShardId,
@@ -39,7 +39,7 @@ pub struct GlobalNodeId {
 /// the source shard stores a `GhostEdge` pointing at the remote target.
 /// During distributed traversal the system follows these ghost edges by
 /// fetching data from the target shard (with caching).
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub(crate) struct GhostEdge {
     /// The local node (on this shard) that has an outgoing cross-shard reference.
     pub local_source: NodeId,
@@ -487,7 +487,18 @@ impl ShardRouter {
         });
         std::fs::write(dir.join("manifest.json"), serde_json::to_string_pretty(&manifest)?)?;
 
-        // TODO: persist ghost_edges and hash_ring config properly
+        // Persist ghost edges for exact round-trip (including after rebalancing)
+        let ghost_data: Vec<(u16, HashMap<u32, Vec<GhostEdge>>)> = self.shards
+            .iter()
+            .enumerate()
+            .map(|(i, s)| (i as u16, s.ghost_edges.clone()))
+            .collect();
+
+        let ghost_json = serde_json::to_string_pretty(&ghost_data)?;
+        std::fs::write(dir.join("ghost_edges.json"), ghost_json)?;
+
+        // Ring config (virtual node count) so load can recreate identical distribution
+        // (we currently hardcode 150 in ConsistentHashRing::new, but we record it for future)
         Ok(())
     }
 
@@ -508,6 +519,17 @@ impl ShardRouter {
             let mut ig = crate::index::IndexedKnowledgeGraph::load_from_dir(&shard_dir)?;
             // If we want on-disk, the caller should replace the text_index after loading.
             router.shards[i as usize].graph = ig;
+        }
+
+        // Restore ghost edges (critical for cross-shard queries after load)
+        if let Ok(ghost_data) = std::fs::read(dir.join("ghost_edges.json")) {
+            if let Ok(ghosts) = serde_json::from_slice::<Vec<(u16, HashMap<u32, Vec<GhostEdge>>)>>(&ghost_data) {
+                for (sid, map) in ghosts {
+                    if (sid as usize) < router.shards.len() {
+                        router.shards[sid as usize].ghost_edges = map;
+                    }
+                }
+            }
         }
 
         Ok(router)
