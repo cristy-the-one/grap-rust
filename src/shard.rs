@@ -505,6 +505,22 @@ impl ShardRouter {
     ///         graph/...
     ///         text_index/...
     ///       0001/...
+    /// Save the entire sharded graph to a directory.
+    ///
+    /// Layout:
+    ///   <dir>/
+    ///     manifest.json        ← written last (commit record)
+    ///     ghost_edges.json
+    ///     shards/
+    ///       0000/
+    ///         graph/...
+    ///         text_index/...
+    ///       0001/...
+    ///
+    /// The top-level metadata files (`manifest.json` and `ghost_edges.json`) are
+    /// written atomically: each is first staged as a `.new` file, then renamed
+    /// into place. `manifest.json` is renamed last so it acts as the commit
+    /// record — an interrupted save leaves the old manifest intact.
     pub fn save_to_dir(&mut self, dir: &std::path::Path) -> Result<(), crate::GraphError> {
         std::fs::create_dir_all(dir)?;
 
@@ -517,29 +533,30 @@ impl ShardRouter {
             shard.graph.save_to_dir(&shard_dir)?;
         }
 
-        // Save high-level router state
-        let manifest = serde_json::json!({
-            "shard_count": self.shards.len(),
-            "version": 1,
-        });
-        std::fs::write(
-            dir.join("manifest.json"),
-            serde_json::to_string_pretty(&manifest)?,
-        )?;
-
-        // Persist ghost edges for exact round-trip (including after rebalancing)
+        // Stage ghost_edges.json atomically (.new → final)
         let ghost_data: Vec<(u16, HashMap<u32, Vec<GhostEdge>>)> = self
             .shards
             .iter()
             .enumerate()
             .map(|(i, s)| (i as u16, s.ghost_edges.clone()))
             .collect();
-
         let ghost_json = serde_json::to_string_pretty(&ghost_data)?;
-        std::fs::write(dir.join("ghost_edges.json"), ghost_json)?;
+        let ghost_new = dir.join("ghost_edges.json.new");
+        std::fs::write(&ghost_new, ghost_json)?;
 
-        // Ring config (virtual node count) so load can recreate identical distribution
-        // (we currently hardcode 150 in ConsistentHashRing::new, but we record it for future)
+        // Stage manifest.json atomically (.new → final)
+        let manifest = serde_json::json!({
+            "shard_count": self.shards.len(),
+            "version": 1,
+        });
+        let manifest_new = dir.join("manifest.json.new");
+        std::fs::write(&manifest_new, serde_json::to_string_pretty(&manifest)?)?;
+
+        // Rename into place: ghost_edges first, manifest last (commit record).
+        // retry logic handles brief Defender / AV scan windows on Windows.
+        crate::serialize::rename_with_retry(&ghost_new, &dir.join("ghost_edges.json"))?;
+        crate::serialize::rename_with_retry(&manifest_new, &dir.join("manifest.json"))?;
+
         Ok(())
     }
 

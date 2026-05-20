@@ -250,22 +250,32 @@ impl KnowledgeGraph {
     }
 
     fn rename_with_retry(src: &Path, dst: &Path) -> Result<(), GraphError> {
-        let mut last_err: Option<std::io::Error> = None;
-        for attempt in 0..8u64 {
-            match fs::rename(src, dst) {
-                Ok(_) => return Ok(()),
-                Err(e) => {
-                    last_err = Some(e);
-                    if attempt < 7 {
-                        std::thread::sleep(std::time::Duration::from_millis(50 + attempt * 30));
-                    }
+        rename_with_retry(src, dst)
+    }
+}
+
+/// Rename `src` → `dst` with up to 8 retries and exponential back-off.
+/// Made `pub(crate)` so the sharding layer can reuse the same retry logic
+/// for its own atomic metadata writes.
+pub(crate) fn rename_with_retry(src: &Path, dst: &Path) -> Result<(), GraphError> {
+    let mut last_err: Option<std::io::Error> = None;
+    for attempt in 0..8u64 {
+        match fs::rename(src, dst) {
+            Ok(_) => return Ok(()),
+            Err(e) => {
+                last_err = Some(e);
+                if attempt < 7 {
+                    std::thread::sleep(std::time::Duration::from_millis(50 + attempt * 30));
                 }
             }
         }
-        Err(last_err
-            .map(GraphError::from)
-            .unwrap_or_else(|| std::io::Error::new(std::io::ErrorKind::Other, "rename failed after retries").into()))
     }
+    Err(last_err
+        .map(GraphError::from)
+        .unwrap_or_else(|| std::io::Error::new(std::io::ErrorKind::Other, "rename failed after retries").into()))
+}
+
+impl KnowledgeGraph {
 
     /// Internal: writes the graph contents into an existing directory.
     fn write_graph_to_dir(&self, dir: &Path) -> Result<(), GraphError> {
