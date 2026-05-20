@@ -86,12 +86,47 @@ def main(
     console.print(f"\n[green][OK][/green] Successfully ingested {len(node_map)} documents into the graph.")
     console.print(f"Graph location: [cyan]{graph_path}[/cyan]")
 
-    # Placeholder for future relationship inference
-    # (e.g. if one document name appears in another document's content, create an edge)
-    if len(documents) > 1:
-        console.print(
-            "[dim]Tip: Future versions will add automatic relationship inference between documents.[/dim]"
-        )
+    # --- Basic relationship inference ---
+    if len(node_map) > 1:
+        console.print("[yellow]Inferring simple relationships...[/yellow]")
+        edges_added = 0
+
+        # Build a reverse map: stem/title -> node_id
+        title_to_id: Dict[str, int] = {}
+        for path, nid in node_map.items():
+            stem = path.stem.lower()
+            title_to_id[stem] = nid
+            # Also try the label if we had one (we used filename as label in add-file)
+
+        for path, source_id in node_map.items():
+            try:
+                content = path.read_text(encoding="utf-8", errors="ignore").lower()
+            except Exception:
+                continue
+
+            for other_stem, target_id in title_to_id.items():
+                if other_stem == path.stem.lower():
+                    continue
+                if other_stem in content or f"{other_stem}.md" in content:
+                    # Add a weak edge
+                    run_grap_cli(
+                        [
+                            "add-edge",
+                            "--graph-dir", str(graph_path),
+                            "--source", str(source_id),
+                            "--target", str(target_id),
+                            "--strength", "0.4",
+                            "--json",
+                        ],
+                        json_output=True,
+                        check=False,  # don't fail the whole ingest if one edge fails
+                    )
+                    edges_added += 1
+
+        if edges_added:
+            console.print(f"[green]Added {edges_added} inferred relationships.[/green]")
+        else:
+            console.print("[dim]No obvious relationships found between documents.[/dim]")
 
 
 if __name__ == "__main__":

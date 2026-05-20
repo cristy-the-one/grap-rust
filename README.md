@@ -65,20 +65,29 @@ fn main() {
 
 ### Try the Holistic Demo
 
-The best way to experience `grap` is through the Python-driven demo:
+The most impressive way to see what `grap` can do is the Python-driven interactive demo:
 
 ```bash
-# One-time setup
+# Build the CLI + install Python helpers (one time)
 cargo build --release --bin grap-cli --features "fulltext,sharding"
 pip install -r demo/python/requirements.txt
 
-# Run the full interactive story
+# Run the full story (ingestion → search → live vacuum → persistence)
 python -m demo.python.interactive_demo --graph-dir demo-graph --reset
 ```
 
-See [`DEMO.md`](./DEMO.md) for detailed instructions, what the demo showcases, and how to run it in recording mode (`--auto`).
+See [`DEMO.md`](./DEMO.md) for a complete guide, including visualization and how to run the demo in non-interactive mode.
 
-Smaller Rust-only examples are also available:
+You can also explore individual tools:
+
+```bash
+python -m demo.python.stats   --graph-dir demo-graph --segments
+python -m demo.python.query   --graph-dir demo-graph "ownership" --traverse
+python -m demo.python.ingest  --input ./my-docs --graph-dir demo-graph
+python -m demo.python.visualize --graph-dir demo-graph --output graph.dot
+```
+
+Smaller pure-Rust examples:
 
 ```bash
 cargo run --example demo

@@ -887,6 +887,11 @@ impl IndexedKnowledgeGraph {
         self.text_index.stats()
     }
 
+    /// Exposed for CLI export/visualization tooling.
+    pub fn all_edges(&self) -> &Vec<crate::graph::Edge> {
+        self.graph.all_edges()
+    }
+
     /// Saves the underlying graph to disk (the inverted index is not persisted;
     /// it will be rebuilt on load).
     pub fn save_to_disk(&self, dir: &std::path::Path) -> Result<(), GraphError> {

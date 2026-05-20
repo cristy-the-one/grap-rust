@@ -12,7 +12,7 @@
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 
-use grap::{IndexedKnowledgeGraph, SegmentInfo, ShardedGraph};
+use grap::{ids::NodeId, IndexedKnowledgeGraph, SegmentInfo, ShardedGraph};
 
 #[derive(Parser)]
 #[command(
@@ -55,6 +55,12 @@ enum Commands {
 
     /// Run incremental vacuum to reclaim space from deleted documents.
     Vacuum(VacuumArgs),
+
+    /// Export the graph as JSON (nodes + edges) for visualization tools.
+    Export(ExportArgs),
+
+    /// Add an edge between two existing nodes.
+    AddEdge(AddEdgeArgs),
 }
 
 /// Arguments for the `stats` subcommand.
@@ -107,6 +113,25 @@ struct VacuumArgs {
     show_segments: bool,
 }
 
+/// Arguments for `export`.
+#[derive(Parser)]
+struct ExportArgs {
+    /// Output format (currently only 'json' is supported).
+    #[arg(long, default_value = "json")]
+    format: String,
+}
+
+/// Arguments for `add-edge`.
+#[derive(Parser)]
+struct AddEdgeArgs {
+    #[arg(long)]
+    source: u32,
+    #[arg(long)]
+    target: u32,
+    #[arg(long, default_value_t = 0.5)]
+    strength: f64,
+}
+
 fn main() {
     let cli = Cli::parse();
 
@@ -120,6 +145,8 @@ fn main() {
         Commands::AddFile(args) => run_add_file(&graph_dir, cli.json, args),
         Commands::DeleteNode(args) => run_delete_node(&graph_dir, cli.json, args),
         Commands::Vacuum(args) => run_vacuum(&graph_dir, cli.json, args),
+        Commands::Export(args) => run_export(&graph_dir, cli.json, args),
+        Commands::AddEdge(args) => run_add_edge(&graph_dir, cli.json, args),
     }
 }
 
@@ -420,5 +447,84 @@ fn run_vacuum(graph_dir: &PathBuf, json: bool, args: VacuumArgs) {
         if args.show_segments {
             println!("Segments before: {}, after: {}", before.len(), after.len());
         }
+    }
+}
+
+fn run_export(graph_dir: &PathBuf, json: bool, args: ExportArgs) {
+    let ig = match IndexedKnowledgeGraph::load_from_dir(graph_dir) {
+        Ok(g) => g,
+        Err(e) => {
+            eprintln!("Failed to load graph: {}", e);
+            std::process::exit(1);
+        }
+    };
+
+    let node_count = ig.graph.node_count();
+
+    let mut nodes = Vec::new();
+    for i in 0..node_count {
+        let id = NodeId(i as u32);
+        let label = ig.graph.node_label(id).map(|s| s.to_string());
+        let text = ig.graph.read_blob(id);
+        let snippet: String = text.chars().take(120).collect();
+
+        nodes.push(serde_json::json!({
+            "id": i,
+            "label": label,
+            "snippet": snippet,
+        }));
+    }
+
+    let mut edges = Vec::new();
+    for edge in ig.all_edges().iter() {
+        edges.push(serde_json::json!({
+            "source": edge.source.0,
+            "target": edge.target.0,
+            "strength": edge.strength,
+        }));
+    }
+
+    let output = serde_json::json!({
+        "node_count": node_count,
+        "edge_count": ig.graph.edge_count(),
+        "nodes": nodes,
+        "edges": edges,
+    });
+
+    if json || args.format == "json" {
+        println!("{}", serde_json::to_string_pretty(&output).unwrap());
+    } else {
+        println!("Only JSON format is supported at the moment.");
+    }
+}
+
+fn run_add_edge(graph_dir: &PathBuf, json: bool, args: AddEdgeArgs) {
+    let mut ig = match IndexedKnowledgeGraph::load_from_dir(graph_dir) {
+        Ok(g) => g,
+        Err(e) => {
+            eprintln!("Failed to load graph: {}", e);
+            std::process::exit(1);
+        }
+    };
+
+    let source = NodeId(args.source);
+    let target = NodeId(args.target);
+
+    ig.graph.add_edge(source, target, args.strength, vec![]);
+
+    if let Err(e) = ig.save_to_dir(graph_dir) {
+        eprintln!("Failed to save after adding edge: {}", e);
+        std::process::exit(1);
+    }
+
+    if json {
+        println!("{}", serde_json::json!({
+            "status": "ok",
+            "source": args.source,
+            "target": args.target,
+            "strength": args.strength
+        }));
+    } else {
+        println!("Added edge {} -> {} (strength={:.2})", args.source, args.target, args.strength);
     }
 }

@@ -24,10 +24,10 @@ pub(crate) struct Node {
 }
 
 #[derive(Debug)]
-pub(crate) struct Edge {
-    pub(crate) source: NodeId,
-    pub(crate) target: NodeId,
-    pub(crate) strength: f64,
+pub struct Edge {
+    pub source: NodeId,
+    pub target: NodeId,
+    pub strength: f64,
     pub(crate) properties: Vec<(PropertyTag, PropertyValue)>,
     pub(crate) property_mask: u64,
 }
@@ -154,6 +154,11 @@ impl KnowledgeGraph {
     /// Number of nodes currently in the graph.
     pub fn node_count(&self) -> usize {
         self.nodes.len()
+    }
+
+    /// Returns a reference to all edges. Exposed for CLI export / visualization tools.
+    pub fn all_edges(&self) -> &Vec<Edge> {
+        &self.edges
     }
 
     /// Number of edges currently in the graph.
