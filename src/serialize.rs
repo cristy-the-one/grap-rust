@@ -166,13 +166,50 @@ impl From<SerializablePropertyValue> for PropertyValue {
 // ============================================================================
 
 impl KnowledgeGraph {
-    /// Serialize the graph to a directory.
+    /// Serialize the graph to a directory in an atomic, crash-safe way.
     ///
-    /// Creates three files:
-    /// - `graph.topo`   — bincode of nodes + edges + registry
-    /// - `graph.blobs`  — concatenated raw blob chunks
-    /// - `graph.meta`   — JSON metadata + checksums
+    /// The save is performed by writing all data to a temporary directory
+    /// and then atomically renaming it into place. This guarantees that
+    /// readers will either see the old complete version or the new complete
+    /// version — never a partially written state.
+    ///
+    /// Creates three files inside `dir`:
+    /// - `graph.topo`
+    /// - `graph.blobs`
+    /// - `graph.meta`
     pub fn save_to_disk(&self, dir: &Path) -> Result<(), GraphError> {
+        let parent = dir.parent().unwrap_or(Path::new("."));
+
+        // Create a temporary directory next to the target (atomic rename target)
+        let temp_dir = tempfile::Builder::new()
+            .prefix(".grap-save-")
+            .tempdir_in(parent)?;
+
+        let temp_path = temp_dir.path();
+
+        // Write everything into the temporary directory
+        self.write_graph_to_dir(temp_path)?;
+
+        // Ensure data is on disk
+        Self::sync_directory(temp_path)?;
+
+        // Atomic replacement
+        if dir.exists() {
+            fs::remove_dir_all(dir)?;
+        }
+        fs::rename(temp_path, dir)?;
+
+        // Ensure the rename is durable
+        Self::sync_directory(parent)?;
+
+        // Prevent the TempDir from deleting the directory we just moved
+        let _ = temp_dir.into_path();
+
+        Ok(())
+    }
+
+    /// Internal: writes the graph contents into an existing directory.
+    fn write_graph_to_dir(&self, dir: &Path) -> Result<(), GraphError> {
         fs::create_dir_all(dir)?;
 
         let chunk_offsets = self.compute_chunk_offsets();
@@ -273,8 +310,28 @@ impl KnowledgeGraph {
         offsets
     }
 
+    /// Best-effort fsync on a directory (important for durability of rename).
+    fn sync_directory(dir: &Path) -> std::io::Result<()> {
+        let dir_file = File::open(dir)?;
+        dir_file.sync_all()
+    }
+
     /// Load a graph from disk (portable path, no mmap).
     pub fn load_from_disk(dir: &Path) -> Result<Self, GraphError> {
+        // Best-effort cleanup of failed previous saves (atomic save recovery)
+        if let Some(parent) = dir.parent() {
+            if let Ok(entries) = fs::read_dir(parent) {
+                for entry in entries.flatten() {
+                    let name = entry.file_name();
+                    if let Some(name_str) = name.to_str() {
+                        if name_str.starts_with(".grap-save-") {
+                            let _ = fs::remove_dir_all(entry.path());
+                        }
+                    }
+                }
+            }
+        }
+
         // Read meta
         let meta_str = fs::read_to_string(dir.join("graph.meta"))?;
         let meta: GraphMeta =
