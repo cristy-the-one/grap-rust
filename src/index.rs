@@ -743,12 +743,36 @@ impl IndexedKnowledgeGraph {
         self.text_index.stats()
     }
 
-    /// Perform a plain text search (no graph traversal) and return the scored nodes.
+    /// Saves the underlying graph to disk (the inverted index is not persisted;
+    /// it will be rebuilt on load).
+    pub fn save_to_disk(&self, dir: &std::path::Path) -> std::io::Result<()> {
+        self.graph.save_to_disk(dir)
+    }
+
+    /// Loads a graph from disk and rebuilds the full-text inverted index.
+    pub fn load_from_disk(dir: &std::path::Path) -> std::io::Result<Self> {
+        let graph = KnowledgeGraph::load_from_disk(dir)?;
+        let mut ig = Self {
+            graph,
+            text_index: InvertedIndex::new(),
+        };
+
+        // Rebuild the index (simple and correct)
+        for i in 0..ig.graph.node_count() {
+            let id = NodeId(i as u32);
+            let text = ig.graph.read_blob(id);
+            ig.text_index.index_document(id, text);
+        }
+
+        Ok(ig)
+    }
+
+    /// Plain text search (delegates to the inverted index).
     pub fn search(&self, query: &str, max_results: usize) -> Vec<TextSearchResult> {
         self.text_index.search(query, max_results)
     }
 
-    /// Perform a phrase search (no graph traversal).
+    /// Phrase search (delegates to the inverted index).
     pub fn phrase_search(&self, phrase: &str, max_gap: u32, max_results: usize) -> Vec<TextSearchResult> {
         self.text_index.phrase_search(phrase, max_gap, max_results)
     }

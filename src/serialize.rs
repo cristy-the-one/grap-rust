@@ -358,24 +358,80 @@ pub fn load_with_mmap(dir: &Path) -> io::Result<KnowledgeGraph> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::{IndexedKnowledgeGraph, KnowledgeGraph};
     use tempfile::tempdir;
 
     #[test]
     fn basic_save_load_roundtrip() {
         let mut g = KnowledgeGraph::new();
-        let p = g.properties.register("topic");
+        let topic = g.properties.register("topic");
+        let rel = g.properties.register("relation");
 
         let n1 = g.add_node("Hello world from grap serialization test.", Some("first"));
-        g.add_node("Second document about graphs and persistence.", Some("second"));
+        let n2 = g.add_node("Second document about graphs and persistence.", Some("second"));
+        let n3 = g.add_node("Third document on knowledge graphs.", Some("third"));
 
-        // We don't have edges in this minimal test yet
+        // Add edges with properties
+        g.add_edge(
+            n1,
+            n2,
+            0.92,
+            vec![
+                (topic, PropertyValue::Label("serialization".to_string())),
+                (rel, PropertyValue::Label("related".to_string())),
+            ],
+        );
+        g.add_edge(
+            n2,
+            n3,
+            0.87,
+            vec![(topic, PropertyValue::Label("serialization".to_string()))],
+        );
 
         let dir = tempdir().unwrap();
         g.save_to_disk(dir.path()).expect("save should succeed");
 
         let loaded = KnowledgeGraph::load_from_disk(dir.path()).expect("load should succeed");
 
-        assert_eq!(loaded.node_count(), 2);
+        assert_eq!(loaded.node_count(), 3);
+        assert_eq!(loaded.edge_count(), 2);
         assert!(loaded.read_blob(n1).contains("grap serialization"));
+
+        // Verify edges survived
+        assert!(loaded.edge_count() > 0);
+
+        // Sanity: we can still read properties
+        let first_edge = EdgeId(0);
+        let val = loaded.edge_property(first_edge, topic);
+        assert!(val.is_some());
+    }
+
+    #[test]
+    fn indexed_graph_save_load_roundtrip() {
+        let mut ig = IndexedKnowledgeGraph::new();
+        let topic = ig.graph.properties.register("topic");
+
+        let n1 = ig.add_node("Rust ownership prevents data races at compile time.", Some("rust"));
+        let n2 = ig.add_node("Borrowing allows safe references without ownership transfer.", Some("borrow"));
+
+        ig.add_edge(
+            n1,
+            n2,
+            0.91,
+            vec![(topic, PropertyValue::Label("memory".to_string()))],
+        );
+
+        let dir = tempdir().unwrap();
+        ig.save_to_disk(dir.path()).expect("save should succeed");
+
+        let loaded = IndexedKnowledgeGraph::load_from_disk(dir.path())
+            .expect("load should succeed");
+
+        assert_eq!(loaded.graph.node_count(), 2);
+        assert_eq!(loaded.graph.edge_count(), 1);
+
+        // The index should have been rebuilt
+        let results = loaded.search("ownership borrowing", 5);
+        assert!(!results.is_empty());
     }
 }
