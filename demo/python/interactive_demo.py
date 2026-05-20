@@ -17,6 +17,7 @@ It is designed to be impressive in a live demo or workshop setting.
 
 from __future__ import annotations
 
+import os
 import shutil
 import time
 from pathlib import Path
@@ -45,6 +46,9 @@ def main(
     graph_dir: str = typer.Option("demo-graph", "--graph-dir", "-g", help="Where to store the demo graph"),
     auto: bool = typer.Option(False, "--auto", help="Run without pauses (for recording)"),
     reset: bool = typer.Option(False, "--reset", help="Delete the graph directory first and start fresh"),
+    merge_policy: int | None = typer.Option(
+        None, "--merge-policy", "-m", help="Enable tiered merge policy with this segments_per_tier value (e.g. 3 or 4)"
+    ),
 ):
     """Run the complete interactive grap demonstration."""
     graph_path = Path(graph_dir).expanduser().resolve()
@@ -54,6 +58,10 @@ def main(
         shutil.rmtree(graph_path)
 
     graph_path = ensure_graph_dir(graph_path)
+
+    if merge_policy is not None and merge_policy > 0:
+        os.environ["GRAP_MERGE_POLICY"] = str(merge_policy)
+        console.print(f"[cyan]Merge policy enabled[/cyan] (segments_per_tier={merge_policy}) — background merging will occur.")
 
     console.print(Panel.fit(
         "[bold cyan]grap Holistic Demo[/bold cyan]\n\n"

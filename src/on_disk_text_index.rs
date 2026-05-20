@@ -46,6 +46,20 @@ impl OnDiskTextIndex {
         }
     }
 
+    /// Create an on-disk text index with a tiered merge policy enabled.
+    /// `segments_per_tier` controls how aggressive the background merging is
+    /// (typical good values: 3, 4, or 5).
+    pub fn new_with_merge_policy(segments_per_tier: usize) -> Self {
+        let policy = crate::on_disk_index::TieredMergePolicy { segments_per_tier };
+        let engine = crate::on_disk_index::OnDiskIndex::with_merge_policy(policy);
+        Self {
+            engine: std::sync::Arc::new(std::sync::Mutex::new(engine)),
+            tokenizer: Box::new(DefaultTokenizer::new()),
+            node_to_local: std::collections::HashMap::new(),
+            next_local_id: 0,
+        }
+    }
+
     pub fn new_in_dir(dir: &std::path::Path) -> std::io::Result<Self> {
         let mut s = Self::new();
         std::fs::create_dir_all(dir)?;

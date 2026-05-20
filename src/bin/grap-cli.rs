@@ -329,6 +329,19 @@ fn run_query(graph_dir: &PathBuf, json: bool, args: QueryArgs) {
 // Mutation commands (for live demo scenarios)
 // ---------------------------------------------------------------------------
 
+/// Creates a fresh on-disk graph, optionally with a tiered merge policy
+/// if the `GRAP_MERGE_POLICY=<n>` environment variable is set (e.g. 3 or 4).
+fn create_on_disk_graph() -> IndexedKnowledgeGraph {
+    if let Ok(val) = std::env::var("GRAP_MERGE_POLICY") {
+        if let Ok(n) = val.parse::<usize>() {
+            if n > 0 {
+                return IndexedKnowledgeGraph::new_on_disk_with_merge_policy(n);
+            }
+        }
+    }
+    IndexedKnowledgeGraph::new_on_disk()
+}
+
 fn run_add_file(graph_dir: &PathBuf, json: bool, args: AddFileArgs) {
     // Ensure the target directory exists (harmless if it already does).
     if let Err(e) = std::fs::create_dir_all(graph_dir) {
@@ -339,8 +352,9 @@ fn run_add_file(graph_dir: &PathBuf, json: bool, args: AddFileArgs) {
     let mut ig = match IndexedKnowledgeGraph::load_from_dir(graph_dir) {
         Ok(g) => g,
         Err(_) => {
-            // Directory is new or empty — create a fresh on-disk graph
-            IndexedKnowledgeGraph::new_on_disk()
+            // Directory is new or empty — create a fresh on-disk graph.
+            // Respect GRAP_MERGE_POLICY=<n> to enable tiered background merging (demo / advanced use).
+            create_on_disk_graph()
         }
     };
 

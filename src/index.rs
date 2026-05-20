@@ -668,6 +668,21 @@ impl IndexedKnowledgeGraph {
         }
     }
 
+    /// Create an `IndexedKnowledgeGraph` using the on-disk segmented index
+    /// **with a tiered merge policy** enabled for automatic background merging.
+    ///
+    /// `segments_per_tier` controls the merge aggressiveness (recommended: 3–5).
+    /// After construction, call `start_background_workers` to actually run the merger.
+    pub fn new_on_disk_with_merge_policy(segments_per_tier: usize) -> Self {
+        Self {
+            graph: KnowledgeGraph::new(),
+            text_index: Box::new(
+                crate::on_disk_text_index::OnDiskTextIndex::new_with_merge_policy(segments_per_tier),
+            ),
+            merge_workers: Vec::new(),
+        }
+    }
+
     /// Builder-style constructor that lets you choose the text backend.
     /// You can pass an `OnDiskTextIndex` (for persistence) or a plain
     /// `InvertedIndex` (lightweight, in-memory only).
