@@ -290,7 +290,7 @@ pub struct TieredMergePolicy { pub segments_per_tier: usize }
 impl Default for TieredMergePolicy { fn default() -> Self { Self { segments_per_tier: 4 } } }
 
 #[derive(Debug)]
-struct SealedSegment { segment: OnDiskSegment, tier: u32 }
+pub(crate) struct SealedSegment { segment: OnDiskSegment, tier: u32 }
 
 #[derive(Debug)]
 pub struct OnDiskIndex {
@@ -345,6 +345,75 @@ impl OnDiskIndex {
             removed.segment.doc_lengths.iter().map(|&l| l as u64).sum::<u64>(),
         );
         Some((removed.segment, removed.tier))
+    }
+
+    /// Persist the entire index (active buffer is flushed first) into a directory.
+    /// Layout:
+    ///   manifest.json
+    ///   seg-0000.bin
+    ///   seg-0001.bin
+    ///   ...
+    ///   active.wal   (if a WAL was configured)
+    pub fn save_to_dir(&mut self, dir: &Path) -> std::io::Result<()> {
+        std::fs::create_dir_all(dir)?;
+
+        // Make sure everything is in sealed segments for a clean snapshot.
+        self.flush();
+
+        let mut entries = Vec::new();
+        for (i, sealed) in self.sealed.iter().enumerate() {
+            let filename = format!("seg-{:04}.bin", i);
+            let path = dir.join(&filename);
+            sealed.segment.write_to_disk(&path)?;
+
+            entries.push(SegmentEntry {
+                filename,
+                tier: sealed.tier,
+                doc_count: sealed.segment.doc_count,
+            });
+        }
+
+        let manifest = IndexManifest {
+            version: 1,
+            segments: entries,
+            total_docs: self.total_docs,
+            total_tokens: self.total_tokens,
+        };
+
+        let manifest_json = serde_json::to_string_pretty(&manifest)?;
+        std::fs::write(dir.join("manifest.json"), manifest_json)?;
+
+        Ok(())
+    }
+
+    /// Load a previously saved `OnDiskIndex` from a directory created by `save_to_dir`.
+    pub fn load_from_dir(dir: &Path) -> std::io::Result<Self> {
+        let manifest_path = dir.join("manifest.json");
+        let manifest_data = std::fs::read(manifest_path)?;
+        let manifest: IndexManifest = serde_json::from_slice(&manifest_data)?;
+
+        let mut idx = Self::new();
+        idx.total_docs = manifest.total_docs;
+        idx.total_tokens = manifest.total_tokens;
+
+        for entry in manifest.segments {
+            let seg_path = dir.join(&entry.filename);
+            let segment = OnDiskSegment::load_from_disk(&seg_path)?;
+            idx.sealed.push(SealedSegment {
+                segment,
+                tier: entry.tier,
+            });
+        }
+
+        // If an active.wal exists next to the manifest, replay it.
+        let wal_path = dir.join("active.wal");
+        if wal_path.exists() {
+            let wal = SimpleWal::open_for_replay(&wal_path)?;
+            // We replay into a fresh active buffer
+            let _ = wal.replay_into(&mut idx.active);
+        }
+
+        Ok(idx)
     }
 
     pub fn sealed_segment_count(&self) -> usize { self.sealed.len() }

@@ -510,7 +510,7 @@ impl ShardRouter {
             router.shards[i as usize].graph = ig;
         }
 
-        Ok(ShardedGraph { router })
+        Ok(router)
     }
 
     /// Memory-map version of `load_from_dir`.
