@@ -68,20 +68,22 @@ Run the built-in demo:
 ```bash
 cargo run --example demo
 cargo run --example hybrid_search
+cargo run --example on_disk_persistence --features "fulltext,on-disk-index,sharding"
 ```
 
 ## Feature Flags
 
-| Feature   | Description                                      | Brings in          |
-|-----------|--------------------------------------------------|--------------------|
-| `fulltext` | BM25 inverted index + phrase search + hybrid fusion | — |
-| `mmap`    | Real memory-mapped blob store (zero-copy reads) | `memmap2`, `crc32fast` |
-| `sharding`| `ShardedGraph` + consistent hashing + ghost edges + rebalancing | — |
+| Feature        | Description                                                                 | Brings in                  |
+|----------------|-----------------------------------------------------------------------------|----------------------------|
+| `fulltext`     | BM25 inverted index + phrase search + hybrid fusion                         | —                          |
+| `on-disk-index`| Segmented on-disk text index with WAL, tiered merge, incremental vacuum   | —                          |
+| `mmap`         | Real memory-mapped blob store (zero-copy reads)                             | `memmap2`, `crc32fast`     |
+| `sharding`     | `ShardedGraph` + consistent hashing + ghost edges + rebalancing             | —                          |
 
 All features are additive. Core graph + property bitmasks + traversal work with no features.
 
 ```toml
-grap = { version = "0.1", features = ["fulltext", "mmap", "sharding"] }
+grap = { version = "0.1", features = ["fulltext", "on-disk-index", "sharding"] }
 ```
 
 ## The Three Main APIs
@@ -102,6 +104,17 @@ Wraps `KnowledgeGraph` with an incremental BM25 index.
 - `search("phrase")` → ranked text results
 - `phrase_search("exact phrase", max_gap, k)`
 - `search_and_traverse(...)` with `FusionWeights` blending text score and graph strength
+
+When the `on-disk-index` feature is enabled you can also use a persistent backend:
+
+```rust
+let mut g = IndexedKnowledgeGraph::new_on_disk();
+// ... add nodes ...
+g.save_to_dir("my-index/")?;
+let g2 = IndexedKnowledgeGraph::load_from_dir("my-index/")?;
+```
+
+The on-disk backend supports incremental vacuum, background merge workers, and per-segment statistics.
 
 ### 3. `ShardedGraph` (requires `sharding`)
 
@@ -132,18 +145,35 @@ let plan = g.plan_rebalance(8);   // "what if we went to 8 shards?"
 g.execute_rebalance(plan);        // actual migration + ghost edge repair
 ```
 
-## Persistence
+`ShardedGraph` supports full persistence (including on-disk text indexes per shard and persisted ghost edges):
 
 ```rust
-// Portable (everything in RAM after load)
+g.save_to_dir("my-cluster/")?;
+let g2 = ShardedGraph::load_from_dir("my-cluster/")?;
+```
+
+## Persistence
+
+grap offers two persistence styles:
+
+**Classic (KnowledgeGraph level)**
+
+```rust
 g.save_to_disk("my-graph/")?;
 
-// Fast path with memory mapping (requires `mmap` feature)
 #[cfg(feature = "mmap")]
 let g = IndexedKnowledgeGraph::load_mmap("my-graph/")?;
 ```
 
-Blobs remain zero-copy after an mmap load. Topology + masks are always hot in RAM.
+**Modern directory-based (recommended for on-disk + sharded use)**
+
+```rust
+// Works for both IndexedKnowledgeGraph and ShardedGraph
+g.save_to_dir("my-index/")?;
+let g2 = IndexedKnowledgeGraph::load_from_dir("my-index/")?;
+```
+
+When using the `on-disk-index` feature, `save_to_dir` / `load_from_dir` will correctly persist and restore the segmented on-disk text indexes, including after rebalancing. Ghost edges are also persisted for `ShardedGraph`.
 
 ## Architecture at a Glance
 
@@ -171,11 +201,17 @@ The design is described in detail in [`core_graph_design.md`](./core_graph_desig
 
 ## Status & Roadmap
 
-- **Phase 1–4 complete**: Core graph + bitmasks, full-text index, persistence + real mmap, sharding with ghost edges + rebalancing.
-- **Phase 5 (current)**: Production hardening — error handling, documentation, benchmarks, atomic saves, `GraphFormatVersion`, rich telemetry, root README, clippy clean.
-- Target: `0.1.0` crates.io release with a stable, well-documented API.
+- **Core engine + full-text + sharding** (0.1 features) are stable.
+- **0.2 on-disk work** (behind the `on-disk-index` feature):
+  - Segmented immutable on-disk text index with WAL and tiered merging
+  - Incremental vacuum / compaction
+  - First-class `save_to_dir` / `load_from_dir` for both single-graph and sharded use (including ghost edge persistence)
+  - Background maintenance workers
+  - Segment-aware rebalancing with real `SegmentMigration` execution
 
-See [`docs/phase5.md`](./docs/phase5.md) for the detailed checklist.
+The `on-disk-index` + `sharding` combination now supports realistic large-scale persistent deployments.
+
+See [`docs/roadmap-0.2.md`](./docs/roadmap-0.2.md) and [`docs/design-0.2-on-disk-index-and-deletes.md`](./docs/design-0.2-on-disk-index-and-deletes.md) for design details.
 
 ## Performance Claims (to be validated in Phase 5)
 
