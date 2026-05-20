@@ -1,0 +1,31 @@
+name: Scheduled Benchmarks
+
+on:
+  schedule:
+    # Run every Sunday at 08:00 UTC
+    - cron: '0 8 * * 0'
+  workflow_dispatch: # Allow manual trigger
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  benchmark:
+    name: Run Benchmarks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Run Criterion benchmarks
+        run: |
+          cargo bench --features "fulltext,sharding" -- --save-baseline weekly
+
+      - name: Upload benchmark results
+        uses: actions/upload-artifact@v4
+        with:
+          name: criterion-results
+          path: target/criterion/
+
+      # Optional: In the future we could post results to a GitHub issue or a tracking branch
+      # For now we just keep historical artifacts

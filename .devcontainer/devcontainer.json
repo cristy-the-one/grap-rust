@@ -1,0 +1,49 @@
+{
+  "name": "grap Development Environment",
+  "image": "mcr.microsoft.com/devcontainers/rust:1",
+
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "rust-lang.rust-analyzer",
+        "tamasfe.even-better-toml",
+        "serayuzgur.crates",
+        "vadimcn.vscode-lldb"
+      ],
+      "settings": {
+        "rust-analyzer.checkOnSave.command": "clippy",
+        "rust-analyzer.checkOnSave.allTargets": true,
+        "rust-analyzer.checkOnSave.extraArgs": ["--all-features"],
+        "rust-analyzer.cargo.features": "all"
+      }
+    }
+  },
+
+  "postCreateCommand": "cargo check --all-features",
+
+  "features": {
+    "ghcr.io/devcontainers/features/rust:1": {
+      "version": "stable",
+      "profile": "minimal"
+    }
+  },
+
+  "remoteUser": "vscode",
+
+  "mounts": [
+    "source=${localEnv:HOME}${localEnv:USERPROFILE}/.cargo/registry,target=/usr/local/cargo/registry,type=bind,consistency=cached"
+  ]
+}
+```
+
+This is minimal but practical.
+
+I should also consider adding a `Dockerfile` for more control, but since the user asked for "minimal", the image-based approach is perfect.
+
+Optionally, create a simple README note or update CONTRIBUTING.md, but the main request is the files.
+
+Finally, I should verify the files are correct and perhaps commit them (following the user's earlier emphasis on git).
+
+But since the instruction is to complete the request, creating the files is the core.
+
+Let me also improve the `rust-toolchain.toml` slightly for better dev experience.

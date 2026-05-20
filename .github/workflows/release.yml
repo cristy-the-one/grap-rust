@@ -1,0 +1,36 @@
+name: Release
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to publish (e.g. 0.1.0)'
+        required: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  release:
+    name: Publish to crates.io
+    runs-on: ubuntu-latest
+    # Require manual approval for releases (recommended for safety)
+    environment: crates-io
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Verify tests pass
+        run: cargo test --all-features
+
+      - name: Verify clippy
+        run: cargo clippy --all-targets --all-features -- -D warnings
+
+      - name: Publish to crates.io
+        run: cargo publish --token ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        # Only publish on actual release events or when manually confirmed
+        if: github.event_name == 'release' || github.event.inputs.version != ''

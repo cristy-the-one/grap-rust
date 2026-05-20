@@ -1,0 +1,7 @@
+# Development toolchain for grap.
+# The project's MSRV is declared in Cargo.toml (currently 1.81).
+# For local development we use the latest stable + required components.
+[toolchain]
+channel = "stable"
+components = ["rustfmt", "clippy"]
+profile = "minimal"
