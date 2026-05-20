@@ -116,3 +116,53 @@ impl From<bincode::Error> for GraphError {
         GraphError::Io(format!("bincode error: {}", e))
     }
 }
+
+/// A trait for receiving internal observability events from the graph engine.
+///
+/// This allows users to integrate `grap` with their own metrics backend
+/// (Prometheus, OpenTelemetry, StatsD, custom dashboards, etc.) without
+/// the library pulling in any particular observability crate.
+///
+/// All methods have default no-op implementations, so you only override
+/// the events you care about.
+///
+/// # Example
+///
+/// ```rust
+/// use std::sync::atomic::{AtomicU64, Ordering};
+/// use grap::Telemetry;
+///
+/// #[derive(Default)]
+/// struct MyMetrics {
+///     nodes_visited: AtomicU64,
+/// }
+///
+/// impl Telemetry for MyMetrics {
+///     fn record_traversal_nodes_visited(&self, n: u64) {
+///         self.nodes_visited.fetch_add(n, Ordering::Relaxed);
+///     }
+/// }
+/// ```
+pub trait Telemetry: Send + Sync + 'static {
+    /// Called for every node visited during a `search_and_traverse` call.
+    fn record_traversal_nodes_visited(&self, count: u64) {}
+
+    /// Called when the 64-bit property mask causes early pruning of edges.
+    fn record_mask_prune(&self, _pruned: u64) {}
+
+    /// Called when the router attempts to fetch a node from a remote shard
+    /// (via a ghost edge). `hit` is true if the value was served from the
+    /// per-shard remote cache.
+    fn record_remote_fetch(&self, _hit: bool) {}
+
+    /// Called after `execute_rebalance` finishes.
+    fn record_rebalance(&self, _nodes_moved: u64) {}
+}
+
+/// A no-op implementation of [`Telemetry`].
+///
+/// This is used by default when no custom telemetry is provided.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct NoopTelemetry;
+
+impl Telemetry for NoopTelemetry {}

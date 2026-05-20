@@ -91,6 +91,12 @@ pub struct ShardedGraphStats {
     pub nodes_per_shard: Vec<usize>,
     /// Per-shard ghost edge counts.
     pub ghost_edges_per_shard: Vec<usize>,
+
+    /// Total number of cached remote nodes across all shards.
+    /// Useful for understanding memory overhead of cross-shard caching.
+    pub remote_cache_entries: usize,
+    /// Remote cache size per shard.
+    pub remote_cache_per_shard: Vec<usize>,
 }
 
 /// Result row returned from a distributed `search_and_traverse` (or phrase variant)
@@ -146,6 +152,12 @@ pub(crate) struct Shard {
     pub ghost_edges: HashMap<u32, Vec<GhostEdge>>,
     /// Cache of remote node data fetched during distributed traversals.
     remote_cache: HashMap<GlobalNodeId, CachedRemoteNode>,
+}
+
+impl Shard {
+    pub(crate) fn remote_cache_size(&self) -> usize {
+        self.remote_cache.len()
+    }
 }
 
 impl Shard {
@@ -271,6 +283,8 @@ pub struct ShardRouter {
     /// Direct access to the individual shards (advanced use only).
     pub(crate) shards: Vec<Shard>,
     hash_ring: ConsistentHashRing,
+    /// User-provided telemetry hook (defaults to no-op).
+    telemetry: std::sync::Arc<dyn crate::Telemetry>,
 }
 
 impl ShardRouter {
@@ -285,7 +299,15 @@ impl ShardRouter {
         Self {
             shards,
             hash_ring: ConsistentHashRing::new(shard_count, 150),
+            telemetry: std::sync::Arc::new(crate::NoopTelemetry),
         }
+    }
+
+    /// Replace the telemetry hook used by this router.
+    ///
+    /// Useful for plugging in custom metrics after construction.
+    pub fn set_telemetry(&mut self, telemetry: impl crate::Telemetry + 'static) {
+        self.telemetry = std::sync::Arc::new(telemetry);
     }
 
     /// Decide which shard owns a new node based on its content (consistent hashing).
@@ -455,6 +477,9 @@ impl ShardRouter {
         let mut results: Vec<ShardedQueryResult> = Vec::new();
 
         while let Some(e) = pq.pop() {
+            self.telemetry.record_traversal_nodes_visited(1);
+            log::trace!("traversal: visiting {:?}", e.gnode);
+
             let shard = &self.shards[e.gnode.shard.0 as usize];
             let node = e.gnode.local;
 
@@ -486,6 +511,7 @@ impl ShardRouter {
             if let Some(ghosts) = shard.ghost_edges.get(&node.0) {
                 for ghost in ghosts {
                     if ghost.strength < min_strength {
+                        self.telemetry.record_mask_prune(1);
                         continue;
                     }
 
@@ -496,6 +522,12 @@ impl ShardRouter {
                         continue;
                     }
                     visited.insert(remote_key);
+
+                    // Check remote cache for hit/miss
+                    let target_shard = &self.shards[remote.shard.0 as usize];
+                    let hit = target_shard.remote_cache.contains_key(&remote);
+                    self.telemetry.record_remote_fetch(hit);
+                    log::trace!("traversal: following ghost edge to {:?}", remote);
 
                     // Fetch remote data (cache update is best-effort in current borrow model)
                     let remote_shard = &self.shards[remote.shard.0 as usize];
@@ -570,6 +602,8 @@ impl ShardRouter {
 
     /// Apply a rebalance plan, moving nodes between shards and repairing ghost edges.
     pub fn execute_rebalance(&mut self, plan: RebalancePlan) -> Result<(), crate::GraphError> {
+        let nodes_moved = plan.node_migrations.len() as u64;
+
         for (gid, target_shard_id) in plan.node_migrations {
             let old_idx = gid.shard.0 as usize;
             if old_idx >= self.shards.len() {
@@ -617,6 +651,14 @@ impl ShardRouter {
                 }
             }
         }
+
+        self.telemetry.record_rebalance(nodes_moved);
+        log::info!(
+            "rebalance completed: moved {} nodes from {} to {} shards",
+            nodes_moved,
+            plan.old_shard_count,
+            plan.new_shard_count
+        );
         Ok(())
     }
 }
@@ -630,10 +672,16 @@ pub struct ShardedGraph {
 }
 
 impl ShardedGraph {
+    /// Create a new sharded graph with the given number of shards.
     pub fn new(shard_count: u16) -> Self {
         Self {
             router: ShardRouter::new(shard_count),
         }
+    }
+
+    /// Replace the telemetry implementation used for observability.
+    pub fn set_telemetry(&mut self, telemetry: impl crate::Telemetry + 'static) {
+        self.router.set_telemetry(telemetry);
     }
 
     pub fn add_node(
@@ -827,12 +875,23 @@ impl ShardedGraph {
     /// This is the recommended way to get an overview for monitoring,
     /// dashboards, or logging.
     pub fn stats(&self) -> ShardedGraphStats {
+        let remote_cache_per_shard: Vec<usize> = self
+            .router
+            .shards
+            .iter()
+            .map(|s| s.remote_cache_size())
+            .collect();
+
+        let remote_cache_entries: usize = remote_cache_per_shard.iter().sum();
+
         ShardedGraphStats {
             shard_count: self.shard_count(),
             total_nodes: self.global_node_count(),
             total_ghost_edges: self.ghost_edge_count(),
             nodes_per_shard: self.nodes_per_shard(),
             ghost_edges_per_shard: self.ghost_edges_per_shard(),
+            remote_cache_entries,
+            remote_cache_per_shard,
         }
     }
 }
