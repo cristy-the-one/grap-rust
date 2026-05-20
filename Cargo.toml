@@ -2,6 +2,7 @@
 name = "grap"
 version = "0.1.0"
 edition = "2021"
+rust-version = "1.80"
 authors = ["Grok + User"]
 description = "Rust-native knowledge graph engine for interconnected text documents with property-weighted, bitmask-filtered edges. Hot topology + cold blob store + BM25 seed index."
 license = "MIT OR Apache-2.0"
@@ -35,6 +36,7 @@ sharding = []
 
 [dev-dependencies]
 tempfile = "3"
+
 
 [profile.dev]
 opt-level = 1
