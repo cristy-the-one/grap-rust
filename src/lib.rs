@@ -51,7 +51,7 @@ pub use shard::{
     GlobalNodeId, RebalancePlan, ShardedGraph, ShardedQueryResult, ShardId, ShardRouter,
 };
 
-pub use serialize::CURRENT_GRAPH_FORMAT_VERSION;
+pub use serialize::{GraphMeta, CURRENT_GRAPH_FORMAT_VERSION};
 
 pub mod shard; // Graph sharding (Phase 4)
 

@@ -362,6 +362,32 @@ fn find_chunk_for_offset(boundaries: &[u64], global_offset: u64) -> (u32, u32) {
 
 
 impl KnowledgeGraph {
+    /// Load only the metadata for a graph on disk without reading the
+    /// topology or blobs.
+    ///
+    /// This is useful for:
+    /// - Inspecting the on-disk format version
+    /// - Getting node/edge counts and total blob size
+    /// - Verifying checksum information
+    /// - Building tools that work with many graphs efficiently
+    ///
+    /// The version check is performed (unknown versions produce
+    /// [`GraphError::UnsupportedVersion`]).
+    pub fn load_meta(dir: &Path) -> Result<GraphMeta, GraphError> {
+        let meta_str = fs::read_to_string(dir.join("graph.meta"))?;
+        let meta: GraphMeta =
+            serde_json::from_str(&meta_str).map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+
+        if meta.version != CURRENT_GRAPH_FORMAT_VERSION {
+            return Err(GraphError::UnsupportedVersion {
+                found: meta.version,
+                supported: CURRENT_GRAPH_FORMAT_VERSION,
+            });
+        }
+
+        Ok(meta)
+    }
+
     /// Load a graph using memory-mapped blobs (zero-copy reads for very large corpora).
     ///
     /// This is the high-performance path described in the design document.

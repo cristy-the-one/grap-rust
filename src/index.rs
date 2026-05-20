@@ -768,6 +768,14 @@ impl IndexedKnowledgeGraph {
         Ok(ig)
     }
 
+    /// Load only the metadata for a persisted graph (without loading blobs
+    /// or rebuilding the text index).
+    ///
+    /// Delegates to [`KnowledgeGraph::load_meta`].
+    pub fn load_meta(dir: &std::path::Path) -> Result<crate::serialize::GraphMeta, GraphError> {
+        KnowledgeGraph::load_meta(dir)
+    }
+
     /// Load using memory-mapped blobs (zero-copy) and rebuild the text index.
     ///
     /// Requires the `mmap` feature to be enabled.
