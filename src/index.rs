@@ -233,7 +233,8 @@ impl Default for FusionWeights {
 /// Weights used when combining text (BM25), vector (embedding), and graph signals
 /// during hybrid retrieval.
 ///
-/// All three weights are normalized at query time so that `text + vector + graph = 1.0`.
+/// Weights are **not** normalized automatically; ensure `text + vector + graph ≈ 1.0`
+/// for meaningful fused scores. The default weights sum to 1.0.
 #[derive(Debug, Clone, Copy)]
 pub struct HybridWeights {
     /// Weight given to the text / BM25 score.
@@ -751,7 +752,7 @@ pub struct IndexedKnowledgeGraph {
     ///
     /// Phase 0/1: populated with a `BruteForceVectorIndex` when the first
     /// embedding is added. Later replaced by an HNSW (or other) implementation.
-    pub vector_index: Option<Box<dyn crate::vector_index::VectorIndex>>,
+    pub(crate) vector_index: Option<Box<dyn crate::vector_index::VectorIndex>>,
 
     /// Background merge/vacuum worker handles for on-disk text indexes.
     /// Stored here so they stay alive as long as the graph does.
@@ -842,25 +843,12 @@ impl IndexedKnowledgeGraph {
         let id = self.graph.add_node(text, label, embedding);
         self.text_index.index_document(id, text);
 
-        // Phase 0/1 vector index ingestion
+        // Vector index ingestion — lazily initialise with the canonical factory.
         if let Some(emb) = embedding {
-            if self.vector_index.is_none() {
-                #[cfg(feature = "ann-hnsw")]
-                {
-                    self.vector_index = Some(Box::new(
-                        crate::vector_index::HNSWVectorIndex::new(),
-                    ));
-                }
-                #[cfg(not(feature = "ann-hnsw"))]
-                {
-                    self.vector_index = Some(Box::new(
-                        crate::vector_index::BruteForceVectorIndex::new(),
-                    ));
-                }
-            }
-            if let Some(vidx) = &mut self.vector_index {
-                vidx.add_vector(id, emb);
-            }
+            let vidx = self
+                .vector_index
+                .get_or_insert_with(|| crate::vector_index::create_default_vector_index());
+            vidx.add_vector(id, emb);
         }
 
         id
@@ -997,23 +985,21 @@ impl IndexedKnowledgeGraph {
         max_results: usize,
         weights: HybridWeights,
     ) -> Vec<CombinedResult<'_>> {
-        // --- 1. Collect text seeds (BM25) ---
-        let text_results = self.text_index.search(text_query, max_seeds);
-        let mut text_seed_scores: std::collections::HashMap<NodeId, f64> =
-            text_results.into_iter().collect();
+        // Named constants make the budget arithmetic self-documenting.
+        const MIN_VECTOR_CANDIDATES: usize = 8;
+        const VECTOR_OVERSAMPLE: usize = 2;
 
-        // --- 2. Collect vector seeds (from ANN / VectorIndex) if a query vector was provided ---
-        let mut vector_seed_scores: std::collections::HashMap<NodeId, f64> =
-            std::collections::HashMap::new();
+        let text_results = self.text_index.search(text_query, max_seeds);
+        let text_seed_scores: HashMap<NodeId, f64> = text_results.into_iter().collect();
+
+        let vector_budget = max_seeds.max(MIN_VECTOR_CANDIDATES) * VECTOR_OVERSAMPLE;
+        let mut vector_seed_scores: HashMap<NodeId, f64> =
+            HashMap::with_capacity(vector_budget);
 
         if let Some(qvec) = vector {
             if let Some(vidx) = &self.vector_index {
-                // Pull a bit more vector candidates than text seeds for better recall
-                let vector_budget = max_seeds.max(8) * 2;
-                let vec_candidates = vidx.search(qvec, vector_budget);
-
-                for (node, sim) in vec_candidates {
-                    // Store the best vector similarity seen for this node as a seed
+                for (node, sim) in vidx.search(qvec, vector_budget) {
+                    // Keep the highest similarity if the same node appears twice.
                     let entry = vector_seed_scores.entry(node).or_insert(0.0);
                     if sim > *entry {
                         *entry = sim;
@@ -1022,19 +1008,21 @@ impl IndexedKnowledgeGraph {
             }
         }
 
-        // --- 3. Build the union of seeds for graph traversal ---
-        let mut all_seeds: Vec<NodeId> = text_seed_scores.keys().copied().collect();
-        for &node in vector_seed_scores.keys() {
-            if !text_seed_scores.contains_key(&node) {
-                all_seeds.push(node);
-            }
-        }
+        // Build the union of text + vector seeds as a single deduped list.
+        let all_seeds: Vec<NodeId> = text_seed_scores
+            .keys()
+            .chain(
+                vector_seed_scores
+                    .keys()
+                    .filter(|k| !text_seed_scores.contains_key(k)),
+            )
+            .copied()
+            .collect();
 
         if all_seeds.is_empty() {
             return Vec::new();
         }
 
-        // --- 4. Run graph traversal from the combined seeds ---
         let mut builder = self
             .graph
             .find()
@@ -1049,18 +1037,15 @@ impl IndexedKnowledgeGraph {
 
         let graph_results = builder.execute_with_text();
 
-        // --- 5. Build rich results with proper three-way scores ---
         let mut combined: Vec<CombinedResult> = graph_results
             .into_iter()
             .map(|(gr, text)| {
                 let node = gr.node_id;
 
-                // Text score: from BM25 seeds (0 if the node only came via vector or graph expansion)
                 let text_score = text_seed_scores.get(&node).copied().unwrap_or(0.0);
 
-                // Vector score priority:
-                //   1. Pre-computed from vector seed (best case — direct ANN hit)
-                //   2. On-the-fly cosine for nodes that have embeddings (graph-expanded nodes)
+                // Prefer the pre-computed ANN score; fall back to on-the-fly cosine
+                // for nodes reached only through graph expansion.
                 let vector_score = if let Some(precomputed) = vector_seed_scores.get(&node) {
                     *precomputed
                 } else if let Some(qvec) = vector {
@@ -1088,7 +1073,6 @@ impl IndexedKnowledgeGraph {
             })
             .collect();
 
-        // Re-rank by fused hybrid score
         combined.sort_by(|a, b| {
             b.fused_score
                 .partial_cmp(&a.fused_score)

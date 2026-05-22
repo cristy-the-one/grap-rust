@@ -10,7 +10,7 @@ use crate::index::cosine_similarity; // reuse the existing helper
 #[cfg(feature = "ann-hnsw")]
 use hnsw_rs::anndists::dist::distances::DistCosine;
 #[cfg(feature = "ann-hnsw")]
-use hnsw_rs::hnsw::{Hnsw, Neighbour};
+use hnsw_rs::hnsw::Hnsw;
 
 /// Statistics about a vector index.
 #[derive(Debug, Clone, Default)]
@@ -155,6 +155,9 @@ impl VectorIndex for BruteForceVectorIndex {
 #[cfg(feature = "ann-hnsw")]
 pub struct HNSWVectorIndex {
     /// The actual HNSW index. Uses cosine distance.
+    ///
+    /// The `'static` lifetime is a requirement of the `hnsw_rs` crate's internal
+    /// thread-safety model — it is not a self-referential borrow.
     inner: Hnsw<'static, f32, DistCosine>,
     /// Dimension of the vectors (inferred on first insert).
     dimension: usize,
@@ -162,6 +165,18 @@ pub struct HNSWVectorIndex {
     deleted: std::collections::HashSet<NodeId>,
     /// Parameters used at construction time (for stats / future rebuild).
     params: HNSWParams,
+}
+
+#[cfg(feature = "ann-hnsw")]
+impl std::fmt::Debug for HNSWVectorIndex {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("HNSWVectorIndex")
+            .field("dimension", &self.dimension)
+            .field("vector_count", &self.inner.get_nb_point())
+            .field("deleted_count", &self.deleted.len())
+            .field("params", &self.params)
+            .finish_non_exhaustive()
+    }
 }
 
 /// Tunable parameters for the HNSW index.
@@ -223,6 +238,16 @@ impl VectorIndex for HNSWVectorIndex {
     fn add_vector(&mut self, node: NodeId, embedding: &[f32]) {
         if self.dimension == 0 && !embedding.is_empty() {
             self.dimension = embedding.len();
+        } else if self.dimension > 0 && embedding.len() != self.dimension {
+            // Silently skip mismatched vectors in release; panic in debug to catch bugs early.
+            debug_assert_eq!(
+                embedding.len(),
+                self.dimension,
+                "HNSWVectorIndex: dimension mismatch (got {}, expected {})",
+                embedding.len(),
+                self.dimension
+            );
+            return;
         }
 
         // hnsw_rs uses usize labels. We cast NodeId (u32) safely.
@@ -246,12 +271,22 @@ impl VectorIndex for HNSWVectorIndex {
             return Vec::new();
         }
 
-        let ef = self.params.ef_search.max(max_results * 2);
+        // Only fetch extra candidates when there are soft-deleted nodes to skip.
+        // This avoids the 2× over-fetch cost on the common (no deletes) path.
+        let fetch = if self.deleted.is_empty() {
+            max_results
+        } else {
+            max_results * 2
+        };
+        // Minimum search expansion factor (ef). The actual ef used at query time
+        // is `max(ef_search, fetch)` to ensure enough candidates are explored
+        // when large result sets are requested.
+        let ef = self.params.ef_search.max(fetch);
 
         // hnsw_rs returns neighbors with distance (lower is better for DistCosine)
-        let neighbors = self.inner.search(query, max_results * 2, ef);
+        let neighbors = self.inner.search(query, fetch, ef);
 
-        let mut results = Vec::new();
+        let mut results = Vec::with_capacity(max_results);
 
         for neighbor in neighbors {
             let node_id = NodeId(neighbor.d_id as u32);
@@ -262,13 +297,14 @@ impl VectorIndex for HNSWVectorIndex {
 
             // Convert cosine *distance* to similarity.
             // DistCosine returns 1 - cosine_similarity for normalized vectors.
-            let distance = neighbor.distance;
-            let similarity: f64 = (1.0 - distance as f64).clamp(0.0, 1.0);
-
+            let similarity: f64 = (1.0 - neighbor.distance as f64).clamp(0.0, 1.0);
             results.push((node_id, similarity));
+
+            if results.len() == max_results {
+                break;
+            }
         }
 
-        results.truncate(max_results);
         results
     }
 
