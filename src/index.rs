@@ -854,6 +854,35 @@ impl IndexedKnowledgeGraph {
         id
     }
 
+    /// Replace a node's text content and optionally its embedding.
+    ///
+    /// - Text index is updated: old terms are removed (tombstoned for on-disk
+    ///   indexes; may linger for the in-memory `InvertedIndex`) and new text is
+    ///   indexed.
+    /// - If `new_embedding` is `Some`, the vector index entry is replaced.
+    /// - If `new_embedding` is `None`, the existing vector index entry is kept.
+    /// - **Edges are never touched.**
+    ///
+    /// # Errors
+    /// Returns `GraphError::Other` if the node is out of bounds or deleted.
+    pub fn update_node(
+        &mut self,
+        id: crate::NodeId,
+        new_text: &str,
+        new_embedding: Option<&[f32]>,
+    ) -> Result<(), crate::GraphError> {
+        self.graph.update_node_content(id, new_text, new_embedding)?;
+        self.text_index.delete_document(id);
+        self.text_index.index_document(id, new_text);
+        if let Some(emb) = new_embedding {
+            if let Some(vidx) = &mut self.vector_index {
+                vidx.remove_vector(id);
+                vidx.add_vector(id, emb);
+            }
+        }
+        Ok(())
+    }
+
     /// Perform a pure (standalone) vector similarity search.
     ///
     /// Uses the configured `VectorIndex` (HNSW when the `ann-hnsw` feature is enabled,
@@ -1567,6 +1596,59 @@ impl IndexedKnowledgeGraph {
         }
 
         started
+    }
+}
+
+#[cfg(test)]
+mod update_node_tests {
+    use crate::index::{IndexedKnowledgeGraph, InvertedIndex};
+
+    fn make_graph() -> IndexedKnowledgeGraph {
+        IndexedKnowledgeGraph::with_text_index(Box::new(InvertedIndex::new()))
+    }
+
+    #[test]
+    fn update_node_new_text_searchable() {
+        let mut g = make_graph();
+        let id = g.add_node("original text", None, None);
+
+        g.update_node(id, "updated content", None).unwrap();
+
+        let hits = g.text_index.search("content", 5);
+        assert!(hits.iter().any(|(n, _)| *n == id), "new text must be findable");
+    }
+
+    #[test]
+    fn update_node_preserves_edges() {
+        let mut g = make_graph();
+        let a = g.add_node("a", None, None);
+        let b = g.add_node("b", None, None);
+        g.add_edge(a, b, 0.8, vec![]);
+
+        g.update_node(a, "a changed", None).unwrap();
+
+        assert_eq!(g.graph.nodes[a.0 as usize].outgoing.len(), 1);
+    }
+
+    #[test]
+    fn update_node_rejects_deleted() {
+        let mut g = make_graph();
+        let id = g.add_node("x", None, None);
+        g.graph.remove_node(id);
+
+        assert!(g.update_node(id, "y", None).is_err());
+    }
+
+    #[test]
+    fn update_node_none_embedding_leaves_vector_index_unchanged() {
+        let mut g = make_graph();
+        g.vector_index = Some(Box::new(crate::BruteForceVectorIndex::new()));
+        let id = g.add_node("a", None, Some(&[1.0f32, 0.0]));
+
+        // Update text only; embedding must remain
+        g.update_node(id, "b", None).unwrap();
+
+        assert!(g.vector_index.as_ref().unwrap().contains_vector(id));
     }
 }
 
