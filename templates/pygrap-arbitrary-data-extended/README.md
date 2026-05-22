@@ -17,8 +17,13 @@ pip install -r requirements.txt
 cp -r documents/ your-documents/
 
 python ingest.py
-python query.py --require "topic=rag,confidence>0.7"
+python query.py --require topic
+python query.py --require "topic,confidence"
 ```
+
+> **Note:** `--require` filters by **property presence** (does the edge carry this property?),
+> not by value or range. `confidence>0.7` is parsed as just `confidence`.
+> Value/range predicates are planned for a future release.
 
 ## Example Document
 

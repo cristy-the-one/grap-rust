@@ -24,7 +24,8 @@ pub struct VectorIndexManifest {
     pub dimension: usize,
     /// How many vectors are stored in the accompanying data file.
     pub vector_count: usize,
-    /// ISO-8601 timestamp when this snapshot was created.
+    /// Unix timestamp (seconds since the UNIX epoch) when this snapshot was created.
+    /// Informational only — not used during load.
     pub created_at: String,
     /// HNSW-specific parameters, stored as raw JSON so the manifest remains
     /// deserializable even when the `ann-hnsw` feature is disabled.
@@ -219,7 +220,11 @@ impl BruteForceVectorIndex {
             backend: "brute_force".to_string(),
             dimension: self.dimension,
             vector_count: self.vectors.len(),
-            created_at: format!("{:?}", std::time::SystemTime::now()),
+            created_at: std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs()
+                .to_string(),
             hnsw_params: None,
         };
 
@@ -262,10 +267,18 @@ impl BruteForceVectorIndex {
                 crate::GraphError::Other(format!("Bad manifest.json: {}", e))
             })?;
 
-        if manifest.version != 1 || manifest.backend != "brute_force" {
-            return Err(crate::GraphError::Other(
-                "Unsupported or incompatible vector index manifest".into(),
-            ));
+        // Wrong backend: a different implementation wrote this index.
+        // Return Ok(false) so the caller falls back to a full rebuild gracefully.
+        if manifest.backend != "brute_force" {
+            return Ok(false);
+        }
+        // Wrong version: this is our backend but the format has changed.
+        // Return Err so the caller knows something unexpected happened.
+        if manifest.version != 1 {
+            return Err(crate::GraphError::Other(format!(
+                "Unsupported brute-force vector index version {} (expected 1)",
+                manifest.version
+            )));
         }
 
         let data = fs::read(&vectors_path)?;
@@ -294,8 +307,6 @@ impl BruteForceVectorIndex {
     }
 }
 
-
-
 // ============================================================================
 // HNSW Backend (Phase 1)
 // ============================================================================
@@ -314,6 +325,10 @@ pub struct HNSWVectorIndex {
     inner: Hnsw<'static, f32, DistCosine>,
     /// Raw vectors we have inserted. We keep them so we can persist the index
     /// without having to re-read the entire graph's BlobStore.
+    ///
+    /// **Memory note**: this doubles the in-memory footprint of each embedding
+    /// (once here, once inside `inner`). For large indexes this cost is known
+    /// and intentional — it avoids a full BlobStore scan on every save.
     vectors: std::collections::HashMap<NodeId, Vec<f32>>,
     /// Dimension of the vectors (inferred on first insert).
     dimension: usize,
@@ -507,7 +522,11 @@ impl HNSWVectorIndex {
             backend: "hnsw".to_string(),
             dimension: self.dimension,
             vector_count: self.vectors.len(),
-            created_at: format!("{:?}", std::time::SystemTime::now()), // human-readable enough for now
+            created_at: std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs()
+                .to_string(),
             hnsw_params: Some(serde_json::to_value(self.params).unwrap_or(serde_json::Value::Null)),
         };
 
@@ -553,11 +572,17 @@ impl HNSWVectorIndex {
         let manifest: VectorIndexManifest = serde_json::from_str(&manifest_json)
             .map_err(|e| crate::GraphError::Other(format!("Invalid manifest.json: {e}")))?;
 
-        // Basic sanity checks
+        // Wrong backend: a different implementation wrote this index.
+        // Return Ok(false) so the caller falls back gracefully.
+        if manifest.backend != "hnsw" {
+            return Ok(false);
+        }
+        // Wrong version: our backend but the format changed.
         if manifest.version != 1 {
-            return Err(crate::GraphError::Other(
-                "Unsupported vector index persistence version".into(),
-            ));
+            return Err(crate::GraphError::Other(format!(
+                "Unsupported HNSW vector index version {} (expected 1)",
+                manifest.version
+            )));
         }
         if manifest.dimension == 0 {
             return Ok(false);

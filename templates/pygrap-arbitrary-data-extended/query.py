@@ -4,8 +4,12 @@ Extended query script with property-based filtering support.
 
 Usage examples:
     python query.py
-    python query.py --require topic=rag
-    python query.py --require "topic=ai,confidence>0.7"
+    python query.py --require topic
+    python query.py --require "topic,confidence"
+
+Note: --require performs *property presence* filtering (does the edge carry this
+property at all?), not value/range filtering.  Passing "confidence>0.7" is parsed
+as just "confidence" — the ">0.7" part is currently ignored.
 """
 
 import os
@@ -22,7 +26,19 @@ EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "all-MiniLM-L6-v2")
 
 
 def parse_requirements(require_str: str) -> List[str]:
-    """Very simple parser: 'topic=rag,confidence>0.7' -> ['topic', 'confidence']"""
+    """
+    Parse a comma-separated list of property names (or property expressions) into
+    a list of property names for existence-based filtering.
+
+    Examples:
+        "topic"              -> ["topic"]
+        "topic,confidence"   -> ["topic", "confidence"]
+        "topic=rag"          -> ["topic"]   (value part is stripped — existence only)
+        "confidence>0.7"     -> ["confidence"]  (range part is stripped — existence only)
+
+    Note: The underlying pygrap API filters by property *presence*, not by value or range.
+    Support for value/range predicates is planned but not yet implemented.
+    """
     if not require_str:
         return []
     props = []
@@ -32,12 +48,23 @@ def parse_requirements(require_str: str) -> List[str]:
             props.append(part.split("=")[0].strip())
         elif ">" in part or "<" in part:
             props.append(part.split(">")[0].split("<")[0].strip())
+        elif part:
+            props.append(part)
     return props
 
 
 def main():
     parser = argparse.ArgumentParser(description="Hybrid query with property filtering")
-    parser.add_argument("--require", type=str, default="", help="Comma-separated property requirements (e.g. topic=rag,confidence>0.7)")
+    parser.add_argument(
+        "--require",
+        type=str,
+        default="",
+        help=(
+            "Comma-separated property names (or expressions) to require on traversed edges. "
+            "Filters by property *presence* only — values and ranges are not evaluated. "
+            "Examples: 'topic', 'topic,confidence', 'topic=rag' (value part is ignored)."
+        ),
+    )
     args = parser.parse_args()
 
     if not (GRAPH_DIR / "graph").exists():

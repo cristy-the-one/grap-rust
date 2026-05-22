@@ -62,7 +62,7 @@ fn vector_index_survives_sharded_save_load() {
 
     // Add nodes with embeddings across shards
     let n0 = sg.add_node_with_embedding("rust ownership", None, Some(&[1.0f32, 0.0, 0.0])).unwrap();
-    let n1 = sg.add_node_with_embedding("borrowing rules", None, Some(&[0.0f32, 1.0, 0.0])).unwrap();
+    let _n1 = sg.add_node_with_embedding("borrowing rules", None, Some(&[0.0f32, 1.0, 0.0])).unwrap();
     let _n2 = sg.add_node_with_embedding("lifetimes are hard", None, Some(&[0.0f32, 0.0, 1.0])).unwrap();
 
     // Save

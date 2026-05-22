@@ -1247,9 +1247,9 @@ impl IndexedKnowledgeGraph {
         // Persist vector index (HNSW or brute-force) if we have one.
         if let Some(vidx) = &self.vector_index {
             let vdir = dir.join("vector_index");
-            // We call the concrete implementation via a small helper.
-            // For now we only have real persistence on HNSW; BruteForce is a no-op.
-            let _ = vidx.save_to_dir(&vdir); // ignore errors for Phase 3 (best effort)
+            if let Err(e) = vidx.save_to_dir(&vdir) {
+                log::warn!("Vector index save failed — next load will rebuild from embeddings: {e}");
+            }
         }
 
         Ok(())
@@ -1273,10 +1273,10 @@ impl IndexedKnowledgeGraph {
         }
 
         // Phase 3: Try fast vector load, otherwise full rebuild
-        if !ig.load_vector_index(dir) {
-            ig.rebuild_vector_index();
-        } else {
+        if ig.load_vector_index(dir) {
             ig.sync_new_vectors();
+        } else {
+            ig.rebuild_vector_index();
         }
 
         Ok(ig)
@@ -1290,11 +1290,6 @@ impl IndexedKnowledgeGraph {
         KnowledgeGraph::load_meta(dir)
     }
 
-    /// Rebuild the vector index from embeddings stored in the graph.
-    ///
-    /// Called after any load path (`load_from_disk`, `load_from_dir`, `load_mmap`)
-    /// because the ANN index is an in-memory acceleration structure — embeddings
-    /// are persisted via the `BlobStore`; the index is always derived from them.
     /// Attempts to load a previously persisted vector index from `vector_index/`
     /// inside the given directory. Returns `true` if a valid persisted index was
     /// successfully loaded (fast path). Returns `false` if no persisted data was
@@ -1324,6 +1319,12 @@ impl IndexedKnowledgeGraph {
         }
     }
 
+    /// Rebuild the vector index from embeddings stored in the graph.
+    ///
+    /// Called after any load path (`load_from_disk`, `load_from_dir`, `load_mmap`)
+    /// when no valid persisted index is available. The ANN index is an in-memory
+    /// acceleration structure; embeddings are durably persisted via the `BlobStore`,
+    /// so the index is always re-derivable from them.
     fn rebuild_vector_index(&mut self) {
         for i in 0..self.graph.node_count() {
             let id = NodeId(i as u32);
@@ -1437,9 +1438,11 @@ impl IndexedKnowledgeGraph {
         // Save the text index
         self.text_index.save_to_dir(&dir.join("text_index"))?;
 
-        // Save the vector index (HNSW or brute-force) – best effort in Phase 3
+        // Save the vector index (HNSW or brute-force)
         if let Some(vidx) = &self.vector_index {
-            let _ = vidx.save_to_dir(&dir.join("vector_index"));
+            if let Err(e) = vidx.save_to_dir(&dir.join("vector_index")) {
+                log::warn!("Vector index save failed — next load will rebuild from embeddings: {e}");
+            }
         }
 
         Ok(())

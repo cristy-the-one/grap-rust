@@ -8,6 +8,11 @@ Features:
 - Idempotency via file hash tracking
 - Embeddings via sentence-transformers
 - Periodic safe saves during long runs
+
+Note: This basic template creates *nodes only* — no edges between chunks.
+The graph_weight in query.py contributes 0 because there are no traversable edges.
+For a richer graph structure (edges + property-based filtering), see the extended
+template in ../pygrap-arbitrary-data-extended/.
 """
 
 import os
