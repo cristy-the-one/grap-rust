@@ -9,6 +9,60 @@ use pyo3::types::{PyAny, PyType};
 use crate::errors::to_py_err;
 use grap::{FusionWeights, HybridWeights, IndexedKnowledgeGraph as InnerGraph};
 
+/// Result returned by `IndexedKnowledgeGraph.merge_nodes(keep, absorb)`.
+#[pyclass(get_all)]
+#[derive(Clone)]
+pub struct MergeReport {
+    pub absorbed: u32,
+    pub edges_redirected: usize,
+    pub edges_merged: usize,
+    pub self_loops_dropped: usize,
+    pub embedding_updated: bool,
+}
+
+#[pymethods]
+impl MergeReport {
+    fn __repr__(&self) -> String {
+        format!(
+            "MergeReport(absorbed={}, edges_redirected={}, edges_merged={}, \
+             self_loops_dropped={}, embedding_updated={})",
+            self.absorbed, self.edges_redirected, self.edges_merged,
+            self.self_loops_dropped, self.embedding_updated
+        )
+    }
+}
+
+impl From<grap::MergeReport> for MergeReport {
+    fn from(r: grap::MergeReport) -> Self {
+        MergeReport {
+            absorbed: r.absorbed.0,
+            edges_redirected: r.edges_redirected,
+            edges_merged: r.edges_merged,
+            self_loops_dropped: r.self_loops_dropped,
+            embedding_updated: r.embedding_updated,
+        }
+    }
+}
+
+/// Single result returned by `IndexedKnowledgeGraph.traverse_by_relation(...)`.
+#[pyclass(get_all)]
+#[derive(Clone)]
+pub struct TraversalResult {
+    pub node_id: u32,
+    pub depth: u32,
+    pub strength: f64,
+}
+
+#[pymethods]
+impl TraversalResult {
+    fn __repr__(&self) -> String {
+        format!(
+            "TraversalResult(node_id={}, depth={}, strength={:.3})",
+            self.node_id, self.depth, self.strength
+        )
+    }
+}
+
 #[pyclass]
 pub struct IndexedKnowledgeGraph {
     inner: InnerGraph,
