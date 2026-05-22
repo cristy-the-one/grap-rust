@@ -57,13 +57,9 @@ def chunk_text(text: str, max_chars: int = CHUNK_SIZE, overlap: int = CHUNK_OVER
 
 
 def load_or_create_graph() -> grap.IndexedKnowledgeGraph:
-    """Load existing graph or create a new on-disk one."""
-    if (GRAPH_DIR / "graph").exists():
-        print(f"Loading existing graph from {GRAPH_DIR}")
-        return grap.IndexedKnowledgeGraph.load_from_dir(GRAPH_DIR)
-    else:
-        print("Creating new on-disk graph with merge policy...")
-        return grap.IndexedKnowledgeGraph.new_on_disk_with_merge_policy(4)
+    """Load existing graph or create a new on-disk one with merge policy."""
+    print(f"Opening/creating graph at {GRAPH_DIR} with merge policy...")
+    return grap.IndexedKnowledgeGraph.with_merge_policy(str(GRAPH_DIR), 4)
 
 
 def get_act_id(data: dict) -> str:
@@ -103,11 +99,9 @@ def main():
 
     g = load_or_create_graph()
 
-    # Register useful property tags (will be used more in later phases)
-    g.graph.properties.register("tip_act")
-    g.graph.properties.register("emitent")
-    g.graph.properties.register("data_vigoare")
-    g.graph.properties.register("in_vigoare")
+    # Note: Property registration is not exposed in the current pygrap build.
+    # We will use labels and text-based filtering in Phase 0.
+    # Proper property support will be added in Phase 1.
 
     json_files = sorted(DATA_DIR.glob("*.json"))
     print(f"Found {len(json_files)} legal acts.\n")
@@ -148,14 +142,14 @@ def main():
         processed += 1
         if processed % 200 == 0:
             print(f"  Processed {processed} acts...")
-            g.save_to_dir(GRAPH_DIR)
+            g.save_to_dir(str(GRAPH_DIR))
 
     print(f"\nIngestion complete.")
     print(f"  Processed: {processed}")
     print(f"  Skipped:   {skipped}")
 
     print("Saving graph...")
-    g.save_to_dir(GRAPH_DIR)
+    g.save_to_dir(str(GRAPH_DIR))
     print(f"Graph saved to {GRAPH_DIR}")
 
 

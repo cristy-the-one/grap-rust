@@ -22,7 +22,7 @@ def main():
         return
 
     print(f"Loading graph from {GRAPH_DIR}...")
-    g = grap.IndexedKnowledgeGraph.load_from_dir(GRAPH_DIR)
+    g = grap.IndexedKnowledgeGraph.with_merge_policy(str(GRAPH_DIR), 4)
 
     print(f"Loading embedding model: {EMBEDDING_MODEL}")
     model = SentenceTransformer(EMBEDDING_MODEL)
@@ -47,12 +47,12 @@ def main():
 
         # Basic hybrid search (Phase 0)
         results = g.search_and_traverse_hybrid(
-            text_query=query,
+            query=query,                    # note: parameter is "query", not "text_query"
             vector=qvec,
             max_seeds=10,
             text_weight=0.4,
             vector_weight=0.5,
-            graph_weight=0.1,   # low in Phase 0 because we haven't built many edges yet
+            graph_weight=0.1,               # low in Phase 0 (no relationships extracted yet)
             min_strength=0.5,
             max_depth=2,
             max_results=10,

@@ -105,3 +105,6 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+real-data-law-ro/graph/graph
+real-data-law-ro/graph/text_index
+real-data-law-ro/graph/vector_index
