@@ -445,6 +445,9 @@ impl IndexedKnowledgeGraph {
     /// `vector` is an optional list of floats (the query embedding).
     /// When provided, cosine similarity against stored node embeddings is computed
     /// and fused using the supplied weights.
+    ///
+    /// If `traversal_weight_property` is set to a property name (e.g. `"confidence"`),
+    /// edges that carry that property will be prioritised during BFS expansion.
     #[pyo3(signature = (
         query,
         vector = None,
