@@ -456,6 +456,7 @@ impl IndexedKnowledgeGraph {
         text_weight = 0.4,
         vector_weight = 0.4,
         graph_weight = 0.2,
+        traversal_weight_property = None,
     ))]
     fn search_and_traverse_hybrid(
         &self,
@@ -469,12 +470,13 @@ impl IndexedKnowledgeGraph {
         text_weight: f64,
         vector_weight: f64,
         graph_weight: f64,
+        traversal_weight_property: Option<String>,
     ) -> PyResult<Vec<QueryResult>> {
         let weights = HybridWeights {
             text: text_weight,
             vector: vector_weight,
             graph: graph_weight,
-            traversal_weight_property: None,
+            traversal_weight_property,
         };
 
         let prop_refs: Vec<&str> = required_properties.iter().map(|s| s.as_str()).collect();
