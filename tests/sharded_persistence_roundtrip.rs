@@ -51,3 +51,37 @@ fn ghost_edges_survive_rebalance_and_manual_roundtrip() {
         "ghost edges must round-trip after rebalance using the public persistence helpers"
     );
 }
+
+/// Tests that vector embeddings survive a full sharded save/load cycle,
+/// including the new Phase 3 vector index persistence (manifest + vectors.bin).
+#[test]
+fn vector_index_survives_sharded_save_load() {
+    use grap::ShardedGraph;
+
+    let mut sg = ShardedGraph::new(3);
+
+    // Add nodes with embeddings across shards
+    let n0 = sg.add_node_with_embedding("rust ownership", None, Some(&[1.0f32, 0.0, 0.0])).unwrap();
+    let n1 = sg.add_node_with_embedding("borrowing rules", None, Some(&[0.0f32, 1.0, 0.0])).unwrap();
+    let _n2 = sg.add_node_with_embedding("lifetimes are hard", None, Some(&[0.0f32, 0.0, 1.0])).unwrap();
+
+    // Save
+    let dir = tempfile::tempdir().unwrap();
+    sg.save_to_dir(dir.path()).expect("save sharded graph");
+
+    // Load fresh
+    let loaded = ShardedGraph::load_from_dir(dir.path()).expect("load sharded graph");
+
+    // Verify standalone vector search works after load
+    let results = loaded.vector_search(&[1.0f32, 0.0, 0.0], 5);
+    let ids: Vec<_> = results.iter().map(|(gid, _)| (gid.shard.0, gid.local.0)).collect();
+
+    assert!(
+        ids.contains(&(n0.shard.0, n0.local.0)),
+        "n0 should be findable via vector search after sharded load"
+    );
+
+    // Also sanity-check that we have the other embeddings
+    let results2 = loaded.vector_search(&[0.0f32, 1.0, 0.0], 5);
+    assert!(!results2.is_empty(), "should find at least one vector result");
+}

@@ -549,7 +549,8 @@ impl ShardRouter {
     pub fn save_to_dir(&mut self, dir: &std::path::Path) -> Result<(), crate::GraphError> {
         std::fs::create_dir_all(dir)?;
 
-        // Save per-shard data
+        // Save per-shard data (each IndexedKnowledgeGraph now also persists
+        // its vector index into shard_dir/vector_index/ via manifest.json + vectors.bin)
         let shards_dir = dir.join("shards");
         std::fs::create_dir_all(&shards_dir)?;
 
@@ -607,6 +608,9 @@ impl ShardRouter {
             // IndexedKnowledgeGraph::load_from_dir now auto-detects whether the
             // text_index/ subdir contains an on-disk manifest and loads the
             // correct backend (OnDiskTextIndex or InvertedIndex).
+            // IndexedKnowledgeGraph::load_from_dir now handles vector index persistence:
+            // it will look for vector_index/manifest.json and try a fast load
+            // (HNSW or brute-force) before falling back to a full rebuild from embeddings.
             let ig = crate::index::IndexedKnowledgeGraph::load_from_dir(&shard_dir)?;
             router.shards[i as usize].graph = ig;
         }
@@ -1326,12 +1330,18 @@ impl ShardedGraph {
     // === Per-shard on-disk persistence (0.2) ===
 
     /// Save the whole sharded graph, including each shard's on-disk text index
-    /// (if it is using the persistent backend).
+    /// and vector index (if present).
+    ///
+    /// Each shard will write its vector index under `shards/XXXX/vector_index/`
+    /// (manifest.json + vectors.bin) for fast reload.
     pub fn save_to_dir(&mut self, dir: &std::path::Path) -> Result<(), crate::GraphError> {
         self.router.save_to_dir(dir)
     }
 
     /// Load a previously saved sharded graph.
+    ///
+    /// Vector indexes (if persisted) are loaded per-shard via the fast path
+    /// (manifest.json + vectors.bin) when available.
     pub fn load_from_dir(dir: &std::path::Path) -> Result<Self, crate::GraphError> {
         let router = ShardRouter::load_from_dir(dir)?;
         Ok(Self { router })

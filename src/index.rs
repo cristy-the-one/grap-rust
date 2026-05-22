@@ -1237,10 +1237,22 @@ impl IndexedKnowledgeGraph {
         self.graph.all_edges()
     }
 
-    /// Saves the underlying graph to disk (the inverted index is not persisted;
-    /// it will be rebuilt on load).
+    /// Saves the underlying graph to disk.
+    ///
+    /// The vector index (if present) is also persisted into a `vector_index/`
+    /// subdirectory for fast reload (Phase 3 persistence).
     pub fn save_to_disk(&self, dir: &std::path::Path) -> Result<(), GraphError> {
-        self.graph.save_to_disk(dir)
+        self.graph.save_to_disk(dir)?;
+
+        // Persist vector index (HNSW or brute-force) if we have one.
+        if let Some(vidx) = &self.vector_index {
+            let vdir = dir.join("vector_index");
+            // We call the concrete implementation via a small helper.
+            // For now we only have real persistence on HNSW; BruteForce is a no-op.
+            let _ = vidx.save_to_dir(&vdir); // ignore errors for Phase 3 (best effort)
+        }
+
+        Ok(())
     }
 
     /// Loads a graph from disk and rebuilds the full-text inverted index.
@@ -1260,8 +1272,12 @@ impl IndexedKnowledgeGraph {
             ig.text_index.index_document(id, text);
         }
 
-        // Rebuild the vector index from stored embeddings
-        ig.rebuild_vector_index();
+        // Phase 3: Try fast vector load, otherwise full rebuild
+        if !ig.load_vector_index(dir) {
+            ig.rebuild_vector_index();
+        } else {
+            ig.sync_new_vectors();
+        }
 
         Ok(ig)
     }
@@ -1279,6 +1295,35 @@ impl IndexedKnowledgeGraph {
     /// Called after any load path (`load_from_disk`, `load_from_dir`, `load_mmap`)
     /// because the ANN index is an in-memory acceleration structure — embeddings
     /// are persisted via the `BlobStore`; the index is always derived from them.
+    /// Attempts to load a previously persisted vector index from `vector_index/`
+    /// inside the given directory. Returns `true` if a valid persisted index was
+    /// successfully loaded (fast path). Returns `false` if no persisted data was
+    /// found or it was invalid — in which case the caller should fall back to
+    /// `rebuild_vector_index()`.
+    fn load_vector_index(&mut self, base_dir: &std::path::Path) -> bool {
+        let vdir = base_dir.join("vector_index");
+        let manifest_path = vdir.join("manifest.json");
+
+        if !manifest_path.exists() {
+            return false;
+        }
+
+        // Create the appropriate backend (HNSW if the feature is enabled)
+        let mut vidx = crate::vector_index::create_default_vector_index();
+
+        match vidx.try_load_from_dir(&vdir) {
+            Ok(true) => {
+                self.vector_index = Some(vidx);
+                true
+            }
+            Ok(false) | Err(_) => {
+                // Persisted data was missing, incompatible, or corrupted.
+                // Fall back to full rebuild from the BlobStore.
+                false
+            }
+        }
+    }
+
     fn rebuild_vector_index(&mut self) {
         for i in 0..self.graph.node_count() {
             let id = NodeId(i as u32);
@@ -1290,6 +1335,30 @@ impl IndexedKnowledgeGraph {
                     .vector_index
                     .get_or_insert_with(|| crate::vector_index::create_default_vector_index());
                 vidx.add_vector(id, &emb);
+            }
+        }
+    }
+
+    /// After a successful fast load of a persisted vector index, this method
+    /// inserts any *new* nodes that have embeddings but are not yet present
+    /// in the vector index. This is the "delta sync" optimization.
+    fn sync_new_vectors(&mut self) {
+        if self.vector_index.is_none() {
+            self.vector_index = Some(crate::vector_index::create_default_vector_index());
+        }
+
+        if let Some(vidx) = &mut self.vector_index {
+            for i in 0..self.graph.node_count() {
+                let id = NodeId(i as u32);
+                if self.graph.is_node_deleted(id) {
+                    continue;
+                }
+                if vidx.contains_vector(id) {
+                    continue; // already have it — skip
+                }
+                if let Some(emb) = self.graph.read_embedding(id) {
+                    vidx.add_vector(id, &emb);
+                }
             }
         }
     }
@@ -1362,11 +1431,16 @@ impl IndexedKnowledgeGraph {
     ///
     /// Creates two subdirectories: `graph/` and `text_index/`.
     pub fn save_to_dir(&mut self, dir: &std::path::Path) -> Result<(), GraphError> {
-        // Save the graph part (KnowledgeGraph uses the established save_to_disk name)
+        // Save the graph part
         self.graph.save_to_disk(&dir.join("graph"))?;
 
-        // Save the text index (on-disk backend will actually write data)
+        // Save the text index
         self.text_index.save_to_dir(&dir.join("text_index"))?;
+
+        // Save the vector index (HNSW or brute-force) – best effort in Phase 3
+        if let Some(vidx) = &self.vector_index {
+            let _ = vidx.save_to_dir(&dir.join("vector_index"));
+        }
 
         Ok(())
     }
@@ -1398,8 +1472,15 @@ impl IndexedKnowledgeGraph {
             vector_index: None,
             merge_workers: Vec::new(),
         };
-        // Rebuild the vector index from embeddings stored in the BlobStore
-        result.rebuild_vector_index();
+
+        // Phase 3: Prefer fast load from persisted vector index if available.
+        if result.load_vector_index(dir) {
+            // Fast path succeeded → only sync new nodes (delta sync)
+            result.sync_new_vectors();
+        } else {
+            result.rebuild_vector_index();
+        }
+
         Ok(result)
     }
 
@@ -1428,8 +1509,14 @@ impl IndexedKnowledgeGraph {
             vector_index: None,
             merge_workers: Vec::new(),
         };
-        // Rebuild the vector index from embeddings stored in the BlobStore
-        result.rebuild_vector_index();
+
+        // Phase 3: Prefer fast vector load
+        if !result.load_vector_index(dir) {
+            result.rebuild_vector_index();
+        } else {
+            result.sync_new_vectors();
+        }
+
         Ok(result)
     }
 
