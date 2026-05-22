@@ -115,6 +115,82 @@ impl KnowledgeGraph {
             traversal_weight_property: None,
         }
     }
+
+    /// Returns all direct outgoing neighbors reached via an edge whose
+    /// `property == value`. Returns `(target_node, edge_strength)` pairs.
+    ///
+    /// Returns an empty `Vec` (never `Err`) when:
+    /// - `node` is out of bounds or deleted
+    /// - `property` is not registered in the graph
+    pub fn neighbors_by_relation(
+        &self,
+        node: NodeId,
+        property: &str,
+        value: PropertyValue,
+    ) -> Vec<(NodeId, f64)> {
+        let idx = node.0 as usize;
+        if idx >= self.nodes.len() || self.deleted.get(idx).copied().unwrap_or(true) {
+            return Vec::new();
+        }
+        let tag = match self.properties.get_tag(property) {
+            Some(t) => t,
+            None => return Vec::new(),
+        };
+        self.nodes[idx]
+            .outgoing
+            .iter()
+            .filter_map(|&eid| {
+                let edge = &self.edges[eid.0 as usize];
+                let matches = edge
+                    .properties
+                    .iter()
+                    .any(|(t, v)| *t == tag && *v == value);
+                if matches {
+                    Some((edge.target, edge.strength))
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
+
+    /// Returns all direct incoming predecessors connected via an edge whose
+    /// `property == value`. Returns `(source_node, edge_strength)` pairs.
+    ///
+    /// Returns an empty `Vec` (never `Err`) when:
+    /// - `node` is out of bounds or deleted
+    /// - `property` is not registered in the graph
+    pub fn predecessors_by_relation(
+        &self,
+        node: NodeId,
+        property: &str,
+        value: PropertyValue,
+    ) -> Vec<(NodeId, f64)> {
+        let idx = node.0 as usize;
+        if idx >= self.nodes.len() || self.deleted.get(idx).copied().unwrap_or(true) {
+            return Vec::new();
+        }
+        let tag = match self.properties.get_tag(property) {
+            Some(t) => t,
+            None => return Vec::new(),
+        };
+        self.nodes[idx]
+            .incoming
+            .iter()
+            .filter_map(|&eid| {
+                let edge = &self.edges[eid.0 as usize];
+                let matches = edge
+                    .properties
+                    .iter()
+                    .any(|(t, v)| *t == tag && *v == value);
+                if matches {
+                    Some((edge.source, edge.strength))
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
 }
 
 impl<'g> QueryBuilder<'g> {
@@ -480,5 +556,80 @@ mod weight_property_tests {
             .execute();
 
         assert!(results.iter().any(|r| r.node_id == dest));
+    }
+}
+
+#[cfg(test)]
+mod relation_neighbor_tests {
+    use crate::graph::KnowledgeGraph;
+    use crate::properties::PropertyValue;
+
+    #[test]
+    fn neighbors_by_relation_returns_matching_edges_only() {
+        let mut g = KnowledgeGraph::new();
+        let tag = g.properties.register("rel");
+
+        let a = g.add_node("a", None, None);
+        let b = g.add_node("b", None, None);
+        let c = g.add_node("c", None, None);
+
+        g.add_edge(a, b, 0.8, vec![(tag, PropertyValue::Label("supports".into()))]);
+        g.add_edge(a, c, 0.7, vec![(tag, PropertyValue::Label("opposes".into()))]);
+
+        let results = g.neighbors_by_relation(
+            a,
+            "rel",
+            PropertyValue::Label("supports".into()),
+        );
+
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].0, b);
+        assert!((results[0].1 - 0.8).abs() < 1e-10);
+    }
+
+    #[test]
+    fn predecessors_by_relation_returns_incoming_only() {
+        let mut g = KnowledgeGraph::new();
+        let tag = g.properties.register("kind");
+
+        let src = g.add_node("src", None, None);
+        let dst = g.add_node("dst", None, None);
+        let other = g.add_node("other", None, None);
+
+        g.add_edge(src,   dst, 0.9, vec![(tag, PropertyValue::Label("x".into()))]);
+        g.add_edge(other, dst, 0.5, vec![(tag, PropertyValue::Label("y".into()))]);
+
+        let preds = g.predecessors_by_relation(
+            dst,
+            "kind",
+            PropertyValue::Label("x".into()),
+        );
+
+        assert_eq!(preds.len(), 1);
+        assert_eq!(preds[0].0, src);
+    }
+
+    #[test]
+    fn neighbors_by_relation_empty_on_unknown_property() {
+        let mut g = KnowledgeGraph::new();
+        let a = g.add_node("a", None, None);
+        let b = g.add_node("b", None, None);
+        g.add_edge(a, b, 1.0, vec![]);
+
+        let results = g.neighbors_by_relation(a, "nonexistent", PropertyValue::Bool(true));
+        assert!(results.is_empty());
+    }
+
+    #[test]
+    fn neighbors_by_relation_empty_on_deleted_node() {
+        let mut g = KnowledgeGraph::new();
+        let tag = g.properties.register("r");
+        let a = g.add_node("a", None, None);
+        let b = g.add_node("b", None, None);
+        g.add_edge(a, b, 0.5, vec![(tag, PropertyValue::Bool(true))]);
+        g.remove_node(a);
+
+        let results = g.neighbors_by_relation(a, "r", PropertyValue::Bool(true));
+        assert!(results.is_empty());
     }
 }
