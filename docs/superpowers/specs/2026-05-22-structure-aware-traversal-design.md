@@ -143,9 +143,13 @@ For each outgoing edge `absorb → target`:
 - `target == keep`: self-loop post-merge → drop. `self_loops_dropped++`.
 - `existing_out` contains `target`:
   - Collision → merge:
-    - `keep_edge.strength = (keep_edge.strength + absorb_edge.strength) / 2.0`
+    - `keep_edge.strength = (a² + b²) / (a + b)` where `a` = keep edge strength,
+      `b` = absorb edge strength (guard: return `0.0` if `a + b == 0.0`).
+      This formula is always ≥ arithmetic mean and ≤ max — the weaker edge
+      contributes proportionally less, biasing the result toward the stronger
+      connection.
     - Properties: union of both; on key conflict, take value from the
-      higher-strength edge (the dominant one pre-average).
+      higher-strength edge (the dominant one, evaluated before averaging).
   - `edges_merged++`.
 - Otherwise: create new edge `keep → target` with absorb_edge's strength +
   properties. `edges_redirected++`.
@@ -157,7 +161,8 @@ Build `existing_in: HashMap<NodeId, EdgeId>` from keep's current incoming edges.
 For each incoming edge `source → absorb`:
 
 - `source == keep`: self-loop → drop. `self_loops_dropped++`.
-- `existing_in` contains `source`: merge (same rule as outgoing). `edges_merged++`.
+- `existing_in` contains `source`: merge using the same `(a² + b²) / (a + b)`
+  strength formula and property-conflict rule. `edges_merged++`.
 - Otherwise: create new edge `source → keep`. `edges_redirected++`.
 
 **Text and embedding (Option C):**
@@ -321,7 +326,7 @@ Each feature gets dedicated tests:
 - **`merge_nodes` — no collision**: two unconnected hubs, merge, verify edge
   counts and tombstone.
 - **`merge_nodes` — collision**: keep and absorb both have edge to same target,
-  verify averaged strength, merged properties, single edge after merge.
+  verify strength = `(a² + b²) / (a + b)`, merged properties, single edge after merge.
 - **`merge_nodes` — self-loop**: keep→absorb edge exists; verify dropped.
 - **`merge_nodes` — embedding propagation**: keep has none, absorb has one;
   verify keep gains it. Both have embeddings; verify keep's unchanged.
