@@ -56,8 +56,11 @@ pub mod vector_index; // ANN / vector index (0.3/0.4 Phase 0+)
 
 pub mod serialize; // Persistence (save/load + optional mmap) - Phase 3 in progress
 
+pub mod graph_ops; // Graph mutations (node merging, content updates)
+
 // Re-exports for ergonomic use
 pub use crate::index::TextIndex;
+pub use graph_ops::MergeReport;
 
 // Flat re-exports for the primary on-disk types (first-class public API).
 // Advanced/escape-hatch types (LocalDocId, Posting, SegmentBuilder, ActiveBuffer,
