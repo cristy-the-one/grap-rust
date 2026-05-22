@@ -263,6 +263,12 @@ impl<'g> QueryBuilder<'g> {
     ///
     /// Falls back to `edge.strength` for any edge that lacks the property.
     /// `min_strength` still gates on `edge.strength`, not on the property value.
+    ///
+    /// **Value range:** the property value is used directly as a multiplicative
+    /// weight. For well-behaved priority ordering, values should be in `[0.0, 1.0]`
+    /// (the same convention as `edge.strength`). Values outside this range will
+    /// produce `cumulative_strength` outside `[0.0, 1.0]` and may distort heap
+    /// ordering across multi-hop traversals.
     pub fn weight_by_property(mut self, name: &str) -> Self {
         if let Some(tag) = self.graph.properties.get_tag(name) {
             self.traversal_weight_property = Some(tag);
