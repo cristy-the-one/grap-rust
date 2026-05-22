@@ -11,7 +11,7 @@ import os
 import re
 import unicodedata
 from pathlib import Path
-from typing import Dict, Optional, Tuple
+from typing import Dict, Tuple
 
 from sentence_transformers import SentenceTransformer
 import pygrap
@@ -35,9 +35,10 @@ _DIACRITIC_MAP.update(str.maketrans("şţŞŢ", "stST"))
 _DEFINITE_TO_BASE: Dict[str, str] = {
     "LEGEA": "LEGE",
     "HOTARAREA": "HOTARARE",
-    "HOTARAREA": "HOTARARE",
+    "HOTARARILE": "HOTARARE",
+    "HOTARARILOR": "HOTARARE",
     "DECIZIA": "DECIZIE",
-    "NORMA": "NORMA",
+    "DECIZIEI": "DECIZIE",
 }
 
 
