@@ -1269,12 +1269,15 @@ impl IndexedKnowledgeGraph {
             merge_workers: Vec::new(),
         };
 
-        // Rebuild the index (simple and correct)
+        // Rebuild the text index (simple and correct)
         for i in 0..ig.graph.node_count() {
             let id = NodeId(i as u32);
             let text = ig.graph.read_blob(id);
             ig.text_index.index_document(id, text);
         }
+
+        // Rebuild the vector index from stored embeddings
+        ig.rebuild_vector_index();
 
         Ok(ig)
     }
@@ -1285,6 +1288,26 @@ impl IndexedKnowledgeGraph {
     /// Delegates to [`KnowledgeGraph::load_meta`].
     pub fn load_meta(dir: &std::path::Path) -> Result<crate::serialize::GraphMeta, GraphError> {
         KnowledgeGraph::load_meta(dir)
+    }
+
+    /// Rebuild the vector index from embeddings stored in the graph.
+    ///
+    /// Called after any load path (`load_from_disk`, `load_from_dir`, `load_mmap`)
+    /// because the ANN index is an in-memory acceleration structure — embeddings
+    /// are persisted via the `BlobStore`; the index is always derived from them.
+    fn rebuild_vector_index(&mut self) {
+        for i in 0..self.graph.node_count() {
+            let id = NodeId(i as u32);
+            if self.graph.is_node_deleted(id) {
+                continue;
+            }
+            if let Some(emb) = self.graph.read_embedding(id) {
+                let vidx = self
+                    .vector_index
+                    .get_or_insert_with(|| crate::vector_index::create_default_vector_index());
+                vidx.add_vector(id, &emb);
+            }
+        }
     }
 
     /// Attempts to repair a potentially corrupted graph directory.
@@ -1385,12 +1408,15 @@ impl IndexedKnowledgeGraph {
             Box::new(InvertedIndex::new())
         };
 
-        Ok(Self {
+        let mut result = Self {
             graph,
             text_index,
             vector_index: None,
             merge_workers: Vec::new(),
-        })
+        };
+        // Rebuild the vector index from embeddings stored in the BlobStore
+        result.rebuild_vector_index();
+        Ok(result)
     }
 
     /// Loads an `IndexedKnowledgeGraph` from `dir` using memory-mapped I/O for the graph data.
@@ -1412,12 +1438,15 @@ impl IndexedKnowledgeGraph {
             Box::new(InvertedIndex::new())
         };
 
-        Ok(Self {
+        let mut result = Self {
             graph,
             text_index,
             vector_index: None,
             merge_workers: Vec::new(),
-        })
+        };
+        // Rebuild the vector index from embeddings stored in the BlobStore
+        result.rebuild_vector_index();
+        Ok(result)
     }
 
     /// Loads an `IndexedKnowledgeGraph` from `dir`.
@@ -1598,6 +1627,22 @@ mod tests {
         let tokens2 = tok.tokenize("THE quick brown fox");
         let words2: Vec<&str> = tokens2.iter().map(|(w, _)| *w).collect();
         assert!(!words2.contains(&"THE"), "'THE' mid-string should be filtered as a stop word");
+    }
+
+    #[test]
+    fn vector_index_survives_save_load() {
+        use tempfile::tempdir;
+        let dir = tempdir().unwrap();
+        let mut g = IndexedKnowledgeGraph::new();
+        let n0 = g.add_node("rust ownership", None, Some(&[1.0f32, 0.0, 0.0]));
+        let _n1 = g.add_node("python gc", None, Some(&[0.0f32, 1.0, 0.0]));
+        g.save_to_dir(dir.path()).unwrap();
+
+        let loaded = IndexedKnowledgeGraph::load_from_dir(dir.path()).unwrap();
+        let results = loaded.vector_search(&[1.0f32, 0.0, 0.0], 2);
+        let ids: Vec<u32> = results.iter().map(|(n, _)| n.0).collect();
+        assert!(ids.contains(&n0.0), "n0 must be found after load");
+        assert!(!ids.is_empty());
     }
 
     #[test]

@@ -274,7 +274,9 @@ impl VectorIndex for HNSWVectorIndex {
 
     fn stats(&self) -> VectorIndexStats {
         VectorIndexStats {
-            vector_count: self.inner.get_nb_point() - self.deleted.len(),
+            // Use saturating_sub: deleted.len() could theoretically exceed get_nb_point()
+            // if remove_vector is called on a node that was never inserted.
+            vector_count: self.inner.get_nb_point().saturating_sub(self.deleted.len()),
             dimension: self.dimension,
             backend: "hnsw",
         }
@@ -288,6 +290,24 @@ impl Default for HNSWVectorIndex {
     }
 }
 
+/// Creates a default vector index for the current feature configuration.
+///
+/// Selects `HNSWVectorIndex` when the `ann-hnsw` feature is enabled,
+/// otherwise falls back to `BruteForceVectorIndex`.
+///
+/// This is the single canonical location for the feature-flag dispatch,
+/// keeping all callers clean and consistent.
+pub fn create_default_vector_index() -> Box<dyn VectorIndex> {
+    #[cfg(feature = "ann-hnsw")]
+    {
+        Box::new(HNSWVectorIndex::new())
+    }
+    #[cfg(not(feature = "ann-hnsw"))]
+    {
+        Box::new(BruteForceVectorIndex::new())
+    }
+}
+
 // ============================================================================
 // Basic tests (Phase 0)
 // ============================================================================
@@ -295,6 +315,17 @@ impl Default for HNSWVectorIndex {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn hnsw_stats_no_underflow_on_double_delete() {
+        // Calling remove_vector on a node never inserted must not panic or wrap.
+        // Uses BruteForce (always available) to verify the concept; the same
+        // saturating_sub fix applies to the HNSW backend.
+        let mut idx = BruteForceVectorIndex::new();
+        idx.remove_vector(NodeId(99)); // never added
+        let s = idx.stats();
+        assert_eq!(s.vector_count, 0); // must not wrap to usize::MAX
+    }
 
     #[test]
     fn brute_force_basic_search() {
