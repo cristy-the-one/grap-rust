@@ -34,6 +34,11 @@ pub struct GraphQuery {
     pub max_results: usize,
     /// If `true`, results are sorted by cumulative path strength (highest first).
     pub sort_by_strength: bool,
+    /// If `Some(tag)`, use the named edge property's numeric value as the
+    /// traversal priority weight instead of `edge.strength`.
+    /// Falls back to `edge.strength` when the property is absent on a given edge.
+    /// `None` (default) preserves existing behaviour exactly.
+    pub traversal_weight_property: Option<PropertyTag>,
 }
 
 /// A single result returned by a graph traversal.
@@ -63,6 +68,7 @@ pub struct QueryBuilder<'g> {
     max_depth: u32,
     max_results: usize,
     sort_by_strength: bool,
+    traversal_weight_property: Option<PropertyTag>,
 }
 
 impl std::fmt::Debug for QueryBuilder<'_> {
@@ -106,6 +112,7 @@ impl KnowledgeGraph {
             max_depth: 3,
             max_results: 100,
             sort_by_strength: true,
+            traversal_weight_property: None,
         }
     }
 }
@@ -147,6 +154,22 @@ impl<'g> QueryBuilder<'g> {
         self
     }
 
+    /// Use a named edge property's numeric value as the traversal priority weight.
+    ///
+    /// The property must have been registered via
+    /// `KnowledgeGraph::properties.register` before building edges. Unregistered
+    /// names are silently ignored (behaviour is identical to calling without this
+    /// method).
+    ///
+    /// Falls back to `edge.strength` for any edge that lacks the property.
+    /// `min_strength` still gates on `edge.strength`, not on the property value.
+    pub fn weight_by_property(mut self, name: &str) -> Self {
+        if let Some(tag) = self.graph.properties.get_tag(name) {
+            self.traversal_weight_property = Some(tag);
+        }
+        self
+    }
+
     /// Set the minimum cumulative path strength required to keep expanding.
     pub fn min_strength(mut self, s: f64) -> Self {
         self.min_strength = s;
@@ -179,6 +202,7 @@ impl<'g> QueryBuilder<'g> {
             max_depth: self.max_depth,
             max_results: self.max_results,
             sort_by_strength: self.sort_by_strength,
+            traversal_weight_property: self.traversal_weight_property,
         };
         self.graph.query(&q)
     }
@@ -300,9 +324,22 @@ impl KnowledgeGraph {
                 let mut new_path = entry.path.clone();
                 new_path.push(edge_id);
 
+                let w = match q.traversal_weight_property {
+                    Some(tag) => edge
+                        .properties
+                        .iter()
+                        .find(|(t, _)| *t == tag)
+                        .and_then(|(_, v)| match v {
+                            PropertyValue::Float(f) => Some(*f),
+                            PropertyValue::Int(i)   => Some(*i as f64),
+                            _ => None,
+                        })
+                        .unwrap_or(edge.strength),
+                    None => edge.strength,
+                };
                 heap.push(QueueEntry {
                     node: target,
-                    cumulative_strength: entry.cumulative_strength * edge.strength,
+                    cumulative_strength: entry.cumulative_strength * w,
                     depth: entry.depth + 1,
                     path: new_path,
                 });
@@ -368,3 +405,80 @@ impl KnowledgeGraph {
 
 // The internal Edge type is currently private in graph.rs; we need a small bridge.
 // For the initial skeleton we accept the stub above. Real impl will move the fn or make Edge pub(crate).
+
+#[cfg(test)]
+mod weight_property_tests {
+    use crate::graph::KnowledgeGraph;
+    use crate::properties::PropertyValue;
+
+    #[test]
+    fn weight_by_property_selects_higher_confidence_path() {
+        let mut g = KnowledgeGraph::new();
+        let tag = g.properties.register("confidence");
+
+        let start  = g.add_node("start",  None, None);
+        let hi     = g.add_node("hi",     None, None);  // high confidence path
+        let lo     = g.add_node("lo",     None, None);  // low confidence path
+
+        // Both edges have equal `strength = 0.5`, but different `confidence` properties.
+        g.add_edge(start, hi, 0.5, vec![(tag, PropertyValue::Float(0.9))]);
+        g.add_edge(start, lo, 0.5, vec![(tag, PropertyValue::Float(0.1))]);
+
+        let results = g
+            .find()
+            .from_node(start)
+            .weight_by_property("confidence")
+            .depth(1)
+            .limit(10)
+            .execute();
+
+        // `hi` must appear before `lo` because its confidence weight is higher.
+        let hi_pos = results.iter().position(|r| r.node_id == hi).unwrap();
+        let lo_pos = results.iter().position(|r| r.node_id == lo).unwrap();
+        assert!(hi_pos < lo_pos, "hi-confidence node must rank before lo-confidence node");
+    }
+
+    #[test]
+    fn weight_by_property_falls_back_when_absent() {
+        let mut g = KnowledgeGraph::new();
+        let _tag = g.properties.register("confidence");
+
+        let start = g.add_node("start", None, None);
+        let dest  = g.add_node("dest",  None, None);
+        // Edge has NO confidence property — fallback to edge.strength
+        g.add_edge(start, dest, 0.7, vec![]);
+
+        let results = g
+            .find()
+            .from_node(start)
+            .weight_by_property("confidence")
+            .depth(1)
+            .limit(5)
+            .execute();
+
+        // `dest` must still be reachable
+        assert!(results.iter().any(|r| r.node_id == dest));
+        let dest_result = results.iter().find(|r| r.node_id == dest).unwrap();
+        // cumulative_strength should equal edge.strength (the fallback)
+        assert!((dest_result.cumulative_strength - 0.7).abs() < 1e-10);
+    }
+
+    #[test]
+    fn weight_by_property_unknown_name_is_noop() {
+        let mut g = KnowledgeGraph::new();
+        let start = g.add_node("start", None, None);
+        let dest  = g.add_node("dest",  None, None);
+        g.add_edge(start, dest, 0.6, vec![]);
+
+        // "nonexistent" is not in the registry — should silently ignore
+        let results = g
+            .find()
+            .from_node(start)
+            .weight_by_property("nonexistent")
+            .depth(1)
+            .limit(5)
+            .execute();
+
+        assert!(results.iter().any(|r| r.node_id == dest));
+    }
+}
