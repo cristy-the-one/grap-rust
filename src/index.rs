@@ -883,6 +883,40 @@ impl IndexedKnowledgeGraph {
         Ok(())
     }
 
+    /// Merge `absorb` into `keep` and update all indexes.
+    ///
+    /// Delegates to [`KnowledgeGraph::merge_nodes`] for graph topology, then:
+    /// - Removes `absorb` from the text and vector indexes.
+    /// - If `keep` gained `absorb`'s embedding, replaces `keep`'s vector index entry.
+    ///
+    /// # Errors
+    /// Returns `GraphError::Other` if either node is out of bounds or deleted.
+    pub fn merge_nodes(
+        &mut self,
+        keep: crate::NodeId,
+        absorb: crate::NodeId,
+    ) -> Result<crate::MergeReport, crate::GraphError> {
+        let report = self.graph.merge_nodes(keep, absorb)?;
+
+        // Remove absorbed node from indexes
+        self.text_index.delete_document(absorb);
+        if let Some(vidx) = &mut self.vector_index {
+            vidx.remove_vector(absorb);
+        }
+
+        // If keep gained absorb's embedding, update the vector index for keep
+        if report.embedding_updated {
+            if let Some(new_emb) = self.graph.read_embedding(keep) {
+                if let Some(vidx) = &mut self.vector_index {
+                    vidx.remove_vector(keep);
+                    vidx.add_vector(keep, &new_emb);
+                }
+            }
+        }
+
+        Ok(report)
+    }
+
     /// Perform a pure (standalone) vector similarity search.
     ///
     /// Uses the configured `VectorIndex` (HNSW when the `ann-hnsw` feature is enabled,
@@ -1827,5 +1861,47 @@ mod tests {
             // This is a soft assertion — mainly to exercise the path
             assert!(phrase[0].score > 0.0);
         }
+    }
+}
+
+#[cfg(test)]
+mod merge_node_tests {
+    use crate::index::{IndexedKnowledgeGraph, InvertedIndex};
+
+    fn make_graph() -> IndexedKnowledgeGraph {
+        IndexedKnowledgeGraph::with_text_index(Box::new(InvertedIndex::new()))
+    }
+
+    #[test]
+    fn indexed_merge_returns_report() {
+        let mut g = make_graph();
+        let keep   = g.add_node("keep node", None, None);
+        let absorb = g.add_node("absorb node", None, None);
+        let other  = g.add_node("other", None, None);
+        g.add_edge(absorb, other, 0.7, vec![]);
+
+        let report = g.merge_nodes(keep, absorb).unwrap();
+
+        assert_eq!(report.absorbed, absorb);
+        assert_eq!(report.edges_redirected, 1);
+        assert!(g.graph.is_node_deleted(absorb));
+    }
+
+    #[test]
+    fn indexed_merge_updates_vector_index() {
+        let mut g = make_graph();
+        g.vector_index = Some(Box::new(crate::BruteForceVectorIndex::new()));
+
+        let keep   = g.add_node("keep", None, None);                     // no embedding
+        let absorb = g.add_node("absorb", None, Some(&[1.0f32, 0.0]));   // has embedding
+
+        let report = g.merge_nodes(keep, absorb).unwrap();
+
+        assert!(report.embedding_updated);
+        // keep should now be findable in vector search
+        let results = g.vector_search(&[1.0f32, 0.0], 5);
+        assert!(results.iter().any(|(n, _)| n.0 == keep.0));
+        // absorb must be gone from vector index
+        assert!(!g.vector_index.as_ref().unwrap().contains_vector(absorb));
     }
 }
