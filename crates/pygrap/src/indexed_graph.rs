@@ -4,10 +4,10 @@ use std::path::PathBuf;
 use std::time::Duration;
 
 use pyo3::prelude::*;
-use pyo3::types::{PyAny, PyType};
+use pyo3::types::{PyAny, PyDict, PyType};
 
 use crate::errors::to_py_err;
-use grap::{FusionWeights, HybridWeights, IndexedKnowledgeGraph as InnerGraph};
+use grap::{FusionWeights, HybridWeights, IndexedKnowledgeGraph as InnerGraph, NodeId, PropertyValue};
 
 /// Result returned by `IndexedKnowledgeGraph.merge_nodes(keep, absorb)`.
 #[pyclass(get_all)]
@@ -91,6 +91,28 @@ impl QueryResult {
             self.node, self.fused_score, self.text_score, self.vector_score, self.graph_strength, self.depth
         )
     }
+}
+
+/// Convert a Python object to a `PropertyValue`.
+///
+/// IMPORTANT: bool MUST be checked before int — in Python, `bool` is a subtype
+/// of `int`, so `extract::<i64>()` would succeed for `True`/`False` as well.
+fn py_to_property_value(val: &Bound<'_, PyAny>) -> PyResult<PropertyValue> {
+    if let Ok(b) = val.extract::<bool>() {
+        return Ok(PropertyValue::Bool(b));
+    }
+    if let Ok(i) = val.extract::<i64>() {
+        return Ok(PropertyValue::Int(i));
+    }
+    if let Ok(f) = val.extract::<f64>() {
+        return Ok(PropertyValue::Float(f));
+    }
+    if let Ok(s) = val.extract::<String>() {
+        return Ok(PropertyValue::Label(s));
+    }
+    Err(pyo3::exceptions::PyTypeError::new_err(
+        "cannot convert to PropertyValue: expected str, int, float, or bool",
+    ))
 }
 
 #[pymethods]
@@ -189,6 +211,65 @@ impl IndexedKnowledgeGraph {
         let emb_ref: Option<&[f32]> = embedding.as_deref();
         let id = self.inner.add_node(text, label, emb_ref);
         Ok(id.0)
+    }
+
+    /// Add a directed edge between two nodes with optional property dict.
+    ///
+    /// `properties` is an optional Python dict `{str: any}` where values must be
+    /// `str`, `int`, `float`, or `bool`. Property names are auto-registered.
+    ///
+    /// Returns nothing (panics on OOB node IDs, consistent with Rust behaviour).
+    #[pyo3(signature = (source, target, strength, properties=None))]
+    fn add_edge(
+        &mut self,
+        source: u32,
+        target: u32,
+        strength: f64,
+        properties: Option<&Bound<'_, PyDict>>,
+    ) -> PyResult<()> {
+        let mut props = Vec::new();
+        if let Some(dict) = properties {
+            for (key, val) in dict.iter() {
+                let name: String = key.extract()?;
+                let tag = self.inner.graph.properties.register(&name);
+                let pv = py_to_property_value(&val)?;
+                props.push((tag, pv));
+            }
+        }
+        self.inner.add_edge(NodeId(source), NodeId(target), strength, props);
+        Ok(())
+    }
+
+    /// Return the full stored text for a node.
+    ///
+    /// Raises `ValueError` if the node ID is out of bounds or deleted.
+    fn get_node_text(&self, id: u32) -> PyResult<String> {
+        self.inner
+            .graph
+            .try_read_blob(NodeId(id))
+            .map(|s| s.to_string())
+            .ok_or_else(|| {
+                pyo3::exceptions::PyValueError::new_err(format!(
+                    "node {} is out of bounds or deleted",
+                    id
+                ))
+            })
+    }
+
+    /// Return the label of a node, or `None` if it has no label.
+    ///
+    /// Raises `ValueError` if the node ID is out of bounds or deleted.
+    fn get_node_label(&self, id: u32) -> PyResult<Option<String>> {
+        self.inner
+            .graph
+            .try_node_label(NodeId(id))
+            .map(|opt| opt.map(|s| s.to_string()))
+            .ok_or_else(|| {
+                pyo3::exceptions::PyValueError::new_err(format!(
+                    "node {} is out of bounds or deleted",
+                    id
+                ))
+            })
     }
 
     /// Perform hybrid text + graph search.
