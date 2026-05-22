@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  pygrap:
+    build: .
+    container_name: pygrap-template
+    volumes:
+      # Mount your documents (read/write)
+      - ./documents:/app/documents
+      # Persist the grap database
+      - ./graph:/app/graph
+    environment:
+      - GRAP_DIR=/app/graph
+      - DOCS_DIR=/app/documents
+      - EMBEDDING_MODEL=all-MiniLM-L6-v2
+    # Example usage:
+    #   docker compose run --rm pygrap python ingest.py
+    #   docker compose run --rm pygrap python query.py
+    #   docker compose run --rm pygrap bash
