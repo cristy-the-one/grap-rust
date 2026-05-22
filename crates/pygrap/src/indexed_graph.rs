@@ -63,6 +63,16 @@ impl TraversalResult {
     }
 }
 
+impl From<grap::QueryResult> for TraversalResult {
+    fn from(r: grap::QueryResult) -> Self {
+        TraversalResult {
+            node_id: r.node_id.0,
+            depth: r.depth,
+            strength: r.cumulative_strength,
+        }
+    }
+}
+
 #[pyclass]
 pub struct IndexedKnowledgeGraph {
     inner: InnerGraph,
@@ -314,6 +324,62 @@ impl IndexedKnowledgeGraph {
             .merge_nodes(NodeId(keep), NodeId(absorb))
             .map(MergeReport::from)
             .map_err(to_py_err)
+    }
+
+    /// Return all outgoing neighbors of `node` whose edges have a property
+    /// matching `(property_name, value)`.
+    ///
+    /// Returns a list of `(node_id, strength)` tuples.
+    /// `value` must be `str`, `int`, `float`, or `bool`.
+    fn neighbors_by_relation(
+        &self,
+        node: u32,
+        property_name: &str,
+        value: &Bound<'_, PyAny>,
+    ) -> PyResult<Vec<(u32, f64)>> {
+        let pv = py_to_property_value(value)?;
+        let results = self.inner.neighbors_by_relation(NodeId(node), property_name, pv);
+        Ok(results.into_iter().map(|(id, s)| (id.0, s)).collect())
+    }
+
+    /// Return all incoming neighbors of `node` whose edges have a property
+    /// matching `(property_name, value)`.
+    ///
+    /// Returns a list of `(node_id, strength)` tuples.
+    /// `value` must be `str`, `int`, `float`, or `bool`.
+    fn predecessors_by_relation(
+        &self,
+        node: u32,
+        property_name: &str,
+        value: &Bound<'_, PyAny>,
+    ) -> PyResult<Vec<(u32, f64)>> {
+        let pv = py_to_property_value(value)?;
+        let results = self.inner.predecessors_by_relation(NodeId(node), property_name, pv);
+        Ok(results.into_iter().map(|(id, s)| (id.0, s)).collect())
+    }
+
+    /// BFS traversal from `node` following edges that match `(property_name, value)`.
+    ///
+    /// Returns a list of `TraversalResult` objects (node_id, depth, strength).
+    /// `value` must be `str`, `int`, `float`, or `bool`.
+    #[pyo3(signature = (node, property_name, value, depth=3, max_results=50))]
+    fn traverse_by_relation(
+        &self,
+        node: u32,
+        property_name: &str,
+        value: &Bound<'_, PyAny>,
+        depth: u32,
+        max_results: usize,
+    ) -> PyResult<Vec<TraversalResult>> {
+        let pv = py_to_property_value(value)?;
+        let results = self.inner.traverse_by_relation(
+            NodeId(node),
+            property_name,
+            pv,
+            depth,
+            max_results,
+        );
+        Ok(results.into_iter().map(TraversalResult::from).collect())
     }
 
     /// Perform hybrid text + graph search.
