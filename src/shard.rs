@@ -933,6 +933,34 @@ impl ShardRouter {
         all_results
     }
 
+    /// Standalone vector similarity search across all shards.
+    ///
+    /// Performs `vector_search` on every shard and merges the top results.
+    /// This is a simple but effective implementation for Phase 2.
+    pub fn vector_search(&self, query: &[f32], top_k: usize) -> Vec<(GlobalNodeId, f64)> {
+        let mut all_results: Vec<(GlobalNodeId, f64)> = Vec::new();
+
+        for (shard_idx, shard) in self.shards.iter().enumerate() {
+            let local_results = shard.graph.vector_search(query, top_k * 2);
+
+            for (local_id, score) in local_results {
+                let gid = GlobalNodeId {
+                    shard: ShardId(shard_idx as u16),
+                    local: local_id,
+                };
+                all_results.push((gid, score));
+            }
+        }
+
+        // Global sort by score descending and truncate
+        all_results.sort_by(|a, b| {
+            b.1.partial_cmp(&a.1)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+        all_results.truncate(top_k);
+        all_results
+    }
+
     /// Compute which nodes would need to move if we changed the number of shards.
     pub fn plan_rebalance(&self, new_shard_count: u16) -> RebalancePlan {
         let new_ring = ConsistentHashRing::new(new_shard_count, 150);
@@ -1223,6 +1251,13 @@ impl ShardedGraph {
             max_results,
             weights,
         )
+    }
+
+    /// Standalone approximate vector similarity search across the entire sharded cluster.
+    ///
+    /// Returns up to `top_k` global nodes with their cosine similarity scores.
+    pub fn vector_search(&self, query: &[f32], top_k: usize) -> Vec<(GlobalNodeId, f64)> {
+        self.router.vector_search(query, top_k)
     }
 
     /// Access the underlying router if you need lower-level control.

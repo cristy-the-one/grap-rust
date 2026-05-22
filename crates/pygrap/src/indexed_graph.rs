@@ -260,6 +260,17 @@ impl IndexedKnowledgeGraph {
             .collect())
     }
 
+    /// Standalone approximate nearest neighbor search using the vector index (HNSW or brute-force).
+    ///
+    /// Returns up to `top_k` results as `(node_id, similarity_score)`.
+    fn vector_search(&self, embedding: Vec<f32>, top_k: usize) -> PyResult<Vec<(u32, f64)>> {
+        let results = self.inner.vector_search(&embedding, top_k);
+        Ok(results
+            .into_iter()
+            .map(|(node_id, score)| (node_id.0, score))
+            .collect())
+    }
+
     /// Start background merge/vacuum workers.
     fn start_background_workers(&mut self, interval_ms: u64) -> usize {
         self.inner

@@ -220,6 +220,17 @@ impl ShardedGraph {
             .collect())
     }
 
+    /// Standalone vector similarity search across the sharded cluster.
+    ///
+    /// Returns up to `top_k` results as `((shard_id, local_id), similarity_score)`.
+    fn vector_search(&self, embedding: Vec<f32>, top_k: usize) -> PyResult<Vec<((u16, u32), f64)>> {
+        let results = self.inner.vector_search(&embedding, top_k);
+        Ok(results
+            .into_iter()
+            .map(|(gid, score)| ((gid.shard.0, gid.local.0), score))
+            .collect())
+    }
+
     /// Compute a rebalance plan (mainly for inspection / dry-run).
     fn plan_rebalance(&self, target_shards: u16) -> PyResult<RebalancePlanPy> {
         let plan = self.inner.plan_rebalance(target_shards);

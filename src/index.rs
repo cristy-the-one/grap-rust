@@ -866,10 +866,17 @@ impl IndexedKnowledgeGraph {
         id
     }
 
-    /// Perform a pure vector similarity search using the configured vector index
-    /// (or a brute-force fallback if none has been created yet).
+    /// Perform a pure (standalone) vector similarity search.
     ///
-    /// Returns up to `top_k` nodes ordered by descending similarity (cosine).
+    /// Uses the configured `VectorIndex` (HNSW when the `ann-hnsw` feature is enabled,
+    /// otherwise a brute-force fallback).
+    ///
+    /// Returns up to `top_k` nodes with their cosine similarity scores (higher = more similar).
+    ///
+    /// This method is independent of text search and graph traversal. It is useful for:
+    /// - Pure semantic search
+    /// - Building custom hybrid pipelines
+    /// - Debugging / inspecting what the vector index "sees"
     pub fn vector_search(&self, query: &[f32], top_k: usize) -> Vec<(NodeId, f64)> {
         if let Some(vidx) = &self.vector_index {
             vidx.search(query, top_k)

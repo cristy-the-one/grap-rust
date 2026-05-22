@@ -229,4 +229,27 @@ fn main() {
     );
     println!("   You can now tune HybridWeights to emphasize semantic similarity (vector),");
     println!("   keyword matching (text), or relationship strength (graph).");
+
+    // =====================================================================
+    // Standalone Vector Search (new in Phase 2)
+    // =====================================================================
+    println!("\n=== Standalone Vector Search ===\n");
+
+    // Pure vector search — find nodes most similar to the "concurrency + safety" embedding
+    let pure_vector_results = g.vector_search(concurrency_safety_query, 5);
+
+    println!("Top 5 nodes by vector similarity to 'concurrency + safety' embedding:");
+    for (i, (node_id, score)) in pure_vector_results.iter().enumerate() {
+        let text = g.read_blob(*node_id);
+        println!(
+            "{}. score={:.3}  node={}  — {}",
+            i + 1,
+            score,
+            node_id,
+            text.chars().take(70).collect::<String>()
+        );
+    }
+
+    println!("\n✅ Standalone vector_search works independently of text or graph traversal.");
+    println!("   Combine it with search_and_traverse_hybrid for the full three-way experience.");
 }
