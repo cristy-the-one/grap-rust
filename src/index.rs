@@ -966,14 +966,19 @@ impl IndexedKnowledgeGraph {
 
     /// High-level hybrid "text + vector + graph" query.
     ///
-    /// 1. Runs BM25 text search to obtain high-quality seed nodes (same as `search_and_traverse`).
-    /// 2. Expands using the normal graph traversal.
-    /// 3. For every reached node that has a stored embedding, computes cosine similarity against
-    ///    the provided `vector` (if any).
-    /// 4. Fuses the three signals using the supplied [`HybridWeights`].
+    /// Seed selection strategy (Phase 2 integration):
+    /// 1. Always runs BM25 text search for high-quality textual seeds.
+    /// 2. If a `vector` is provided **and** a `VectorIndex` (HNSW or brute-force) exists,
+    ///    we also pull approximate nearest neighbors from the vector index as additional seeds.
+    /// 3. The union of text + vector seeds is used to start graph traversal.
+    /// 4. Final ranking uses three-way fusion via [`HybridWeights`] (text / vector / graph).
     ///
-    /// When `vector` is `None`, the method behaves exactly like `search_and_traverse` with
-    /// `vector_score` set to 0.0 for all results.
+    /// Nodes proposed directly by the ANN get a strong pre-computed `vector_score`.
+    /// Nodes reached only through graph expansion still receive a `vector_score` via
+    /// on-the-fly cosine if they have an embedding stored.
+    ///
+    /// When `vector` is `None` (or no vector index is present), behavior is identical
+    /// to the non-hybrid `search_and_traverse`.
     pub fn search_and_traverse_hybrid(
         &self,
         text_query: &str,
@@ -985,21 +990,48 @@ impl IndexedKnowledgeGraph {
         max_results: usize,
         weights: HybridWeights,
     ) -> Vec<CombinedResult<'_>> {
+        // --- 1. Collect text seeds (BM25) ---
         let text_results = self.text_index.search(text_query, max_seeds);
+        let mut text_seed_scores: std::collections::HashMap<NodeId, f64> =
+            text_results.into_iter().collect();
 
-        if text_results.is_empty() {
+        // --- 2. Collect vector seeds (from ANN / VectorIndex) if a query vector was provided ---
+        let mut vector_seed_scores: std::collections::HashMap<NodeId, f64> =
+            std::collections::HashMap::new();
+
+        if let Some(qvec) = vector {
+            if let Some(vidx) = &self.vector_index {
+                // Pull a bit more vector candidates than text seeds for better recall
+                let vector_budget = max_seeds.max(8) * 2;
+                let vec_candidates = vidx.search(qvec, vector_budget);
+
+                for (node, sim) in vec_candidates {
+                    // Store the best vector similarity seen for this node as a seed
+                    let entry = vector_seed_scores.entry(node).or_insert(0.0);
+                    if sim > *entry {
+                        *entry = sim;
+                    }
+                }
+            }
+        }
+
+        // --- 3. Build the union of seeds for graph traversal ---
+        let mut all_seeds: Vec<NodeId> = text_seed_scores.keys().copied().collect();
+        for &node in vector_seed_scores.keys() {
+            if !text_seed_scores.contains_key(&node) {
+                all_seeds.push(node);
+            }
+        }
+
+        if all_seeds.is_empty() {
             return Vec::new();
         }
 
-        let seed_ids: Vec<NodeId> = text_results.iter().map(|(id, _)| *id).collect();
-
-        let seed_scores: std::collections::HashMap<NodeId, f64> =
-            text_results.iter().map(|(id, sc)| (*id, *sc)).collect();
-
+        // --- 4. Run graph traversal from the combined seeds ---
         let mut builder = self
             .graph
             .find()
-            .from_nodes(&seed_ids)
+            .from_nodes(&all_seeds)
             .min_strength(min_strength)
             .depth(max_depth)
             .limit(max_results);
@@ -1010,15 +1042,22 @@ impl IndexedKnowledgeGraph {
 
         let graph_results = builder.execute_with_text();
 
-        // Build combined results with all three signals
+        // --- 5. Build rich results with proper three-way scores ---
         let mut combined: Vec<CombinedResult> = graph_results
             .into_iter()
             .map(|(gr, text)| {
-                let text_score = seed_scores.get(&gr.node_id).copied().unwrap_or(0.0);
+                let node = gr.node_id;
 
-                // Vector score (cosine) if both query vector and node embedding exist
-                let vector_score = if let Some(qvec) = vector {
-                    self.read_embedding(gr.node_id)
+                // Text score: from BM25 seeds (0 if the node only came via vector or graph expansion)
+                let text_score = text_seed_scores.get(&node).copied().unwrap_or(0.0);
+
+                // Vector score priority:
+                //   1. Pre-computed from vector seed (best case — direct ANN hit)
+                //   2. On-the-fly cosine for nodes that have embeddings (graph-expanded nodes)
+                let vector_score = if let Some(precomputed) = vector_seed_scores.get(&node) {
+                    *precomputed
+                } else if let Some(qvec) = vector {
+                    self.read_embedding(node)
                         .map(|node_vec| cosine_similarity(qvec, &node_vec))
                         .unwrap_or(0.0)
                 } else {
@@ -1027,7 +1066,6 @@ impl IndexedKnowledgeGraph {
 
                 let graph_strength = gr.cumulative_strength;
 
-                // Weighted fusion (callers should typically make the weights sum to ~1.0)
                 let fused_score = text_score * weights.text
                     + vector_score * weights.vector
                     + graph_strength * weights.graph;
@@ -1043,7 +1081,7 @@ impl IndexedKnowledgeGraph {
             })
             .collect();
 
-        // Re-rank by the hybrid fused score
+        // Re-rank by fused hybrid score
         combined.sort_by(|a, b| {
             b.fused_score
                 .partial_cmp(&a.fused_score)
