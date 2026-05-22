@@ -1,7 +1,7 @@
 # Design: Approximate Nearest Neighbor (ANN) Index for grap
 
-**Status**: Design Phase (post 0.3 Python + Vector foundation)  
-**Target**: 0.3 late / 0.4 implementation  
+**Status**: Implemented (Phases 0–2 complete, post-review refinements applied)  
+**Target**: 0.3 late / 0.4  
 **Owner**: Core Engine Team
 
 ---
@@ -18,7 +18,7 @@ Add a first-class Approximate Nearest Neighbor (ANN) index that enables *sub-lin
 - Use **HNSW** (Hierarchical Navigable Small World) as the initial ANN algorithm (in-memory).
 - Introduce a `VectorIndex` trait modeled directly on the successful `TextIndex` trait.
 - Each `IndexedKnowledgeGraph` (and therefore each shard) owns its own ANN index.
-- For v1, the ANN index is **rebuilt on load** from the canonical embeddings stored in the `BlobStore`. This dramatically simplifies persistence and mutability.
+- For v1, the ANN index is **rebuilt on load** from the canonical embeddings stored in the `BlobStore` using an explicit `rebuild_vector_index()` method. This dramatically simplifies persistence and mutability while avoiding the pitfall of silently losing the index on reload.
 - Primary integration: when a query vector is supplied to `search_and_traverse_hybrid`, the ANN index proposes the top vector-similar nodes as additional (or primary) seeds for graph traversal.
 
 This design preserves `grap`'s architectural strengths (hot topology + cold blobs, sharding via ghost edges, property bitmask pruning) while adding the missing fast vector retrieval primitive.
@@ -284,7 +284,9 @@ The existing rich `QueryResult` / `ShardedQueryResult` objects already carry `ve
 
 ---
 
-## 11. Phased Implementation Roadmap
+## 11. Phased Implementation Roadmap (as executed)
+
+> **Note**: The phases below reflect what was actually delivered. Several important corrections and hardenings were identified during code review and are documented in section 11.5.
 
 **Phase 0 – Foundation (small)**
 - Define `VectorIndex` trait + `VectorIndexStats`.
@@ -314,6 +316,33 @@ The existing rich `QueryResult` / `ShardedQueryResult` objects already carry `ve
 
 ---
 
+## 11.5 Implementation Experience & Review Corrections
+
+After the initial implementation of Phases 0–2, a detailed code review surfaced several important issues and improvements. These have been incorporated into the codebase.
+
+### Critical Fixes
+- **Vector index persistence (C2)**: The vector index was being silently discarded on every load path (`load_from_disk`, `load_from_dir`, `load_mmap`). This was fixed by introducing a `create_default_vector_index()` factory and an explicit `rebuild_vector_index()` method, which is now called after restoring the graph in all load paths. A regression test `vector_index_survives_save_load` was added.
+- **Stats underflow (C1)**: `HNSWVectorIndex::stats()` used subtraction that could underflow when the deleted set was larger than the live point count. Changed to `saturating_sub()`.
+
+### Important Hardening & Cleanups
+- Added dimension-mismatch guards in `add_vector`.
+- Improved HNSW search efficiency (only over-fetch when the deleted set is non-empty).
+- Added proper `Debug` implementation and documentation for the `'static` lifetime on the HNSW inner struct.
+- Replaced ad-hoc `#[cfg]` branching in `add_node` with the factory function.
+- Made `vector_index` field `pub(crate)` instead of `pub`.
+- Cleaned up seed collection logic in `search_and_traverse_hybrid` using named constants and iterator chains.
+- Fixed documentation around `HybridWeights` (they are **not** automatically normalized).
+
+### Efficiency Improvement
+- `BruteForceVectorIndex::search` was changed from a full sort (`O(N log N)`) to a partial sort using `select_nth_unstable_by` (`O(N + k log k)`).
+
+### Minor Polish
+- Added an object-safety note to the `VectorIndex::load_from_dir` trait method documentation.
+
+These changes significantly improved robustness, especially around the critical "index survives restart" guarantee.
+
+---
+
 ## 12. Risks, Trade-offs & Open Questions
 
 | Risk / Question                        | Recommended Direction                          | Notes |
@@ -336,14 +365,16 @@ The existing rich `QueryResult` / `ShardedQueryResult` objects already carry `ve
 
 ---
 
-## 14. Next Steps After Approval
+## 14. Next Steps (Post Implementation)
 
-1. Flesh out the `VectorIndex` trait in code (behind a feature flag if desired).
-2. Implement the brute-force reference.
-3. Choose / prototype an HNSW backend.
-4. Wire the first end-to-end hybrid + ANN path.
-5. Write benchmarks.
+With Phases 0–2 complete and review corrections applied, the recommended next areas of work are:
 
-This design document is intended to be the single source of truth for the architectural decisions during implementation.
+1. **Proper persistence for the HNSW index** (Phase 3) — Move beyond pure rebuild-on-load for large graphs.
+2. **Improved delete / compaction story** for the vector index (periodic physical rebuilds, better tombstone handling).
+3. **Quantization support** (scalar first) to reduce memory usage.
+4. **Benchmarks** comparing brute-force vs HNSW in both pure vector search and hybrid retrieval scenarios.
+5. **Python ergonomics** — Consider a small `VectorSearchResult` dataclass or richer return type.
+
+This design document (including the post-implementation review notes in section 11.5) is intended to remain the reference for architectural decisions.
 
 **End of Design Document**
