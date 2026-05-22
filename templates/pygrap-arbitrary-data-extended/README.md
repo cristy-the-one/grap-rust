@@ -13,9 +13,31 @@ This is the **extended version** of the basic template.
 ```bash
 pip install -r requirements.txt
 
+# Optional: copy the example document
+cp -r documents/ your-documents/
+
 python ingest.py
 python query.py --require "topic=rag,confidence>0.7"
 ```
+
+## Example Document
+
+An example Markdown file with frontmatter is included at:
+
+```
+documents/example-rag-document.md
+```
+
+It demonstrates the following metadata fields:
+
+- `topic`
+- `source`
+- `confidence`
+- `author`
+- `date`
+- `tags`
+
+During ingestion, this metadata is attached to the edges between chunks of the document, enabling powerful property-based filtering at query time.
 
 ## Frontmatter Example
 
@@ -24,6 +46,8 @@ python query.py --require "topic=rag,confidence>0.7"
 topic: rag
 source: internal-docs
 confidence: 0.92
+author: Jane Doe
+date: 2026-03-15
 ---
 
 # My Document
@@ -31,4 +55,4 @@ confidence: 0.92
 Content here...
 ```
 
-The metadata will be attached to the document's internal edges and can be used for filtering.
+The metadata is attached to internal document edges and can be used for filtering with the `--require` flag.
