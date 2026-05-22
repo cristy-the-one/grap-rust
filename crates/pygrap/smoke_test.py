@@ -70,7 +70,6 @@ def main():
         print("merge_nodes OK")
 
         # 10. search_and_traverse_hybrid with traversal_weight_property
-        import struct
         qvec = [0.9, 0.1]
         results = g.search_and_traverse_hybrid(
             "node a",

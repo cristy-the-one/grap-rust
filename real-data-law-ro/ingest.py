@@ -26,7 +26,7 @@ SAVE_INTERVAL = 200
 # Romanian diacritics normalisation map
 _DIACRITIC_MAP = str.maketrans(
     "ăâîșțĂÂÎȘȚ",
-    "aaisaAIIST",
+    "aaistAAIST",
 )
 # Extended cedilla/comma variants
 _DIACRITIC_MAP.update(str.maketrans("şţŞŢ", "stST"))
