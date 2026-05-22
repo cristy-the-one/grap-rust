@@ -1,73 +1,82 @@
 #!/usr/bin/env python3
 """
-Phase 0 - Prototype ingestion for the Romanian Legal Acts dataset (real-data-law-ro).
+Phase 1 - Two-pass citation-network ingestion for the Romanian Legal Acts dataset.
 
-This script ingests all JSON files from the legal corpus into grap as nodes.
-
-Features implemented in Phase 0:
-- Parse JSON legal acts
-- Create one node per legal act with rich properties (via label + text prefix)
-- Chunk long legal texts
-- Generate embeddings
-- Idempotent ingestion (based on act ID)
-- On-disk persistence with merge policy
-
-Future phases will add:
-- Relationship extraction (references, amendments)
-- Proper edge properties for filtering
-- Advanced hybrid + graph queries
+Pass 1: Create one node per legal act, build (tip_norm, nr, year) → node_id map.
+Pass 2: Extract citation references from text_complet, create edges.
 """
 
 import json
 import os
+import re
+import unicodedata
 from pathlib import Path
-from typing import List, Optional
+from typing import Dict, Optional, Tuple
 
 from sentence_transformers import SentenceTransformer
-import pygrap as grap
-
+import pygrap
 
 # ====================== CONFIG ======================
-DATA_DIR = Path(__file__).parent  # real-data-law-ro/
+DATA_DIR = Path(__file__).parent
 GRAPH_DIR = Path(os.getenv("GRAP_DIR", DATA_DIR / "graph"))
 EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "all-MiniLM-L6-v2")
-
-CHUNK_SIZE = 800
-CHUNK_OVERLAP = 100
+SAVE_INTERVAL = 200
 # ====================================================
 
+# Romanian diacritics normalisation map
+_DIACRITIC_MAP = str.maketrans(
+    "ăâîșțĂÂÎȘȚ",
+    "aaisaAIIST",
+)
+# Extended cedilla/comma variants
+_DIACRITIC_MAP.update(str.maketrans("şţŞŢ", "stST"))
 
-def chunk_text(text: str, max_chars: int = CHUNK_SIZE, overlap: int = CHUNK_OVERLAP) -> List[str]:
-    """Simple paragraph-aware chunker for legal texts."""
-    paragraphs = [p.strip() for p in text.split("\n\n") if p.strip()]
-    chunks: List[str] = []
-    current = ""
-
-    for para in paragraphs:
-        if len(current) + len(para) + 2 <= max_chars:
-            current = f"{current}\n\n{para}".strip()
-        else:
-            if current:
-                chunks.append(current)
-            current = para[-overlap:] + "\n\n" + para if len(para) > overlap else para
-
-    if current:
-        chunks.append(current)
-    return chunks
+# Definite-article forms → base form
+_DEFINITE_TO_BASE: Dict[str, str] = {
+    "LEGEA": "LEGE",
+    "HOTARAREA": "HOTARARE",
+    "HOTARAREA": "HOTARARE",
+    "DECIZIA": "DECIZIE",
+    "NORMA": "NORMA",
+}
 
 
-def load_or_create_graph() -> grap.IndexedKnowledgeGraph:
-    """Load existing graph or create a new on-disk one with merge policy."""
-    print(f"Opening/creating graph at {GRAPH_DIR} with merge policy...")
-    return grap.IndexedKnowledgeGraph.with_merge_policy(str(GRAPH_DIR), 4)
+def _norm_diacritics(s: str) -> str:
+    """Remove Romanian diacritics and uppercase."""
+    s = s.translate(_DIACRITIC_MAP)
+    # Fallback: strip any remaining combining diacritical marks
+    s = unicodedata.normalize("NFD", s)
+    s = "".join(c for c in s if unicodedata.category(c) != "Mn")
+    return s.upper()
 
 
-def get_act_id(data: dict) -> str:
-    return str(data.get("id"))
+def normalize_tip(tip: str) -> str:
+    """Normalise act type string for key matching."""
+    normed = _norm_diacritics(tip.strip())
+    # Collapse whitespace
+    normed = re.sub(r"\s+", " ", normed)
+    # Resolve definite-article forms
+    return _DEFINITE_TO_BASE.get(normed, normed)
+
+
+def act_key(tip: str, nr: str, year: str) -> Tuple[str, str, str]:
+    return (normalize_tip(tip), nr.strip().lstrip("0") or "0", year.strip())
+
+
+# Regex to find references to other acts in the text
+# Matches patterns like: LEGEA nr. 166 din 9 noiembrie 1999
+#                        ORDONANȚA DE URGENTA nr. 69 din 29 decembrie 1998
+#                        HOTĂRÂREA nr. 671 din 17 august 2000
+REF_PATTERN = re.compile(
+    r"\b(LEGE[AI]?|ORDONAN[^\s,\.]{0,20}(?:\s+DE\s+URGEN[^\s,\.]{0,10})?|"
+    r"HOT[^\s,\.]{0,10}RE[AI]?|DECIZI[AEI]?|NORM[AĂ]?)\s+"
+    r"nr\.\s*([\d][\d.]*)\s+din\s+\d{1,2}\s+\w+\s+(\d{4})",
+    re.IGNORECASE | re.UNICODE,
+)
 
 
 def build_node_text(act: dict) -> str:
-    """Create the main text content for the node, with metadata prefix for filtering."""
+    """Create the main text content for the node, with metadata prefix."""
     meta = []
     if act.get("tip_act"):
         meta.append(f"Tip: {act['tip_act']}")
@@ -84,9 +93,7 @@ def build_node_text(act: dict) -> str:
     title = act.get("titlu", "").strip()
     text = act.get("text_complet", "").strip()
 
-    # Prefix metadata so it can be used in text search + we can parse it later if needed
     prefix = f"[METADATA] {meta_str}\n\n"
-
     full_text = prefix + f"{title}\n\n{text}" if text else prefix + title
     return full_text
 
@@ -97,14 +104,20 @@ def main():
     print(f"Loading embedding model: {EMBEDDING_MODEL}")
     model = SentenceTransformer(EMBEDDING_MODEL)
 
-    g = load_or_create_graph()
-
-    # Note: Property registration is not exposed in the current pygrap build.
-    # We will use labels and text-based filtering in Phase 0.
-    # Proper property support will be added in Phase 1.
+    print(f"Opening/creating graph at {GRAPH_DIR}...")
+    g = pygrap.IndexedKnowledgeGraph.with_merge_policy(str(GRAPH_DIR), 4)
 
     json_files = sorted(DATA_DIR.glob("*.json"))
     print(f"Found {len(json_files)} legal acts.\n")
+
+    # ------------------------------------------------------------------
+    # Pass 1: create nodes, build act_key → node_id map
+    # ------------------------------------------------------------------
+    print("=== Pass 1: Creating nodes ===")
+    key_to_node: Dict[Tuple[str, str, str], int] = {}
+    # Also store raw acts for Pass 2 (avoid re-reading files)
+    acts = []
+    node_ids = []
 
     processed = 0
     skipped = 0
@@ -115,42 +128,77 @@ def main():
                 act = json.load(f)
         except Exception as e:
             print(f"  Skipping {json_path.name} (JSON error: {e})")
+            skipped += 1
             continue
 
-        act_id = get_act_id(act)
+        act_id = str(act.get("id", "")).strip()
         if not act_id:
             skipped += 1
             continue
 
-        # Idempotency: use the official act ID as label
-        label = f"act-{act_id}"
-
-        # Very naive check for existing nodes (we'll improve this)
-        # For Phase 0 we just always re-add (the label helps humans, real idempotency comes later)
-        # A better way would be to store processed IDs, but for simplicity in Phase 0 we re-process.
+        tip = act.get("tip_act") or ""
+        nr = str(act.get("numar") or "").strip()
+        dv = act.get("data_vigoare") or ""
+        year = dv[:4] if len(dv) >= 4 else ""
 
         text = build_node_text(act)
-        chunks = chunk_text(text)
+        embedding = model.encode(text[:2000], normalize_embeddings=True).tolist()
+        node_id = g.add_node(text=text, label=f"act-{act_id}", embedding=embedding)
 
-        # For Phase 0 we create one main node per act (using the first chunk + metadata)
-        # In later phases we can create chunk nodes + link them.
-        main_text = chunks[0] if chunks else text
-        embedding = model.encode(main_text, normalize_embeddings=True).tolist()
+        acts.append(act)
+        node_ids.append(node_id)
 
-        g.add_node(text=main_text, label=label, embedding=embedding)
+        if tip and nr and year:
+            k = act_key(tip, nr, year)
+            key_to_node[k] = node_id
 
         processed += 1
-        if processed % 200 == 0:
-            print(f"  Processed {processed} acts...")
+        if processed % SAVE_INTERVAL == 0:
+            print(f"  Pass 1: {processed} nodes created...")
             g.save_to_dir(str(GRAPH_DIR))
 
-    print(f"\nIngestion complete.")
-    print(f"  Processed: {processed}")
-    print(f"  Skipped:   {skipped}")
+    print(f"Pass 1 complete: {processed} nodes, {skipped} skipped, {len(key_to_node)} keyed acts.")
+    g.save_to_dir(str(GRAPH_DIR))
 
-    print("Saving graph...")
+    # ------------------------------------------------------------------
+    # Pass 2: extract citations, create edges
+    # ------------------------------------------------------------------
+    print("\n=== Pass 2: Extracting citation edges ===")
+    edges_created = 0
+    unresolved = 0
+
+    for act, source_id in zip(acts, node_ids):
+        text_complet = act.get("text_complet") or ""
+        seen = set()
+
+        for m in REF_PATTERN.finditer(text_complet):
+            ref_tip = m.group(1)
+            ref_nr = m.group(2).replace(".", "").lstrip("0") or "0"
+            ref_year = m.group(3)
+
+            k = act_key(ref_tip, ref_nr, ref_year)
+            if k in seen:
+                continue
+            seen.add(k)
+
+            target_id = key_to_node.get(k)
+            if target_id is None:
+                unresolved += 1
+                continue
+
+            if target_id == source_id:
+                continue  # skip self-references
+
+            g.add_edge(source_id, target_id, 0.8,
+                       {"relation_type": "cites", "confidence": 0.8})
+            edges_created += 1
+
+    print(f"Pass 2 complete: {edges_created} edges created, {unresolved} unresolved references.")
+
+    print("Saving final graph...")
     g.save_to_dir(str(GRAPH_DIR))
     print(f"Graph saved to {GRAPH_DIR}")
+    print(f"\nSummary: {processed} nodes | {edges_created} citation edges | {unresolved} unresolved refs")
 
 
 if __name__ == "__main__":
