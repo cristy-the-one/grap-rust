@@ -923,6 +923,47 @@ impl IndexedKnowledgeGraph {
         Ok(report)
     }
 
+    /// Single-hop: direct outgoing neighbors where the connecting edge has
+    /// `property == value`. Returns `(target_node, edge_strength)` pairs.
+    ///
+    /// Delegates to [`KnowledgeGraph::neighbors_by_relation`].
+    pub fn neighbors_by_relation(
+        &self,
+        node: crate::NodeId,
+        property: &str,
+        value: crate::properties::PropertyValue,
+    ) -> Vec<(crate::NodeId, f64)> {
+        self.graph.neighbors_by_relation(node, property, value)
+    }
+
+    /// Single-hop: direct incoming predecessors where the connecting edge has
+    /// `property == value`. Returns `(source_node, edge_strength)` pairs.
+    ///
+    /// Delegates to [`KnowledgeGraph::predecessors_by_relation`].
+    pub fn predecessors_by_relation(
+        &self,
+        node: crate::NodeId,
+        property: &str,
+        value: crate::properties::PropertyValue,
+    ) -> Vec<(crate::NodeId, f64)> {
+        self.graph.predecessors_by_relation(node, property, value)
+    }
+
+    /// Multi-hop BFS up to `depth` hops following only edges where
+    /// `property == value`. Returns full [`QueryResult`] list.
+    ///
+    /// Delegates to [`KnowledgeGraph::traverse_by_relation`].
+    pub fn traverse_by_relation(
+        &self,
+        node: crate::NodeId,
+        property: &str,
+        value: crate::properties::PropertyValue,
+        depth: u32,
+        max_results: usize,
+    ) -> Vec<crate::query::QueryResult> {
+        self.graph.traverse_by_relation(node, property, value, depth, max_results)
+    }
+
     /// Perform a pure (standalone) vector similarity search.
     ///
     /// Uses the configured `VectorIndex` (HNSW when the `ann-hnsw` feature is enabled,
@@ -1962,5 +2003,77 @@ mod hybrid_weight_tests {
         let without_ids: Vec<_> = results_without.iter().map(|r| r.graph_result.node_id).collect();
         assert!(without_ids.contains(&hi));
         assert!(without_ids.contains(&lo));
+    }
+}
+
+#[cfg(test)]
+mod indexed_relation_tests {
+    use crate::index::{IndexedKnowledgeGraph, InvertedIndex};
+    use crate::properties::PropertyValue;
+
+    fn make_graph() -> IndexedKnowledgeGraph {
+        IndexedKnowledgeGraph::with_text_index(Box::new(InvertedIndex::new()))
+    }
+
+    #[test]
+    fn indexed_neighbors_by_relation_delegates() {
+        let mut g = make_graph();
+        let tag = g.graph.properties.register("link");
+
+        let a = g.add_node("a", None, None);
+        let b = g.add_node("b", None, None);
+        let c = g.add_node("c", None, None);
+
+        g.add_edge(a, b, 0.8, vec![(tag, PropertyValue::Label("has".into()))]);
+        g.add_edge(a, c, 0.5, vec![(tag, PropertyValue::Label("not".into()))]);
+
+        let results = g.neighbors_by_relation(
+            a,
+            "link",
+            PropertyValue::Label("has".into()),
+        );
+
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].0, b);
+    }
+
+    #[test]
+    fn indexed_predecessors_by_relation_delegates() {
+        let mut g = make_graph();
+        let tag = g.graph.properties.register("t");
+
+        let src = g.add_node("src", None, None);
+        let dst = g.add_node("dst", None, None);
+
+        g.add_edge(src, dst, 0.9, vec![(tag, PropertyValue::Bool(true))]);
+
+        let preds = g.predecessors_by_relation(
+            dst,
+            "t",
+            PropertyValue::Bool(true),
+        );
+
+        assert_eq!(preds.len(), 1);
+        assert_eq!(preds[0].0, src);
+    }
+
+    #[test]
+    fn indexed_traverse_by_relation_delegates() {
+        let mut g = make_graph();
+        let tag = g.graph.properties.register("rel");
+
+        let a = g.add_node("a", None, None);
+        let b = g.add_node("b", None, None);
+        let c = g.add_node("c", None, None);
+
+        let val = PropertyValue::Label("supports".into());
+        g.add_edge(a, b, 0.9, vec![(tag, val.clone())]);
+        g.add_edge(b, c, 0.9, vec![(tag, val.clone())]);
+
+        let results = g.traverse_by_relation(a, "rel", val, 3, 10);
+        let ids: Vec<_> = results.iter().map(|r| r.node_id).collect();
+
+        assert!(ids.contains(&b));
+        assert!(ids.contains(&c));
     }
 }
