@@ -287,6 +287,35 @@ impl IndexedKnowledgeGraph {
             })
     }
 
+    /// Update the text (and optionally the embedding) of an existing node.
+    ///
+    /// All edges incident to the node are preserved. Raises `GraphError` on
+    /// invalid node ID.
+    #[pyo3(signature = (id, text, embedding=None))]
+    fn update_node(
+        &mut self,
+        id: u32,
+        text: &str,
+        embedding: Option<Vec<f32>>,
+    ) -> PyResult<()> {
+        let emb_ref: Option<&[f32]> = embedding.as_deref();
+        self.inner
+            .update_node(NodeId(id), text, emb_ref)
+            .map_err(to_py_err)
+    }
+
+    /// Merge two nodes: keep one, absorb the other.
+    ///
+    /// All edges from `absorb` are redirected to `keep`. Returns a `MergeReport`
+    /// describing the operation. Raises `GraphError` on validation failure
+    /// (e.g., same node twice, or invalid IDs).
+    fn merge_nodes(&mut self, keep: u32, absorb: u32) -> PyResult<MergeReport> {
+        self.inner
+            .merge_nodes(NodeId(keep), NodeId(absorb))
+            .map(MergeReport::from)
+            .map_err(to_py_err)
+    }
+
     /// Perform hybrid text + graph search.
     #[pyo3(signature = (
         query,
