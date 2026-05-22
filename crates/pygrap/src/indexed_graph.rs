@@ -95,9 +95,14 @@ impl QueryResult {
 
 /// Convert a Python object to a `PropertyValue`.
 ///
+/// Dispatch order: `str` → `bool` → `int` → `float`.
+///
 /// IMPORTANT: bool MUST be checked before int — in Python, `bool` is a subtype
 /// of `int`, so `extract::<i64>()` would succeed for `True`/`False` as well.
 fn py_to_property_value(val: &Bound<'_, PyAny>) -> PyResult<PropertyValue> {
+    if let Ok(s) = val.extract::<String>() {
+        return Ok(PropertyValue::Label(s));
+    }
     if let Ok(b) = val.extract::<bool>() {
         return Ok(PropertyValue::Bool(b));
     }
@@ -106,9 +111,6 @@ fn py_to_property_value(val: &Bound<'_, PyAny>) -> PyResult<PropertyValue> {
     }
     if let Ok(f) = val.extract::<f64>() {
         return Ok(PropertyValue::Float(f));
-    }
-    if let Ok(s) = val.extract::<String>() {
-        return Ok(PropertyValue::Label(s));
     }
     Err(pyo3::exceptions::PyTypeError::new_err(
         "cannot convert to PropertyValue: expected str, int, float, or bool",
@@ -218,7 +220,7 @@ impl IndexedKnowledgeGraph {
     /// `properties` is an optional Python dict `{str: any}` where values must be
     /// `str`, `int`, `float`, or `bool`. Property names are auto-registered.
     ///
-    /// Returns nothing (panics on OOB node IDs, consistent with Rust behaviour).
+    /// Returns nothing on success.
     #[pyo3(signature = (source, target, strength, properties=None))]
     fn add_edge(
         &mut self,
@@ -242,7 +244,7 @@ impl IndexedKnowledgeGraph {
 
     /// Return the full stored text for a node.
     ///
-    /// Raises `ValueError` if the node ID is out of bounds or deleted.
+    /// Raises `ValueError` if the node ID is out of bounds.
     fn get_node_text(&self, id: u32) -> PyResult<String> {
         self.inner
             .graph
@@ -258,7 +260,7 @@ impl IndexedKnowledgeGraph {
 
     /// Return the label of a node, or `None` if it has no label.
     ///
-    /// Raises `ValueError` if the node ID is out of bounds or deleted.
+    /// Raises `ValueError` if the node ID is out of bounds.
     fn get_node_label(&self, id: u32) -> PyResult<Option<String>> {
         self.inner
             .graph
