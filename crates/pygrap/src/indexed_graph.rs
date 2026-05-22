@@ -229,6 +229,7 @@ impl IndexedKnowledgeGraph {
             text: text_weight,
             vector: vector_weight,
             graph: graph_weight,
+            traversal_weight_property: None,
         };
 
         let prop_refs: Vec<&str> = required_properties.iter().map(|s| s.as_str()).collect();

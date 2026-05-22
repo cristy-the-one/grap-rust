@@ -201,6 +201,7 @@ fn main() {
         text: 0.15,
         vector: 0.70,
         graph: 0.15,
+        traversal_weight_property: None,
     };
 
     let vector_biased = g.search_and_traverse_hybrid(

@@ -235,7 +235,7 @@ impl Default for FusionWeights {
 ///
 /// Weights are **not** normalized automatically; ensure `text + vector + graph ≈ 1.0`
 /// for meaningful fused scores. The default weights sum to 1.0.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct HybridWeights {
     /// Weight given to the text / BM25 score.
     pub text: f64,
@@ -243,6 +243,11 @@ pub struct HybridWeights {
     pub vector: f64,
     /// Weight given to the graph path strength.
     pub graph: f64,
+    /// If `Some(name)`, use this edge property's numeric value as the
+    /// traversal priority weight instead of `edge.strength`.
+    /// Falls back to `edge.strength` if the property is absent on a given edge.
+    /// `None` (default) preserves existing behaviour exactly.
+    pub traversal_weight_property: Option<String>,
 }
 
 impl Default for HybridWeights {
@@ -251,6 +256,7 @@ impl Default for HybridWeights {
             text: 0.4,
             vector: 0.4,
             graph: 0.2,
+            traversal_weight_property: None,
         }
     }
 }
@@ -1098,6 +1104,10 @@ impl IndexedKnowledgeGraph {
             builder = builder.with_property(name);
         }
 
+        if let Some(ref prop) = weights.traversal_weight_property {
+            builder = builder.weight_by_property(prop);
+        }
+
         let graph_results = builder.execute_with_text();
 
         let mut combined: Vec<CombinedResult> = graph_results
@@ -1903,5 +1913,54 @@ mod merge_node_tests {
         assert!(results.iter().any(|(n, _)| n.0 == keep.0));
         // absorb must be gone from vector index
         assert!(!g.vector_index.as_ref().unwrap().contains_vector(absorb));
+    }
+}
+
+#[cfg(test)]
+mod hybrid_weight_tests {
+    use crate::index::{HybridWeights, IndexedKnowledgeGraph, InvertedIndex};
+    use crate::properties::PropertyValue;
+
+    fn make_graph() -> IndexedKnowledgeGraph {
+        IndexedKnowledgeGraph::with_text_index(Box::new(InvertedIndex::new()))
+    }
+
+    #[test]
+    fn hybrid_traversal_weight_property_changes_ranking() {
+        let mut g = make_graph();
+        let tag = g.graph.properties.register("confidence");
+
+        let seed = g.add_node("seed query", None, None);
+        let hi   = g.add_node("hi answer", None, None);
+        let lo   = g.add_node("lo answer", None, None);
+
+        // Equal strength, different confidence
+        g.add_edge(seed, hi, 0.5, vec![(tag, PropertyValue::Float(0.9))]);
+        g.add_edge(seed, lo, 0.5, vec![(tag, PropertyValue::Float(0.1))]);
+
+        let weights_with = HybridWeights {
+            traversal_weight_property: Some("confidence".into()),
+            ..HybridWeights::default()
+        };
+        let results_with = g.search_and_traverse_hybrid(
+            "seed query", None, 5, &[], 0.0, 2, 10, weights_with,
+        );
+
+        let weights_without = HybridWeights::default();
+        let results_without = g.search_and_traverse_hybrid(
+            "seed query", None, 5, &[], 0.0, 2, 10, weights_without,
+        );
+
+        // With confidence weight, hi must come before lo
+        let with_ids: Vec<_> = results_with.iter().map(|r| r.graph_result.node_id).collect();
+        let hi_pos = with_ids.iter().position(|&n| n == hi).unwrap_or(usize::MAX);
+        let lo_pos = with_ids.iter().position(|&n| n == lo).unwrap_or(usize::MAX);
+        assert!(hi_pos < lo_pos, "hi-confidence must rank above lo-confidence with weight property");
+
+        // Without weight property, both paths have equal cumulative strength,
+        // so we just check both are reachable.
+        let without_ids: Vec<_> = results_without.iter().map(|r| r.graph_result.node_id).collect();
+        assert!(without_ids.contains(&hi));
+        assert!(without_ids.contains(&lo));
     }
 }

@@ -899,7 +899,7 @@ impl ShardRouter {
                 min_strength,
                 max_depth,
                 max_results,
-                weights,
+                weights.clone(),
             );
 
             for cr in local_results {
