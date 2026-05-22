@@ -252,7 +252,7 @@ impl IndexedKnowledgeGraph {
             .map(|s| s.to_string())
             .ok_or_else(|| {
                 pyo3::exceptions::PyValueError::new_err(format!(
-                    "node {} is out of bounds or deleted",
+                    "node {} is out of bounds",
                     id
                 ))
             })
@@ -268,7 +268,7 @@ impl IndexedKnowledgeGraph {
             .map(|opt| opt.map(|s| s.to_string()))
             .ok_or_else(|| {
                 pyo3::exceptions::PyValueError::new_err(format!(
-                    "node {} is out of bounds or deleted",
+                    "node {} is out of bounds",
                     id
                 ))
             })
