@@ -55,6 +55,10 @@ pub trait VectorIndex: Send + Sync + std::any::Any {
     }
 
     /// Load a vector index from a directory.
+    ///
+    /// **Note:** This method requires `Self: Sized` and cannot be called through
+    /// `Box<dyn VectorIndex>`. Call it directly on the concrete type.
+    /// This matches the identical pattern in `TextIndex::load_from_dir`.
     fn load_from_dir(_dir: &std::path::Path) -> Result<Box<dyn VectorIndex>, crate::GraphError>
     where
         Self: Sized,
