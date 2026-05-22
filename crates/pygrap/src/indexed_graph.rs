@@ -220,7 +220,9 @@ impl IndexedKnowledgeGraph {
     /// `properties` is an optional Python dict `{str: any}` where values must be
     /// `str`, `int`, `float`, or `bool`. Property names are auto-registered.
     ///
-    /// Returns nothing on success.
+    /// Raises `ValueError` if `source` or `target` are out of bounds.
+    /// Raises `GraphError` if more than 64 distinct property names have been registered.
+    /// Raises `TypeError` if a property value cannot be converted.
     #[pyo3(signature = (source, target, strength, properties=None))]
     fn add_edge(
         &mut self,
@@ -229,11 +231,22 @@ impl IndexedKnowledgeGraph {
         strength: f64,
         properties: Option<&Bound<'_, PyDict>>,
     ) -> PyResult<()> {
+        let node_count = self.inner.graph.node_count();
+        if source as usize >= node_count {
+            return Err(pyo3::exceptions::PyValueError::new_err(format!(
+                "source node {} is out of bounds", source
+            )));
+        }
+        if target as usize >= node_count {
+            return Err(pyo3::exceptions::PyValueError::new_err(format!(
+                "target node {} is out of bounds", target
+            )));
+        }
         let mut props = Vec::new();
         if let Some(dict) = properties {
             for (key, val) in dict.iter() {
                 let name: String = key.extract()?;
-                let tag = self.inner.graph.properties.register(&name);
+                let tag = self.inner.graph.properties.try_register(&name).map_err(to_py_err)?;
                 let pv = py_to_property_value(&val)?;
                 props.push((tag, pv));
             }
