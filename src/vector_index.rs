@@ -111,26 +111,27 @@ impl VectorIndex for BruteForceVectorIndex {
     }
 
     fn search(&self, query: &[f32], max_results: usize) -> Vec<(NodeId, f64)> {
-        if self.vectors.is_empty() || query.is_empty() {
+        if self.vectors.is_empty() || query.is_empty() || max_results == 0 {
             return Vec::new();
         }
 
         let mut scored: Vec<(NodeId, f64)> = self
             .vectors
             .iter()
-            .map(|(&node, vec)| {
-                let sim = cosine_similarity(query, vec);
-                (node, sim)
-            })
+            .map(|(&node, vec)| (node, cosine_similarity(query, vec)))
             .collect();
 
-        // Sort by similarity descending
-        scored.sort_by(|a, b| {
-            b.1.partial_cmp(&a.1)
-                .unwrap_or(std::cmp::Ordering::Equal)
-        });
+        // O(N + k log k) partial sort instead of O(N log N) full sort.
+        // `select_nth_unstable_by` places the k-th best element at position k-1
+        // and guarantees all elements before it are ≥ it (descending order).
+        if scored.len() <= max_results {
+            scored.sort_unstable_by(|a, b| b.1.total_cmp(&a.1));
+        } else {
+            scored.select_nth_unstable_by(max_results - 1, |a, b| b.1.total_cmp(&a.1));
+            scored.truncate(max_results);
+            scored.sort_unstable_by(|a, b| b.1.total_cmp(&a.1));
+        }
 
-        scored.truncate(max_results);
         scored
     }
 
@@ -351,6 +352,25 @@ pub fn create_default_vector_index() -> Box<dyn VectorIndex> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn brute_force_partial_sort_correctness() {
+        // Cosine similarity is direction-only, so [i, 0] vectors are all
+        // equally similar to [9, 0]. Use genuinely different-direction vectors.
+        let mut idx = BruteForceVectorIndex::new();
+        idx.add_vector(NodeId(0), &[1.0, 0.0]);   // cos([1,0]) = 1.0 — closest
+        idx.add_vector(NodeId(1), &[0.9, 0.436]); // cos ≈ 0.9
+        idx.add_vector(NodeId(2), &[0.5, 0.866]); // cos ≈ 0.5
+        idx.add_vector(NodeId(3), &[0.0, 1.0]);   // cos = 0.0
+        idx.add_vector(NodeId(4), &[-1.0, 0.0]);  // cos = -1.0 — farthest
+
+        let results = idx.search(&[1.0, 0.0], 3);
+        assert_eq!(results.len(), 3);
+        assert!(results[0].1 >= results[1].1, "results must be descending");
+        assert!(results[1].1 >= results[2].1, "results must be descending");
+        // [1,0] has cosine similarity 1.0 with query [1,0]
+        assert_eq!(results[0].0, NodeId(0));
+    }
 
     #[test]
     fn hnsw_stats_no_underflow_on_double_delete() {
