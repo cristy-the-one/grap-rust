@@ -48,7 +48,7 @@ graph.pdf
 
 # AI / exploration artifacts (not part of the project)
 .claude/
-docs/superpowers/
+docs/superpowers/plans/
 
 # Python extension build artifacts (pygrap / maturin)
 *.pyd
