@@ -191,6 +191,30 @@ impl KnowledgeGraph {
             })
             .collect()
     }
+
+    /// Multi-hop BFS up to `depth` hops, following only edges where
+    /// `property == value`. Returns full [`QueryResult`] (path, depth, strength).
+    ///
+    /// This is a thin wrapper over [`KnowledgeGraph::find`] with
+    /// [`QueryBuilder::where_property`] — no new traversal logic.
+    ///
+    /// Returns an empty `Vec` (never `Err`) for an invalid node or unregistered
+    /// property.
+    pub fn traverse_by_relation(
+        &self,
+        node: NodeId,
+        property: &str,
+        value: PropertyValue,
+        depth: u32,
+        max_results: usize,
+    ) -> Vec<QueryResult> {
+        self.find()
+            .from_node(node)
+            .where_property(property, value)
+            .depth(depth)
+            .limit(max_results)
+            .execute()
+    }
 }
 
 impl<'g> QueryBuilder<'g> {
@@ -631,5 +655,65 @@ mod relation_neighbor_tests {
 
         let results = g.neighbors_by_relation(a, "r", PropertyValue::Bool(true));
         assert!(results.is_empty());
+    }
+
+    #[test]
+    fn traverse_by_relation_follows_matching_chain() {
+        let mut g = KnowledgeGraph::new();
+        let tag = g.properties.register("rel_type");
+
+        // Chain: A → B → C → D (all "supports")
+        // Branch: A → E ("opposes") — must be excluded
+        let a = g.add_node("A", None, None);
+        let b = g.add_node("B", None, None);
+        let c = g.add_node("C", None, None);
+        let d = g.add_node("D", None, None);
+        let e = g.add_node("E", None, None);
+
+        let supports = PropertyValue::Label("supports".into());
+        let opposes  = PropertyValue::Label("opposes".into());
+
+        g.add_edge(a, b, 0.9, vec![(tag, supports.clone())]);
+        g.add_edge(b, c, 0.9, vec![(tag, supports.clone())]);
+        g.add_edge(c, d, 0.9, vec![(tag, supports.clone())]);
+        g.add_edge(a, e, 0.9, vec![(tag, opposes)]);
+
+        let results = g.traverse_by_relation(
+            a,
+            "rel_type",
+            supports,
+            4,
+            10,
+        );
+
+        let ids: Vec<_> = results.iter().map(|r| r.node_id).collect();
+        assert!(ids.contains(&b), "B must be reachable");
+        assert!(ids.contains(&c), "C must be reachable");
+        assert!(ids.contains(&d), "D must be reachable");
+        assert!(!ids.contains(&e), "E must be excluded (different rel_type)");
+    }
+
+    #[test]
+    fn traverse_by_relation_respects_depth_limit() {
+        let mut g = KnowledgeGraph::new();
+        let tag = g.properties.register("t");
+        let val = PropertyValue::Bool(true);
+
+        let a = g.add_node("a", None, None);
+        let b = g.add_node("b", None, None);
+        let c = g.add_node("c", None, None);
+        let d = g.add_node("d", None, None);
+
+        g.add_edge(a, b, 0.9, vec![(tag, val.clone())]);
+        g.add_edge(b, c, 0.9, vec![(tag, val.clone())]);
+        g.add_edge(c, d, 0.9, vec![(tag, val.clone())]);
+
+        // depth = 1 → only B should be reachable, not C or D
+        let results = g.traverse_by_relation(a, "t", val, 1, 10);
+        let ids: Vec<_> = results.iter().map(|r| r.node_id).collect();
+
+        assert!(ids.contains(&b));
+        assert!(!ids.contains(&c), "C is 2 hops away, must be excluded with depth=1");
+        assert!(!ids.contains(&d), "D is 3 hops away, must be excluded with depth=1");
     }
 }
