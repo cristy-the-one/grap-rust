@@ -80,12 +80,8 @@ def main():
     print(f"Loading embedding model: {EMBEDDING_MODEL}")
     model = SentenceTransformer(EMBEDDING_MODEL)
 
-    if (GRAPH_DIR / "graph").exists():
-        print("Loading existing graph...")
-        g = grap.IndexedKnowledgeGraph.load_from_dir(GRAPH_DIR)
-    else:
-        print("Creating new on-disk graph...")
-        g = grap.IndexedKnowledgeGraph.new_on_disk_with_merge_policy(4)
+    print("Opening/creating graph (with merge policy)...")
+    g = grap.IndexedKnowledgeGraph.with_merge_policy(str(GRAPH_DIR), 4)
 
     docs = [p for p in DOCS_DIR.rglob("*") if p.suffix.lower() in {".md", ".txt", ".rst"}]
     print(f"Found {len(docs)} documents.\n")

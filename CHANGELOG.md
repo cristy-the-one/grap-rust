@@ -33,6 +33,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The combination of `fulltext + sharding + on-disk` is now substantially more mature and has survived extensive correctness hardening.
 - Many previously partial or placeholder behaviors in the sharded on-disk path (global IDs, cross-shard search, persistence of mappings, atomic saves) are now properly implemented.
 
+### Python Bindings (`pygrap`) & 0.3 Surface
+- First-class, rich Python bindings for both `IndexedKnowledgeGraph` and `ShardedGraph` via PyO3 + maturin.
+- `add_node(..., embedding=list[float])`, `add_edge(..., properties=dict)` with ergonomic Python dicts for properties.
+- Full hybrid search: `search_and_traverse_hybrid(query, vector=..., HybridWeights, traversal_weight_property=...)`.
+- Structure-aware graph traversal exposed to Python: `traverse_by_relation`, `predecessors_by_relation`, `neighbors_by_relation`.
+- Rich result objects (`QueryResult`, `TraversalResult`, `MergeReport`, `ShardedQueryResult`) carrying text/vector/graph scores, depth, and full text.
+- Context manager support (`with pygrap.IndexedKnowledgeGraph(...) as g:`) with automatic save.
+- `vector_search(embedding, top_k)`, `merge_nodes`, `update_node`, `remove_node`, background workers, rebalancing, ghost-edge cleanup all exposed.
+- Real-world demonstration: `real-data-law-ro/` — two-pass citation network over 2,092 Romanian legal acts using the new relation traversal APIs.
+- Production-oriented drop-in templates added under `templates/pygrap-arbitrary-data*` (with Docker).
+
 ## [0.2.0] - 2026-05
 
 ### Added

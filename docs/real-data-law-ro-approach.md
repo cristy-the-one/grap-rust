@@ -1,7 +1,7 @@
 # Approach for Ingesting Romanian Legal Data (`real-data-law-ro`) into grap
 
 **Date**: 2026-05  
-**Status**: Proposal
+**Status**: Partially implemented (Phase 1 citation network completed; see real-data-law-ro/ for the working demo)
 
 ---
 

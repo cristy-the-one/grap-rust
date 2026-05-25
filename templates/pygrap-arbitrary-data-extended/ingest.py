@@ -83,12 +83,8 @@ def main():
     print(f"Loading embedding model: {EMBEDDING_MODEL}")
     model = SentenceTransformer(EMBEDDING_MODEL)
 
-    if (GRAPH_DIR / "graph").exists():
-        print("Loading existing graph...")
-        g = grap.IndexedKnowledgeGraph.load_from_dir(GRAPH_DIR)
-    else:
-        print("Creating new on-disk graph...")
-        g = grap.IndexedKnowledgeGraph.new_on_disk_with_merge_policy(4)
+    print("Opening/creating graph (with merge policy)...")
+    g = grap.IndexedKnowledgeGraph.with_merge_policy(str(GRAPH_DIR), 4)
 
     # Register common property tags for filtering
     topic_tag = g.graph.properties.register("topic")
@@ -141,7 +137,9 @@ def main():
                 except (ValueError, TypeError):
                     pass
 
-            g.add_edge(node_ids[i], node_ids[i + 1], strength=0.85, props=props)
+            # Convert list of (tag, value) tuples into a simple dict for the current pygrap binding
+            props_dict = {name: val for name, val in props} if props else None
+            g.add_edge(node_ids[i], node_ids[i + 1], 0.85, props_dict)
 
         ingested[file_id] = file_hash
         processed += 1

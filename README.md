@@ -101,6 +101,45 @@ cargo run --example hybrid_search
 cargo run --example on_disk_persistence --features "fulltext,sharding"
 ```
 
+## Python Bindings (`pygrap`)
+
+For most real-world work, exploration, and production pipelines we recommend the Python bindings.
+
+They give you the full power of the engine (hybrid text + vector + graph search, rich property-weighted traversal, on-disk persistence, sharding) with a pleasant Python surface.
+
+### Quick Install (from source)
+
+```bash
+pip install maturin
+maturin develop --manifest-path crates/pygrap/Cargo.toml --release
+```
+
+See the detailed instructions in [`crates/pygrap/README.md`](crates/pygrap/README.md).
+
+### Drop-in Templates
+
+Ready-to-use production-oriented templates for ingesting your own documents:
+
+- [`templates/pygrap-arbitrary-data/`](templates/pygrap-arbitrary-data/) — Recursive ingestion, chunking, embeddings, hybrid search, Docker support
+- [`templates/pygrap-arbitrary-data-extended/`](templates/pygrap-arbitrary-data-extended/) — Adds YAML frontmatter parsing + edge properties + `--require` filtering
+
+### Real-World Example: Romanian Legal Citation Network
+
+The [`real-data-law-ro/`](real-data-law-ro/) folder contains a complete Phase 1 demonstration:
+
+- ~2,092 Romanian legal acts ingested as nodes with embeddings
+- Two-pass citation extraction (regex over `text_complet`)
+- Directed "cites" graph with properties on edges
+- Interactive explorer using `search_and_traverse_hybrid` + `traverse_by_relation` / `predecessors_by_relation`
+
+```bash
+cd real-data-law-ro
+python ingest.py
+python query.py
+```
+
+This is currently the best end-to-end showcase of what the engine + Python surface can do.
+
 ## Feature Flags
 
 | Feature     | Description                                                                 | Brings in                  |
