@@ -1,0 +1,53 @@
+# Example Procedure Graph - Simple ASPICE Gap Check (POC)
+# This is a minimal flat procedure used to demonstrate the narrow-but-vertical POC.
+
+name: "Simple ASPICE Gap Check v0.1"
+description: "Basic procedure to detect gaps in requirements mapped to ASPICE process outcomes"
+version: "0.1.0"
+
+steps:
+  - id: "select-requirements"
+    operation: "Select requirements in scope for analysis"
+    inputs:
+      scope: "all"
+    outputs:
+      requirements: "list"
+    references:
+      - kg:aspice.scope.current
+    notes: "For POC we usually pass a small curated set of requirements"
+
+  - id: "classify-requirements"
+    operation: "Classify requirements against ASPICE process outcomes using ontology"
+    inputs:
+      requirements: "select-requirements.outputs.requirements"
+    outputs:
+      classified: "list"
+    references:
+      - kg:aspice.ontology.v1
+
+  - id: "detect-gaps"
+    operation: "Detect gaps where requirements are incomplete according to the ontology"
+    inputs:
+      classified: "classify-requirements.outputs.classified"
+    outputs:
+      gaps: "list"
+    references:
+      - kg:aspice.ontology.v1
+
+  - id: "explain-gaps"
+    operation: "Generate explanations for each detected gap"
+    inputs:
+      gaps: "detect-gaps.outputs.gaps"
+    outputs:
+      explanations: "list"
+    references:
+      - kg:aspice.ontology.v1
+
+  - id: "emit-report"
+    operation: "Emit final gap report with explanations and traceability"
+    inputs:
+      explanations: "explain-gaps.outputs.explanations"
+    outputs:
+      report: "object"
+    references:
+      - kg:aspice.report.template.v1

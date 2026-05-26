@@ -1,0 +1,41 @@
+# Minimal ASPICE Ontology for POC (v0.1)
+#
+# Focused on a small number of high-value process outcomes
+# so we can demonstrate real gap detection quickly.
+
+process_outcomes:
+  - id: "SYS.5.BP3"
+    name: "Define verification criteria"
+    description: "Verification criteria for each system requirement are defined."
+    required_characteristics:
+      - "verification_method_specified"
+      - "acceptance_criteria_defined"
+      - "test_environment_identified"
+
+  - id: "SWE.1.BP4"
+    name: "Specify software units"
+    description: "Software units are specified."
+    required_characteristics:
+      - "functional_requirements"
+      - "interface_definition"
+      - "constraints"
+
+  - id: "SUP.1.BP1"
+    name: "Establish a quality management system"
+    description: "A quality management system is established."
+    required_characteristics:
+      - "process_definition"
+      - "responsibility_assignment"
+
+# Simple mapping hints (used for inference in the POC)
+# In a real implementation these would be part of richer ontology rules.
+mapping_hints:
+  - outcome: "SYS.5.BP3"
+    indicators:
+      - keywords: ["verify", "test", "acceptance", "criteria"]
+      - properties: ["has_verification_method"]
+
+  - outcome: "SWE.1.BP4"
+    indicators:
+      - keywords: ["software unit", "module", "component"]
+      - properties: ["has_interface"]

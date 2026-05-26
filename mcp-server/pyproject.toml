@@ -1,0 +1,15 @@
+[project]
+name = "grap-mcp-server"
+version = "0.1.0"
+description = "MCP server for the grap engine (POC)"
+requires-python = ">=3.11"
+dependencies = [
+    "mcp>=1.0.0",          # Official MCP Python SDK (FastMCP style)
+    "pygrap",              # Local pygrap bindings (installed via maturin develop)
+]
+
+[tool.setuptools]
+packages = ["grap_mcp"]
+
+[project.scripts]
+grap-mcp-server = "grap_mcp.server:main"
