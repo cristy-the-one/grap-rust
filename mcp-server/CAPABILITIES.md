@@ -26,9 +26,14 @@ Every mutating capability emits a Workspace audit event (see `get_audit_log`).
 - **get_explanation(target)** → `{status, explanation}`. Sectioned explanation for a gap target
   (`<outcome_id>:<characteristic>`).
 
-## Authoring
-- **validate_procedure_graph(path)** → `{status, ok, errors, warnings}`.
+## Authoring & Validation
+- **validate_procedure_graph(path)** → `{status, ok, errors, warnings}` (publish-time rules; non-blocking).
 - **diff_procedure_graphs(path_a, path_b)** → `{status, diff}`.
+- **get_validation(version_hash)** → cached validation report for a published PG version.
+
+> `publish_pg` runs validation (non-blocking) and stores the report; `promote_pg` is
+> **refused when the report has errors**. Reports are cached by PG content hash and
+> invalidated when the loaded ontology version changes.
 
 ## Audit & Introspection
 - **get_audit_log()** → workspace audit events.

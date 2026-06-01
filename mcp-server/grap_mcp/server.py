@@ -19,6 +19,7 @@ from .diff import diff_pg
 from .procedure_graph import _default_resolver
 from . import ontology as onto_loader
 from . import reasoner
+from .publish_validation import validate_for_publish
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("grap-mcp")
@@ -44,6 +45,34 @@ def _get_workspace():
         root = os.environ.get("GRAP_WORKSPACE", "./grap-workspace")
         _state["ws"] = pygrap.Workspace.open(root)
     return _state["ws"]
+
+
+def _cached_validation(ws, version_hash):
+    """Return the cached validation report for a PG version, or None.
+
+    Looks up the latest `validation_run` event linked to the version, fetches the
+    linked validation record, and only returns it if it was validated against the
+    currently loaded ontology version.
+    """
+    try:
+        events = [e for e in ws.events_linked_to("pg_version", version_hash)
+                  if e.event_type == "validation_run"]
+        if not events:
+            return None
+        latest = events[-1]
+        record_hash = next((i for (_r, k, i) in latest.links if k == "validation"), None)
+        if not record_hash:
+            return None
+        raw = ws.get_record(record_hash)
+        if not raw:
+            return None
+        report = json.loads(raw)
+        if report.get("ontology_version") != _state.get("ontology_version"):
+            return None
+        return report
+    except Exception:
+        logger.warning("cached validation lookup failed", exc_info=True)
+        return None
 
 
 # =============================================================================
@@ -234,16 +263,22 @@ def detect_gaps(scope: str = "all", kind: str = "production") -> dict:
 
 @mcp.tool()
 def validate_procedure_graph(path: str) -> dict:
-    """Parse a PG file and validate it (structural + cross-KG when a KG is loaded)."""
+    """Parse a PG file and validate it (publish-time rules; non-blocking)."""
     try:
         pg = pg_loader.load_from_file(path)
     except Exception as e:
         return {"status": "error", "message": str(e)}
-
-    kg = _state.get("kg")
-    resolver = _default_resolver(kg) if kg else None
-    report = validate_pg(pg, resolver=resolver)
+    report = validate_for_publish(pg, _state.get("kg"), _state.get("ontology"))
     return {"status": "ok", "path": path, **report}
+
+
+@mcp.tool()
+def get_validation(version_hash: str) -> dict:
+    """Return the cached validation report for a published PG version."""
+    report = _cached_validation(_get_workspace(), version_hash)
+    if report is None:
+        return {"status": "error", "message": "not validated yet (or ontology changed)"}
+    return {"status": "ok", "validation": report}
 
 
 @mcp.tool()
@@ -299,7 +334,7 @@ def get_status() -> dict:
 
 @mcp.tool()
 def publish_pg(level: str = "draft", rationale: str = None) -> dict:
-    """Publish the currently loaded Procedure Graph at the given level (draft|promoted)."""
+    """Publish the currently loaded Procedure Graph; runs (non-blocking) validation."""
     pg = _state.get("pg")
     if not pg:
         return {"status": "error", "message": "No Procedure Graph loaded."}
@@ -309,7 +344,14 @@ def publish_pg(level: str = "draft", rationale: str = None) -> dict:
         version = ws.publish_pg(raw, level=level, rationale=rationale,
                                 metadata={"name": pg.name, "version": pg.version})
         _state["current_logic_id"] = pg.name
-        return {"status": "ok", "version_hash": version.hash, "level": level}
+
+        report = validate_for_publish(pg, _state.get("kg"), _state.get("ontology"))
+        report["ontology_version"] = _state.get("ontology_version")
+        ws.record_validation(version.hash, json.dumps(report), report["ok"])
+
+        return {"status": "ok", "version_hash": version.hash, "level": level,
+                "validation": {"ok": report["ok"], "error_count": len(report["errors"]),
+                               "warning_count": len(report["warnings"])}}
     except Exception as e:
         logger.exception("publish_pg failed")
         return {"status": "error", "message": str(e)}
@@ -317,11 +359,29 @@ def publish_pg(level: str = "draft", rationale: str = None) -> dict:
 
 @mcp.tool()
 def promote_pg(version_hash: str, rationale: str) -> dict:
-    """Promote a previously published PG version (rationale required)."""
+    """Promote a published PG version (rationale required); refused if validation has errors."""
     try:
-        _get_workspace().promote(version_hash, rationale)
-        return {"status": "ok", "version_hash": version_hash, "level": "promoted"}
+        ws = _get_workspace()
+        report = _cached_validation(ws, version_hash)
+        if report is None:
+            # Cold path: reload the PG by hash, re-validate, and cache the result.
+            raw = ws.get_record(version_hash)
+            if not raw:
+                return {"status": "error", "message": f"Unknown version '{version_hash}'."}
+            pg = pg_loader.load_from_string(raw)
+            report = validate_for_publish(pg, _state.get("kg"), _state.get("ontology"))
+            report["ontology_version"] = _state.get("ontology_version")
+            ws.record_validation(version_hash, json.dumps(report), report["ok"])
+
+        if report["errors"]:
+            return {"status": "error", "message": "validation failed; cannot promote",
+                    "validation": report}
+
+        ws.promote(version_hash, rationale)
+        return {"status": "ok", "version_hash": version_hash, "level": "promoted",
+                "validation": {"ok": True, "warning_count": len(report["warnings"])}}
     except Exception as e:
+        logger.exception("promote_pg failed")
         return {"status": "error", "message": str(e)}
 
 
@@ -454,7 +514,7 @@ def list_capabilities() -> dict:
             "pg_lifecycle": ["load_procedure_graph", "publish_pg", "promote_pg",
                              "activate", "set_production", "get_production", "list_versions"],
             "execution_reasoning": ["run_procedure", "detect_gaps", "get_explanation"],
-            "authoring": ["validate_procedure_graph", "diff_procedure_graphs"],
+            "validation": ["validate_procedure_graph", "diff_procedure_graphs", "get_validation"],
             "audit": ["get_audit_log", "get_status", "list_capabilities",
                       "list_runs", "get_run", "reconstruct_run", "query_events"],
         },
