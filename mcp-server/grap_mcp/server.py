@@ -34,6 +34,7 @@ _state = {
     "pg": None,                 # Will hold a ProcedureGraph object
     "ws": None,                 # lifecycle Workspace (Rust-backed)
     "current_logic_id": None,   # pg_logic_id of the loaded/active PG
+    "pg_version": None,         # content hash of the last published PG
     "ontology": None,           # parsed Ontology model
     "ontology_version": None,   # ontology version hash in the workspace
     "explanations": {},         # target -> explanation dict (POC, in-memory)
@@ -234,7 +235,7 @@ def _run_gap_detection(scope: str, kind: str, extra_summary: dict = None) -> dic
         logic_id = _state.get("current_logic_id")
         activation = ws.current_production(logic_id) if logic_id else None
         activation_id = activation.activation_id if activation else None
-        pg_version = activation.pg_version if activation else None
+        pg_version = (activation.pg_version if activation else None) or _state.get("pg_version")
         kg_version = (activation.kg_version if activation else None) or _state.get("ontology_version")
 
         run_id = f"run-{uuid.uuid4().hex[:8]}"
@@ -360,6 +361,7 @@ def publish_pg(level: str = "draft", rationale: str = None) -> dict:
         version = ws.publish_pg(raw, level=level, rationale=rationale,
                                 metadata={"name": pg.name, "version": pg.version})
         _state["current_logic_id"] = pg.name
+        _state["pg_version"] = version.hash
 
         report = validate_for_publish(pg, _state.get("kg"), _state.get("ontology"))
         report["ontology_version"] = _state.get("ontology_version")
@@ -522,6 +524,40 @@ def query_events(event_type: str = None, run_id: str = None) -> dict:
 
 
 @mcp.tool()
+def get_quality_metrics() -> dict:
+    """Production-only quality view; experiment runs are excluded (quarantine boundary)."""
+    try:
+        return {"status": "ok", **quality_metrics(_get_workspace())}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
+@mcp.tool()
+def adopt_experiment(run_id: str, activation_id: str, rationale: str) -> dict:
+    """Promote an experiment's PG version into production via the gated lifecycle."""
+    try:
+        run = _get_workspace().get_run(run_id)
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+    if not run:
+        return {"status": "error", "message": f"Run '{run_id}' not found."}
+    if run.kind != "experiment":
+        return {"status": "error", "message": f"Run '{run_id}' is not an experiment."}
+    if not run.pg_version:
+        return {"status": "error", "message": "Experiment run has no frozen PG version to adopt."}
+
+    promo = promote_pg(run.pg_version, rationale)
+    if promo["status"] != "ok":
+        return promo  # validation gate / rationale enforcement surfaced as-is
+
+    act = activate(activation_id, run.pg_version, set_as_production=True)
+    if act["status"] != "ok":
+        return act
+    return {"status": "ok", "activation_id": activation_id,
+            "version_hash": run.pg_version, "promoted": True, "is_production": True}
+
+
+@mcp.tool()
 def list_capabilities() -> dict:
     """Return the MCP capability taxonomy grouped by domain."""
     return {
@@ -530,6 +566,7 @@ def list_capabilities() -> dict:
             "pg_lifecycle": ["load_procedure_graph", "publish_pg", "promote_pg",
                              "activate", "set_production", "get_production", "list_versions"],
             "execution_reasoning": ["run_procedure", "detect_gaps", "get_explanation"],
+            "experimentation": ["run_experiment", "get_quality_metrics", "adopt_experiment"],
             "validation": ["validate_procedure_graph", "diff_procedure_graphs", "get_validation"],
             "audit": ["get_audit_log", "get_status", "list_capabilities",
                       "list_runs", "get_run", "reconstruct_run", "query_events"],
