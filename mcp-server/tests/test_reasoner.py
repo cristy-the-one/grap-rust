@@ -72,3 +72,27 @@ def test_lexical_hit_below_threshold_is_still_a_gap():
                          "verification_method_specified": [Hit(2, 0.9, "strong")]})
     gaps = detect_gaps(kg, onto)
     assert {g["missing_characteristic"] for g in gaps} == {"acceptance_criteria_defined"}
+
+
+from grap_mcp.reasoner import explain_gap
+
+
+def test_explain_gap_has_sections_and_raw_signals():
+    gap = {
+        "outcome_id": "SYS.5.BP3",
+        "outcome_name": "Verify",
+        "missing_characteristic": "acceptance_criteria_defined",
+        "signals": {"structural": [], "lexical": [
+            {"kind": "lexical", "node": 1, "score": 0.05, "snippet": "weak", "query": "acceptance criteria defined"}
+        ]},
+        "confidence": 0.95,
+    }
+    exp = explain_gap(gap, ontology_version_hash="abc123", expected="Criteria defined.")
+    assert exp["target"] == "SYS.5.BP3:acceptance_criteria_defined"
+    assert exp["sections"]["structured"]["outcome"] == "SYS.5.BP3"
+    assert exp["sections"]["structured"]["expected"] == "Criteria defined."
+    assert exp["sections"]["statistical"]["queries"] == ["acceptance criteria defined"]
+    assert exp["sections"]["statistical"]["top_hits"][0]["node"] == 1
+    assert isinstance(exp["sections"]["rendered"], str) and exp["sections"]["rendered"]
+    assert exp["raw_signals"]["ontology_version"] == "abc123"
+    assert exp["raw_signals"]["characteristic"] == "acceptance_criteria_defined"

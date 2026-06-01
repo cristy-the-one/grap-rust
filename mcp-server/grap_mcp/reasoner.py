@@ -95,3 +95,44 @@ def detect_gaps(kg, ontology: Ontology, pg=None) -> List[Dict[str, Any]]:
                     "confidence": round(1.0 - satisfaction, 3),
                 })
     return gaps
+
+
+def explain_gap(gap: Dict[str, Any], ontology_version_hash: Optional[str] = None,
+                expected: str = "") -> Dict[str, Any]:
+    """Produce a sectioned, reproducible explanation for a single gap."""
+    outcome_id = gap["outcome_id"]
+    characteristic = gap["missing_characteristic"]
+    lexical = gap["signals"]["lexical"]
+    queries = sorted({s["query"] for s in lexical if "query" in s})
+    top_hits = [{"node": s.get("node"), "score": s.get("score"), "snippet": s.get("snippet")}
+                for s in lexical]
+
+    rendered = (
+        f"Process outcome {outcome_id} ({gap.get('outcome_name', '')}) requires "
+        f"'{characteristic}', but it was not found in the knowledge graph. "
+        f"Expected: {expected or 'see ontology'}. "
+        f"{'No supporting evidence above threshold.' if not top_hits else 'Closest matches were below the satisfaction threshold.'}"
+    )
+
+    return {
+        "target": f"{outcome_id}:{characteristic}",
+        "sections": {
+            "structured": {
+                "outcome": outcome_id,
+                "characteristic": characteristic,
+                "expected": expected,
+            },
+            "statistical": {
+                "queries": queries,
+                "top_hits": top_hits,
+                "threshold": LEXICAL_THRESHOLD,
+            },
+            "rendered": rendered,
+        },
+        "raw_signals": {
+            "ontology_version": ontology_version_hash,
+            "outcome_id": outcome_id,
+            "characteristic": characteristic,
+            "signals": gap["signals"],
+        },
+    }
