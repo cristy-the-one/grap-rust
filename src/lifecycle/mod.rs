@@ -6,6 +6,7 @@ mod activation;
 mod audit;
 mod hash;
 mod publish;
+mod run;
 mod version;
 mod workspace;
 
@@ -13,6 +14,7 @@ pub use activation::{Activation, ActivationState, ActivationStore};
 pub use audit::{AuditEvent, AuditLog};
 pub use hash::ContentHash;
 pub use publish::{PublishLevel, PublishRecord, PublishStore};
+pub use run::{RunKind, RunRecord, RunStatus, RunStore};
 pub use version::{Version, VersionKind, VersionStore};
 pub use workspace::Workspace;
 
