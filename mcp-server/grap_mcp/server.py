@@ -253,7 +253,11 @@ def _run_gap_detection(scope: str, kind: str, extra_summary: dict = None) -> dic
         ws.start_run(run_id, kind=kind, activation_id=activation_id,
                      pg_version=pg_version, kg_version=kg_version, scope=scope)
 
-        gaps = reasoner.detect_gaps(kg, ontology, pg)
+        if activation is not None:
+            weights = dict(activation.frozen_weights)
+        else:
+            weights = config_store.load_config(_resolve_ws_root())["weights"]
+        gaps = reasoner.detect_gaps(kg, ontology, pg, weights=weights)
         explanations = {}
         hashes = []
         for gap in gaps:
@@ -265,7 +269,7 @@ def _run_gap_detection(scope: str, kind: str, extra_summary: dict = None) -> dic
             hashes.append(version.hash)
         _state["explanations"] = explanations
 
-        summary = {"scope": scope}
+        summary = {"scope": scope, "weights": json.dumps(weights)}
         if extra_summary:
             summary.update(extra_summary)
         ws.complete_run(run_id, status="completed", gaps_found=len(gaps),
@@ -612,6 +616,24 @@ def set_retention(key: str, days: int, rationale: str) -> dict:
     _get_workspace().record_event("config_changed", f"retention:{key}",
                                   details={"days": str(days)}, rationale=rationale)
     return {"status": "ok", "retention": cfg["retention"], "last_changed": cfg["last_changed"]}
+
+
+@mcp.tool()
+def enforce_retention() -> dict:
+    """Purge runs (+ orphaned explanations) older than the configured retention windows."""
+    try:
+        ws = _get_workspace()
+        retention = config_store.load_config(_resolve_ws_root())["retention"]
+        now_ms = int(time.time() * 1000)
+        day_ms = 86_400_000
+        prod_cutoff = max(0, now_ms - int(retention.get("production_days", 365)) * day_ms)
+        exp_cutoff = max(0, now_ms - int(retention.get("experiment_days", 30)) * day_ms)
+        rep = ws.enforce_retention(prod_cutoff, exp_cutoff)
+        return {"status": "ok", "runs_deleted": rep.runs_deleted,
+                "explanations_deleted": rep.explanations_deleted, "run_ids": rep.run_ids}
+    except Exception as e:
+        logger.exception("enforce_retention failed")
+        return {"status": "error", "message": str(e)}
 
 
 @mcp.tool()
