@@ -39,6 +39,7 @@ impl From<lc::Version> for Version {
         let kind = match v.kind {
             lc::VersionKind::Pg => "pg",
             lc::VersionKind::Ontology => "ontology",
+            lc::VersionKind::Explanation => "explanation",
         };
         Version {
             hash: v.hash.to_string(),
@@ -94,18 +95,23 @@ pub struct AuditEvent {
     pub ts: u64,
     /// Event type.
     pub event_type: String,
-    /// Subject id (hash or activation id).
+    /// Subject id (hash or activation/run id).
     pub subject: String,
     /// Optional rationale.
     pub rationale: Option<String>,
+    /// Typed links as (relation, kind, id) tuples.
+    pub links: Vec<(String, String, String)>,
 }
 
 #[pymethods]
 impl AuditEvent {
     fn __repr__(&self) -> String {
         format!(
-            "AuditEvent(ts={}, type={}, subject={})",
-            self.ts, self.event_type, self.subject
+            "AuditEvent(ts={}, type={}, subject={}, links={})",
+            self.ts,
+            self.event_type,
+            self.subject,
+            self.links.len()
         )
     }
 }
@@ -117,7 +123,130 @@ impl From<lc::AuditEvent> for AuditEvent {
             event_type: e.event_type,
             subject: e.subject,
             rationale: e.rationale,
+            links: e
+                .links
+                .into_iter()
+                .map(|l| (l.relation, l.kind, l.id))
+                .collect(),
         }
+    }
+}
+
+/// Python wrapper for a run record.
+#[pyclass(get_all)]
+#[derive(Clone)]
+pub struct RunRecord {
+    /// Run id.
+    pub run_id: String,
+    /// "production" or "experiment".
+    pub kind: String,
+    /// "running", "completed", or "failed".
+    pub status: String,
+    /// Number of gaps found.
+    pub gaps_found: u32,
+    /// Frozen PG version hash, if any.
+    pub pg_version: Option<String>,
+    /// Frozen KG/ontology version hash, if any.
+    pub kg_version: Option<String>,
+    /// Explanation record hashes.
+    pub explanation_hashes: Vec<String>,
+}
+
+#[pymethods]
+impl RunRecord {
+    fn __repr__(&self) -> String {
+        format!(
+            "RunRecord(id={}, kind={}, status={}, gaps_found={})",
+            self.run_id, self.kind, self.status, self.gaps_found
+        )
+    }
+}
+
+impl From<lc::RunRecord> for RunRecord {
+    fn from(r: lc::RunRecord) -> Self {
+        let kind = match r.kind {
+            lc::RunKind::Production => "production",
+            lc::RunKind::Experiment => "experiment",
+        };
+        let status = match r.status {
+            lc::RunStatus::Running => "running",
+            lc::RunStatus::Completed => "completed",
+            lc::RunStatus::Failed => "failed",
+        };
+        RunRecord {
+            run_id: r.run_id,
+            kind: kind.to_string(),
+            status: status.to_string(),
+            gaps_found: r.gaps_found,
+            pg_version: r.pg_version.map(|h| h.to_string()),
+            kg_version: r.kg_version.map(|h| h.to_string()),
+            explanation_hashes: r
+                .explanation_hashes
+                .into_iter()
+                .map(|h| h.to_string())
+                .collect(),
+        }
+    }
+}
+
+/// Python wrapper for a reconstruction report.
+#[pyclass(get_all)]
+#[derive(Clone)]
+pub struct ReconstructionReport {
+    /// The run id.
+    pub run_id: String,
+    /// True when every referenced artifact is present.
+    pub complete: bool,
+    /// Whether the PG version is present.
+    pub pg_version_present: bool,
+    /// Whether the KG version is present.
+    pub kg_version_present: bool,
+    /// Explanations present.
+    pub explanations_present: usize,
+    /// Explanations referenced.
+    pub explanations_total: usize,
+    /// Human-readable missing-artifact descriptions.
+    pub missing: Vec<String>,
+}
+
+#[pymethods]
+impl ReconstructionReport {
+    fn __repr__(&self) -> String {
+        format!(
+            "ReconstructionReport(run={}, complete={}, missing={})",
+            self.run_id,
+            self.complete,
+            self.missing.len()
+        )
+    }
+}
+
+impl From<lc::ReconstructionReport> for ReconstructionReport {
+    fn from(r: lc::ReconstructionReport) -> Self {
+        ReconstructionReport {
+            run_id: r.run_id,
+            complete: r.complete,
+            pg_version_present: r.pg_version_present,
+            kg_version_present: r.kg_version_present,
+            explanations_present: r.explanations_present,
+            explanations_total: r.explanations_total,
+            missing: r.missing,
+        }
+    }
+}
+
+fn parse_run_kind(kind: &str) -> lc::RunKind {
+    match kind {
+        "experiment" => lc::RunKind::Experiment,
+        _ => lc::RunKind::Production,
+    }
+}
+
+fn parse_run_status(status: &str) -> lc::RunStatus {
+    match status {
+        "failed" => lc::RunStatus::Failed,
+        "running" => lc::RunStatus::Running,
+        _ => lc::RunStatus::Completed,
     }
 }
 
@@ -286,6 +415,141 @@ impl Workspace {
         Ok(self
             .inner
             .read_audit()
+            .map_err(to_py)?
+            .into_iter()
+            .map(Into::into)
+            .collect())
+    }
+
+    /// Start a run; freezes the given versions.
+    #[pyo3(signature = (run_id, kind="production", activation_id=None, pg_version=None, kg_version=None, scope="all"))]
+    fn start_run(
+        &self,
+        run_id: String,
+        kind: &str,
+        activation_id: Option<String>,
+        pg_version: Option<String>,
+        kg_version: Option<String>,
+        scope: &str,
+    ) -> PyResult<RunRecord> {
+        let run = self
+            .inner
+            .start_run(
+                run_id,
+                parse_run_kind(kind),
+                activation_id,
+                pg_version.map(grap::ContentHash),
+                kg_version.map(grap::ContentHash),
+                scope.to_string(),
+            )
+            .map_err(to_py)?;
+        Ok(run.into())
+    }
+
+    /// Store an immutable explanation record; returns its hash via Version.
+    #[pyo3(signature = (content, metadata=None))]
+    fn record_explanation(
+        &self,
+        content: String,
+        metadata: Option<&Bound<'_, PyDict>>,
+    ) -> PyResult<Version> {
+        let mut meta = BTreeMap::new();
+        if let Some(d) = metadata {
+            for (k, v) in d.iter() {
+                meta.insert(k.extract::<String>()?, v.extract::<String>()?);
+            }
+        }
+        let v = self
+            .inner
+            .record_explanation(content.as_bytes(), meta)
+            .map_err(to_py)?;
+        Ok(v.into())
+    }
+
+    /// Complete a run.
+    #[pyo3(signature = (run_id, status="completed", gaps_found=0, explanation_hashes=None, summary=None))]
+    fn complete_run(
+        &self,
+        run_id: String,
+        status: &str,
+        gaps_found: u32,
+        explanation_hashes: Option<Vec<String>>,
+        summary: Option<&Bound<'_, PyDict>>,
+    ) -> PyResult<RunRecord> {
+        let hashes = explanation_hashes
+            .unwrap_or_default()
+            .into_iter()
+            .map(grap::ContentHash)
+            .collect();
+        let mut s = BTreeMap::new();
+        if let Some(d) = summary {
+            for (k, v) in d.iter() {
+                s.insert(k.extract::<String>()?, v.extract::<String>()?);
+            }
+        }
+        let run = self
+            .inner
+            .complete_run(&run_id, parse_run_status(status), gaps_found, hashes, s)
+            .map_err(to_py)?;
+        Ok(run.into())
+    }
+
+    /// Get a run record.
+    fn get_run(&self, run_id: String) -> PyResult<Option<RunRecord>> {
+        Ok(self.inner.get_run(&run_id).map_err(to_py)?.map(Into::into))
+    }
+
+    /// List runs, optionally filtered by kind ("production"/"experiment").
+    #[pyo3(signature = (kind=None))]
+    fn list_runs(&self, kind: Option<String>) -> PyResult<Vec<RunRecord>> {
+        let k = kind.as_deref().map(parse_run_kind);
+        Ok(self
+            .inner
+            .list_runs(k)
+            .map_err(to_py)?
+            .into_iter()
+            .map(Into::into)
+            .collect())
+    }
+
+    /// Reconstruct a run, reporting any missing artifacts.
+    fn reconstruct(&self, run_id: String) -> PyResult<ReconstructionReport> {
+        Ok(self.inner.reconstruct(&run_id).map_err(to_py)?.into())
+    }
+
+    /// Filtered timeline query.
+    #[pyo3(signature = (event_type=None, since=None, until=None))]
+    fn query_events(
+        &self,
+        event_type: Option<String>,
+        since: Option<u64>,
+        until: Option<u64>,
+    ) -> PyResult<Vec<AuditEvent>> {
+        Ok(self
+            .inner
+            .temporal_query(event_type.as_deref(), since, until)
+            .map_err(to_py)?
+            .into_iter()
+            .map(Into::into)
+            .collect())
+    }
+
+    /// All events for a run.
+    fn events_for_run(&self, run_id: String) -> PyResult<Vec<AuditEvent>> {
+        Ok(self
+            .inner
+            .events_for_run(&run_id)
+            .map_err(to_py)?
+            .into_iter()
+            .map(Into::into)
+            .collect())
+    }
+
+    /// All events linked to an entity (kind + id).
+    fn events_linked_to(&self, kind: String, id: String) -> PyResult<Vec<AuditEvent>> {
+        Ok(self
+            .inner
+            .events_linked_to(&kind, &id)
             .map_err(to_py)?
             .into_iter()
             .map(Into::into)

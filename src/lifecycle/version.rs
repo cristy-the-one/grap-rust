@@ -13,6 +13,8 @@ pub enum VersionKind {
     Pg,
     /// A KG/ontology snapshot.
     Ontology,
+    /// An immutable explanation record (raw signals + rendered snapshot).
+    Explanation,
 }
 
 /// Metadata for an immutable, content-addressed version.
@@ -139,6 +141,19 @@ mod tests {
             .unwrap();
         assert_eq!(a.hash, b.hash);
         assert_eq!(store.list(None).unwrap().len(), 1);
+    }
+
+    #[test]
+    fn explanation_kind_round_trips() {
+        let dir = tmp();
+        let store = VersionStore::open(dir.path()).unwrap();
+        let v = store
+            .put(VersionKind::Explanation, b"{\"x\":1}", BTreeMap::new())
+            .unwrap();
+        let (meta, bytes) = store.get(&v.hash).unwrap().unwrap();
+        assert_eq!(meta.kind, VersionKind::Explanation);
+        assert_eq!(bytes, b"{\"x\":1}");
+        assert_eq!(store.list(Some(VersionKind::Explanation)).unwrap().len(), 1);
     }
 
     #[test]

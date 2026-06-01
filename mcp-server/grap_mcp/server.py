@@ -10,6 +10,8 @@ import pygrap
 from pathlib import Path
 import logging
 import os
+import uuid
+import json
 
 from . import procedure_graph as pg_loader
 from .validation import validate_pg
@@ -161,22 +163,25 @@ def run_procedure(scope: str = "all") -> dict:
         node_count = kg.node_count()
         step_count = len(pg.steps) if hasattr(pg, "steps") else 0
 
-        gaps = []
+        ws = _get_workspace()
         ontology = _state.get("ontology")
-        if ontology:
-            gaps = reasoner.detect_gaps(kg, ontology, pg)
+        run_id = f"run-{uuid.uuid4().hex[:8]}"
+        activation_id = activation.activation_id if activation else None
+        pg_version = activation.pg_version if activation else None
+        kg_version = (activation.kg_version if activation else None) or _state.get("ontology_version")
+        ws.start_run(run_id, kind="production", activation_id=activation_id,
+                     pg_version=pg_version, kg_version=kg_version, scope=scope)
 
-        try:
-            _get_workspace().record_event("procedure_run", scope,
-                                          details={"gaps_found": str(len(gaps))})
-        except Exception:
-            logger.warning("audit record_event failed for procedure_run", exc_info=True)
+        gaps = reasoner.detect_gaps(kg, ontology, pg) if ontology else []
+        ws.complete_run(run_id, status="completed", gaps_found=len(gaps),
+                        explanation_hashes=[], summary={"scope": scope})
 
         return {
             "status": "ok",
             "message": "Procedure executed (gap detection wired)",
             "scope": scope,
-            "activation_id": activation.activation_id if activation else None,
+            "run_id": run_id,
+            "activation_id": activation_id,
             "kg_node_count": node_count,
             "pg_step_count": step_count,
             "gaps_found": len(gaps),
@@ -188,26 +193,40 @@ def run_procedure(scope: str = "all") -> dict:
 
 
 @mcp.tool()
-def detect_gaps(scope: str = "all") -> dict:
-    """Detect ASPICE gaps using the loaded ontology + KG (hybrid reasoner)."""
+def detect_gaps(scope: str = "all", kind: str = "production") -> dict:
+    """Detect ASPICE gaps using the loaded ontology + KG, persisting a run + explanations."""
     kg = _state.get("kg")
     ontology = _state.get("ontology")
     if not kg or not ontology:
         return {"status": "error", "message": "KG and ontology must be loaded first."}
     try:
+        ws = _get_workspace()
         pg = _state.get("pg")
+        logic_id = _state.get("current_logic_id")
+        activation = ws.current_production(logic_id) if logic_id else None
+        activation_id = activation.activation_id if activation else None
+        pg_version = activation.pg_version if activation else None
+        kg_version = (activation.kg_version if activation else None) or _state.get("ontology_version")
+
+        run_id = f"run-{uuid.uuid4().hex[:8]}"
+        ws.start_run(run_id, kind=kind, activation_id=activation_id,
+                     pg_version=pg_version, kg_version=kg_version, scope=scope)
+
         gaps = reasoner.detect_gaps(kg, ontology, pg)
-        # Build + store explanations for this run (POC: in-memory).
         explanations = {}
+        hashes = []
         for gap in gaps:
             oc = ontology.outcome(gap["outcome_id"])
             exp = reasoner.explain_gap(gap, _state.get("ontology_version"),
                                        expected=oc.description if oc else "")
             explanations[exp["target"]] = exp
+            version = ws.record_explanation(json.dumps(exp), metadata={"target": exp["target"]})
+            hashes.append(version.hash)
         _state["explanations"] = explanations
-        _get_workspace().record_event("gap_detection_run", scope,
-                                      details={"gaps_found": str(len(gaps))})
-        return {"status": "ok", "scope": scope, "gaps": gaps, "gaps_found": len(gaps)}
+
+        ws.complete_run(run_id, status="completed", gaps_found=len(gaps),
+                        explanation_hashes=hashes, summary={"scope": scope})
+        return {"status": "ok", "run_id": run_id, "scope": scope, "gaps": gaps, "gaps_found": len(gaps)}
     except Exception as e:
         logger.exception("detect_gaps failed")
         return {"status": "error", "message": str(e)}
@@ -372,6 +391,61 @@ def get_audit_log() -> dict:
 
 
 @mcp.tool()
+def list_runs(kind: str = None) -> dict:
+    """List execution runs, optionally filtered by kind (production|experiment)."""
+    try:
+        runs = _get_workspace().list_runs(kind)
+        return {"runs": [{"run_id": r.run_id, "kind": r.kind, "status": r.status,
+                          "gaps_found": r.gaps_found} for r in runs]}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
+@mcp.tool()
+def get_run(run_id: str) -> dict:
+    """Return a single run record."""
+    try:
+        r = _get_workspace().get_run(run_id)
+        if not r:
+            return {"status": "error", "message": f"Run '{run_id}' not found."}
+        return {"status": "ok", "run_id": r.run_id, "kind": r.kind, "status_": r.status,
+                "gaps_found": r.gaps_found, "pg_version": r.pg_version,
+                "kg_version": r.kg_version, "explanation_hashes": r.explanation_hashes}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
+@mcp.tool()
+def reconstruct_run(run_id: str) -> dict:
+    """Reconstruct a past run, reporting any missing frozen artifacts."""
+    try:
+        rep = _get_workspace().reconstruct(run_id)
+        return {"status": "ok", "run_id": rep.run_id, "complete": rep.complete,
+                "pg_version_present": rep.pg_version_present,
+                "kg_version_present": rep.kg_version_present,
+                "explanations_present": rep.explanations_present,
+                "explanations_total": rep.explanations_total, "missing": rep.missing}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
+@mcp.tool()
+def query_events(event_type: str = None, run_id: str = None) -> dict:
+    """Query the Temporal Graph: by event_type, or all events for a run_id."""
+    try:
+        ws = _get_workspace()
+        if run_id:
+            events = ws.events_for_run(run_id)
+        else:
+            events = ws.query_events(event_type)
+        return {"events": [{"ts": e.ts, "type": e.event_type, "subject": e.subject,
+                            "links": [{"relation": r, "kind": k, "id": i} for (r, k, i) in e.links]}
+                           for e in events]}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
+@mcp.tool()
 def list_capabilities() -> dict:
     """Return the MCP capability taxonomy grouped by domain."""
     return {
@@ -381,7 +455,8 @@ def list_capabilities() -> dict:
                              "activate", "set_production", "get_production", "list_versions"],
             "execution_reasoning": ["run_procedure", "detect_gaps", "get_explanation"],
             "authoring": ["validate_procedure_graph", "diff_procedure_graphs"],
-            "audit": ["get_audit_log", "get_status", "list_capabilities"],
+            "audit": ["get_audit_log", "get_status", "list_capabilities",
+                      "list_runs", "get_run", "reconstruct_run", "query_events"],
         },
         "auth": "deferred (POC: no authentication/authorization)",
     }

@@ -34,3 +34,7 @@ Every mutating capability emits a Workspace audit event (see `get_audit_log`).
 - **get_audit_log()** → workspace audit events.
 - **get_status()** → loaded KG/PG/lifecycle state.
 - **list_capabilities()** → this taxonomy.
+- **list_runs(kind=None)** → execution runs (filter by production|experiment).
+- **get_run(run_id)** → a single run record with frozen versions + explanation hashes.
+- **reconstruct_run(run_id)** → reproduction completeness report (names missing artifacts).
+- **query_events(event_type=None, run_id=None)** → Temporal Graph events (filtered, or for a run).

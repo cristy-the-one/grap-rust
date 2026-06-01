@@ -64,8 +64,9 @@ pub mod lifecycle; // Versioning, activation, and lifecycle (Task 01)
 pub use crate::index::TextIndex;
 pub use graph_ops::MergeReport;
 pub use lifecycle::{
-    Activation, ActivationState, AuditEvent, ChangeStatus, ContentHash, LifecycleError,
-    PublishLevel, Version, VersionKind, Workspace,
+    Activation, ActivationState, AuditEvent, ChangeStatus, ContentHash, EventLink, LifecycleError,
+    PublishLevel, ReconstructionReport, RunKind, RunRecord, RunStatus, Version, VersionKind,
+    Workspace,
 };
 
 // Flat re-exports for the primary on-disk types (first-class public API).
