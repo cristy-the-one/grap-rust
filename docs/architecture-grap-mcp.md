@@ -96,6 +96,14 @@ nodes — by node id so they are never mistaken for evidence). Unsatisfied
 characteristics become gaps, each with a sectioned,
 reproducible explanation (structured + statistical + rendered snapshot).
 
+**Same-session searchability.** Content added during a session — ingested
+requirements, the projected ontology, and PG steps — is immediately findable by
+search, in-process and across the worker threads the MCP runtime uses to dispatch
+synchronous tools. The engine's background merge workers are optional and not started
+by the server, so per-session search results are stable; BM25 scores shift only as
+the index grows, which is expected. Gap detection therefore reflects exactly the
+knowledge present at run time, and is deterministic.
+
 ---
 
 ## Governance & reproducibility
