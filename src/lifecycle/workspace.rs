@@ -63,6 +63,7 @@ impl Workspace {
             subject: version.hash.to_string(),
             details: BTreeMap::from([("level".to_string(), format!("{:?}", level))]),
             rationale,
+            links: vec![],
         })?;
         Ok(version)
     }
@@ -85,6 +86,7 @@ impl Workspace {
             subject: version.hash.to_string(),
             details: BTreeMap::from([("kind".to_string(), "ontology".to_string())]),
             rationale: None,
+            links: vec![],
         })?;
         Ok(version)
     }
@@ -105,6 +107,7 @@ impl Workspace {
             subject: subject.to_string(),
             details,
             rationale,
+            links: vec![],
         })
     }
 
@@ -128,6 +131,7 @@ impl Workspace {
             subject: hash.to_string(),
             details: BTreeMap::new(),
             rationale: Some(rationale),
+            links: vec![],
         })?;
         Ok(())
     }
@@ -163,6 +167,7 @@ impl Workspace {
             subject: activation_id,
             details: BTreeMap::new(),
             rationale: None,
+            links: vec![],
         })?;
         Ok(activation)
     }
@@ -177,6 +182,7 @@ impl Workspace {
             subject: activation_id.to_string(),
             details: BTreeMap::from([("pg_logic_id".to_string(), activation.pg_logic_id.clone())]),
             rationale: None,
+            links: vec![],
         })?;
         Ok(activation)
     }

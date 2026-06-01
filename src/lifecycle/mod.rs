@@ -11,7 +11,7 @@ mod version;
 mod workspace;
 
 pub use activation::{Activation, ActivationState, ActivationStore};
-pub use audit::{AuditEvent, AuditLog};
+pub use audit::{AuditEvent, AuditLog, EventLink};
 pub use hash::ContentHash;
 pub use publish::{PublishLevel, PublishRecord, PublishStore};
 pub use run::{RunKind, RunRecord, RunStatus, RunStore};

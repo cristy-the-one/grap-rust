@@ -8,6 +8,18 @@ use std::path::{Path, PathBuf};
 
 use super::LifecycleError;
 
+/// A typed link from an event to an entity (run, version, KG node, PG step, ...).
+/// Together these turn the append-only log into a relational event graph.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct EventLink {
+    /// The relationship name, e.g. "produced", "used", "touched".
+    pub relation: String,
+    /// The target entity kind, e.g. "run", "pg_version", "kg_node".
+    pub kind: String,
+    /// The target entity id (a run id, hash, node id, ...).
+    pub id: String,
+}
+
 /// A single auditable event.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct AuditEvent {
@@ -23,6 +35,9 @@ pub struct AuditEvent {
     pub details: BTreeMap<String, String>,
     /// Optional rationale captured with the action.
     pub rationale: Option<String>,
+    /// Typed links to related entities (relational event graph).
+    #[serde(default)]
+    pub links: Vec<EventLink>,
 }
 
 /// Append-only log writing one JSON object per line.
@@ -68,6 +83,55 @@ impl AuditLog {
         }
         Ok(out)
     }
+
+    /// Filtered timeline query: by event type and/or time window.
+    pub fn query(
+        &self,
+        event_type: Option<&str>,
+        since: Option<u64>,
+        until: Option<u64>,
+    ) -> Result<Vec<AuditEvent>, LifecycleError> {
+        Ok(self
+            .read_all()?
+            .into_iter()
+            .filter(|e| match event_type {
+                Some(t) => e.event_type == t,
+                None => true,
+            })
+            .filter(|e| match since {
+                Some(s) => e.ts >= s,
+                None => true,
+            })
+            .filter(|e| match until {
+                Some(u) => e.ts <= u,
+                None => true,
+            })
+            .collect())
+    }
+
+    /// All events linked to (or whose subject is) a run.
+    pub fn events_for_run(&self, run_id: &str) -> Result<Vec<AuditEvent>, LifecycleError> {
+        Ok(self
+            .read_all()?
+            .into_iter()
+            .filter(|e| {
+                e.subject == run_id || e.links.iter().any(|l| l.kind == "run" && l.id == run_id)
+            })
+            .collect())
+    }
+
+    /// All events carrying a link to the given entity (kind + id).
+    pub fn events_linked_to(
+        &self,
+        kind: &str,
+        id: &str,
+    ) -> Result<Vec<AuditEvent>, LifecycleError> {
+        Ok(self
+            .read_all()?
+            .into_iter()
+            .filter(|e| e.links.iter().any(|l| l.kind == kind && l.id == id))
+            .collect())
+    }
 }
 
 #[cfg(test)]
@@ -82,7 +146,33 @@ mod tests {
             subject: subject.to_string(),
             details: BTreeMap::new(),
             rationale: None,
+            links: vec![],
         }
+    }
+
+    #[test]
+    fn old_event_without_links_deserializes() {
+        let json =
+            r#"{"ts":1,"event_type":"x","actor":null,"subject":"s","details":{},"rationale":null}"#;
+        let e: AuditEvent = serde_json::from_str(json).unwrap();
+        assert!(e.links.is_empty());
+    }
+
+    #[test]
+    fn events_for_run_and_linked_to() {
+        let dir = tempfile::tempdir().unwrap();
+        let log = AuditLog::open(dir.path()).unwrap();
+        let mut e = ev("run_started", "run-1");
+        e.links = vec![EventLink {
+            relation: "used".into(),
+            kind: "pg_version".into(),
+            id: "h1".into(),
+        }];
+        log.append(&e).unwrap();
+        log.append(&ev("other", "x")).unwrap();
+        assert_eq!(log.events_for_run("run-1").unwrap().len(), 1);
+        assert_eq!(log.events_linked_to("pg_version", "h1").unwrap().len(), 1);
+        assert_eq!(log.query(Some("other"), None, None).unwrap().len(), 1);
     }
 
     #[test]
