@@ -40,6 +40,7 @@ impl From<lc::Version> for Version {
             lc::VersionKind::Pg => "pg",
             lc::VersionKind::Ontology => "ontology",
             lc::VersionKind::Explanation => "explanation",
+            lc::VersionKind::Validation => "validation",
         };
         Version {
             hash: v.hash.to_string(),
@@ -464,6 +465,37 @@ impl Workspace {
             .record_explanation(content.as_bytes(), meta)
             .map_err(to_py)?;
         Ok(v.into())
+    }
+
+    /// Store a validation report for a PG version (content-addressed + linked event).
+    #[pyo3(signature = (pg_hash, content, ok, metadata=None))]
+    fn record_validation(
+        &self,
+        pg_hash: &str,
+        content: String,
+        ok: bool,
+        metadata: Option<&Bound<'_, PyDict>>,
+    ) -> PyResult<Version> {
+        let mut meta = BTreeMap::new();
+        if let Some(d) = metadata {
+            for (k, v) in d.iter() {
+                meta.insert(k.extract::<String>()?, v.extract::<String>()?);
+            }
+        }
+        let v = self
+            .inner
+            .record_validation(pg_hash, content.as_bytes(), ok, meta)
+            .map_err(to_py)?;
+        Ok(v.into())
+    }
+
+    /// Fetch the text content of any stored record by hash, or None.
+    fn get_record(&self, hash: String) -> PyResult<Option<String>> {
+        Ok(self
+            .inner
+            .get_record(&grap::ContentHash(hash))
+            .map_err(to_py)?
+            .map(|bytes| String::from_utf8_lossy(&bytes).into_owned()))
     }
 
     /// Complete a run.
