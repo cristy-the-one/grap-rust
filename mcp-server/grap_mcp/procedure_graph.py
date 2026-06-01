@@ -74,22 +74,13 @@ class ProcedureGraph:
         return None
 
 
-def load_from_file(path: str | Path) -> ProcedureGraph:
-    """
-    Load a Procedure Graph from a .pg.yaml file using the POC format.
-    """
-    path = Path(path)
-    if not path.exists():
-        raise FileNotFoundError(f"Procedure Graph file not found: {path}")
+def load_from_string(text: str, source_path: Optional[str] = None) -> ProcedureGraph:
+    """Parse a Procedure Graph from a YAML string (POC flat format)."""
+    data = yaml.safe_load(text) or {}
 
-    with open(path, "r", encoding="utf-8") as f:
-        data = yaml.safe_load(f)
-
-    steps_data = data.get("steps", [])
     steps: List[ProcedureStep] = []
-
-    for step_data in steps_data:
-        step = ProcedureStep(
+    for step_data in data.get("steps", []):
+        steps.append(ProcedureStep(
             id=step_data["id"],
             operation=step_data.get("operation", ""),
             inputs=step_data.get("inputs"),
@@ -97,16 +88,23 @@ def load_from_file(path: str | Path) -> ProcedureGraph:
             references=step_data.get("references"),
             guards=step_data.get("guards"),
             notes=step_data.get("notes"),
-        )
-        steps.append(step)
+        ))
 
     return ProcedureGraph(
         name=data.get("name", "Unnamed Procedure"),
         description=data.get("description", ""),
         version=data.get("version", "0.0.0"),
         steps=steps,
-        source_path=str(path),
+        source_path=source_path,
     )
+
+
+def load_from_file(path: str | Path) -> ProcedureGraph:
+    """Load a Procedure Graph from a .pg.yaml file using the POC format."""
+    path = Path(path)
+    if not path.exists():
+        raise FileNotFoundError(f"Procedure Graph file not found: {path}")
+    return load_from_string(path.read_text(encoding="utf-8"), source_path=str(path))
 
 
 def load_from_directory(directory: str | Path) -> List[ProcedureGraph]:
