@@ -371,6 +371,22 @@ def get_audit_log() -> dict:
         return {"status": "error", "message": str(e)}
 
 
+@mcp.tool()
+def list_capabilities() -> dict:
+    """Return the MCP capability taxonomy grouped by domain."""
+    return {
+        "domains": {
+            "knowledge": ["load_knowledge_graph", "load_ontology"],
+            "pg_lifecycle": ["load_procedure_graph", "publish_pg", "promote_pg",
+                             "activate", "set_production", "get_production", "list_versions"],
+            "execution_reasoning": ["run_procedure", "detect_gaps", "get_explanation"],
+            "authoring": ["validate_procedure_graph", "diff_procedure_graphs"],
+            "audit": ["get_audit_log", "get_status", "list_capabilities"],
+        },
+        "auth": "deferred (POC: no authentication/authorization)",
+    }
+
+
 # =============================================================================
 # Entry point
 # =============================================================================
