@@ -26,6 +26,14 @@ Every mutating capability emits a Workspace audit event (see `get_audit_log`).
 - **get_explanation(target)** → `{status, explanation}`. Sectioned explanation for a gap target
   (`<outcome_id>:<characteristic>`).
 
+## Experimentation & Quarantine
+- **run_experiment(scope="all", hypothesis=None)** → `{status, run_id, kind:"experiment", gaps_found}`.
+  Runs gap detection as a quarantined experiment with full audit parity (run record + explanations).
+- **get_quality_metrics()** → production-only quality view; experiments reported only as
+  `experiments_excluded` and never counted in `production_runs`.
+- **adopt_experiment(run_id, activation_id, rationale)** → promotes the experiment's PG version
+  into production through the validation-gated `promote_pg` + `activate` path.
+
 ## Authoring & Validation
 - **validate_procedure_graph(path)** → `{status, ok, errors, warnings}` (publish-time rules; non-blocking).
 - **diff_procedure_graphs(path_a, path_b)** → `{status, diff}`.
