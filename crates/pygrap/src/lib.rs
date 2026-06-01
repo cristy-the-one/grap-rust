@@ -33,6 +33,7 @@ fn pygrap(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<lifecycle::AuditEvent>()?;
     m.add_class::<lifecycle::RunRecord>()?;
     m.add_class::<lifecycle::ReconstructionReport>()?;
+    m.add_class::<lifecycle::RetentionReport>()?;
 
     m.add_function(wrap_pyfunction!(version, m)?)?;
     Ok(())
