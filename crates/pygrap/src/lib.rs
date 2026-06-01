@@ -6,6 +6,7 @@ use pyo3::prelude::*;
 
 mod errors;
 mod indexed_graph;
+mod lifecycle;
 mod sharded_graph;
 
 pub use errors::GraphError;
@@ -26,6 +27,10 @@ fn pygrap(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<sharded_graph::ShardedGraph>()?;
     m.add_class::<sharded_graph::RebalancePlanPy>()?;
     m.add_class::<sharded_graph::ShardedQueryResult>()?;
+    m.add_class::<lifecycle::Workspace>()?;
+    m.add_class::<lifecycle::Version>()?;
+    m.add_class::<lifecycle::Activation>()?;
+    m.add_class::<lifecycle::AuditEvent>()?;
 
     m.add_function(wrap_pyfunction!(version, m)?)?;
     Ok(())
