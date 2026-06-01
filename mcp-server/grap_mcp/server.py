@@ -23,6 +23,7 @@ from . import reasoner
 from .publish_validation import validate_for_publish
 from .experiments import experiment_summary, quality_metrics
 from . import config as config_store
+from . import auth
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("grap-mcp")
@@ -38,6 +39,7 @@ _state = {
     "ws_root": None,            # workspace root path (for the config store)
     "current_logic_id": None,   # pg_logic_id of the loaded/active PG
     "pg_version": None,         # content hash of the last published PG
+    "role": os.environ.get("GRAP_ROLE", "operator"),  # current role (POC simulation)
     "ontology": None,           # parsed Ontology model
     "ontology_version": None,   # ontology version hash in the workspace
     "explanations": {},         # target -> explanation dict (POC, in-memory)
@@ -58,6 +60,15 @@ def _resolve_ws_root():
     if _state.get("ws_root") is None:
         _get_workspace()
     return _state["ws_root"]
+
+
+def _require(required: str):
+    """Return an error dict if the current role is below `required`, else None."""
+    current = _state.get("role", "operator")
+    if not auth.role_allows(current, required):
+        return {"status": "error",
+                "message": f"requires '{required}' role (current: '{current}')"}
+    return None
 
 
 def _cached_validation(ws, version_hash):
@@ -99,6 +110,9 @@ def load_knowledge_graph(path: str) -> dict:
     For the POC this can be a simple on-disk grap store.
     """
     logger.info(f"Loading Knowledge Graph from: {path}")
+    denied = _require("operator")
+    if denied:
+        return denied
     try:
         kg = pygrap.IndexedKnowledgeGraph.with_merge_policy(path, 2)
         _state["kg"] = kg
@@ -121,6 +135,9 @@ def load_knowledge_graph(path: str) -> dict:
 @mcp.tool()
 def load_ontology(path: str) -> dict:
     """Load an ASPICE ontology, project it into the KG, and version it."""
+    denied = _require("operator")
+    if denied:
+        return denied
     kg = _state.get("kg")
     if not kg:
         return {"status": "error", "message": "Load a Knowledge Graph first."}
@@ -151,6 +168,9 @@ def load_procedure_graph(path: str) -> dict:
     Load a Procedure Graph from a .pg.yaml file using the POC flat format.
     """
     logger.info(f"Loading Procedure Graph from: {path}")
+    denied = _require("operator")
+    if denied:
+        return denied
     try:
         pg = pg_loader.load_from_file(path)
         _state["pg"] = pg
@@ -187,6 +207,9 @@ def run_procedure(scope: str = "all") -> dict:
     Respects the current activation and frozen weights when present.
     """
     logger.info(f"Running procedure with scope: {scope}")
+    denied = _require("operator")
+    if denied:
+        return denied
 
     activation = None
     logic_id = _state.get("current_logic_id")
@@ -284,12 +307,18 @@ def _run_gap_detection(scope: str, kind: str, extra_summary: dict = None) -> dic
 @mcp.tool()
 def detect_gaps(scope: str = "all") -> dict:
     """Detect ASPICE gaps as a production run (persists run + explanations)."""
+    denied = _require("operator")
+    if denied:
+        return denied
     return _run_gap_detection(scope, "production")
 
 
 @mcp.tool()
 def run_experiment(scope: str = "all", hypothesis: str = None) -> dict:
     """Run gap detection as a quarantined experiment (full audit parity with production)."""
+    denied = _require("operator")
+    if denied:
+        return denied
     return _run_gap_detection(scope, "experiment", experiment_summary(scope, hypothesis))
 
 
@@ -367,6 +396,9 @@ def get_status() -> dict:
 @mcp.tool()
 def publish_pg(level: str = "draft", rationale: str = None) -> dict:
     """Publish the currently loaded Procedure Graph; runs (non-blocking) validation."""
+    denied = _require("operator")
+    if denied:
+        return denied
     pg = _state.get("pg")
     if not pg:
         return {"status": "error", "message": "No Procedure Graph loaded."}
@@ -393,6 +425,9 @@ def publish_pg(level: str = "draft", rationale: str = None) -> dict:
 @mcp.tool()
 def promote_pg(version_hash: str, rationale: str) -> dict:
     """Promote a published PG version (rationale required); refused if validation has errors."""
+    denied = _require("operator")
+    if denied:
+        return denied
     try:
         ws = _get_workspace()
         report = _cached_validation(ws, version_hash)
@@ -422,6 +457,9 @@ def promote_pg(version_hash: str, rationale: str) -> dict:
 def activate(activation_id: str, version_hash: str, weights: dict = None,
              set_as_production: bool = False, kg_version: str = None) -> dict:
     """Activate a promoted PG version with frozen weights."""
+    denied = _require("operator")
+    if denied:
+        return denied
     pg = _state.get("pg")
     logic_id = _state.get("current_logic_id") or (pg.name if pg else None)
     if not logic_id:
@@ -446,6 +484,9 @@ def activate(activation_id: str, version_hash: str, weights: dict = None,
 @mcp.tool()
 def set_production(activation_id: str) -> dict:
     """Make the given activation the production one for its PG logic."""
+    denied = _require("operator")
+    if denied:
+        return denied
     try:
         act = _get_workspace().set_production(activation_id)
         return {"status": "ok", "production_id": act.activation_id}
@@ -554,6 +595,9 @@ def get_quality_metrics() -> dict:
 @mcp.tool()
 def adopt_experiment(run_id: str, activation_id: str, rationale: str) -> dict:
     """Promote an experiment's PG version into production via the gated lifecycle."""
+    denied = _require("operator")
+    if denied:
+        return denied
     try:
         run = _get_workspace().get_run(run_id)
     except Exception as e:
@@ -587,6 +631,9 @@ def get_config() -> dict:
 @mcp.tool()
 def set_weight(name: str, value: float, rationale: str) -> dict:
     """Set a prioritization weight (rationale required; audited)."""
+    denied = _require("admin")
+    if denied:
+        return denied
     if not rationale:
         return {"status": "error", "message": "rationale is required"}
     if isinstance(value, bool) or not isinstance(value, (int, float)):
@@ -604,6 +651,9 @@ def set_weight(name: str, value: float, rationale: str) -> dict:
 @mcp.tool()
 def set_retention(key: str, days: int, rationale: str) -> dict:
     """Set a retention-policy value in days (rationale required; audited; not enforced)."""
+    denied = _require("admin")
+    if denied:
+        return denied
     if not rationale:
         return {"status": "error", "message": "rationale is required"}
     if isinstance(days, bool) or not isinstance(days, int):
@@ -621,6 +671,9 @@ def set_retention(key: str, days: int, rationale: str) -> dict:
 @mcp.tool()
 def enforce_retention() -> dict:
     """Purge runs (+ orphaned explanations) older than the configured retention windows."""
+    denied = _require("admin")
+    if denied:
+        return denied
     try:
         ws = _get_workspace()
         retention = config_store.load_config(_resolve_ws_root())["retention"]
@@ -634,6 +687,22 @@ def enforce_retention() -> dict:
     except Exception as e:
         logger.exception("enforce_retention failed")
         return {"status": "error", "message": str(e)}
+
+
+@mcp.tool()
+def get_role() -> dict:
+    """Return the current role and the available roles."""
+    return {"status": "ok", "role": _state.get("role", "operator"),
+            "roles": sorted(auth.ROLES, key=lambda r: auth.ROLES[r])}
+
+
+@mcp.tool()
+def set_role(role: str) -> dict:
+    """Set the current role (POC simulation; no identity backend)."""
+    if role not in auth.ROLES:
+        return {"status": "error", "message": f"unknown role '{role}'"}
+    _state["role"] = role
+    return {"status": "ok", "role": role}
 
 
 @mcp.tool()
