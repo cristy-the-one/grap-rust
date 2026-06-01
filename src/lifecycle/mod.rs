@@ -3,8 +3,10 @@
 //! log.
 
 mod hash;
+mod version;
 
 pub use hash::ContentHash;
+pub use version::{Version, VersionKind, VersionStore};
 
 use std::time::{SystemTime, UNIX_EPOCH};
 
