@@ -66,6 +66,19 @@ def test_gap_when_characteristic_unsatisfied():
     assert gaps[0]["outcome_id"] == "SYS.5.BP3"
 
 
+def test_projected_ontology_nodes_are_ignored_as_evidence():
+    onto = _onto()
+    # Both characteristics only "match" their own projected ontology scaffolding,
+    # which must NOT count as evidence -> both are gaps.
+    kg = FakeKG(lexical={
+        "verification_method_specified": [Hit(1, 0.95, "[characteristic] verification_method_specified")],
+        "acceptance_criteria_defined": [Hit(2, 0.95, "[ASPICE outcome] Verify: d")],
+    })
+    gaps = detect_gaps(kg, onto)
+    assert {g["missing_characteristic"] for g in gaps} == {
+        "verification_method_specified", "acceptance_criteria_defined"}
+
+
 def test_lexical_hit_below_threshold_is_still_a_gap():
     onto = _onto()
     kg = FakeKG(lexical={"acceptance_criteria_defined": [Hit(1, 0.05, "weak")],

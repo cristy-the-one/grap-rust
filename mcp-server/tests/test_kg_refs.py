@@ -12,8 +12,8 @@ class FakeKG:
         self._next += 1
         return nid
 
-    def add_edge(self, source, target, strength=1.0, props=None):
-        self.edges.append((source, target, props or {}))
+    def add_edge(self, source, target, strength=1.0, properties=None):
+        self.edges.append((source, target, properties or {}))
 
     # Resolver hook used by project_to_grap's default resolver.
     def resolve_reference(self, ref_id):

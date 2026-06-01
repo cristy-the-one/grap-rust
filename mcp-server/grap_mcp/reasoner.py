@@ -16,6 +16,11 @@ LEXICAL_THRESHOLD = 0.2
 
 _OUTCOME_REF_PREFIX = "kg:aspice.process_outcome."
 
+# Text prefixes of ontology-projected nodes. These are scaffolding, not project
+# evidence, so they must be ignored when searching for characteristic support
+# (otherwise the ontology trivially "satisfies" its own characteristics).
+_PROJECTED_PREFIXES = ("[ASPICE outcome]", "[characteristic]")
+
 
 def scoped_outcomes(ontology: Ontology, pg=None) -> List[ProcessOutcome]:
     """Outcomes referenced by the PG, or all ontology outcomes if none referenced."""
@@ -58,11 +63,14 @@ def _lexical_signals(kg, ontology: Ontology, outcome_id: str, characteristic: st
         hits = []
     signals = []
     for h in hits:
+        text = getattr(h, "text", "") or ""
+        if text.startswith(_PROJECTED_PREFIXES):
+            continue  # ignore ontology scaffolding nodes; only real evidence counts
         signals.append({
             "kind": "lexical",
             "node": getattr(h, "node", None),
             "score": getattr(h, "fused_score", 0.0),
-            "snippet": (getattr(h, "text", "") or "")[:160],
+            "snippet": text[:160],
             "query": query,
         })
     return signals

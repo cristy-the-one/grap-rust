@@ -51,8 +51,8 @@ class FakeKG:
         self.nodes[nid] = (text, label)
         return nid
 
-    def add_edge(self, source, target, strength=1.0, props=None):
-        self.edges.append((source, target, props or {}))
+    def add_edge(self, source, target, strength=1.0, properties=None):
+        self.edges.append((source, target, properties or {}))
 
 
 def test_projection_creates_labelled_outcome_and_characteristic_nodes():

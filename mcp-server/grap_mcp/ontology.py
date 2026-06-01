@@ -101,7 +101,7 @@ def project_ontology_to_grap(ontology: Ontology, kg) -> Dict:
                 label=f"kg:aspice.characteristic.{o.id}.{char}",
             )
             kg.add_edge(onode, cnode, strength=1.0,
-                        props={"type": "requires", "characteristic": char})
+                        properties={"type": "requires", "characteristic": char})
             characteristics_projected += 1
 
     return {
