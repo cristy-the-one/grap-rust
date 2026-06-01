@@ -90,8 +90,10 @@ flowchart LR
 
 The reasoner is **hybrid**: for each in-scope process outcome it checks every required
 characteristic using a structural signal (when present) and a lexical signal (a
-mapping-hint-weighted BM25 search over real KG content, excluding ontology
-scaffolding). Unsatisfied characteristics become gaps, each with a sectioned,
+mapping-hint-weighted BM25 search over real KG content, deterministically excluding
+system-projected nodes — the ontology scaffolding *and* the procedure's own step
+nodes — by node id so they are never mistaken for evidence). Unsatisfied
+characteristics become gaps, each with a sectioned,
 reproducible explanation (structured + statistical + rendered snapshot).
 
 ---

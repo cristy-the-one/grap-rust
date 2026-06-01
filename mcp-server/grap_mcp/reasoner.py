@@ -18,10 +18,35 @@ LEXICAL_THRESHOLD = DEFAULT_WEIGHTS["lexical_threshold"]
 
 _OUTCOME_REF_PREFIX = "kg:aspice.process_outcome."
 
-# Text prefixes of ontology-projected nodes. These are scaffolding, not project
-# evidence, so they must be ignored when searching for characteristic support
-# (otherwise the ontology trivially "satisfies" its own characteristics).
-_PROJECTED_PREFIXES = ("[ASPICE outcome]", "[characteristic]")
+# Text prefixes of system-projected nodes. These are scaffolding/procedure nodes,
+# NOT project knowledge, so they must never be counted as evidence that a
+# characteristic is satisfied (otherwise the ontology or the procedure graph
+# trivially "satisfies" the very characteristics we are checking).
+_PROJECTED_PREFIXES = ("[ASPICE outcome]", "[characteristic]", "[PG Step]")
+
+# Label prefixes of system-projected nodes (timing-robust secondary guard).
+_PROJECTED_LABEL_PREFIXES = ("kg:aspice.", "pg-step-")
+
+
+def _is_projected(kg, node, text: str, exclude_nodes) -> bool:
+    """True if a hit is a system-projected node (ontology scaffolding or PG step),
+    so it must not count as evidence.
+
+    Authoritative check is the explicit node-id set captured at projection time
+    (timing- and thread-independent). Label and text prefixes are secondary guards.
+    """
+    if exclude_nodes and node in exclude_nodes:
+        return True
+    if text.startswith(_PROJECTED_PREFIXES):
+        return True
+    if node is not None and hasattr(kg, "get_node_label"):
+        try:
+            label = kg.get_node_label(node)
+            if label and label.startswith(_PROJECTED_LABEL_PREFIXES):
+                return True
+        except Exception:
+            return False
+    return False
 
 
 def scoped_outcomes(ontology: Ontology, pg=None) -> List[ProcessOutcome]:
@@ -50,7 +75,7 @@ def _structural_signals(kg, outcome_id: str, characteristic: str) -> List[Dict[s
 
 
 def _lexical_signals(kg, ontology: Ontology, outcome_id: str, characteristic: str,
-                     weights: Dict[str, float]) -> List[Dict[str, Any]]:
+                     weights: Dict[str, float], exclude_nodes=None) -> List[Dict[str, Any]]:
     hint = ontology.hint_for(outcome_id)
     keywords = " ".join(hint.keywords) if hint else ""
     # Keep the raw characteristic token (e.g. "verification_method_specified") plus
@@ -68,8 +93,9 @@ def _lexical_signals(kg, ontology: Ontology, outcome_id: str, characteristic: st
     signals = []
     for h in hits:
         text = getattr(h, "text", "") or ""
-        if text.startswith(_PROJECTED_PREFIXES):
-            continue  # ignore ontology scaffolding nodes; only real evidence counts
+        node = getattr(h, "node", None)
+        if _is_projected(kg, node, text, exclude_nodes):
+            continue  # ignore system-projected nodes; only real evidence counts
         signals.append({
             "kind": "lexical",
             "node": getattr(h, "node", None),
@@ -89,14 +115,20 @@ def _best_score(signals: List[Dict[str, Any]]) -> float:
     return best
 
 
-def detect_gaps(kg, ontology: Ontology, pg=None, weights=None) -> List[Dict[str, Any]]:
-    """Return gap dicts for unsatisfied required characteristics, ranked by confidence."""
+def detect_gaps(kg, ontology: Ontology, pg=None, weights=None,
+                exclude_nodes=None) -> List[Dict[str, Any]]:
+    """Return gap dicts for unsatisfied required characteristics, ranked by confidence.
+
+    `exclude_nodes` is an optional set of system-projected node ids (ontology
+    scaffolding + PG steps) to never count as evidence, independent of any
+    label/text read-back or index timing.
+    """
     w = {**DEFAULT_WEIGHTS, **(weights or {})}
     gaps: List[Dict[str, Any]] = []
     for outcome in scoped_outcomes(ontology, pg):
         for characteristic in outcome.required_characteristics:
             structural = _structural_signals(kg, outcome.id, characteristic)
-            lexical = _lexical_signals(kg, ontology, outcome.id, characteristic, w)
+            lexical = _lexical_signals(kg, ontology, outcome.id, characteristic, w, exclude_nodes)
             satisfaction = _best_score(structural + lexical)
             satisfied = bool(structural) or satisfaction >= w["lexical_threshold"]
             if not satisfied:

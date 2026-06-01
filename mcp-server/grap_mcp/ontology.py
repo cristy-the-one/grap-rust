@@ -86,6 +86,7 @@ def project_ontology_to_grap(ontology: Ontology, kg) -> Dict:
     outcomes_projected = 0
     characteristics_projected = 0
     outcome_node_map: Dict[str, int] = {}
+    projected_node_ids: List[int] = []
 
     for o in ontology.process_outcomes:
         onode = kg.add_node(
@@ -93,6 +94,7 @@ def project_ontology_to_grap(ontology: Ontology, kg) -> Dict:
             label=f"kg:aspice.process_outcome.{o.id}",
         )
         outcome_node_map[o.id] = onode
+        projected_node_ids.append(onode)
         outcomes_projected += 1
 
         for char in o.required_characteristics:
@@ -102,10 +104,12 @@ def project_ontology_to_grap(ontology: Ontology, kg) -> Dict:
             )
             kg.add_edge(onode, cnode, strength=1.0,
                         properties={"type": "requires", "characteristic": char})
+            projected_node_ids.append(cnode)
             characteristics_projected += 1
 
     return {
         "outcomes_projected": outcomes_projected,
         "characteristics_projected": characteristics_projected,
         "outcome_node_map": outcome_node_map,
+        "projected_node_ids": projected_node_ids,
     }

@@ -226,5 +226,6 @@ def project_to_grap(pg: ProcedureGraph, kg, resolver=None) -> dict:
         "data_flow_edges": created_edges,
         "references_resolved": references_resolved,
         "unresolved_references": unresolved_references,
+        "projected_node_ids": list(node_map.values()),
         "message": "Procedure Graph projected into KG with steps, data flow, and references (POC)",
     }
