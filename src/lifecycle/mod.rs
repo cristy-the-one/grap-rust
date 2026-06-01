@@ -39,6 +39,25 @@ pub struct ChangeStatus {
     pub production_hash: Option<ContentHash>,
 }
 
+/// Result of attempting to reconstruct a past run from its frozen references.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ReconstructionReport {
+    /// The run being reconstructed.
+    pub run_id: String,
+    /// True only when every referenced artifact is still present.
+    pub complete: bool,
+    /// Whether the frozen PG version blob is present.
+    pub pg_version_present: bool,
+    /// Whether the frozen KG/ontology version blob is present.
+    pub kg_version_present: bool,
+    /// How many referenced explanation records are present.
+    pub explanations_present: usize,
+    /// How many explanation records the run referenced.
+    pub explanations_total: usize,
+    /// Human-readable descriptions of missing artifacts.
+    pub missing: Vec<String>,
+}
+
 /// Errors produced by the lifecycle subsystem.
 #[derive(thiserror::Error, Debug)]
 pub enum LifecycleError {
