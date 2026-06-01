@@ -3,12 +3,13 @@
 use std::collections::BTreeMap;
 
 use grap::lifecycle as lc;
-use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
+use crate::errors::GraphError;
+
 fn to_py(err: grap::LifecycleError) -> PyErr {
-    PyRuntimeError::new_err(err.to_string())
+    GraphError::new_err(err.to_string())
 }
 
 /// Python wrapper for a stored version.
