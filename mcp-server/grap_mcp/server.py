@@ -15,6 +15,8 @@ from . import procedure_graph as pg_loader
 from .validation import validate_pg
 from .diff import diff_pg
 from .procedure_graph import _default_resolver
+from . import ontology as onto_loader
+from . import reasoner
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("grap-mcp")
@@ -28,6 +30,9 @@ _state = {
     "pg": None,                 # Will hold a ProcedureGraph object
     "ws": None,                 # lifecycle Workspace (Rust-backed)
     "current_logic_id": None,   # pg_logic_id of the loaded/active PG
+    "ontology": None,           # parsed Ontology model
+    "ontology_version": None,   # ontology version hash in the workspace
+    "explanations": {},         # target -> explanation dict (POC, in-memory)
 }
 
 
@@ -53,6 +58,11 @@ def load_knowledge_graph(path: str) -> dict:
     try:
         kg = pygrap.IndexedKnowledgeGraph.with_merge_policy(path, 2)
         _state["kg"] = kg
+        try:
+            _get_workspace().record_event("kg_loaded", path,
+                                          details={"node_count": str(kg.node_count())})
+        except Exception:
+            logger.warning("audit record_event failed for kg_loaded", exc_info=True)
         return {
             "status": "ok",
             "path": path,
@@ -61,6 +71,33 @@ def load_knowledge_graph(path: str) -> dict:
         }
     except Exception as e:
         logger.exception("Failed to load KG")
+        return {"status": "error", "message": str(e)}
+
+
+@mcp.tool()
+def load_ontology(path: str) -> dict:
+    """Load an ASPICE ontology, project it into the KG, and version it."""
+    kg = _state.get("kg")
+    if not kg:
+        return {"status": "error", "message": "Load a Knowledge Graph first."}
+    try:
+        ontology = onto_loader.load_ontology_from_file(path)
+        projection = onto_loader.project_ontology_to_grap(ontology, kg)
+        raw = open(path, "r", encoding="utf-8").read()
+        version = _get_workspace().publish_ontology(raw, metadata={"version": ontology.version})
+        _state["ontology"] = ontology
+        _state["ontology_version"] = version.hash
+        _get_workspace().record_event("ontology_loaded", path,
+                                      details={"outcomes": str(projection["outcomes_projected"])})
+        return {
+            "status": "ok",
+            "path": path,
+            "version_hash": version.hash,
+            "outcomes_projected": projection["outcomes_projected"],
+            "characteristics_projected": projection["characteristics_projected"],
+        }
+    except Exception as e:
+        logger.exception("load_ontology failed")
         return {"status": "error", "message": str(e)}
 
 
@@ -74,6 +111,10 @@ def load_procedure_graph(path: str) -> dict:
         pg = pg_loader.load_from_file(path)
         _state["pg"] = pg
         _state["current_logic_id"] = pg.name
+        try:
+            _get_workspace().record_event("pg_loaded", path, details={"name": pg.name})
+        except Exception:
+            logger.warning("audit record_event failed for pg_loaded", exc_info=True)
 
         # Attempt early projection into the KG (POC)
         projection_result = {}
@@ -116,23 +157,30 @@ def run_procedure(scope: str = "all") -> dict:
     if not pg:
         return {"status": "error", "message": "No Procedure Graph loaded or activated."}
 
-    # POC stub — real execution + gap detection coming next
     try:
         node_count = kg.node_count()
         step_count = len(pg.steps) if hasattr(pg, "steps") else 0
 
-        weights = {}
+        gaps = []
+        ontology = _state.get("ontology")
+        if ontology:
+            gaps = reasoner.detect_gaps(kg, ontology, pg)
+
+        try:
+            _get_workspace().record_event("procedure_run", scope,
+                                          details={"gaps_found": str(len(gaps))})
+        except Exception:
+            logger.warning("audit record_event failed for procedure_run", exc_info=True)
 
         return {
             "status": "ok",
-            "message": "Procedure executed (POC stub)",
+            "message": "Procedure executed (gap detection wired)",
             "scope": scope,
             "activation_id": activation.activation_id if activation else None,
             "kg_node_count": node_count,
             "pg_step_count": step_count,
-            "weights_used": weights,
-            "gaps_found": 0,
-            "note": "Real gap detection + explanations coming next."
+            "gaps_found": len(gaps),
+            "gap_summary": [f"{g['outcome_id']}:{g['missing_characteristic']}" for g in gaps],
         }
     except Exception as e:
         logger.exception("Execution failed")
@@ -141,31 +189,27 @@ def run_procedure(scope: str = "all") -> dict:
 
 @mcp.tool()
 def detect_gaps(scope: str = "all") -> dict:
-    """
-    POC version of gap detection.
-    Currently very basic — will evolve into real grap-native lightweight reasoning
-    using the loaded ontology.
-    """
-    if not _state.get("kg") or not _state.get("pg"):
-        return {"status": "error", "message": "KG and PG must be loaded first."}
-
-    kg = _state["kg"]
-    pg = _state["pg"]
-
-    # Extremely naive POC gap detection:
-    # In a real implementation this will use the ontology + inference engine.
+    """Detect ASPICE gaps using the loaded ontology + KG (hybrid reasoner)."""
+    kg = _state.get("kg")
+    ontology = _state.get("ontology")
+    if not kg or not ontology:
+        return {"status": "error", "message": "KG and ontology must be loaded first."}
     try:
-        # For now just report that we have the structures needed
-        return {
-            "status": "ok",
-            "gaps": [],
-            "message": "Gap detection executed (POC stub)",
-            "kg_nodes": kg.node_count(),
-            "pg_steps": len(pg.steps) if hasattr(pg, "steps") else 0,
-            "note": "Real ontology-based gap detection coming in next iteration."
-        }
+        pg = _state.get("pg")
+        gaps = reasoner.detect_gaps(kg, ontology, pg)
+        # Build + store explanations for this run (POC: in-memory).
+        explanations = {}
+        for gap in gaps:
+            oc = ontology.outcome(gap["outcome_id"])
+            exp = reasoner.explain_gap(gap, _state.get("ontology_version"),
+                                       expected=oc.description if oc else "")
+            explanations[exp["target"]] = exp
+        _state["explanations"] = explanations
+        _get_workspace().record_event("gap_detection_run", scope,
+                                      details={"gaps_found": str(len(gaps))})
+        return {"status": "ok", "scope": scope, "gaps": gaps, "gaps_found": len(gaps)}
     except Exception as e:
-        logger.exception("Gap detection failed")
+        logger.exception("detect_gaps failed")
         return {"status": "error", "message": str(e)}
 
 
@@ -197,13 +241,11 @@ def diff_procedure_graphs(path_a: str, path_b: str) -> dict:
 
 @mcp.tool()
 def get_explanation(target: str) -> dict:
-    """POC stub for retrieving explanations."""
-    return {
-        "status": "ok",
-        "target": target,
-        "explanation": "Explanation retrieval not yet implemented.",
-        "note": "Will return sectioned structured + statistical explanations."
-    }
+    """Return the sectioned explanation for a gap target (e.g. 'SYS.5.BP3:acceptance_criteria_defined')."""
+    exp = _state.get("explanations", {}).get(target)
+    if not exp:
+        return {"status": "error", "message": f"No explanation for target '{target}'. Run detect_gaps first."}
+    return {"status": "ok", "explanation": exp}
 
 
 @mcp.tool()
@@ -327,6 +369,22 @@ def get_audit_log() -> dict:
                             "rationale": e.rationale} for e in events]}
     except Exception as e:
         return {"status": "error", "message": str(e)}
+
+
+@mcp.tool()
+def list_capabilities() -> dict:
+    """Return the MCP capability taxonomy grouped by domain."""
+    return {
+        "domains": {
+            "knowledge": ["load_knowledge_graph", "load_ontology"],
+            "pg_lifecycle": ["load_procedure_graph", "publish_pg", "promote_pg",
+                             "activate", "set_production", "get_production", "list_versions"],
+            "execution_reasoning": ["run_procedure", "detect_gaps", "get_explanation"],
+            "authoring": ["validate_procedure_graph", "diff_procedure_graphs"],
+            "audit": ["get_audit_log", "get_status", "list_capabilities"],
+        },
+        "auth": "deferred (POC: no authentication/authorization)",
+    }
 
 
 # =============================================================================

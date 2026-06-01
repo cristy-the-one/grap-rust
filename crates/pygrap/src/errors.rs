@@ -1,47 +1,12 @@
 //! Error types exposed to Python.
 
 use pyo3::prelude::*;
-use pyo3::PyErr;
 
-/// The main exception type for grap errors.
-#[pyclass]
-#[derive(Debug)]
-pub struct GraphError {
-    message: String,
-}
+// `GraphError` is a real Python exception (subclass of `Exception`), so it can
+// be raised and caught in Python code.
+pyo3::create_exception!(pygrap, GraphError, pyo3::exceptions::PyException);
 
-#[pymethods]
-impl GraphError {
-    fn __str__(&self) -> &str {
-        &self.message
-    }
-
-    fn __repr__(&self) -> String {
-        format!("GraphError({})", self.message)
-    }
-}
-
-impl GraphError {
-    pub fn new(msg: impl Into<String>) -> Self {
-        GraphError {
-            message: msg.into(),
-        }
-    }
-}
-
-impl From<grap::GraphError> for GraphError {
-    fn from(err: grap::GraphError) -> Self {
-        GraphError::new(err.to_string())
-    }
-}
-
-impl From<GraphError> for PyErr {
-    fn from(err: GraphError) -> PyErr {
-        PyErr::new::<GraphError, _>(err.message)
-    }
-}
-
-/// Helper to convert any `grap::GraphError` into a Python exception.
+/// Convert any `grap::GraphError` into a raisable Python `GraphError`.
 pub fn to_py_err(err: grap::GraphError) -> PyErr {
-    GraphError::from(err).into()
+    GraphError::new_err(err.to_string())
 }

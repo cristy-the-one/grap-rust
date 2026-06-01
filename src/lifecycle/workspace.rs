@@ -67,6 +67,47 @@ impl Workspace {
         Ok(version)
     }
 
+    /// Publish a KG/ontology snapshot as an immutable `Ontology` version.
+    /// Lighter than PG publishing: no Draft/Promoted record, just a versioned
+    /// artifact plus an audit event.
+    pub fn publish_ontology(
+        &self,
+        content: &[u8],
+        metadata: BTreeMap<String, String>,
+    ) -> Result<Version, LifecycleError> {
+        let version = self
+            .versions
+            .put(VersionKind::Ontology, content, metadata)?;
+        self.audit.append(&AuditEvent {
+            ts: now_millis(),
+            event_type: "version_published".to_string(),
+            actor: None,
+            subject: version.hash.to_string(),
+            details: BTreeMap::from([("kind".to_string(), "ontology".to_string())]),
+            rationale: None,
+        })?;
+        Ok(version)
+    }
+
+    /// Append an arbitrary audit event (used by higher-level/MCP capabilities
+    /// that mutate state outside the core lifecycle operations).
+    pub fn record_event(
+        &self,
+        event_type: &str,
+        subject: &str,
+        details: BTreeMap<String, String>,
+        rationale: Option<String>,
+    ) -> Result<(), LifecycleError> {
+        self.audit.append(&AuditEvent {
+            ts: now_millis(),
+            event_type: event_type.to_string(),
+            actor: None,
+            subject: subject.to_string(),
+            details,
+            rationale,
+        })
+    }
+
     /// Promote a previously published version. Requires a non-empty rationale.
     pub fn promote(&self, hash: &ContentHash, rationale: String) -> Result<(), LifecycleError> {
         if rationale.is_empty() {
@@ -240,6 +281,28 @@ mod tests {
         assert!(events.contains(&"version_promoted".to_string()));
         assert!(events.contains(&"activation_created".to_string()));
         assert!(events.contains(&"production_flag_moved".to_string()));
+    }
+
+    #[test]
+    fn publish_ontology_stores_an_ontology_version() {
+        let dir = tempfile::tempdir().unwrap();
+        let ws = Workspace::open(dir.path()).unwrap();
+        let v = ws.publish_ontology(b"onto yaml", BTreeMap::new()).unwrap();
+        let listed = ws.list_versions(Some(VersionKind::Ontology)).unwrap();
+        assert_eq!(listed.len(), 1);
+        assert_eq!(listed[0].hash, v.hash);
+    }
+
+    #[test]
+    fn record_event_appends_to_audit() {
+        let dir = tempfile::tempdir().unwrap();
+        let ws = Workspace::open(dir.path()).unwrap();
+        ws.record_event("kg_loaded", "subj", BTreeMap::new(), None)
+            .unwrap();
+        let events = ws.read_audit().unwrap();
+        assert!(events
+            .iter()
+            .any(|e| e.event_type == "kg_loaded" && e.subject == "subj"));
     }
 
     #[test]

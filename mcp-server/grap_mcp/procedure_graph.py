@@ -190,7 +190,7 @@ def project_to_grap(pg: ProcedureGraph, kg, resolver=None) -> dict:
                             node_map[source_step_id],
                             target_node,
                             strength=1.0,
-                            props={
+                            properties={
                                 "type": "data_flow",
                                 "from_step": source_step_id,
                                 "to_step": step.id,
@@ -216,7 +216,7 @@ def project_to_grap(pg: ProcedureGraph, kg, resolver=None) -> dict:
                     step_node,
                     target,
                     strength=1.0,
-                    props={"type": "references", "ref": ref},
+                    properties={"type": "references", "ref": ref},
                 )
                 references_resolved += 1
             except Exception:
