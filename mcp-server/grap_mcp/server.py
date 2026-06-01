@@ -424,12 +424,16 @@ def activate(activation_id: str, version_hash: str, weights: dict = None,
         return {"status": "error", "message": "No PG logic id known; load and publish a PG first."}
     try:
         ws = _get_workspace()
+        cfg = config_store.load_config(_resolve_ws_root())
+        effective_weights = weights if weights is not None else cfg["weights"]
         act = ws.activate(activation_id, logic_id, version_hash,
-                          weights=weights or {}, kg_version=kg_version)
+                          weights=effective_weights, kg_version=kg_version)
         if set_as_production:
             act = ws.set_production(activation_id)
         return {"status": "ok", "activation_id": act.activation_id,
-                "is_production": act.is_production}
+                "is_production": act.is_production,
+                "frozen_weights": effective_weights,
+                "weights_last_changed": cfg["last_changed"]}
     except Exception as e:
         logger.exception("activate failed")
         return {"status": "error", "message": str(e)}
@@ -620,6 +624,7 @@ def list_capabilities() -> dict:
                              "activate", "set_production", "get_production", "list_versions"],
             "execution_reasoning": ["run_procedure", "detect_gaps", "get_explanation"],
             "experimentation": ["run_experiment", "get_quality_metrics", "adopt_experiment"],
+            "governance": ["get_config", "set_weight", "set_retention"],
             "validation": ["validate_procedure_graph", "diff_procedure_graphs", "get_validation"],
             "audit": ["get_audit_log", "get_status", "list_capabilities",
                       "list_runs", "get_run", "reconstruct_run", "query_events"],
