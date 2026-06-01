@@ -15,6 +15,8 @@ pub enum VersionKind {
     Ontology,
     /// An immutable explanation record (raw signals + rendered snapshot).
     Explanation,
+    /// An immutable validation report for a PG version.
+    Validation,
 }
 
 /// Metadata for an immutable, content-addressed version.
