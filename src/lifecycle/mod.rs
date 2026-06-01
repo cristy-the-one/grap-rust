@@ -2,10 +2,12 @@
 //! snapshots, backed by a filesystem workspace store with an append-only audit
 //! log.
 
+mod activation;
 mod hash;
 mod publish;
 mod version;
 
+pub use activation::{Activation, ActivationState, ActivationStore};
 pub use hash::ContentHash;
 pub use publish::{PublishLevel, PublishRecord, PublishStore};
 pub use version::{Version, VersionKind, VersionStore};
