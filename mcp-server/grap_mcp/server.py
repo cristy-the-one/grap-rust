@@ -15,6 +15,8 @@ from . import procedure_graph as pg_loader
 from .validation import validate_pg
 from .diff import diff_pg
 from .procedure_graph import _default_resolver
+from . import ontology as onto_loader
+from . import reasoner
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("grap-mcp")
@@ -28,6 +30,9 @@ _state = {
     "pg": None,                 # Will hold a ProcedureGraph object
     "ws": None,                 # lifecycle Workspace (Rust-backed)
     "current_logic_id": None,   # pg_logic_id of the loaded/active PG
+    "ontology": None,           # parsed Ontology model
+    "ontology_version": None,   # ontology version hash in the workspace
+    "explanations": {},         # target -> explanation dict (POC, in-memory)
 }
 
 
@@ -53,6 +58,11 @@ def load_knowledge_graph(path: str) -> dict:
     try:
         kg = pygrap.IndexedKnowledgeGraph.with_merge_policy(path, 2)
         _state["kg"] = kg
+        try:
+            _get_workspace().record_event("kg_loaded", path,
+                                          details={"node_count": str(kg.node_count())})
+        except Exception:
+            logger.warning("audit record_event failed for kg_loaded", exc_info=True)
         return {
             "status": "ok",
             "path": path,
@@ -61,6 +71,33 @@ def load_knowledge_graph(path: str) -> dict:
         }
     except Exception as e:
         logger.exception("Failed to load KG")
+        return {"status": "error", "message": str(e)}
+
+
+@mcp.tool()
+def load_ontology(path: str) -> dict:
+    """Load an ASPICE ontology, project it into the KG, and version it."""
+    kg = _state.get("kg")
+    if not kg:
+        return {"status": "error", "message": "Load a Knowledge Graph first."}
+    try:
+        ontology = onto_loader.load_ontology_from_file(path)
+        projection = onto_loader.project_ontology_to_grap(ontology, kg)
+        raw = open(path, "r", encoding="utf-8").read()
+        version = _get_workspace().publish_ontology(raw, metadata={"version": ontology.version})
+        _state["ontology"] = ontology
+        _state["ontology_version"] = version.hash
+        _get_workspace().record_event("ontology_loaded", path,
+                                      details={"outcomes": str(projection["outcomes_projected"])})
+        return {
+            "status": "ok",
+            "path": path,
+            "version_hash": version.hash,
+            "outcomes_projected": projection["outcomes_projected"],
+            "characteristics_projected": projection["characteristics_projected"],
+        }
+    except Exception as e:
+        logger.exception("load_ontology failed")
         return {"status": "error", "message": str(e)}
 
 
@@ -74,6 +111,10 @@ def load_procedure_graph(path: str) -> dict:
         pg = pg_loader.load_from_file(path)
         _state["pg"] = pg
         _state["current_logic_id"] = pg.name
+        try:
+            _get_workspace().record_event("pg_loaded", path, details={"name": pg.name})
+        except Exception:
+            logger.warning("audit record_event failed for pg_loaded", exc_info=True)
 
         # Attempt early projection into the KG (POC)
         projection_result = {}
