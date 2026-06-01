@@ -109,6 +109,16 @@ impl RunStore {
             .filter(|r| r.kind == kind)
             .collect())
     }
+
+    /// Delete a run record. Returns `true` if it existed.
+    pub fn delete(&self, run_id: &str) -> Result<bool, LifecycleError> {
+        let path = self.path(run_id);
+        if !path.exists() {
+            return Ok(false);
+        }
+        fs::remove_file(path)?;
+        Ok(true)
+    }
 }
 
 #[cfg(test)]

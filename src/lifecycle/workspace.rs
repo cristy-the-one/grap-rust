@@ -7,8 +7,8 @@ use std::path::{Path, PathBuf};
 use super::{
     now_millis, Activation, ActivationState, ActivationStore, AuditEvent, AuditLog, ChangeStatus,
     ContentHash, EventLink, LifecycleError, PublishLevel, PublishRecord, PublishStore,
-    ReconstructionReport, RunKind, RunRecord, RunStatus, RunStore, Version, VersionKind,
-    VersionStore,
+    ReconstructionReport, RetentionReport, RunKind, RunRecord, RunStatus, RunStore, Version,
+    VersionKind, VersionStore,
 };
 
 /// A lifecycle workspace rooted at a directory.
@@ -433,6 +433,66 @@ impl Workspace {
         })
     }
 
+    /// Delete runs older than their kind's cutoff plus their orphaned explanation
+    /// records (those not referenced by any surviving run). Audited.
+    pub fn enforce_retention(
+        &self,
+        production_cutoff_ms: u64,
+        experiment_cutoff_ms: u64,
+    ) -> Result<RetentionReport, LifecycleError> {
+        let all = self.runs.list()?;
+        let is_expired = |r: &RunRecord| -> bool {
+            let cutoff = match r.kind {
+                RunKind::Production => production_cutoff_ms,
+                RunKind::Experiment => experiment_cutoff_ms,
+            };
+            r.started_at < cutoff
+        };
+
+        // Explanation hashes still referenced by surviving (non-expired) runs.
+        let mut surviving_refs = std::collections::HashSet::new();
+        for r in all.iter().filter(|r| !is_expired(r)) {
+            for h in &r.explanation_hashes {
+                surviving_refs.insert(h.clone());
+            }
+        }
+
+        let mut run_ids = Vec::new();
+        let mut deleted_explanations = std::collections::HashSet::new();
+        for r in all.iter().filter(|r| is_expired(r)) {
+            self.runs.delete(&r.run_id)?;
+            run_ids.push(r.run_id.clone());
+            for h in &r.explanation_hashes {
+                if !surviving_refs.contains(h) && !deleted_explanations.contains(h) {
+                    self.versions.delete(h)?;
+                    deleted_explanations.insert(h.clone());
+                }
+            }
+        }
+
+        let report = RetentionReport {
+            runs_deleted: run_ids.len(),
+            explanations_deleted: deleted_explanations.len(),
+            run_ids,
+        };
+        self.audit.append(&AuditEvent {
+            ts: now_millis(),
+            event_type: "retention_enforced".to_string(),
+            actor: None,
+            subject: "retention".to_string(),
+            details: BTreeMap::from([
+                ("runs_deleted".to_string(), report.runs_deleted.to_string()),
+                (
+                    "explanations_deleted".to_string(),
+                    report.explanations_deleted.to_string(),
+                ),
+            ]),
+            rationale: None,
+            links: vec![],
+        })?;
+        Ok(report)
+    }
+
     /// The current production activation for a logic, if any.
     pub fn current_production(
         &self,
@@ -583,6 +643,64 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let ws = Workspace::open(dir.path()).unwrap();
         assert!(ws.get_record(&ContentHash::of(b"nope")).unwrap().is_none());
+    }
+
+    fn put_run(ws: &Workspace, id: &str, kind: RunKind, started_at: u64, exp: Vec<ContentHash>) {
+        let rec = RunRecord {
+            run_id: id.to_string(),
+            kind,
+            status: RunStatus::Completed,
+            started_at,
+            completed_at: Some(started_at),
+            activation_id: None,
+            pg_version: None,
+            kg_version: None,
+            scope: "all".to_string(),
+            gaps_found: 0,
+            explanation_hashes: exp,
+            summary: BTreeMap::new(),
+        };
+        RunStore::open(ws.root().join("runs"))
+            .unwrap()
+            .put(&rec)
+            .unwrap();
+    }
+
+    #[test]
+    fn enforce_retention_deletes_expired_and_keeps_referenced() {
+        let dir = tempfile::tempdir().unwrap();
+        let ws = Workspace::open(dir.path()).unwrap();
+        let shared = ws
+            .record_explanation(b"shared", BTreeMap::new())
+            .unwrap()
+            .hash;
+        let only_old = ws
+            .record_explanation(b"old-only", BTreeMap::new())
+            .unwrap()
+            .hash;
+
+        put_run(
+            &ws,
+            "old",
+            RunKind::Production,
+            1_000,
+            vec![only_old.clone(), shared.clone()],
+        );
+        put_run(&ws, "new", RunKind::Production, 9_000, vec![shared.clone()]);
+
+        let rep = ws.enforce_retention(5_000, 5_000).unwrap();
+        assert_eq!(rep.runs_deleted, 1);
+        assert_eq!(rep.run_ids, vec!["old".to_string()]);
+        assert_eq!(rep.explanations_deleted, 1);
+        assert!(ws.get_run("old").unwrap().is_none());
+        assert!(ws.get_run("new").unwrap().is_some());
+        assert!(ws.get_record(&shared).unwrap().is_some());
+        assert!(ws.get_record(&only_old).unwrap().is_none());
+        assert!(ws
+            .read_audit()
+            .unwrap()
+            .iter()
+            .any(|e| e.event_type == "retention_enforced"));
     }
 
     #[test]

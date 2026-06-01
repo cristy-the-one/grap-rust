@@ -38,7 +38,17 @@ Every mutating capability emits a Workspace audit event (see `get_audit_log`).
 - **get_config()** → `{status, weights, retention, last_changed}`.
 - **set_weight(name, value, rationale)** → set a prioritization weight (rationale required; audited).
 - **set_retention(key, days, rationale)** → set a retention-policy value in days (rationale required;
-  audited; **not enforced** yet).
+  audited).
+- **enforce_retention()** (admin) → hard-deletes runs older than the configured windows
+  (`production_days`/`experiment_days`) + their orphaned explanation records; audited.
+
+## Roles & Access
+- **get_role()** → current role + available roles (`viewer` < `operator` < `admin`).
+- **set_role(role)** → set the current role (POC simulation; no identity backend).
+
+> Mutating capabilities require **operator** (lifecycle/execution) or **admin**
+> (governance + retention). Reads are open to **viewer**. Default role comes from
+> the `GRAP_ROLE` env var (`operator`).
 
 > Weight changes are audited (`config_changed`). `activate` freezes the governed weights when none are
 > passed and surfaces `frozen_weights` + `weights_last_changed`.

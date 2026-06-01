@@ -90,6 +90,27 @@ def test_lexical_hit_below_threshold_is_still_a_gap():
 from grap_mcp.reasoner import explain_gap
 
 
+def test_high_threshold_turns_satisfied_into_gap():
+    onto = _onto()
+    kg = FakeKG(lexical={
+        "verification_method_specified": [Hit(1, 0.9, "verify method")],
+        "acceptance_criteria_defined": [Hit(2, 0.9, "acceptance criteria")],
+    })
+    assert detect_gaps(kg, onto) == []
+    gaps = detect_gaps(kg, onto, weights={"lexical_threshold": 0.99})
+    assert {g["missing_characteristic"] for g in gaps} == {
+        "verification_method_specified", "acceptance_criteria_defined"}
+
+
+def test_gaps_sorted_by_confidence_desc():
+    onto = _onto()
+    kg = FakeKG(lexical={"verification_method_specified": [Hit(1, 0.5, "weak")]})
+    gaps = detect_gaps(kg, onto, weights={"lexical_threshold": 0.99})
+    confidences = [g["confidence"] for g in gaps]
+    assert confidences == sorted(confidences, reverse=True)
+    assert gaps[0]["missing_characteristic"] == "acceptance_criteria_defined"
+
+
 def test_explain_gap_has_sections_and_raw_signals():
     gap = {
         "outcome_id": "SYS.5.BP3",

@@ -64,6 +64,8 @@ pub struct Activation {
     pub kg_version: Option<String>,
     /// Whether this is the production activation.
     pub is_production: bool,
+    /// Frozen prioritization weights.
+    pub frozen_weights: std::collections::BTreeMap<String, f64>,
 }
 
 #[pymethods]
@@ -84,6 +86,7 @@ impl From<lc::Activation> for Activation {
             pg_version: a.pg_version.to_string(),
             kg_version: a.kg_version.map(|h| h.to_string()),
             is_production: a.is_production,
+            frozen_weights: a.frozen_weights,
         }
     }
 }
@@ -232,6 +235,38 @@ impl From<lc::ReconstructionReport> for ReconstructionReport {
             explanations_present: r.explanations_present,
             explanations_total: r.explanations_total,
             missing: r.missing,
+        }
+    }
+}
+
+/// Python wrapper for a retention sweep report.
+#[pyclass(get_all)]
+#[derive(Clone)]
+pub struct RetentionReport {
+    /// Number of run records deleted.
+    pub runs_deleted: usize,
+    /// Number of explanation records deleted.
+    pub explanations_deleted: usize,
+    /// Ids of the deleted runs.
+    pub run_ids: Vec<String>,
+}
+
+#[pymethods]
+impl RetentionReport {
+    fn __repr__(&self) -> String {
+        format!(
+            "RetentionReport(runs_deleted={}, explanations_deleted={})",
+            self.runs_deleted, self.explanations_deleted
+        )
+    }
+}
+
+impl From<lc::RetentionReport> for RetentionReport {
+    fn from(r: lc::RetentionReport) -> Self {
+        RetentionReport {
+            runs_deleted: r.runs_deleted,
+            explanations_deleted: r.explanations_deleted,
+            run_ids: r.run_ids,
         }
     }
 }
@@ -547,6 +582,19 @@ impl Workspace {
     /// Reconstruct a run, reporting any missing artifacts.
     fn reconstruct(&self, run_id: String) -> PyResult<ReconstructionReport> {
         Ok(self.inner.reconstruct(&run_id).map_err(to_py)?.into())
+    }
+
+    /// Purge runs older than their kind's cutoff (+ orphaned explanations).
+    fn enforce_retention(
+        &self,
+        production_cutoff_ms: u64,
+        experiment_cutoff_ms: u64,
+    ) -> PyResult<RetentionReport> {
+        Ok(self
+            .inner
+            .enforce_retention(production_cutoff_ms, experiment_cutoff_ms)
+            .map_err(to_py)?
+            .into())
     }
 
     /// Filtered timeline query.
