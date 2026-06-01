@@ -9,6 +9,7 @@ from mcp.server.fastmcp import FastMCP
 import pygrap
 from pathlib import Path
 import logging
+import os
 
 from . import procedure_graph as pg_loader
 from .validation import validate_pg
@@ -25,28 +26,17 @@ mcp = FastMCP("Grap Engine")
 _state = {
     "kg": None,
     "pg": None,                 # Will hold a ProcedureGraph object
-    "activations": {},          # activation_id -> Activation dict
-    "current_activation_id": None,
+    "ws": None,                 # lifecycle Workspace (Rust-backed)
+    "current_logic_id": None,   # pg_logic_id of the loaded/active PG
 }
 
-class Activation:
-    """Simple activation record for the POC."""
-    def __init__(self, activation_id: str, pg, weights: dict, kg_snapshot: dict = None):
-        self.activation_id = activation_id
-        self.pg = pg
-        self.weights = weights or {}
-        self.kg_snapshot = kg_snapshot or {}
-        self.is_production = False
 
-    def to_dict(self):
-        return {
-            "activation_id": self.activation_id,
-            "pg_name": getattr(self.pg, "name", "unknown"),
-            "pg_version": getattr(self.pg, "version", "unknown"),
-            "weights": self.weights,
-            "is_production": self.is_production,
-        }
-
+def _get_workspace():
+    """Lazily open the lifecycle workspace (env GRAP_WORKSPACE or ./grap-workspace)."""
+    if _state["ws"] is None:
+        root = os.environ.get("GRAP_WORKSPACE", "./grap-workspace")
+        _state["ws"] = pygrap.Workspace.open(root)
+    return _state["ws"]
 
 
 # =============================================================================
@@ -83,6 +73,7 @@ def load_procedure_graph(path: str) -> dict:
     try:
         pg = pg_loader.load_from_file(path)
         _state["pg"] = pg
+        _state["current_logic_id"] = pg.name
 
         # Attempt early projection into the KG (POC)
         projection_result = {}
@@ -113,10 +104,11 @@ def run_procedure(scope: str = "all") -> dict:
     logger.info(f"Running procedure with scope: {scope}")
 
     activation = None
-    if _state.get("current_activation_id"):
-        activation = _state["activations"].get(_state["current_activation_id"])
+    logic_id = _state.get("current_logic_id")
+    if logic_id and _state.get("ws"):
+        activation = _state["ws"].current_production(logic_id)
 
-    pg = activation.pg if activation else _state.get("pg")
+    pg = _state.get("pg")
     kg = _state.get("kg")
 
     if not kg:
@@ -129,7 +121,7 @@ def run_procedure(scope: str = "all") -> dict:
         node_count = kg.node_count()
         step_count = len(pg.steps) if hasattr(pg, "steps") else 0
 
-        weights = activation.weights if activation else {}
+        weights = {}
 
         return {
             "status": "ok",
@@ -216,21 +208,19 @@ def get_explanation(target: str) -> dict:
 
 @mcp.tool()
 def get_status() -> dict:
-    """
-    Developer / debugging tool.
-    Returns the current state of the MCP server (loaded graphs, activations, etc.).
-    Very useful during POC development.
-    """
+    """Developer/debugging tool. Returns current server state."""
     kg = _state.get("kg")
     pg = _state.get("pg")
-    current_id = _state.get("current_activation_id")
-    current_act = _state["activations"].get(current_id) if current_id else None
+    logic_id = _state.get("current_logic_id")
+    production = None
+    if logic_id and _state.get("ws"):
+        prod = _state["ws"].current_production(logic_id)
+        production = prod.activation_id if prod else None
 
     return {
         "kg": {
             "loaded": kg is not None,
             "node_count": kg.node_count() if kg else 0,
-            "path": getattr(kg, "path", None) if kg else None,
         },
         "pg": {
             "loaded": pg is not None,
@@ -238,137 +228,105 @@ def get_status() -> dict:
             "version": getattr(pg, "version", None) if pg else None,
             "step_count": len(pg.steps) if pg and hasattr(pg, "steps") else 0,
         },
-        "activations": {
-            "count": len(_state["activations"]),
-            "current_id": current_id,
-            "production_id": next(
-                (aid for aid, a in _state["activations"].items() if a.is_production), None
-            ),
+        "lifecycle": {
+            "workspace_open": _state.get("ws") is not None,
+            "logic_id": logic_id,
+            "production_id": production,
         },
-        "current_activation": current_act.to_dict() if current_act else None,
     }
 
 
 @mcp.tool()
-def list_activations() -> dict:
-    """List all current activations with basic info. Useful for debugging."""
-    result = []
-    for aid, act in _state["activations"].items():
-        result.append({
-            "activation_id": aid,
-            "pg_name": getattr(act.pg, "name", "unknown"),
-            "weights": act.weights,
-            "is_production": act.is_production,
-        })
-    return {"activations": result, "count": len(result)}
+def publish_pg(level: str = "draft", rationale: str = None) -> dict:
+    """Publish the currently loaded Procedure Graph at the given level (draft|promoted)."""
+    pg = _state.get("pg")
+    if not pg:
+        return {"status": "error", "message": "No Procedure Graph loaded."}
+    try:
+        ws = _get_workspace()
+        raw = open(pg.source_path, "r", encoding="utf-8").read() if pg.source_path else ""
+        version = ws.publish_pg(raw, level=level, rationale=rationale,
+                                metadata={"name": pg.name, "version": pg.version})
+        _state["current_logic_id"] = pg.name
+        return {"status": "ok", "version_hash": version.hash, "level": level}
+    except Exception as e:
+        logger.exception("publish_pg failed")
+        return {"status": "error", "message": str(e)}
 
 
 @mcp.tool()
-def get_current_activation() -> dict:
-    """Return details about the currently active activation (if any)."""
-    current_id = _state.get("current_activation_id")
-    if not current_id:
-        return {"active": False, "message": "No activation is currently active."}
+def promote_pg(version_hash: str, rationale: str) -> dict:
+    """Promote a previously published PG version (rationale required)."""
+    try:
+        _get_workspace().promote(version_hash, rationale)
+        return {"status": "ok", "version_hash": version_hash, "level": "promoted"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
 
-    act = _state["activations"].get(current_id)
-    if not act:
-        return {"active": False, "message": f"Current activation ID {current_id} not found."}
 
-    return {
-        "active": True,
-        "activation": act.to_dict(),
-    }
+@mcp.tool()
+def activate(activation_id: str, version_hash: str, weights: dict = None,
+             set_as_production: bool = False, kg_version: str = None) -> dict:
+    """Activate a promoted PG version with frozen weights."""
+    pg = _state.get("pg")
+    logic_id = _state.get("current_logic_id") or (pg.name if pg else None)
+    if not logic_id:
+        return {"status": "error", "message": "No PG logic id known; load and publish a PG first."}
+    try:
+        ws = _get_workspace()
+        act = ws.activate(activation_id, logic_id, version_hash,
+                          weights=weights or {}, kg_version=kg_version)
+        if set_as_production:
+            act = ws.set_production(activation_id)
+        return {"status": "ok", "activation_id": act.activation_id,
+                "is_production": act.is_production}
+    except Exception as e:
+        logger.exception("activate failed")
+        return {"status": "error", "message": str(e)}
 
 
 @mcp.tool()
 def set_production(activation_id: str) -> dict:
-    """
-    Explicitly set which activation is the production one.
-    Useful for switching production without creating a new activation.
-    """
-    logger.info(f"Setting production to activation_id={activation_id}")
-
-    if activation_id not in _state["activations"]:
-        return {"status": "error", "message": f"Activation '{activation_id}' not found."}
-
-    # Clear previous production flag
-    for act in _state["activations"].values():
-        act.is_production = False
-
-    _state["activations"][activation_id].is_production = True
-    _state["current_activation_id"] = activation_id
-
-    return {
-        "status": "ok",
-        "production_id": activation_id,
-        "message": "Production flag moved successfully."
-    }
+    """Make the given activation the production one for its PG logic."""
+    try:
+        act = _get_workspace().set_production(activation_id)
+        return {"status": "ok", "production_id": act.activation_id}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
 
 
 @mcp.tool()
-def get_current_activation() -> dict:
-    """Return details about the currently active activation (if any)."""
-    current_id = _state.get("current_activation_id")
-    if not current_id:
-        return {"active": False, "message": "No activation is currently active."}
-
-    act = _state["activations"].get(current_id)
+def get_production() -> dict:
+    """Return the current production activation for the loaded PG logic."""
+    logic_id = _state.get("current_logic_id")
+    if not logic_id:
+        return {"active": False, "message": "No PG logic loaded."}
+    act = _get_workspace().current_production(logic_id)
     if not act:
-        return {"active": False, "message": f"Current activation ID {current_id} not found."}
-
-    return {
-        "active": True,
-        "activation": act.to_dict(),
-    }
+        return {"active": False, "message": f"No production activation for '{logic_id}'."}
+    return {"active": True, "activation_id": act.activation_id,
+            "pg_version": act.pg_version, "is_production": act.is_production}
 
 
 @mcp.tool()
-def activate(
-    activation_id: str,
-    weights: dict = None,
-    set_as_production: bool = False
-) -> dict:
-    """
-    Activate a loaded Procedure Graph with a specific set of (frozen) weights.
-    This is a key P0 concept for the POC.
-    """
-    logger.info(f"Activating PG with id={activation_id}")
+def list_versions() -> dict:
+    """List published PG versions in the workspace."""
+    try:
+        versions = _get_workspace().list_versions()
+        return {"versions": [{"hash": v.hash, "kind": v.kind} for v in versions]}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
 
-    if not _state.get("pg"):
-        return {"status": "error", "message": "No Procedure Graph loaded."}
 
-    pg = _state["pg"]
-    kg = _state.get("kg")
-
-    # Capture a lightweight snapshot of the current KG (POC version)
-    kg_snapshot = {}
-    if kg:
-        kg_snapshot = {
-            "node_count": kg.node_count(),
-            "path": getattr(kg, "path", None),
-        }
-
-    activation = Activation(
-        activation_id=activation_id,
-        pg=pg,
-        weights=weights or {},
-        kg_snapshot=kg_snapshot,
-    )
-
-    # If setting as production, clear previous production flag
-    if set_as_production:
-        for act in _state["activations"].values():
-            act.is_production = False
-        activation.is_production = True
-
-    _state["activations"][activation_id] = activation
-    _state["current_activation_id"] = activation_id
-
-    return {
-        "status": "ok",
-        "activation": activation.to_dict(),
-        "message": "Activation created successfully (POC mode)"
-    }
+@mcp.tool()
+def get_audit_log() -> dict:
+    """Return the workspace audit event log."""
+    try:
+        events = _get_workspace().read_audit()
+        return {"events": [{"ts": e.ts, "type": e.event_type, "subject": e.subject,
+                            "rationale": e.rationale} for e in events]}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
 
 
 # =============================================================================
