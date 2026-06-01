@@ -265,6 +265,47 @@ impl Workspace {
             .put(VersionKind::Explanation, content, metadata)
     }
 
+    /// Store a validation report (content-addressed) for a PG version and link
+    /// it to that version with a `validation_run` Temporal-Graph event.
+    pub fn record_validation(
+        &self,
+        pg_hash: &str,
+        content: &[u8],
+        ok: bool,
+        metadata: BTreeMap<String, String>,
+    ) -> Result<Version, LifecycleError> {
+        let version = self
+            .versions
+            .put(VersionKind::Validation, content, metadata)?;
+        self.audit.append(&AuditEvent {
+            ts: now_millis(),
+            event_type: "validation_run".to_string(),
+            actor: None,
+            subject: pg_hash.to_string(),
+            details: BTreeMap::from([("ok".to_string(), ok.to_string())]),
+            rationale: None,
+            links: vec![
+                EventLink {
+                    relation: "used".to_string(),
+                    kind: "pg_version".to_string(),
+                    id: pg_hash.to_string(),
+                },
+                EventLink {
+                    relation: "produced".to_string(),
+                    kind: "validation".to_string(),
+                    id: version.hash.to_string(),
+                },
+            ],
+        })?;
+        Ok(version)
+    }
+
+    /// Fetch the raw bytes for any stored version (PG, ontology, explanation,
+    /// validation), or `None` if absent.
+    pub fn get_record(&self, hash: &ContentHash) -> Result<Option<Vec<u8>>, LifecycleError> {
+        Ok(self.versions.get(hash)?.map(|(_, bytes)| bytes))
+    }
+
     /// Complete a run, recording gaps + explanation references.
     pub fn complete_run(
         &self,
@@ -514,6 +555,34 @@ mod tests {
         assert!(events
             .iter()
             .any(|e| e.event_type == "kg_loaded" && e.subject == "subj"));
+    }
+
+    #[test]
+    fn record_validation_stores_and_links() {
+        let dir = tempfile::tempdir().unwrap();
+        let ws = Workspace::open(dir.path()).unwrap();
+        let pg = ws
+            .publish_pg(
+                b"name: t\nsteps: []\n",
+                PublishLevel::Draft,
+                None,
+                BTreeMap::new(),
+            )
+            .unwrap();
+        let v = ws
+            .record_validation(pg.hash.as_str(), b"{\"ok\":true}", true, BTreeMap::new())
+            .unwrap();
+
+        assert_eq!(ws.get_record(&v.hash).unwrap().unwrap(), b"{\"ok\":true}");
+        let events = ws.events_linked_to("pg_version", pg.hash.as_str()).unwrap();
+        assert!(events.iter().any(|e| e.event_type == "validation_run"));
+    }
+
+    #[test]
+    fn get_record_unknown_hash_is_none() {
+        let dir = tempfile::tempdir().unwrap();
+        let ws = Workspace::open(dir.path()).unwrap();
+        assert!(ws.get_record(&ContentHash::of(b"nope")).unwrap().is_none());
     }
 
     #[test]
