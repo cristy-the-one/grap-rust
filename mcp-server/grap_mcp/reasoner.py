@@ -11,8 +11,10 @@ from typing import Any, Dict, List, Optional
 
 from .ontology import Ontology, ProcessOutcome
 
-# Minimum fused score for a lexical hit to count as satisfying a characteristic.
-LEXICAL_THRESHOLD = 0.2
+# Default reasoner weights. `lexical_threshold` is the satisfaction cutoff;
+# text_weight/graph_weight feed the search fusion.
+DEFAULT_WEIGHTS = {"text_weight": 0.7, "graph_weight": 0.3, "lexical_threshold": 0.2}
+LEXICAL_THRESHOLD = DEFAULT_WEIGHTS["lexical_threshold"]
 
 _OUTCOME_REF_PREFIX = "kg:aspice.process_outcome."
 
@@ -47,7 +49,8 @@ def _structural_signals(kg, outcome_id: str, characteristic: str) -> List[Dict[s
     return []
 
 
-def _lexical_signals(kg, ontology: Ontology, outcome_id: str, characteristic: str) -> List[Dict[str, Any]]:
+def _lexical_signals(kg, ontology: Ontology, outcome_id: str, characteristic: str,
+                     weights: Dict[str, float]) -> List[Dict[str, Any]]:
     hint = ontology.hint_for(outcome_id)
     keywords = " ".join(hint.keywords) if hint else ""
     # Keep the raw characteristic token (e.g. "verification_method_specified") plus
@@ -57,7 +60,8 @@ def _lexical_signals(kg, ontology: Ontology, outcome_id: str, characteristic: st
     try:
         hits = kg.search_and_traverse(
             query, max_seeds=5, required_properties=[], min_strength=0.0,
-            max_depth=1, max_results=5, text_weight=0.7, graph_weight=0.3,
+            max_depth=1, max_results=5,
+            text_weight=weights["text_weight"], graph_weight=weights["graph_weight"],
         )
     except Exception:
         hits = []
@@ -85,15 +89,16 @@ def _best_score(signals: List[Dict[str, Any]]) -> float:
     return best
 
 
-def detect_gaps(kg, ontology: Ontology, pg=None) -> List[Dict[str, Any]]:
-    """Return a list of gap dicts for unsatisfied required characteristics."""
+def detect_gaps(kg, ontology: Ontology, pg=None, weights=None) -> List[Dict[str, Any]]:
+    """Return gap dicts for unsatisfied required characteristics, ranked by confidence."""
+    w = {**DEFAULT_WEIGHTS, **(weights or {})}
     gaps: List[Dict[str, Any]] = []
     for outcome in scoped_outcomes(ontology, pg):
         for characteristic in outcome.required_characteristics:
             structural = _structural_signals(kg, outcome.id, characteristic)
-            lexical = _lexical_signals(kg, ontology, outcome.id, characteristic)
+            lexical = _lexical_signals(kg, ontology, outcome.id, characteristic, w)
             satisfaction = _best_score(structural + lexical)
-            satisfied = bool(structural) or satisfaction >= LEXICAL_THRESHOLD
+            satisfied = bool(structural) or satisfaction >= w["lexical_threshold"]
             if not satisfied:
                 gaps.append({
                     "outcome_id": outcome.id,
@@ -102,6 +107,7 @@ def detect_gaps(kg, ontology: Ontology, pg=None) -> List[Dict[str, Any]]:
                     "signals": {"structural": structural, "lexical": lexical},
                     "confidence": round(1.0 - satisfaction, 3),
                 })
+    gaps.sort(key=lambda g: g["confidence"], reverse=True)
     return gaps
 
 
