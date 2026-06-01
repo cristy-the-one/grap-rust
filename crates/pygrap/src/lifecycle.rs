@@ -173,6 +173,46 @@ impl Workspace {
         Ok(v.into())
     }
 
+    /// Publish a KG/ontology snapshot as an immutable Ontology version.
+    #[pyo3(signature = (content, metadata=None))]
+    fn publish_ontology(
+        &self,
+        content: String,
+        metadata: Option<&Bound<'_, PyDict>>,
+    ) -> PyResult<Version> {
+        let mut meta = BTreeMap::new();
+        if let Some(d) = metadata {
+            for (k, v) in d.iter() {
+                meta.insert(k.extract::<String>()?, v.extract::<String>()?);
+            }
+        }
+        let v = self
+            .inner
+            .publish_ontology(content.as_bytes(), meta)
+            .map_err(to_py)?;
+        Ok(v.into())
+    }
+
+    /// Append an arbitrary audit event.
+    #[pyo3(signature = (event_type, subject, details=None, rationale=None))]
+    fn record_event(
+        &self,
+        event_type: String,
+        subject: String,
+        details: Option<&Bound<'_, PyDict>>,
+        rationale: Option<String>,
+    ) -> PyResult<()> {
+        let mut d = BTreeMap::new();
+        if let Some(dict) = details {
+            for (k, v) in dict.iter() {
+                d.insert(k.extract::<String>()?, v.extract::<String>()?);
+            }
+        }
+        self.inner
+            .record_event(&event_type, &subject, d, rationale)
+            .map_err(to_py)
+    }
+
     /// Promote a published version (rationale required).
     fn promote(&self, version_hash: String, rationale: String) -> PyResult<()> {
         self.inner
