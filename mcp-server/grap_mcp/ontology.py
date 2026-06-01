@@ -72,3 +72,40 @@ def load_ontology_from_file(path: str) -> Ontology:
         process_outcomes=outcomes,
         mapping_hints=hints,
     )
+
+
+def project_ontology_to_grap(ontology: Ontology, kg) -> Dict:
+    """Project the ontology into the grap KG.
+
+    - One node per process outcome, labelled `kg:aspice.process_outcome.<id>`
+      (the exact form PG `references` use, so they resolve to these nodes).
+    - One node per required characteristic, labelled
+      `kg:aspice.characteristic.<outcome>.<char>`, linked from its outcome by a
+      `requires` edge.
+    """
+    outcomes_projected = 0
+    characteristics_projected = 0
+    outcome_node_map: Dict[str, int] = {}
+
+    for o in ontology.process_outcomes:
+        onode = kg.add_node(
+            text=f"[ASPICE outcome] {o.name}: {o.description}",
+            label=f"kg:aspice.process_outcome.{o.id}",
+        )
+        outcome_node_map[o.id] = onode
+        outcomes_projected += 1
+
+        for char in o.required_characteristics:
+            cnode = kg.add_node(
+                text=f"[characteristic] {char}",
+                label=f"kg:aspice.characteristic.{o.id}.{char}",
+            )
+            kg.add_edge(onode, cnode, strength=1.0,
+                        props={"type": "requires", "characteristic": char})
+            characteristics_projected += 1
+
+    return {
+        "outcomes_projected": outcomes_projected,
+        "characteristics_projected": characteristics_projected,
+        "outcome_node_map": outcome_node_map,
+    }
