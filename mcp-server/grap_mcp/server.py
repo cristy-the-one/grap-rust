@@ -12,6 +12,7 @@ import logging
 import os
 import uuid
 import json
+import time
 
 from . import procedure_graph as pg_loader
 from .validation import validate_pg
@@ -21,6 +22,7 @@ from . import ontology as onto_loader
 from . import reasoner
 from .publish_validation import validate_for_publish
 from .experiments import experiment_summary, quality_metrics
+from . import config as config_store
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("grap-mcp")
@@ -33,6 +35,7 @@ _state = {
     "kg": None,
     "pg": None,                 # Will hold a ProcedureGraph object
     "ws": None,                 # lifecycle Workspace (Rust-backed)
+    "ws_root": None,            # workspace root path (for the config store)
     "current_logic_id": None,   # pg_logic_id of the loaded/active PG
     "pg_version": None,         # content hash of the last published PG
     "ontology": None,           # parsed Ontology model
@@ -46,7 +49,15 @@ def _get_workspace():
     if _state["ws"] is None:
         root = os.environ.get("GRAP_WORKSPACE", "./grap-workspace")
         _state["ws"] = pygrap.Workspace.open(root)
+        _state["ws_root"] = root
     return _state["ws"]
+
+
+def _resolve_ws_root():
+    """Return the workspace root path, opening the workspace if needed."""
+    if _state.get("ws_root") is None:
+        _get_workspace()
+    return _state["ws_root"]
 
 
 def _cached_validation(ws, version_hash):
@@ -413,12 +424,16 @@ def activate(activation_id: str, version_hash: str, weights: dict = None,
         return {"status": "error", "message": "No PG logic id known; load and publish a PG first."}
     try:
         ws = _get_workspace()
+        cfg = config_store.load_config(_resolve_ws_root())
+        effective_weights = weights if weights is not None else cfg["weights"]
         act = ws.activate(activation_id, logic_id, version_hash,
-                          weights=weights or {}, kg_version=kg_version)
+                          weights=effective_weights, kg_version=kg_version)
         if set_as_production:
             act = ws.set_production(activation_id)
         return {"status": "ok", "activation_id": act.activation_id,
-                "is_production": act.is_production}
+                "is_production": act.is_production,
+                "frozen_weights": effective_weights,
+                "weights_last_changed": cfg["last_changed"]}
     except Exception as e:
         logger.exception("activate failed")
         return {"status": "error", "message": str(e)}
@@ -558,6 +573,48 @@ def adopt_experiment(run_id: str, activation_id: str, rationale: str) -> dict:
 
 
 @mcp.tool()
+def get_config() -> dict:
+    """Return the governed configuration (weights + retention + last_changed)."""
+    cfg = config_store.load_config(_resolve_ws_root())
+    return {"status": "ok", "weights": cfg["weights"], "retention": cfg["retention"],
+            "last_changed": cfg["last_changed"]}
+
+
+@mcp.tool()
+def set_weight(name: str, value: float, rationale: str) -> dict:
+    """Set a prioritization weight (rationale required; audited)."""
+    if not rationale:
+        return {"status": "error", "message": "rationale is required"}
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return {"status": "error", "message": "value must be a number"}
+    root = _resolve_ws_root()
+    cfg = config_store.load_config(root)
+    cfg["weights"][name] = float(value)
+    cfg["last_changed"] = int(time.time() * 1000)
+    config_store.save_config(root, cfg)
+    _get_workspace().record_event("config_changed", f"weight:{name}",
+                                  details={"value": str(value)}, rationale=rationale)
+    return {"status": "ok", "weights": cfg["weights"], "last_changed": cfg["last_changed"]}
+
+
+@mcp.tool()
+def set_retention(key: str, days: int, rationale: str) -> dict:
+    """Set a retention-policy value in days (rationale required; audited; not enforced)."""
+    if not rationale:
+        return {"status": "error", "message": "rationale is required"}
+    if isinstance(days, bool) or not isinstance(days, int):
+        return {"status": "error", "message": "days must be an integer"}
+    root = _resolve_ws_root()
+    cfg = config_store.load_config(root)
+    cfg["retention"][key] = int(days)
+    cfg["last_changed"] = int(time.time() * 1000)
+    config_store.save_config(root, cfg)
+    _get_workspace().record_event("config_changed", f"retention:{key}",
+                                  details={"days": str(days)}, rationale=rationale)
+    return {"status": "ok", "retention": cfg["retention"], "last_changed": cfg["last_changed"]}
+
+
+@mcp.tool()
 def list_capabilities() -> dict:
     """Return the MCP capability taxonomy grouped by domain."""
     return {
@@ -567,6 +624,7 @@ def list_capabilities() -> dict:
                              "activate", "set_production", "get_production", "list_versions"],
             "execution_reasoning": ["run_procedure", "detect_gaps", "get_explanation"],
             "experimentation": ["run_experiment", "get_quality_metrics", "adopt_experiment"],
+            "governance": ["get_config", "set_weight", "set_retention"],
             "validation": ["validate_procedure_graph", "diff_procedure_graphs", "get_validation"],
             "audit": ["get_audit_log", "get_status", "list_capabilities",
                       "list_runs", "get_run", "reconstruct_run", "query_events"],

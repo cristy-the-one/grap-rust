@@ -34,6 +34,15 @@ Every mutating capability emits a Workspace audit event (see `get_audit_log`).
 - **adopt_experiment(run_id, activation_id, rationale)** → promotes the experiment's PG version
   into production through the validation-gated `promote_pg` + `activate` path.
 
+## Configuration Governance
+- **get_config()** → `{status, weights, retention, last_changed}`.
+- **set_weight(name, value, rationale)** → set a prioritization weight (rationale required; audited).
+- **set_retention(key, days, rationale)** → set a retention-policy value in days (rationale required;
+  audited; **not enforced** yet).
+
+> Weight changes are audited (`config_changed`). `activate` freezes the governed weights when none are
+> passed and surfaces `frozen_weights` + `weights_last_changed`.
+
 ## Authoring & Validation
 - **validate_procedure_graph(path)** → `{status, ok, errors, warnings}` (publish-time rules; non-blocking).
 - **diff_procedure_graphs(path_a, path_b)** → `{status, diff}`.
