@@ -20,6 +20,7 @@ from .procedure_graph import _default_resolver
 from . import ontology as onto_loader
 from . import reasoner
 from .publish_validation import validate_for_publish
+from .experiments import experiment_summary, quality_metrics
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("grap-mcp")
@@ -221,9 +222,8 @@ def run_procedure(scope: str = "all") -> dict:
         return {"status": "error", "message": str(e)}
 
 
-@mcp.tool()
-def detect_gaps(scope: str = "all", kind: str = "production") -> dict:
-    """Detect ASPICE gaps using the loaded ontology + KG, persisting a run + explanations."""
+def _run_gap_detection(scope: str, kind: str, extra_summary: dict = None) -> dict:
+    """Run gap detection as a tracked run (production or experiment)."""
     kg = _state.get("kg")
     ontology = _state.get("ontology")
     if not kg or not ontology:
@@ -253,12 +253,28 @@ def detect_gaps(scope: str = "all", kind: str = "production") -> dict:
             hashes.append(version.hash)
         _state["explanations"] = explanations
 
+        summary = {"scope": scope}
+        if extra_summary:
+            summary.update(extra_summary)
         ws.complete_run(run_id, status="completed", gaps_found=len(gaps),
-                        explanation_hashes=hashes, summary={"scope": scope})
-        return {"status": "ok", "run_id": run_id, "scope": scope, "gaps": gaps, "gaps_found": len(gaps)}
+                        explanation_hashes=hashes, summary=summary)
+        return {"status": "ok", "run_id": run_id, "kind": kind, "scope": scope,
+                "gaps": gaps, "gaps_found": len(gaps)}
     except Exception as e:
-        logger.exception("detect_gaps failed")
+        logger.exception("gap detection failed")
         return {"status": "error", "message": str(e)}
+
+
+@mcp.tool()
+def detect_gaps(scope: str = "all") -> dict:
+    """Detect ASPICE gaps as a production run (persists run + explanations)."""
+    return _run_gap_detection(scope, "production")
+
+
+@mcp.tool()
+def run_experiment(scope: str = "all", hypothesis: str = None) -> dict:
+    """Run gap detection as a quarantined experiment (full audit parity with production)."""
+    return _run_gap_detection(scope, "experiment", experiment_summary(scope, hypothesis))
 
 
 @mcp.tool()
