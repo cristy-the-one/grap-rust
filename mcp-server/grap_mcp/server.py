@@ -42,6 +42,7 @@ _state = {
     "role": os.environ.get("GRAP_ROLE", "operator"),  # current role (POC simulation)
     "ontology": None,           # parsed Ontology model
     "ontology_version": None,   # ontology version hash in the workspace
+    "projected_nodes": set(),   # KG node ids of system-projected nodes (not evidence)
     "explanations": {},         # target -> explanation dict (POC, in-memory)
 }
 
@@ -148,6 +149,7 @@ def load_ontology(path: str) -> dict:
         version = _get_workspace().publish_ontology(raw, metadata={"version": ontology.version})
         _state["ontology"] = ontology
         _state["ontology_version"] = version.hash
+        _state["projected_nodes"].update(projection.get("projected_node_ids", []))
         _get_workspace().record_event("ontology_loaded", path,
                                       details={"outcomes": str(projection["outcomes_projected"])})
         return {
@@ -185,6 +187,7 @@ def load_procedure_graph(path: str) -> dict:
         kg = _state.get("kg")
         if kg:
             projection_result = pg_loader.project_to_grap(pg, kg)
+            _state["projected_nodes"].update(projection_result.get("projected_node_ids", []))
 
         return {
             "status": "ok",
@@ -237,7 +240,9 @@ def run_procedure(scope: str = "all") -> dict:
         ws.start_run(run_id, kind="production", activation_id=activation_id,
                      pg_version=pg_version, kg_version=kg_version, scope=scope)
 
-        gaps = reasoner.detect_gaps(kg, ontology, pg) if ontology else []
+        gaps = (reasoner.detect_gaps(kg, ontology, pg,
+                                     exclude_nodes=_state.get("projected_nodes"))
+                if ontology else [])
         ws.complete_run(run_id, status="completed", gaps_found=len(gaps),
                         explanation_hashes=[], summary={"scope": scope})
 
@@ -280,7 +285,8 @@ def _run_gap_detection(scope: str, kind: str, extra_summary: dict = None) -> dic
             weights = dict(activation.frozen_weights)
         else:
             weights = config_store.load_config(_resolve_ws_root())["weights"]
-        gaps = reasoner.detect_gaps(kg, ontology, pg, weights=weights)
+        gaps = reasoner.detect_gaps(kg, ontology, pg, weights=weights,
+                                    exclude_nodes=_state.get("projected_nodes"))
         explanations = {}
         hashes = []
         for gap in gaps:

@@ -111,6 +111,28 @@ def test_gaps_sorted_by_confidence_desc():
     assert gaps[0]["missing_characteristic"] == "acceptance_criteria_defined"
 
 
+def test_pg_step_nodes_are_not_evidence():
+    onto = _onto()
+    # A projected PG-step node matching the query must NOT satisfy a characteristic
+    # (the procedure is not project knowledge).
+    kg = FakeKG(lexical={"verification_method_specified":
+                         [Hit(14, 2.9, "[PG Step] Detect verification gaps")]})
+    gaps = detect_gaps(kg, onto)
+    assert "verification_method_specified" in {g["missing_characteristic"] for g in gaps}
+
+
+def test_exclude_nodes_by_id_removes_evidence():
+    onto = _onto()
+    # A strong hit with neutral text would normally satisfy the characteristic...
+    kg = FakeKG(lexical={"verification_method_specified":
+                         [Hit(99, 2.9, "some real-looking evidence text")]})
+    assert "verification_method_specified" not in {
+        g["missing_characteristic"] for g in detect_gaps(kg, onto)}
+    # ...but excluding that node id (system-projected) makes it a gap.
+    gaps = detect_gaps(kg, onto, exclude_nodes={99})
+    assert "verification_method_specified" in {g["missing_characteristic"] for g in gaps}
+
+
 def test_explain_gap_has_sections_and_raw_signals():
     gap = {
         "outcome_id": "SYS.5.BP3",
