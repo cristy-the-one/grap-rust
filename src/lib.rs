@@ -65,8 +65,8 @@ pub use crate::index::TextIndex;
 pub use graph_ops::MergeReport;
 pub use lifecycle::{
     Activation, ActivationState, AuditEvent, ChangeStatus, ContentHash, EventLink, LifecycleError,
-    PublishLevel, ReconstructionReport, RunKind, RunRecord, RunStatus, Version, VersionKind,
-    Workspace,
+    PublishLevel, ReconstructionReport, RetentionReport, RunKind, RunRecord, RunStatus, Version,
+    VersionKind, Workspace,
 };
 
 // Flat re-exports for the primary on-disk types (first-class public API).

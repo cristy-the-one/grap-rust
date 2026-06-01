@@ -58,6 +58,17 @@ pub struct ReconstructionReport {
     pub missing: Vec<String>,
 }
 
+/// Outcome of a retention sweep.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RetentionReport {
+    /// Number of run records deleted.
+    pub runs_deleted: usize,
+    /// Number of explanation records deleted.
+    pub explanations_deleted: usize,
+    /// Ids of the deleted runs.
+    pub run_ids: Vec<String>,
+}
+
 /// Errors produced by the lifecycle subsystem.
 #[derive(thiserror::Error, Debug)]
 pub enum LifecycleError {

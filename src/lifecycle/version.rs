@@ -109,6 +109,20 @@ impl VersionStore {
         }
         Ok(out)
     }
+
+    /// Delete a version's blob + metadata. Returns `true` if the blob existed.
+    pub fn delete(&self, hash: &ContentHash) -> Result<bool, LifecycleError> {
+        let obj = self.object_path(hash);
+        if !obj.exists() {
+            return Ok(false);
+        }
+        fs::remove_file(obj)?;
+        let meta = self.meta_path(hash);
+        if meta.exists() {
+            fs::remove_file(meta)?;
+        }
+        Ok(true)
+    }
 }
 
 #[cfg(test)]
