@@ -6,10 +6,17 @@ requires-python = ">=3.11"
 dependencies = [
     "mcp>=1.0.0",          # Official MCP Python SDK (FastMCP style)
     "pygrap",              # Local pygrap bindings (installed via maturin develop)
+    "PyYAML>=6.0",         # Procedure Graph YAML parsing
 ]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
 
 [tool.setuptools]
 packages = ["grap_mcp"]
 
 [project.scripts]
 grap-mcp-server = "grap_mcp.server:main"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
