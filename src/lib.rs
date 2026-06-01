@@ -58,9 +58,15 @@ pub mod serialize; // Persistence (save/load + optional mmap) - Phase 3 in progr
 
 pub mod graph_ops; // Graph mutations (node merging, content updates)
 
+pub mod lifecycle; // Versioning, activation, and lifecycle (Task 01)
+
 // Re-exports for ergonomic use
 pub use crate::index::TextIndex;
 pub use graph_ops::MergeReport;
+pub use lifecycle::{
+    Activation, ActivationState, AuditEvent, ChangeStatus, ContentHash, LifecycleError,
+    PublishLevel, Version, VersionKind, Workspace,
+};
 
 // Flat re-exports for the primary on-disk types (first-class public API).
 // Advanced/escape-hatch types (LocalDocId, Posting, SegmentBuilder, ActiveBuffer,
