@@ -7,12 +7,14 @@ mod audit;
 mod hash;
 mod publish;
 mod version;
+mod workspace;
 
 pub use activation::{Activation, ActivationState, ActivationStore};
 pub use audit::{AuditEvent, AuditLog};
 pub use hash::ContentHash;
 pub use publish::{PublishLevel, PublishRecord, PublishStore};
 pub use version::{Version, VersionKind, VersionStore};
+pub use workspace::Workspace;
 
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -22,6 +24,17 @@ pub(crate) fn now_millis() -> u64 {
         .duration_since(UNIX_EPOCH)
         .map(|d| d.as_millis() as u64)
         .unwrap_or(0)
+}
+
+/// Result of comparing current PG bytes against the production activation.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ChangeStatus {
+    /// True when the current content hash differs from the production version.
+    pub changed: bool,
+    /// Hash of the bytes supplied to `detect_change`.
+    pub current_hash: ContentHash,
+    /// Hash frozen in the current production activation, if any.
+    pub production_hash: Option<ContentHash>,
 }
 
 /// Errors produced by the lifecycle subsystem.
