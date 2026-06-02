@@ -274,9 +274,14 @@ def _api_error(result: dict) -> None:
 
 @app.post("/api/wizard/bootstrap")
 def wizard_bootstrap() -> dict:
-    """One-click POC: load example ontology + PG."""
+    """One-click POC: fresh workspace KG, then example ontology + PG."""
+    ws = bridge.ensure_workspace()
+    kg_path = str(Path(ws) / "kg")
     ex = bridge.default_examples()
     steps = []
+    r = bridge.call("load_knowledge_graph", path=kg_path)
+    steps.append({"knowledge_graph": r})
+    _api_error(r)
     for label, cap, path_key in (
         ("ontology", "load_ontology", "ontology"),
         ("procedure_graph", "load_procedure_graph", "procedure_graph"),
@@ -284,7 +289,7 @@ def wizard_bootstrap() -> dict:
         r = bridge.call(cap, path=ex[path_key])
         steps.append({label: r})
         _api_error(r)
-    return {"status": "ok", "steps": steps, "examples": ex}
+    return {"status": "ok", "steps": steps, "examples": ex, "workspace": ws}
 
 
 @app.post("/api/wizard/publish-activate")

@@ -17,7 +17,13 @@ From the **repository root** (worktree or main checkout):
 .\aspice-gui\scripts\setup-venv.ps1
 ```
 
-Then:
+Then start the server:
+
+```powershell
+.\aspice-gui\scripts\run.ps1
+```
+
+Or manually:
 
 ```powershell
 .\aspice-gui\.venv\Scripts\Activate.ps1
