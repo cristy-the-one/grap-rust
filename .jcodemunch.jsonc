@@ -1,0 +1,16 @@
+{
+  // Enable Markdown documentation indexing (jCodemunch has no built-in .md extension yet).
+  // scripts/jcodemunch_register_markdown.py registers a "markdown" language before indexing.
+  "extra_extensions": {
+    ".md": "markdown",
+    ".mdx": "markdown",
+    ".markdown": "markdown"
+  },
+  // Re-include paths that .gitignore hides from the indexer (gitignore still applies first;
+  // negation patterns undo those skips for jCodemunch discovery only).
+  "extra_ignore_patterns": [
+    "!docs/superpowers/plans/",
+    "!docs/superpowers/plans/**"
+  ],
+  "max_folder_files": 5000
+}

@@ -1,0 +1,18 @@
+[project]
+name = "aspice-gui"
+version = "0.1.0"
+description = "Web GUI for the grap ASPICE-oriented MCP surface"
+requires-python = ">=3.11"
+dependencies = [
+    # 0.115.x pins starlette<0.39 and conflicts with MCP/jcodemunch (starlette 1.x).
+    "fastapi>=0.128.0",
+    "uvicorn[standard]>=0.32.0",
+    "PyYAML>=6.0",
+]
+
+[project.scripts]
+aspice-gui = "backend.main:run"
+
+[tool.setuptools.packages.find]
+include = ["backend*"]
+exclude = ["frontend*"]

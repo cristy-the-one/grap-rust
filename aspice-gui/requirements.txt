@@ -1,0 +1,4 @@
+# Compatible with MCP SDK (starlette 1.x). Do not pin fastapi 0.115 here.
+fastapi>=0.128.0
+uvicorn[standard]>=0.32.0
+PyYAML>=6.0
