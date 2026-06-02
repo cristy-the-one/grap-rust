@@ -24,6 +24,7 @@ from .publish_validation import validate_for_publish
 from .experiments import experiment_summary, quality_metrics
 from . import config as config_store
 from . import auth
+from . import ingest
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("grap-mcp")
@@ -39,6 +40,7 @@ _state = {
     "ws_root": None,            # workspace root path (for the config store)
     "current_logic_id": None,   # pg_logic_id of the loaded/active PG
     "pg_version": None,         # content hash of the last published PG
+    "kg_path": None,            # on-disk path of the current KG (for ingest persistence)
     "role": os.environ.get("GRAP_ROLE", "operator"),  # current role (POC simulation)
     "ontology": None,           # parsed Ontology model
     "ontology_version": None,   # ontology version hash in the workspace
@@ -117,6 +119,7 @@ def load_knowledge_graph(path: str) -> dict:
     try:
         kg = pygrap.IndexedKnowledgeGraph.with_merge_policy(path, 2)
         _state["kg"] = kg
+        _state["kg_path"] = path
         try:
             _get_workspace().record_event("kg_loaded", path,
                                           details={"node_count": str(kg.node_count())})
@@ -130,6 +133,55 @@ def load_knowledge_graph(path: str) -> dict:
         }
     except Exception as e:
         logger.exception("Failed to load KG")
+        return {"status": "error", "message": str(e)}
+
+
+@mcp.tool()
+def create_knowledge_graph(path: str) -> dict:
+    """Create a fresh on-disk Knowledge Graph and make it the current KG."""
+    denied = _require("operator")
+    if denied:
+        return denied
+    try:
+        kg = pygrap.IndexedKnowledgeGraph.with_merge_policy(path, 2)
+        kg.save_to_dir(path)
+        _state["kg"] = kg
+        _state["kg_path"] = path
+        _state["projected_nodes"] = set()
+        try:
+            _get_workspace().record_event("kg_created", path,
+                                          details={"node_count": str(kg.node_count())})
+        except Exception:
+            logger.warning("audit record_event failed for kg_created", exc_info=True)
+        return {"status": "ok", "path": path, "node_count": kg.node_count()}
+    except Exception as e:
+        logger.exception("create_knowledge_graph failed")
+        return {"status": "error", "message": str(e)}
+
+
+@mcp.tool()
+def ingest_documents(path: str) -> dict:
+    """Chunk + add .md/.txt documents under `path` into the loaded KG (real evidence)."""
+    denied = _require("operator")
+    if denied:
+        return denied
+    kg = _state.get("kg")
+    if not kg:
+        return {"status": "error", "message": "Load or create a Knowledge Graph first."}
+    try:
+        result = ingest.ingest_paths(kg, path)
+        kg_path = _state.get("kg_path")
+        if kg_path:
+            kg.save_to_dir(kg_path)
+        try:
+            _get_workspace().record_event("documents_ingested", path,
+                                          details={"files": str(result["files"]),
+                                                   "nodes_added": str(result["nodes_added"])})
+        except Exception:
+            logger.warning("audit record_event failed for documents_ingested", exc_info=True)
+        return {"status": "ok", **result}
+    except Exception as e:
+        logger.exception("ingest_documents failed")
         return {"status": "error", "message": str(e)}
 
 
@@ -716,7 +768,8 @@ def list_capabilities() -> dict:
     """Return the MCP capability taxonomy grouped by domain."""
     return {
         "domains": {
-            "knowledge": ["load_knowledge_graph", "load_ontology"],
+            "knowledge": ["load_knowledge_graph", "create_knowledge_graph",
+                          "ingest_documents", "load_ontology"],
             "pg_lifecycle": ["load_procedure_graph", "publish_pg", "promote_pg",
                              "activate", "set_production", "get_production", "list_versions"],
             "execution_reasoning": ["run_procedure", "detect_gaps", "get_explanation"],
