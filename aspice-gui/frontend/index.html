@@ -4,11 +4,8 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>GRAP ASPICE Console</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link
-      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap"
-      rel="stylesheet"
-    />
+    <!-- Fully self-contained (no external requests): uses IBM Plex if the user
+         has it installed, otherwise the system font stack defined in styles.css. -->
     <link rel="stylesheet" href="/assets/styles.css" />
   </head>
   <body>
@@ -18,10 +15,12 @@
         <p>MCP capability console</p>
       </div>
       <button type="button" class="nav active" data-panel="dashboard">Dashboard</button>
-      <button type="button" class="nav" data-panel="load">Load graphs</button>
-      <button type="button" class="nav" data-panel="lifecycle">Lifecycle</button>
+      <button type="button" class="nav" data-panel="knowledge">Knowledge</button>
       <button type="button" class="nav" data-panel="gaps">Gap analysis</button>
-      <button type="button" class="nav" data-panel="audit">Audit & runs</button>
+      <button type="button" class="nav" data-panel="lifecycle">Lifecycle</button>
+      <button type="button" class="nav" data-panel="runs">Runs &amp; temporal</button>
+      <button type="button" class="nav" data-panel="quality">Quality</button>
+      <button type="button" class="nav" data-panel="audit">Audit</button>
       <button type="button" class="nav" data-panel="settings">Settings</button>
       <div class="role-bar">
         <label for="role-select">Role</label>
@@ -34,6 +33,18 @@
     </nav>
 
     <main>
+      <!-- Persistent status strip -->
+      <header id="statusbar" class="statusbar">
+        <div class="pill-group" id="statusbar-pills">
+          <span class="pill muted">connecting…</span>
+        </div>
+        <div class="statusbar-actions">
+          <span id="statusbar-ws" class="ws-path" title="Active workspace"></span>
+          <button type="button" class="btn btn-ghost" id="btn-refresh-status">↻</button>
+        </div>
+      </header>
+
+      <!-- DASHBOARD -->
       <section id="panel-dashboard" class="panel active">
         <h2>Dashboard</h2>
         <p class="lead">
@@ -41,60 +52,114 @@
           exposed through the same MCP tools this UI calls locally.
         </p>
         <div class="flow">
-          <span>Load KG / ontology / PG</span>
-          <span>Validate & publish</span>
-          <span>Promote & activate</span>
+          <span>Create / ingest KG</span>
+          <span>Load ontology &amp; PG</span>
           <span>Detect gaps</span>
-          <span>Audit & reconstruct</span>
+          <span>Publish → activate</span>
+          <span>Audit &amp; reconstruct</span>
         </div>
-        <div class="card">
-          <h3>Quick start (POC examples)</h3>
-          <p class="lead" style="margin-bottom: 1rem">
-            Loads bundled example ontology and procedure graph, then shows workspace status.
-          </p>
-          <div class="actions">
-            <button type="button" class="btn btn-primary" id="btn-bootstrap">Load examples</button>
-            <button type="button" class="btn" id="btn-refresh-status">Refresh status</button>
-            <button type="button" class="btn" id="btn-detect-quick">Detect gaps</button>
+
+        <div class="card hero">
+          <div class="hero-head">
+            <div>
+              <h3>One-click POC</h3>
+              <p class="muted small">
+                Creates a fresh knowledge graph, ingests the bundled sample documents,
+                loads the ASPICE ontology and procedure graph, then runs gap detection —
+                end to end.
+              </p>
+            </div>
+            <button type="button" class="btn btn-primary" id="btn-bootstrap">Run bootstrap</button>
           </div>
+          <ol class="steps" id="bootstrap-steps" hidden></ol>
         </div>
-        <div class="card" id="status-card">
-          <h3>Workspace status</h3>
-          <pre id="status-preview">Loading…</pre>
+
+        <div class="card" id="dashboard-gaps-card" hidden>
+          <div class="card-head">
+            <h3>Latest gap detection</h3>
+            <span class="badge" id="dashboard-gap-count"></span>
+          </div>
+          <div id="dashboard-gaps"></div>
         </div>
       </section>
 
-      <section id="panel-load" class="panel">
-        <h2>Load graphs</h2>
-        <p class="lead">Point at on-disk KG, ontology YAML, or procedure graph YAML.</p>
+      <!-- KNOWLEDGE -->
+      <section id="panel-knowledge" class="panel">
+        <h2>Knowledge</h2>
+        <p class="lead">
+          Put knowledge <em>into</em> the graph: create a store, ingest documents as evidence,
+          and project the ASPICE ontology and a procedure graph over it.
+        </p>
         <div class="grid-2">
           <div class="card">
-            <h3>Knowledge graph</h3>
-            <label for="path-kg">Path</label>
-            <input id="path-kg" type="text" placeholder="path/to/kg" />
-            <button type="button" class="btn btn-primary" data-action="load_kg">Load KG</button>
+            <h3>Create knowledge graph</h3>
+            <label for="path-create-kg">Directory</label>
+            <input id="path-create-kg" type="text" placeholder="…/grap-workspace/kg" />
+            <button type="button" class="btn btn-primary" id="btn-create-kg">Create empty KG</button>
+            <p class="muted small">Starts empty (any existing graph at this path is replaced).</p>
           </div>
           <div class="card">
-            <h3>Ontology</h3>
-            <label for="path-onto">Path</label>
+            <h3>Ingest documents</h3>
+            <label for="path-ingest">Folder of .md / .txt</label>
+            <input id="path-ingest" type="text" placeholder="…/sample-knowledge" />
+            <button type="button" class="btn btn-primary" id="btn-ingest">Ingest into KG</button>
+            <p class="muted small">Chunks each file and adds it as searchable evidence.</p>
+          </div>
+          <div class="card">
+            <h3>Load ontology</h3>
+            <label for="path-onto">ASPICE ontology YAML</label>
             <input id="path-onto" type="text" />
-            <button type="button" class="btn btn-primary" data-action="load_ontology">Load ontology</button>
+            <button type="button" class="btn" id="btn-load-onto">Load &amp; project ontology</button>
           </div>
           <div class="card">
-            <h3>Procedure graph</h3>
-            <label for="path-pg">Path</label>
+            <h3>Load procedure graph</h3>
+            <label for="path-pg">Procedure graph YAML</label>
             <input id="path-pg" type="text" />
-            <button type="button" class="btn btn-primary" data-action="load_pg">Load PG</button>
+            <button type="button" class="btn" id="btn-load-pg">Load PG</button>
+          </div>
+          <div class="card">
+            <h3>Load existing KG</h3>
+            <label for="path-kg">Directory of a saved graph</label>
+            <input id="path-kg" type="text" placeholder="path/to/kg" />
+            <button type="button" class="btn" id="btn-load-kg">Load KG</button>
           </div>
           <div class="card">
             <h3>Validate PG file</h3>
-            <label for="path-validate">Path</label>
+            <label for="path-validate">Procedure graph YAML</label>
             <input id="path-validate" type="text" />
-            <button type="button" class="btn" data-action="validate_pg">Validate</button>
+            <button type="button" class="btn" id="btn-validate">Validate</button>
+            <div id="validate-result"></div>
           </div>
         </div>
       </section>
 
+      <!-- GAPS -->
+      <section id="panel-gaps" class="panel">
+        <h2>Gap analysis</h2>
+        <p class="lead">
+          Hybrid structural + lexical ASPICE gap detection. Each gap shows how confident the
+          reasoner is that the characteristic is unmet, plus the closest supporting evidence.
+        </p>
+        <div class="card">
+          <div class="inline-form">
+            <div>
+              <label for="gap-scope">Scope</label>
+              <input id="gap-scope" type="text" value="all" />
+            </div>
+            <div class="actions">
+              <button type="button" class="btn btn-primary" id="btn-detect-gaps">Detect gaps</button>
+              <button type="button" class="btn" id="btn-run-experiment">Run as experiment</button>
+              <button type="button" class="btn" id="btn-run-procedure">Run procedure</button>
+            </div>
+          </div>
+          <p class="muted small" id="gaps-run-meta"></p>
+        </div>
+        <div id="gaps-list" class="gaps-list">
+          <p class="muted">No run yet. Detect gaps to see results.</p>
+        </div>
+      </section>
+
+      <!-- LIFECYCLE -->
       <section id="panel-lifecycle" class="panel">
         <h2>Lifecycle</h2>
         <p class="lead">Publish → promote → activate → production. Validation gates promotion.</p>
@@ -107,6 +172,7 @@
             <button type="button" class="btn" id="btn-list-versions">List versions</button>
             <button type="button" class="btn" id="btn-get-production">Current production</button>
           </div>
+          <div id="lifecycle-result"></div>
         </div>
         <div class="grid-2">
           <div class="card">
@@ -129,64 +195,99 @@
             <button type="button" class="btn btn-primary" id="btn-promote">Promote</button>
           </div>
         </div>
+        <div class="card">
+          <h3>Versions</h3>
+          <div id="versions-list"><p class="muted">List versions to view.</p></div>
+        </div>
       </section>
 
-      <section id="panel-gaps" class="panel">
-        <h2>Gap analysis</h2>
-        <p class="lead">Hybrid structural + lexical ASPICE gap detection with explainable outputs.</p>
+      <!-- RUNS & TEMPORAL -->
+      <section id="panel-runs" class="panel">
+        <h2>Runs &amp; temporal graph</h2>
+        <p class="lead">
+          Every detection is a tracked run in the temporal graph. Inspect run records,
+          reconstruct a past run from frozen artifacts, and query the event stream.
+        </p>
         <div class="card">
-          <label for="gap-scope">Scope</label>
-          <input id="gap-scope" type="text" value="all" />
           <div class="actions">
-            <button type="button" class="btn btn-primary" id="btn-detect-gaps">Detect gaps (production run)</button>
-            <button type="button" class="btn" id="btn-run-experiment">Run experiment</button>
-            <button type="button" class="btn" id="btn-run-procedure">Run procedure</button>
+            <button type="button" class="btn btn-primary" id="btn-runs-all">All runs</button>
+            <button type="button" class="btn" id="btn-runs-prod">Production</button>
+            <button type="button" class="btn" id="btn-runs-exp">Experiments</button>
           </div>
         </div>
+        <div id="runs-timeline" class="timeline">
+          <p class="muted">Load runs to see the timeline.</p>
+        </div>
         <div class="card">
-          <h3>Explain gap</h3>
-          <label for="gap-target">Target (outcome:characteristic)</label>
-          <input id="gap-target" type="text" placeholder="SYS.5.BP3:verification_method_specified" />
-          <button type="button" class="btn" id="btn-explain">Get explanation</button>
+          <h3>Query events</h3>
+          <div class="inline-form">
+            <div>
+              <label for="event-type">Event type (optional)</label>
+              <input id="event-type" type="text" placeholder="run_completed" />
+            </div>
+            <div class="actions">
+              <button type="button" class="btn" id="btn-query-events">Query</button>
+            </div>
+          </div>
+          <div id="events-feed" class="feed"></div>
         </div>
       </section>
 
-      <section id="panel-audit" class="panel">
-        <h2>Audit & runs</h2>
-        <p class="lead">Temporal graph: audit log, run records, reconstruction.</p>
+      <!-- QUALITY -->
+      <section id="panel-quality" class="panel">
+        <h2>Quality</h2>
+        <p class="lead">
+          Production-only quality view. Experiment runs are quarantined and reported only as
+          a count, never mixed into production metrics.
+        </p>
         <div class="actions">
-          <button type="button" class="btn" id="btn-audit">Audit log</button>
-          <button type="button" class="btn" id="btn-runs-prod">Runs (production)</button>
-          <button type="button" class="btn" id="btn-runs-exp">Runs (experiment)</button>
-          <button type="button" class="btn" id="btn-quality">Quality metrics</button>
+          <button type="button" class="btn btn-primary" id="btn-quality">Refresh metrics</button>
         </div>
-        <div class="card">
-          <label for="run-id">Run ID (reconstruct)</label>
-          <input id="run-id" type="text" />
-          <button type="button" class="btn btn-primary" id="btn-reconstruct">Reconstruct run</button>
+        <div id="quality-tiles" class="tiles">
+          <p class="muted">Refresh to load quality metrics.</p>
         </div>
       </section>
 
+      <!-- AUDIT -->
+      <section id="panel-audit" class="panel">
+        <h2>Audit log</h2>
+        <p class="lead">Append-only event log: every load, publish, activation, config change, and run.</p>
+        <div class="actions">
+          <button type="button" class="btn btn-primary" id="btn-audit">Refresh audit log</button>
+        </div>
+        <div id="audit-feed" class="feed">
+          <p class="muted">Refresh to load the audit log.</p>
+        </div>
+      </section>
+
+      <!-- SETTINGS -->
       <section id="panel-settings" class="panel">
         <h2>Settings</h2>
         <p class="lead">Governed weights, retention, workspace path.</p>
         <div class="card">
+          <h3>Workspace</h3>
           <label for="workspace-path">Workspace directory</label>
           <input id="workspace-path" type="text" />
           <button type="button" class="btn" id="btn-set-workspace">Apply workspace</button>
         </div>
         <div class="grid-2">
           <div class="card">
-            <h3>Weight</h3>
-            <input id="weight-name" placeholder="lexical" />
-            <input id="weight-value" type="number" step="0.1" value="1.0" />
+            <h3>Weight (admin)</h3>
+            <label>Name</label>
+            <input id="weight-name" placeholder="lexical_threshold" />
+            <label>Value</label>
+            <input id="weight-value" type="number" step="0.1" value="0.6" />
+            <label>Rationale</label>
             <input id="weight-rationale" placeholder="rationale" />
             <button type="button" class="btn" id="btn-set-weight">Set weight</button>
           </div>
           <div class="card">
             <h3>Retention (admin)</h3>
+            <label>Key</label>
             <input id="retention-key" placeholder="production_days" />
+            <label>Days</label>
             <input id="retention-days" type="number" value="90" />
+            <label>Rationale</label>
             <input id="retention-rationale" placeholder="rationale" />
             <div class="actions">
               <button type="button" class="btn" id="btn-set-retention">Set retention</button>
@@ -195,12 +296,22 @@
           </div>
         </div>
         <div class="card">
-          <button type="button" class="btn" id="btn-get-config">Load config</button>
+          <div class="card-head">
+            <h3>Governed config</h3>
+            <button type="button" class="btn btn-ghost" id="btn-get-config">Load config</button>
+          </div>
+          <div id="config-view"></div>
         </div>
       </section>
 
-      <pre id="output" aria-live="polite"></pre>
+      <!-- Collapsible raw response drawer -->
+      <details id="raw-drawer" class="raw-drawer">
+        <summary>Raw MCP response</summary>
+        <pre id="output" aria-live="polite"></pre>
+      </details>
     </main>
+
+    <div id="toast" class="toast" hidden></div>
     <script src="/assets/app.js"></script>
   </body>
 </html>
