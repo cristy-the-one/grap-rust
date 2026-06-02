@@ -436,6 +436,54 @@ $("#btn-ingest").onclick = () =>
     return r;
   });
 
+function renderExtract(r, container) {
+  clear(container);
+  const v = r.validation || {};
+  const okCls = v.ok ? "ok" : "err";
+  container.append(el("div", { class: "extract-meta" },
+    el("span", { class: "badge" }, `provider: ${r.provider}`),
+    el("span", { class: "badge" }, `embedder: ${r.embedder}`),
+    el("span", { class: "badge" }, `${r.chunks} chunks → ${r.fragments} fragments`),
+    el("span", { class: `badge ${okCls}` }, v.ok ? "valid" : "has errors")));
+  (v.warnings || []).forEach((w) => container.append(el("p", { class: "small muted" }, `⚠ ${w}`)));
+  (v.errors || []).forEach((e) => container.append(el("p", { class: "small err-text" }, `✕ ${e}`)));
+
+  const outcomes = r.process_outcomes || [];
+  if (!outcomes.length) {
+    container.append(el("p", { class: "muted small" },
+      "No outcomes proposed. Is the LLM (GRAP_LLM_BASE_URL / Ollama) reachable?"));
+  }
+  outcomes.forEach((o) => {
+    const prov = (r.provenance && r.provenance[o.id]) || [];
+    container.append(el("div", { class: "proposed" },
+      el("div", { class: "proposed-name" }, o.name),
+      el("div", { class: "chips" },
+        (o.characteristics || []).map((c) => el("span", { class: "chip" }, c))),
+      prov.length ? el("div", { class: "muted small" }, `from: ${prov.join(", ")}`) : null));
+  });
+
+  // human gate: adopt the proposal
+  container.append(el("div", { class: "gap-actions" },
+    el("button", {
+      class: "btn",
+      onclick: () => run(async () => {
+        const lr = await post("/api/load/ontology", { path: r.out_path });
+        await refreshStatus();
+        return lr;
+      }, "Proposed ontology loaded as active"),
+    }, "Load this ontology (adopt proposal)")));
+  container.append(el("p", { class: "muted small" }, `candidate written to ${r.out_path}`));
+}
+
+$("#btn-extract").onclick = () =>
+  run(async () => {
+    const r = await post("/api/extract", { path: $("#path-extract").value });
+    if (r) renderExtract(r, $("#extract-result"));
+    if (r && r.status !== "error")
+      toast(`Proposed ${(r.process_outcomes || []).length} outcomes`, r.validation && r.validation.ok ? "ok" : "warn");
+    return r;
+  });
+
 $("#btn-load-onto").onclick = () =>
   run(async () => { const r = await post("/api/load/ontology", { path: $("#path-onto").value }); await refreshStatus(); return r; }, "Ontology loaded");
 
@@ -561,6 +609,7 @@ $("#btn-get-config").onclick = () =>
     $("#statusbar-ws").textContent = ws;
     $("#path-create-kg").value = `${ws}/kg`;
     $("#path-ingest").value = ex.sample_knowledge || "";
+    $("#path-extract").value = ex.sample_knowledge || "";
     $("#path-onto").value = ex.ontology || "";
     $("#path-pg").value = ex.procedure_graph || "";
     $("#path-validate").value = ex.procedure_graph || "";

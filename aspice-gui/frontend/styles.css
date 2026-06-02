@@ -555,6 +555,17 @@ table.hits td:last-child { font-family: var(--mono); color: var(--muted); }
 .config-cols h4 { margin: 0 0 0.4rem; font-size: 0.85rem; color: var(--accent); }
 .err-text { color: var(--err); }
 
+/* ---------- KEE proposed ontology ---------- */
+.extract-meta { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0.5rem 0 0.75rem; }
+.proposed {
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: 8px;
+  padding: 0.6rem 0.8rem;
+  margin-bottom: 0.5rem;
+}
+.proposed-name { font-weight: 600; margin-bottom: 0.35rem; }
+
 /* ---------- raw drawer ---------- */
 .raw-drawer {
   margin-top: 2rem;

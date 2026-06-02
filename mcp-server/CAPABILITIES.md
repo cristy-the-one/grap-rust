@@ -6,8 +6,12 @@ Every mutating capability emits a Workspace audit event (see `get_audit_log`).
 ## Knowledge
 - **load_knowledge_graph(path)** → `{status, node_count}`. Load an on-disk grap KG. Emits `kg_loaded`.
 - **create_knowledge_graph(path)** → `{status, node_count}`. Create a fresh on-disk KG. Emits `kg_created`.
-- **ingest_documents(path)** → `{status, files, nodes_added}`. Chunk + add .md/.txt docs under `path`
-  into the loaded KG as real evidence. Emits `documents_ingested`.
+- **ingest_documents(path)** → `{status, files, nodes_added, embedded}`. Chunk + add .md/.txt docs
+  under `path` into the loaded KG as real evidence (optionally with embeddings). Emits `documents_ingested`.
+- **extract_ontology(path, out_path=None, sim=0.86)** → `{status, out_path, version_hash, process_outcomes,
+  provenance, validation, ...}`. Knowledge Extraction Engine: LLM proposes ontology fragments from
+  documents, reconciled by embedding similarity, written as a **proposed** candidate and versioned for
+  human review (does not become active until loaded). Emits `ontology_proposed`. See `grap_mcp/kee/`.
 - **load_ontology(path)** → `{status, version_hash, outcomes_projected, characteristics_projected}`.
   Parse an ASPICE ontology YAML, project it into the KG, and version it. Emits `ontology_loaded`.
 

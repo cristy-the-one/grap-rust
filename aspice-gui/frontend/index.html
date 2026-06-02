@@ -131,6 +131,28 @@
             <div id="validate-result"></div>
           </div>
         </div>
+
+        <div class="card hero">
+          <div class="hero-head">
+            <div>
+              <h3>Knowledge Extraction Engine</h3>
+              <p class="muted small">
+                Propose an ontology <em>from documents</em>: the LLM extracts fragments,
+                grap reconciles near-duplicate concepts by embedding similarity, and the
+                result is versioned as a <strong>proposed</strong> candidate for review —
+                it does not become active until you load it.
+              </p>
+            </div>
+            <button type="button" class="btn btn-primary" id="btn-extract">Extract ontology</button>
+          </div>
+          <label for="path-extract">Folder of .md / .txt</label>
+          <input id="path-extract" type="text" placeholder="…/sample-knowledge" />
+          <p class="muted small">
+            LLM via <code>GRAP_LLM_BASE_URL</code> (default local Ollama); embeddings local.
+            Set <code>GRAP_LLM_STUB=1</code> to dry-run offline.
+          </p>
+          <div id="extract-result"></div>
+        </div>
       </section>
 
       <!-- GAPS -->

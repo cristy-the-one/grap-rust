@@ -35,6 +35,11 @@ class PathBody(BaseModel):
     path: str
 
 
+class ExtractBody(BaseModel):
+    path: str
+    sim: float = 0.86
+
+
 class ScopeBody(BaseModel):
     scope: str = "all"
     hypothesis: Optional[str] = None
@@ -155,6 +160,11 @@ def create_kg(body: PathBody) -> dict:
 @app.post("/api/ingest")
 def ingest_docs(body: PathBody) -> dict:
     return bridge.call("ingest_documents", path=body.path)
+
+
+@app.post("/api/extract")
+def extract_ontology(body: ExtractBody) -> dict:
+    return bridge.call("extract_ontology", path=body.path, sim=body.sim)
 
 
 @app.post("/api/validate/pg")
