@@ -1,0 +1,4 @@
+grap-workspace/
+__pycache__/
+*.pyc
+.venv/
