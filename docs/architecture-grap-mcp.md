@@ -31,13 +31,13 @@ Each layer owns one concern and talks to the next through a narrow interface:
 - **pygrap (PyO3 bindings)** — exposes the engine + lifecycle `Workspace` to Python.
 - **grap_mcp (Python)** — the domain layer: ontology parsing/projection, the hybrid
   gap-detection reasoner, publish-time validation, and lifecycle/governance wiring.
-- **MCP capability surface** — 31 tools across 8 domains; the *only* interface agents
+- **MCP capability surface** — 33 tools across 8 domains; the *only* interface agents
   and humans need.
 - **Agents & humans** — drive everything through capabilities; no "secret" direct API.
 
 ```mermaid
 flowchart TB
-  A[Agents and Humans] --> M[MCP Capability Surface<br/>8 domains · 31 tools]
+  A[Agents and Humans] --> M[MCP Capability Surface<br/>8 domains · 33 tools]
   M --> P[grap_mcp · Python<br/>ontology · reasoner · validation · lifecycle wiring · auth]
   P --> B[pygrap · PyO3 bindings]
   B --> R[grap · Rust engine<br/>Workspace · Version/Run/Activation stores · Audit log · BM25+graph search]
@@ -126,11 +126,11 @@ answerable.
 
 ---
 
-## Capability surface (8 domains, 31 tools)
+## Capability surface (8 domains, 33 tools)
 
 | Domain | Representative tools |
 |--------|----------------------|
-| knowledge | `load_knowledge_graph`, `load_ontology` |
+| knowledge | `load_knowledge_graph`, `create_knowledge_graph`, `ingest_documents`, `load_ontology` |
 | pg_lifecycle | `load_procedure_graph`, `publish_pg`, `promote_pg`, `activate`, `set_production` |
 | execution_reasoning | `run_procedure`, `detect_gaps`, `get_explanation` |
 | experimentation | `run_experiment`, `get_quality_metrics`, `adopt_experiment` |
@@ -147,7 +147,7 @@ walkthrough: [`mcp-server/demo_aspice_e2e.py`](../mcp-server/demo_aspice_e2e.py)
 ## Suggested infographic layout
 
 A single-page infographic, top to bottom. Numbers to feature: **3 graphs · 5 layers ·
-8 domains · 31 capabilities**.
+8 domains · 33 capabilities**.
 
 1. **Hero band (top).** Title + thesis ("one graph engine, three meanings"). Three
    icons in a row: KG = database/checkmark (truth), PG = flowchart/gears (process),

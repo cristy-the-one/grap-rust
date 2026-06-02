@@ -33,3 +33,39 @@ def test_ingest_paths_reads_md_files(tmp_path):
     assert res["files"] == 2
     assert res["nodes_added"] == 3
     assert all(lbl.startswith("doc:") for (_t, lbl) in kg.nodes)
+
+
+import os
+
+
+def test_ingest_feeds_reasoner(tmp_path, monkeypatch):
+    monkeypatch.setenv("GRAP_WORKSPACE", str(tmp_path / "ws"))
+    monkeypatch.setenv("GRAP_ROLE", "operator")
+    import importlib
+    import grap_mcp.server as s
+    importlib.reload(s)
+
+    onto = os.path.join(os.path.dirname(__file__), "..", "..",
+                        "docs", "examples", "minimal-aspice-ontology.yaml")
+    pg = tmp_path / "p.pg.yaml"
+    pg.write_text(
+        'name: P\nversion: 0.1.0\nsteps:\n  - id: a\n    operation: op\n'
+        '    references: ["kg:aspice.process_outcome.SYS.5.BP3"]\n', encoding="utf-8")
+
+    kgp = str(tmp_path / "kg")
+    assert s.create_knowledge_graph(kgp)["status"] == "ok"
+    assert s.load_ontology(onto)["status"] == "ok"
+    assert s.load_procedure_graph(str(pg))["status"] == "ok"
+    empty = s.detect_gaps()["gaps_found"]
+
+    docs = tmp_path / "docs"
+    docs.mkdir()
+    (docs / "req.md").write_text(
+        "The verification method is specified for each requirement. "
+        "Acceptance criteria are defined. The test environment is identified.",
+        encoding="utf-8")
+    assert s.ingest_documents(str(docs))["status"] == "ok"
+    after = s.detect_gaps()["gaps_found"]
+
+    assert empty >= 1
+    assert after < empty  # ingested evidence covers characteristics -> fewer gaps
