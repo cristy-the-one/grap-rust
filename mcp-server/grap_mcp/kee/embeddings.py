@@ -12,13 +12,21 @@ so ingest never blocks on a missing/offline model.
 from __future__ import annotations
 
 import hashlib
+import json
 import logging
 import math
 import os
 import re
-from typing import List, Protocol, Sequence, runtime_checkable
+import urllib.error
+import urllib.request
+from typing import List, Optional, Protocol, Sequence, runtime_checkable
 
 logger = logging.getLogger("grap-mcp.kee")
+
+# Default OpenAI-compatible endpoint (Ollama). Reused for the HTTP embedder so
+# embeddings can be fully local via Ollama (e.g. nomic-embed-text).
+_DEFAULT_EMBED_BASE_URL = "http://localhost:11434/v1"
+_DEFAULT_OLLAMA_EMBED_MODEL = "nomic-embed-text"
 
 _TOKEN_RE = re.compile(r"[a-z0-9]+")
 
@@ -92,18 +100,95 @@ class LocalEmbedder:
         return [[float(x) for x in row] for row in arr]
 
 
-def get_embedder(prefer_local: bool = True) -> Embedder:
-    """Return an embedder: try the local model, fall back to hashing.
+class OpenAICompatEmbedder:
+    """Embedder backed by an OpenAI-compatible /embeddings endpoint.
 
-    The fallback keeps ingest working offline / without a downloaded model.
+    Works with Ollama (`http://localhost:11434/v1`, e.g. model
+    `nomic-embed-text`), vLLM, and hosted APIs — so embeddings can be fully
+    local via Ollama. Stdlib urllib only; vectors are L2-normalized for
+    consistency with the other embedders.
     """
-    if prefer_local:
+
+    name = "ollama"
+
+    def __init__(self, base_url: Optional[str] = None, model: Optional[str] = None,
+                 api_key: Optional[str] = None, timeout: float = 60.0) -> None:
+        self.base_url = (base_url or os.environ.get("GRAP_EMBED_BASE_URL")
+                         or os.environ.get("GRAP_LLM_BASE_URL")
+                         or _DEFAULT_EMBED_BASE_URL).rstrip("/")
+        self.model = model or os.environ.get("GRAP_EMBED_MODEL", _DEFAULT_OLLAMA_EMBED_MODEL)
+        self.api_key = api_key or os.environ.get("GRAP_LLM_API_KEY")
+        self.timeout = timeout
+        self.dim = 0
+
+    def embed(self, texts: Sequence[str]) -> List[List[float]]:
+        if not texts:
+            return []
+        payload = {"model": self.model, "input": list(texts)}
+        headers = {"Content-Type": "application/json"}
+        if self.api_key:
+            headers["Authorization"] = f"Bearer {self.api_key}"
+        req = urllib.request.Request(f"{self.base_url}/embeddings",
+                                     data=json.dumps(payload).encode("utf-8"),
+                                     headers=headers, method="POST")
+        try:
+            with urllib.request.urlopen(req, timeout=self.timeout) as resp:
+                body = json.loads(resp.read().decode("utf-8"))
+        except (urllib.error.URLError, OSError) as exc:
+            raise RuntimeError(
+                f"embedding request to {self.base_url}/embeddings failed: {exc}. "
+                f"Is the server running and is model '{self.model}' pulled?") from exc
+        try:
+            rows = sorted(body["data"], key=lambda d: d.get("index", 0))
+            vectors = [[float(x) for x in row["embedding"]] for row in rows]
+        except (KeyError, TypeError) as exc:
+            raise RuntimeError(f"unexpected embeddings response shape: {body!r}") from exc
+        if vectors:
+            self.dim = len(vectors[0])
+        return [_l2_normalize(v) for v in vectors]
+
+
+_HTTP_BACKENDS = {"ollama", "http", "openai", "openai-compat"}
+
+
+def get_embedder(prefer_local: bool = True) -> Embedder:
+    """Return an embedder, chosen by GRAP_EMBED_BACKEND:
+
+      - "ollama"/"http"  : OpenAI-compatible HTTP embedder (fully local via
+                           Ollama, e.g. nomic-embed-text); falls back to hashing
+                           if the endpoint is unreachable.
+      - "hashing"        : deterministic offline hashing embedder.
+      - "local"          : sentence-transformers only (no fallback).
+      - unset/"auto"     : try sentence-transformers, fall back to hashing.
+
+    Every fallback keeps ingest working offline / without a model.
+    """
+    backend = os.environ.get("GRAP_EMBED_BACKEND", "").strip().lower()
+
+    if backend in _HTTP_BACKENDS:
+        try:
+            emb = OpenAICompatEmbedder()
+            emb.embed(["warmup"])  # force a real call so we fail here, not mid-ingest
+            logger.info("KEE embedder: HTTP model '%s' at %s (dim=%d)",
+                        emb.model, emb.base_url, emb.dim)
+            return emb
+        except Exception as exc:  # noqa: BLE001 - endpoint unreachable / bad shape
+            logger.warning("KEE embedder: HTTP embedder unavailable (%s); "
+                           "falling back to hashing embedder", exc)
+            return HashingEmbedder()
+
+    if backend == "hashing":
+        return HashingEmbedder()
+
+    if backend == "local" or (prefer_local and backend in ("", "auto")):
         try:
             emb = LocalEmbedder()
             emb.embed(["warmup"])  # force load so we fail here, not mid-ingest
             logger.info("KEE embedder: local model '%s' (dim=%d)", emb.model_name, emb.dim)
             return emb
         except Exception as exc:  # noqa: BLE001 - any load/import/network failure
+            if backend == "local":
+                raise
             logger.warning("KEE embedder: local model unavailable (%s); "
                            "falling back to hashing embedder", exc)
     return HashingEmbedder()

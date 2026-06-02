@@ -10,6 +10,16 @@
 > (OpenAI-compatible HTTP: Ollama/vLLM/llama.cpp/hosted); offline-deterministic
 > via a stub provider + hashing embedder.
 >
+> **Configuration (env):**
+> - `GRAP_LLM_BASE_URL` (default `http://localhost:11434/v1`), `GRAP_LLM_MODEL`,
+>   `GRAP_LLM_API_KEY`; `GRAP_LLM_STUB=1` forces the offline stub. The model is
+>   also selectable per-call (`extract_ontology(model=…)`) / from the GUI.
+> - `GRAP_EMBED_BACKEND`: `auto` (default — sentence-transformers, else hashing),
+>   `ollama`/`http` (fully-local embeddings via Ollama, e.g. `nomic-embed-text`,
+>   falls back to hashing if unreachable), `local`, or `hashing`.
+>   `GRAP_EMBED_MODEL` names the model for the chosen backend;
+>   `GRAP_EMBED_BASE_URL` overrides the HTTP endpoint.
+>
 > Original framing (kept for context): whether the grap + MCP system could
 > extract an ontology from documents by itself. Separate from the ASPICE-from-PDF
 > task, which is a deterministic parser for one known document format.

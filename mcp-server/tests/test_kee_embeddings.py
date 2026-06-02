@@ -1,11 +1,23 @@
 """Phase 1: embeddings foundation — HashingEmbedder + ingest vector round-trip."""
 
+import io
+import json
 import tempfile
 from pathlib import Path
 
 import pygrap
-from grap_mcp.kee.embeddings import HashingEmbedder, get_embedder
+from grap_mcp.kee import embeddings as emb_mod
+from grap_mcp.kee.embeddings import HashingEmbedder, OpenAICompatEmbedder, get_embedder
 from grap_mcp import ingest
+
+
+class _FakeResp(io.BytesIO):
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        self.close()
+        return False
 
 
 def test_hashing_embedder_is_deterministic_and_normalized():
@@ -52,6 +64,44 @@ def test_ingest_with_embedder_populates_vectors(tmp_path):
     assert hits, "vector_search returned no hits — embeddings not stored"
     top_node = hits[0][0]
     assert kg.get_node_text(top_node).startswith("The verification method")
+
+
+def test_openai_compat_embedder_shaping_and_normalization(monkeypatch):
+    captured = {}
+
+    def fake_urlopen(req, timeout=None):
+        captured["url"] = req.full_url
+        captured["body"] = json.loads(req.data.decode("utf-8"))
+        # return two unnormalized vectors, out of order, to test index sorting
+        return _FakeResp(json.dumps({"data": [
+            {"index": 1, "embedding": [0.0, 3.0]},
+            {"index": 0, "embedding": [3.0, 4.0]},
+        ]}).encode("utf-8"))
+
+    monkeypatch.setattr(emb_mod.urllib.request, "urlopen", fake_urlopen)
+    e = OpenAICompatEmbedder(base_url="http://host/v1", model="nomic-embed-text")
+    out = e.embed(["a", "b"])
+
+    assert captured["url"] == "http://host/v1/embeddings"
+    assert captured["body"] == {"model": "nomic-embed-text", "input": ["a", "b"]}
+    assert e.dim == 2
+    assert out[0] == [0.6, 0.8]                # [3,4] L2-normalized, index 0 first
+    assert abs(sum(x * x for x in out[1]) - 1.0) < 1e-9
+
+
+def test_get_embedder_backend_hashing(monkeypatch):
+    monkeypatch.setenv("GRAP_EMBED_BACKEND", "hashing")
+    assert get_embedder().name == "hashing"
+
+
+def test_get_embedder_backend_ollama_falls_back_when_unreachable(monkeypatch):
+    monkeypatch.setenv("GRAP_EMBED_BACKEND", "ollama")
+
+    def boom(req, timeout=None):
+        raise OSError("connection refused")
+
+    monkeypatch.setattr(emb_mod.urllib.request, "urlopen", boom)
+    assert get_embedder().name == "hashing"     # graceful fallback
 
 
 def test_ingest_without_embedder_is_unchanged(tmp_path):

@@ -10,8 +10,13 @@ By default it uses a deterministic StubProvider (canned per-chunk responses) so
 the demo runs offline with no model. To use a real local model, start Ollama
 (or any OpenAI-compatible server) and run with:
 
-    GRAP_LLM_BASE_URL=http://localhost:11434/v1 GRAP_LLM_MODEL=llama3.1 \
+    GRAP_LLM_BASE_URL=http://localhost:11434/v1 GRAP_LLM_MODEL=llama3.1:8b \
         python mcp-server/demo_kee.py --real
+
+For fully-local embeddings via Ollama too (instead of sentence-transformers):
+
+    GRAP_EMBED_BACKEND=ollama GRAP_EMBED_MODEL=nomic-embed-text \
+        GRAP_LLM_MODEL=llama3.1:8b python mcp-server/demo_kee.py --real
 
 The point: the LLM only ever *proposes*; grap dedups/links/versions and a human
 loads the result. Governance stays deterministic even when the extractor isn't.
