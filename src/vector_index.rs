@@ -240,8 +240,8 @@ impl BruteForceVectorIndex {
             .map(|(&id, v)| (id.0, v.clone()))
             .collect();
 
-        let encoded = bincode::serialize(&data)
-            .map_err(|e| crate::GraphError::Other(e.to_string()))?;
+        let encoded =
+            bincode::serialize(&data).map_err(|e| crate::GraphError::Other(e.to_string()))?;
 
         let mut f = fs::File::create(vdir.join("vectors.bin"))?;
         f.write_all(&encoded)?;
@@ -262,10 +262,8 @@ impl BruteForceVectorIndex {
         }
 
         let manifest_json = fs::read_to_string(&manifest_path)?;
-        let manifest: VectorIndexManifest =
-            serde_json::from_str(&manifest_json).map_err(|e| {
-                crate::GraphError::Other(format!("Bad manifest.json: {}", e))
-            })?;
+        let manifest: VectorIndexManifest = serde_json::from_str(&manifest_json)
+            .map_err(|e| crate::GraphError::Other(format!("Bad manifest.json: {}", e)))?;
 
         // Wrong backend: a different implementation wrote this index.
         // Return Ok(false) so the caller falls back to a full rebuild gracefully.
@@ -282,10 +280,8 @@ impl BruteForceVectorIndex {
         }
 
         let data = fs::read(&vectors_path)?;
-        let persisted: Vec<(u32, Vec<f32>)> =
-            bincode::deserialize(&data).map_err(|e| {
-                crate::GraphError::Other(format!("Corrupted vectors.bin: {}", e))
-            })?;
+        let persisted: Vec<(u32, Vec<f32>)> = bincode::deserialize(&data)
+            .map_err(|e| crate::GraphError::Other(format!("Corrupted vectors.bin: {}", e)))?;
 
         // Dimension validation
         for (_, emb) in &persisted {
@@ -670,11 +666,11 @@ mod tests {
         // Cosine similarity is direction-only, so [i, 0] vectors are all
         // equally similar to [9, 0]. Use genuinely different-direction vectors.
         let mut idx = BruteForceVectorIndex::new();
-        idx.add_vector(NodeId(0), &[1.0, 0.0]);   // cos([1,0]) = 1.0 — closest
+        idx.add_vector(NodeId(0), &[1.0, 0.0]); // cos([1,0]) = 1.0 — closest
         idx.add_vector(NodeId(1), &[0.9, 0.436]); // cos ≈ 0.9
         idx.add_vector(NodeId(2), &[0.5, 0.866]); // cos ≈ 0.5
-        idx.add_vector(NodeId(3), &[0.0, 1.0]);   // cos = 0.0
-        idx.add_vector(NodeId(4), &[-1.0, 0.0]);  // cos = -1.0 — farthest
+        idx.add_vector(NodeId(3), &[0.0, 1.0]); // cos = 0.0
+        idx.add_vector(NodeId(4), &[-1.0, 0.0]); // cos = -1.0 — farthest
 
         let results = idx.search(&[1.0, 0.0], 3);
         assert_eq!(results.len(), 3);

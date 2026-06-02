@@ -169,7 +169,10 @@ mod tests {
         }
         // 65th registration must return Err
         let result = reg.try_register("one_too_many");
-        assert!(result.is_err(), "should return Err at the 64-property limit");
+        assert!(
+            result.is_err(),
+            "should return Err at the 64-property limit"
+        );
     }
 
     #[test]

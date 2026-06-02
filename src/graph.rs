@@ -97,8 +97,7 @@ impl KnowledgeGraph {
         let embedding_ref = embedding.map(|e| self.blobs.store_embedding(e));
 
         let id = NodeId(
-            u32::try_from(self.nodes.len())
-                .expect("node count exceeds u32::MAX — graph too large"),
+            u32::try_from(self.nodes.len()).expect("node count exceeds u32::MAX — graph too large"),
         );
         self.nodes.push(Node {
             blob,
@@ -181,7 +180,10 @@ impl KnowledgeGraph {
     /// Returns the embedding of a node, if one was stored.
     pub fn read_embedding(&self, node: NodeId) -> Option<Vec<f32>> {
         let node_data = &self.nodes[node.0 as usize];
-        node_data.embedding.as_ref().and_then(|r| self.blobs.read_embedding(r))
+        node_data
+            .embedding
+            .as_ref()
+            .and_then(|r| self.blobs.read_embedding(r))
     }
 
     /// Bounds-checked variant of [`read_blob`]. Returns `None` if the node id is out of range.
@@ -236,8 +238,7 @@ impl KnowledgeGraph {
         props.sort_by_key(|(t, _)| t.0);
 
         let edge_id = EdgeId(
-            u32::try_from(self.edges.len())
-                .expect("edge count exceeds u32::MAX — graph too large"),
+            u32::try_from(self.edges.len()).expect("edge count exceeds u32::MAX — graph too large"),
         );
         self.edges.push(Edge {
             source,
@@ -320,7 +321,13 @@ impl KnowledgeGraph {
         let n = nodes.len();
         let mut d = deleted;
         d.resize(n, false); // pad if shorter
-        Self { nodes, edges, blobs, properties, deleted: d }
+        Self {
+            nodes,
+            edges,
+            blobs,
+            properties,
+            deleted: d,
+        }
     }
 
     /// Convenience wrapper that starts with all nodes alive.

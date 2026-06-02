@@ -142,15 +142,22 @@ impl TextIndex for OnDiskTextIndex {
     fn search(&self, query: &str, max_results: usize) -> Vec<(NodeId, f64)> {
         let tokens = self.tokenizer.tokenize(query);
         let terms: Vec<&str> = tokens.iter().map(|(t, _)| *t).collect();
-        if terms.is_empty() { return vec![]; }
+        if terms.is_empty() {
+            return vec![];
+        }
         let raw = self.engine.lock().unwrap().search(&terms);
         // Build reverse map: global_id → NodeId
-        let reverse: std::collections::HashMap<u32, u32> =
-            self.node_to_global.iter().map(|(&nid, &gid)| (gid, nid)).collect();
+        let reverse: std::collections::HashMap<u32, u32> = self
+            .node_to_global
+            .iter()
+            .map(|(&nid, &gid)| (gid, nid))
+            .collect();
         raw.into_iter()
             .take(max_results)
             .filter_map(|(global_id, score)| {
-                reverse.get(&global_id).map(|&nid| (NodeId(nid), score as f64))
+                reverse
+                    .get(&global_id)
+                    .map(|&nid| (NodeId(nid), score as f64))
             })
             .collect()
     }
@@ -158,14 +165,21 @@ impl TextIndex for OnDiskTextIndex {
     fn phrase_search(&self, phrase: &str, max_gap: u32, max_results: usize) -> Vec<(NodeId, f64)> {
         let tokens = self.tokenizer.tokenize(phrase);
         let terms: Vec<&str> = tokens.iter().map(|(t, _)| *t).collect();
-        if terms.is_empty() { return vec![]; }
+        if terms.is_empty() {
+            return vec![];
+        }
         let raw = self.engine.lock().unwrap().phrase_search(&terms, max_gap);
-        let reverse: std::collections::HashMap<u32, u32> =
-            self.node_to_global.iter().map(|(&nid, &gid)| (gid, nid)).collect();
+        let reverse: std::collections::HashMap<u32, u32> = self
+            .node_to_global
+            .iter()
+            .map(|(&nid, &gid)| (gid, nid))
+            .collect();
         raw.into_iter()
             .take(max_results)
             .filter_map(|(global_id, score)| {
-                reverse.get(&global_id).map(|&nid| (NodeId(nid), score as f64))
+                reverse
+                    .get(&global_id)
+                    .map(|&nid| (NodeId(nid), score as f64))
             })
             .collect()
     }
@@ -239,8 +253,7 @@ impl TextIndex for OnDiskTextIndex {
         // Persist the NodeId→GlobalId map alongside the text index
         let map_json = serde_json::to_string_pretty(&self.node_to_global)
             .map_err(|e| crate::GraphError::Other(e.to_string()))?;
-        std::fs::write(dir.join("node_map.json"), map_json)
-            .map_err(crate::GraphError::from)?;
+        std::fs::write(dir.join("node_map.json"), map_json).map_err(crate::GraphError::from)?;
         Ok(())
     }
 
@@ -342,7 +355,10 @@ mod tests {
         idx.save_to_dir(dir.path()).unwrap();
 
         let loaded = OnDiskTextIndex::load_from_dir(dir.path()).unwrap();
-        assert!(loaded.is_document_deleted(NodeId(0)), "deleted status must survive save/load");
+        assert!(
+            loaded.is_document_deleted(NodeId(0)),
+            "deleted status must survive save/load"
+        );
         assert!(!loaded.is_document_deleted(NodeId(1)));
     }
 }

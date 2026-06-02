@@ -248,10 +248,10 @@ impl KnowledgeGraph {
 
         // Rename each file: blobs and topo first, meta last (meta = commit point).
         // Retries handle the brief window where Defender may be scanning a just-written file.
-        Self::rename_with_retry(&staging.join("graph.blobs"),   &dir.join("graph.blobs"))?;
-        Self::rename_with_retry(&staging.join("graph.topo"),    &dir.join("graph.topo"))?;
+        Self::rename_with_retry(&staging.join("graph.blobs"), &dir.join("graph.blobs"))?;
+        Self::rename_with_retry(&staging.join("graph.topo"), &dir.join("graph.topo"))?;
         Self::rename_with_retry(&staging.join("graph.deleted"), &dir.join("graph.deleted"))?;
-        Self::rename_with_retry(&staging.join("graph.meta"),    &dir.join("graph.meta"))?;
+        Self::rename_with_retry(&staging.join("graph.meta"), &dir.join("graph.meta"))?;
 
         // Remove the now-empty staging directory (best-effort).
         let _ = fs::remove_dir(&staging);
@@ -281,13 +281,12 @@ pub(crate) fn rename_with_retry(src: &Path, dst: &Path) -> Result<(), GraphError
             }
         }
     }
-    Err(last_err
-        .map(GraphError::from)
-        .unwrap_or_else(|| std::io::Error::new(std::io::ErrorKind::Other, "rename failed after retries").into()))
+    Err(last_err.map(GraphError::from).unwrap_or_else(|| {
+        std::io::Error::new(std::io::ErrorKind::Other, "rename failed after retries").into()
+    }))
 }
 
 impl KnowledgeGraph {
-
     /// Internal: writes the graph contents into an existing directory.
     fn write_graph_to_dir(&self, dir: &Path) -> Result<(), GraphError> {
         fs::create_dir_all(dir)?;
@@ -386,7 +385,11 @@ impl KnowledgeGraph {
         fs::write(meta_path, meta_json)?;
 
         // 5. Write deleted-node bitmap (optional file; missing == all-false on load)
-        let deleted_bytes: Vec<u8> = self.deleted.iter().map(|&b| if b { 1u8 } else { 0u8 }).collect();
+        let deleted_bytes: Vec<u8> = self
+            .deleted
+            .iter()
+            .map(|&b| if b { 1u8 } else { 0u8 })
+            .collect();
         let deleted_path = dir.join("graph.deleted");
         fs::write(deleted_path, &deleted_bytes)?;
 
@@ -430,7 +433,8 @@ impl KnowledgeGraph {
                 for entry in entries.flatten() {
                     let name = entry.file_name();
                     if let Some(name_str) = name.to_str() {
-                        if name_str.starts_with(".grap-save-") || name_str.starts_with(".grap-old-") {
+                        if name_str.starts_with(".grap-save-") || name_str.starts_with(".grap-old-")
+                        {
                             if fs::remove_dir_all(entry.path()).is_ok() {
                                 removed += 1;
                             }
@@ -576,16 +580,26 @@ impl KnowledgeGraph {
             if start > blob_data.len() {
                 return Err(io::Error::new(
                     io::ErrorKind::InvalidData,
-                    format!("chunk boundary {} exceeds blob size {}", start, blob_data.len()),
-                ).into());
+                    format!(
+                        "chunk boundary {} exceeds blob size {}",
+                        start,
+                        blob_data.len()
+                    ),
+                )
+                .into());
             }
             let end = if i + 1 < meta.chunk_boundaries.len() {
                 let next = meta.chunk_boundaries[i + 1] as usize;
                 if next > blob_data.len() {
                     return Err(io::Error::new(
                         io::ErrorKind::InvalidData,
-                        format!("chunk boundary {} exceeds blob size {}", next, blob_data.len()),
-                    ).into());
+                        format!(
+                            "chunk boundary {} exceeds blob size {}",
+                            next,
+                            blob_data.len()
+                        ),
+                    )
+                    .into());
                 }
                 next
             } else {
@@ -629,13 +643,14 @@ impl KnowledgeGraph {
         let mut rebuilt_nodes = Vec::with_capacity(serializable_nodes.len());
         for sn in serializable_nodes {
             let (chunk_idx, local_offset) =
-                find_chunk_for_offset(&meta.chunk_boundaries, sn.blob_global_offset)
-                    .ok_or_else(|| {
+                find_chunk_for_offset(&meta.chunk_boundaries, sn.blob_global_offset).ok_or_else(
+                    || {
                         io::Error::new(
                             io::ErrorKind::InvalidData,
                             format!("blob offset {} out of range", sn.blob_global_offset),
                         )
-                    })?;
+                    },
+                )?;
 
             let blob = BlobRef {
                 chunk_idx,
@@ -644,9 +659,11 @@ impl KnowledgeGraph {
                 uncompressed_len: sn.blob_uncompressed_len,
             };
 
-            let embedding = if let (Some(off), Some(len), Some(ulen)) =
-                (sn.embedding_global_offset, sn.embedding_length, sn.embedding_uncompressed_len)
-            {
+            let embedding = if let (Some(off), Some(len), Some(ulen)) = (
+                sn.embedding_global_offset,
+                sn.embedding_length,
+                sn.embedding_uncompressed_len,
+            ) {
                 let (e_chunk, e_off) = find_chunk_for_offset(&meta.chunk_boundaries, off)
                     .ok_or_else(|| {
                         io::Error::new(
@@ -794,7 +811,11 @@ mod tests {
         let topic = g.properties.register("topic");
         let rel = g.properties.register("relation");
 
-        let n1 = g.add_node("Hello world from grap serialization test.", Some("first"), None);
+        let n1 = g.add_node(
+            "Hello world from grap serialization test.",
+            Some("first"),
+            None,
+        );
         let n2 = g.add_node(
             "Second document about graphs and persistence.",
             Some("second"),
@@ -1005,7 +1026,10 @@ mod tests {
 
         let loaded = KnowledgeGraph::load_from_disk(dir.path()).expect("load");
         // Tombstone must survive
-        assert!(loaded.is_node_deleted(n1), "n1 should still be deleted after reload");
+        assert!(
+            loaded.is_node_deleted(n1),
+            "n1 should still be deleted after reload"
+        );
         assert!(!loaded.is_node_deleted(n0));
         assert!(!loaded.is_node_deleted(n2));
     }
@@ -1028,6 +1052,10 @@ mod tests {
 
         // Load should return Err, not silently return wrong data
         let result = KnowledgeGraph::load_from_disk(dir.path());
-        assert!(result.is_err(), "expected error on corrupt offset, got {:?}", result);
+        assert!(
+            result.is_err(),
+            "expected error on corrupt offset, got {:?}",
+            result
+        );
     }
 }

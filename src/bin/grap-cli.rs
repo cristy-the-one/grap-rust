@@ -404,9 +404,7 @@ fn run_add_file(graph_dir: &PathBuf, json: bool, args: AddFileArgs) {
     } else {
         println!(
             "Added node {} from {:?} (label: {:?})",
-            node_id.0,
-            args.path,
-            label
+            node_id.0, args.path, label
         );
     }
 }
@@ -430,9 +428,15 @@ fn run_delete_node(graph_dir: &PathBuf, json: bool, args: DeleteNodeArgs) {
     }
 
     if json {
-        println!("{}", serde_json::json!({ "status": "deleted", "node_id": args.node_id }));
+        println!(
+            "{}",
+            serde_json::json!({ "status": "deleted", "node_id": args.node_id })
+        );
     } else {
-        println!("Deleted node {} (tombstone created). Run `vacuum` to reclaim space.", args.node_id);
+        println!(
+            "Deleted node {} (tombstone created). Run `vacuum` to reclaim space.",
+            args.node_id
+        );
     }
 }
 
@@ -549,14 +553,20 @@ fn run_add_edge(graph_dir: &PathBuf, json: bool, args: AddEdgeArgs) {
     }
 
     if json {
-        println!("{}", serde_json::json!({
-            "status": "ok",
-            "source": args.source,
-            "target": args.target,
-            "strength": args.strength
-        }));
+        println!(
+            "{}",
+            serde_json::json!({
+                "status": "ok",
+                "source": args.source,
+                "target": args.target,
+                "strength": args.strength
+            })
+        );
     } else {
-        println!("Added edge {} -> {} (strength={:.2})", args.source, args.target, args.strength);
+        println!(
+            "Added edge {} -> {} (strength={:.2})",
+            args.source, args.target, args.strength
+        );
     }
 }
 

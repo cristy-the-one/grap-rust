@@ -13,8 +13,16 @@ fn main() {
     let mut g = KnowledgeGraph::new();
     let topic = g.properties.register("topic");
 
-    let n1 = g.add_node("Document about Rust memory safety.", Some("rust-memory"), None);
-    let n2 = g.add_node("Document about ownership and borrowing.", Some("ownership"), None);
+    let n1 = g.add_node(
+        "Document about Rust memory safety.",
+        Some("rust-memory"),
+        None,
+    );
+    let n2 = g.add_node(
+        "Document about ownership and borrowing.",
+        Some("ownership"),
+        None,
+    );
 
     g.add_edge(
         n1,

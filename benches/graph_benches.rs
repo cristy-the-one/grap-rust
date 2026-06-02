@@ -135,7 +135,8 @@ fn build_graph_with_large_blobs(node_count: usize) -> IndexedKnowledgeGraph {
             i,
             "This is filler text to create reasonably sized blobs for mmap benchmarking. \
              Rust memory safety, ownership, borrowing, lifetimes, and fearless concurrency are \
-             important topics in systems programming. ".repeat(40)
+             important topics in systems programming. "
+                .repeat(40)
         );
         g.add_node(&text, Some(&format!("LargeNode{}", i)), None);
     }
@@ -282,7 +283,10 @@ fn bench_text_graph_fusion_cost(c: &mut Criterion) {
                 0.4,
                 4,
                 100,
-                FusionWeights { text: 0.9, graph: 0.1 },
+                FusionWeights {
+                    text: 0.9,
+                    graph: 0.1,
+                },
             );
             black_box(res.len())
         })
@@ -297,7 +301,10 @@ fn bench_text_graph_fusion_cost(c: &mut Criterion) {
                 0.4,
                 4,
                 100,
-                FusionWeights { text: 0.5, graph: 0.5 },
+                FusionWeights {
+                    text: 0.5,
+                    graph: 0.5,
+                },
             );
             black_box(res.len())
         })
@@ -312,7 +319,10 @@ fn bench_text_graph_fusion_cost(c: &mut Criterion) {
                 0.4,
                 4,
                 100,
-                FusionWeights { text: 0.1, graph: 0.9 },
+                FusionWeights {
+                    text: 0.1,
+                    graph: 0.9,
+                },
             );
             black_box(res.len())
         })
@@ -334,7 +344,8 @@ fn bench_mmap_cold_vs_hot(c: &mut Criterion) {
     let dir = tmp.path().join("mmap_bench_graph");
 
     // Persist it
-    g.save_to_dir(&dir).expect("save_to_dir failed in benchmark");
+    g.save_to_dir(&dir)
+        .expect("save_to_dir failed in benchmark");
 
     let mut group = c.benchmark_group("mmap_cold_vs_hot");
     group.measurement_time(Duration::from_secs(8));

@@ -7,7 +7,9 @@ use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyDict, PyType};
 
 use crate::errors::to_py_err;
-use grap::{FusionWeights, HybridWeights, IndexedKnowledgeGraph as InnerGraph, NodeId, PropertyValue};
+use grap::{
+    FusionWeights, HybridWeights, IndexedKnowledgeGraph as InnerGraph, NodeId, PropertyValue,
+};
 
 /// Result returned by `IndexedKnowledgeGraph.merge_nodes(keep, absorb)`.
 #[pyclass(get_all)]
@@ -26,8 +28,11 @@ impl MergeReport {
         format!(
             "MergeReport(absorbed={}, edges_redirected={}, edges_merged={}, \
              self_loops_dropped={}, embedding_updated={})",
-            self.absorbed, self.edges_redirected, self.edges_merged,
-            self.self_loops_dropped, self.embedding_updated
+            self.absorbed,
+            self.edges_redirected,
+            self.edges_merged,
+            self.self_loops_dropped,
+            self.embedding_updated
         )
     }
 }
@@ -98,7 +103,12 @@ impl QueryResult {
     fn __repr__(&self) -> String {
         format!(
             "QueryResult(node={}, fused={:.3}, text={:.2}, vec={:.2}, graph={:.2}, depth={})",
-            self.node, self.fused_score, self.text_score, self.vector_score, self.graph_strength, self.depth
+            self.node,
+            self.fused_score,
+            self.text_score,
+            self.vector_score,
+            self.graph_strength,
+            self.depth
         )
     }
 }
@@ -189,9 +199,7 @@ impl IndexedKnowledgeGraph {
     /// Returns `True` on success.
     fn save(&mut self) -> PyResult<bool> {
         if let Some(ref dir) = self.path {
-            self.inner
-                .save_to_dir(dir)
-                .map_err(to_py_err)?;
+            self.inner.save_to_dir(dir).map_err(to_py_err)?;
             Ok(true)
         } else {
             Err(pyo3::exceptions::PyValueError::new_err(
@@ -244,24 +252,32 @@ impl IndexedKnowledgeGraph {
         let node_count = self.inner.graph.node_count();
         if source as usize >= node_count {
             return Err(pyo3::exceptions::PyValueError::new_err(format!(
-                "source node {} is out of bounds", source
+                "source node {} is out of bounds",
+                source
             )));
         }
         if target as usize >= node_count {
             return Err(pyo3::exceptions::PyValueError::new_err(format!(
-                "target node {} is out of bounds", target
+                "target node {} is out of bounds",
+                target
             )));
         }
         let mut props = Vec::new();
         if let Some(dict) = properties {
             for (key, val) in dict.iter() {
                 let name: String = key.extract()?;
-                let tag = self.inner.graph.properties.try_register(&name).map_err(to_py_err)?;
+                let tag = self
+                    .inner
+                    .graph
+                    .properties
+                    .try_register(&name)
+                    .map_err(to_py_err)?;
                 let pv = py_to_property_value(&val)?;
                 props.push((tag, pv));
             }
         }
-        self.inner.add_edge(NodeId(source), NodeId(target), strength, props);
+        self.inner
+            .add_edge(NodeId(source), NodeId(target), strength, props);
         Ok(())
     }
 
@@ -274,10 +290,7 @@ impl IndexedKnowledgeGraph {
             .try_read_blob(NodeId(id))
             .map(|s| s.to_string())
             .ok_or_else(|| {
-                pyo3::exceptions::PyValueError::new_err(format!(
-                    "node {} is out of bounds",
-                    id
-                ))
+                pyo3::exceptions::PyValueError::new_err(format!("node {} is out of bounds", id))
             })
     }
 
@@ -290,10 +303,7 @@ impl IndexedKnowledgeGraph {
             .try_node_label(NodeId(id))
             .map(|opt| opt.map(|s| s.to_string()))
             .ok_or_else(|| {
-                pyo3::exceptions::PyValueError::new_err(format!(
-                    "node {} is out of bounds",
-                    id
-                ))
+                pyo3::exceptions::PyValueError::new_err(format!("node {} is out of bounds", id))
             })
     }
 
@@ -302,12 +312,7 @@ impl IndexedKnowledgeGraph {
     /// All edges incident to the node are preserved. Raises `GraphError` on
     /// invalid node ID.
     #[pyo3(signature = (id, text, embedding=None))]
-    fn update_node(
-        &mut self,
-        id: u32,
-        text: &str,
-        embedding: Option<Vec<f32>>,
-    ) -> PyResult<()> {
+    fn update_node(&mut self, id: u32, text: &str, embedding: Option<Vec<f32>>) -> PyResult<()> {
         let emb_ref: Option<&[f32]> = embedding.as_deref();
         self.inner
             .update_node(NodeId(id), text, emb_ref)
@@ -338,7 +343,9 @@ impl IndexedKnowledgeGraph {
         value: &Bound<'_, PyAny>,
     ) -> PyResult<Vec<(u32, f64)>> {
         let pv = py_to_property_value(value)?;
-        let results = self.inner.neighbors_by_relation(NodeId(node), property_name, pv);
+        let results = self
+            .inner
+            .neighbors_by_relation(NodeId(node), property_name, pv);
         Ok(results.into_iter().map(|(id, s)| (id.0, s)).collect())
     }
 
@@ -354,7 +361,9 @@ impl IndexedKnowledgeGraph {
         value: &Bound<'_, PyAny>,
     ) -> PyResult<Vec<(u32, f64)>> {
         let pv = py_to_property_value(value)?;
-        let results = self.inner.predecessors_by_relation(NodeId(node), property_name, pv);
+        let results = self
+            .inner
+            .predecessors_by_relation(NodeId(node), property_name, pv);
         Ok(results.into_iter().map(|(id, s)| (id.0, s)).collect())
     }
 
@@ -372,13 +381,9 @@ impl IndexedKnowledgeGraph {
         max_results: usize,
     ) -> PyResult<Vec<TraversalResult>> {
         let pv = py_to_property_value(value)?;
-        let results = self.inner.traverse_by_relation(
-            NodeId(node),
-            property_name,
-            pv,
-            depth,
-            max_results,
-        );
+        let results =
+            self.inner
+                .traverse_by_relation(NodeId(node), property_name, pv, depth, max_results);
         Ok(results.into_iter().map(TraversalResult::from).collect())
     }
 
@@ -541,7 +546,11 @@ impl IndexedKnowledgeGraph {
     /// String representation for Python (nice for debugging / notebooks).
     fn __repr__(&self) -> String {
         match &self.path {
-            Some(p) => format!("IndexedKnowledgeGraph(path={:?}, nodes={})", p, self.node_count()),
+            Some(p) => format!(
+                "IndexedKnowledgeGraph(path={:?}, nodes={})",
+                p,
+                self.node_count()
+            ),
             None => format!("IndexedKnowledgeGraph(nodes={})", self.node_count()),
         }
     }

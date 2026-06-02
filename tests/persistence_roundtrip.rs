@@ -30,7 +30,9 @@ fn node_blobs_and_labels_roundtrip_after_persistence() {
              to detect when the wrong blob is returned after a persistence \
              round-trip. Additional unique marker: VALUE={}\n\
              Line three with even more entropy: {}",
-            i, i * 12345, i
+            i,
+            i * 12345,
+            i
         );
 
         let _ = ig.add_node(&text, label.as_deref(), None);
@@ -43,8 +45,8 @@ fn node_blobs_and_labels_roundtrip_after_persistence() {
     ig.save_to_dir(&dir).expect("save_to_dir failed");
 
     // Load fresh
-    let loaded = IndexedKnowledgeGraph::load_from_dir(&dir)
-        .expect("load_from_dir failed after save");
+    let loaded =
+        IndexedKnowledgeGraph::load_from_dir(&dir).expect("load_from_dir failed after save");
 
     // Verify every node comes back with the exact original text and label
     assert_eq!(
@@ -57,17 +59,9 @@ fn node_blobs_and_labels_roundtrip_after_persistence() {
         let id = NodeId(i as u32);
 
         let got_label = loaded.graph.node_label(id).map(|s| s.to_string());
-        assert_eq!(
-            got_label, expected_label,
-            "label mismatch for node {}",
-            i
-        );
+        assert_eq!(got_label, expected_label, "label mismatch for node {}", i);
 
         let got_text = loaded.graph.read_blob(id).to_string();
-        assert_eq!(
-            got_text, expected_text,
-            "blob/text mismatch for node {}",
-            i
-        );
+        assert_eq!(got_text, expected_text, "blob/text mismatch for node {}", i);
     }
 }

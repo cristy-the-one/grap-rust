@@ -817,7 +817,9 @@ impl IndexedKnowledgeGraph {
         Self {
             graph: KnowledgeGraph::new(),
             text_index: Box::new(
-                crate::on_disk_text_index::OnDiskTextIndex::new_with_merge_policy(segments_per_tier),
+                crate::on_disk_text_index::OnDiskTextIndex::new_with_merge_policy(
+                    segments_per_tier,
+                ),
             ),
             vector_index: None,
             merge_workers: Vec::new(),
@@ -877,7 +879,8 @@ impl IndexedKnowledgeGraph {
         new_text: &str,
         new_embedding: Option<&[f32]>,
     ) -> Result<(), crate::GraphError> {
-        self.graph.update_node_content(id, new_text, new_embedding)?;
+        self.graph
+            .update_node_content(id, new_text, new_embedding)?;
         self.text_index.delete_document(id);
         self.text_index.index_document(id, new_text);
         if let Some(emb) = new_embedding {
@@ -961,7 +964,8 @@ impl IndexedKnowledgeGraph {
         depth: u32,
         max_results: usize,
     ) -> Vec<crate::query::QueryResult> {
-        self.graph.traverse_by_relation(node, property, value, depth, max_results)
+        self.graph
+            .traverse_by_relation(node, property, value, depth, max_results)
     }
 
     /// Perform a pure (standalone) vector similarity search.
@@ -1103,8 +1107,7 @@ impl IndexedKnowledgeGraph {
         let text_seed_scores: HashMap<NodeId, f64> = text_results.into_iter().collect();
 
         let vector_budget = max_seeds.max(MIN_VECTOR_CANDIDATES) * VECTOR_OVERSAMPLE;
-        let mut vector_seed_scores: HashMap<NodeId, f64> =
-            HashMap::with_capacity(vector_budget);
+        let mut vector_seed_scores: HashMap<NodeId, f64> = HashMap::with_capacity(vector_budget);
 
         if let Some(qvec) = vector {
             if let Some(vidx) = &self.vector_index {
@@ -1362,7 +1365,9 @@ impl IndexedKnowledgeGraph {
         if let Some(vidx) = &self.vector_index {
             let vdir = dir.join("vector_index");
             if let Err(e) = vidx.save_to_dir(&vdir) {
-                log::warn!("Vector index save failed — next load will rebuild from embeddings: {e}");
+                log::warn!(
+                    "Vector index save failed — next load will rebuild from embeddings: {e}"
+                );
             }
         }
 
@@ -1555,7 +1560,9 @@ impl IndexedKnowledgeGraph {
         // Save the vector index (HNSW or brute-force)
         if let Some(vidx) = &self.vector_index {
             if let Err(e) = vidx.save_to_dir(&dir.join("vector_index")) {
-                log::warn!("Vector index save failed — next load will rebuild from embeddings: {e}");
+                log::warn!(
+                    "Vector index save failed — next load will rebuild from embeddings: {e}"
+                );
             }
         }
 
@@ -1700,7 +1707,10 @@ mod update_node_tests {
         g.update_node(id, "updated content", None).unwrap();
 
         let hits = g.text_index.search("content", 5);
-        assert!(hits.iter().any(|(n, _)| *n == id), "new text must be findable");
+        assert!(
+            hits.iter().any(|(n, _)| *n == id),
+            "new text must be findable"
+        );
     }
 
     #[test]
@@ -1863,11 +1873,17 @@ mod tests {
         // Stop word at end of string (no trailing whitespace) — last-token path
         let tokens = tok.tokenize("quick fox THE");
         let words: Vec<&str> = tokens.iter().map(|(w, _)| *w).collect();
-        assert!(!words.contains(&"THE"), "'THE' at end of string should be filtered as a stop word");
+        assert!(
+            !words.contains(&"THE"),
+            "'THE' at end of string should be filtered as a stop word"
+        );
         // Stop word mid-string — main loop path
         let tokens2 = tok.tokenize("THE quick brown fox");
         let words2: Vec<&str> = tokens2.iter().map(|(w, _)| *w).collect();
-        assert!(!words2.contains(&"THE"), "'THE' mid-string should be filtered as a stop word");
+        assert!(
+            !words2.contains(&"THE"),
+            "'THE' mid-string should be filtered as a stop word"
+        );
     }
 
     #[test]
@@ -1926,9 +1942,9 @@ mod merge_node_tests {
     #[test]
     fn indexed_merge_returns_report() {
         let mut g = make_graph();
-        let keep   = g.add_node("keep node", None, None);
+        let keep = g.add_node("keep node", None, None);
         let absorb = g.add_node("absorb node", None, None);
-        let other  = g.add_node("other", None, None);
+        let other = g.add_node("other", None, None);
         g.add_edge(absorb, other, 0.7, vec![]);
 
         let report = g.merge_nodes(keep, absorb).unwrap();
@@ -1943,8 +1959,8 @@ mod merge_node_tests {
         let mut g = make_graph();
         g.vector_index = Some(Box::new(crate::BruteForceVectorIndex::new()));
 
-        let keep   = g.add_node("keep", None, None);                     // no embedding
-        let absorb = g.add_node("absorb", None, Some(&[1.0f32, 0.0]));   // has embedding
+        let keep = g.add_node("keep", None, None); // no embedding
+        let absorb = g.add_node("absorb", None, Some(&[1.0f32, 0.0])); // has embedding
 
         let report = g.merge_nodes(keep, absorb).unwrap();
 
@@ -1972,8 +1988,8 @@ mod hybrid_weight_tests {
         let tag = g.graph.properties.register("confidence");
 
         let seed = g.add_node("seed query", None, None);
-        let hi   = g.add_node("hi answer", None, None);
-        let lo   = g.add_node("lo answer", None, None);
+        let hi = g.add_node("hi answer", None, None);
+        let lo = g.add_node("lo answer", None, None);
 
         // Equal strength, different confidence
         g.add_edge(seed, hi, 0.5, vec![(tag, PropertyValue::Float(0.9))]);
@@ -1983,24 +1999,31 @@ mod hybrid_weight_tests {
             traversal_weight_property: Some("confidence".into()),
             ..HybridWeights::default()
         };
-        let results_with = g.search_and_traverse_hybrid(
-            "seed query", None, 5, &[], 0.0, 2, 10, weights_with,
-        );
+        let results_with =
+            g.search_and_traverse_hybrid("seed query", None, 5, &[], 0.0, 2, 10, weights_with);
 
         let weights_without = HybridWeights::default();
-        let results_without = g.search_and_traverse_hybrid(
-            "seed query", None, 5, &[], 0.0, 2, 10, weights_without,
-        );
+        let results_without =
+            g.search_and_traverse_hybrid("seed query", None, 5, &[], 0.0, 2, 10, weights_without);
 
         // With confidence weight, hi must come before lo
-        let with_ids: Vec<_> = results_with.iter().map(|r| r.graph_result.node_id).collect();
+        let with_ids: Vec<_> = results_with
+            .iter()
+            .map(|r| r.graph_result.node_id)
+            .collect();
         let hi_pos = with_ids.iter().position(|&n| n == hi).unwrap_or(usize::MAX);
         let lo_pos = with_ids.iter().position(|&n| n == lo).unwrap_or(usize::MAX);
-        assert!(hi_pos < lo_pos, "hi-confidence must rank above lo-confidence with weight property");
+        assert!(
+            hi_pos < lo_pos,
+            "hi-confidence must rank above lo-confidence with weight property"
+        );
 
         // Without weight property, both paths have equal cumulative strength,
         // so we just check both are reachable.
-        let without_ids: Vec<_> = results_without.iter().map(|r| r.graph_result.node_id).collect();
+        let without_ids: Vec<_> = results_without
+            .iter()
+            .map(|r| r.graph_result.node_id)
+            .collect();
         assert!(without_ids.contains(&hi));
         assert!(without_ids.contains(&lo));
     }
@@ -2027,11 +2050,7 @@ mod indexed_relation_tests {
         g.add_edge(a, b, 0.8, vec![(tag, PropertyValue::Label("has".into()))]);
         g.add_edge(a, c, 0.5, vec![(tag, PropertyValue::Label("not".into()))]);
 
-        let results = g.neighbors_by_relation(
-            a,
-            "link",
-            PropertyValue::Label("has".into()),
-        );
+        let results = g.neighbors_by_relation(a, "link", PropertyValue::Label("has".into()));
 
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].0, b);
@@ -2047,11 +2066,7 @@ mod indexed_relation_tests {
 
         g.add_edge(src, dst, 0.9, vec![(tag, PropertyValue::Bool(true))]);
 
-        let preds = g.predecessors_by_relation(
-            dst,
-            "t",
-            PropertyValue::Bool(true),
-        );
+        let preds = g.predecessors_by_relation(dst, "t", PropertyValue::Bool(true));
 
         assert_eq!(preds.len(), 1);
         assert_eq!(preds[0].0, src);

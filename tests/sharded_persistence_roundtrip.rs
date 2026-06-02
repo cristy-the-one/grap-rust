@@ -61,9 +61,15 @@ fn vector_index_survives_sharded_save_load() {
     let mut sg = ShardedGraph::new(3);
 
     // Add nodes with embeddings across shards
-    let n0 = sg.add_node_with_embedding("rust ownership", None, Some(&[1.0f32, 0.0, 0.0])).unwrap();
-    let _n1 = sg.add_node_with_embedding("borrowing rules", None, Some(&[0.0f32, 1.0, 0.0])).unwrap();
-    let _n2 = sg.add_node_with_embedding("lifetimes are hard", None, Some(&[0.0f32, 0.0, 1.0])).unwrap();
+    let n0 = sg
+        .add_node_with_embedding("rust ownership", None, Some(&[1.0f32, 0.0, 0.0]))
+        .unwrap();
+    let _n1 = sg
+        .add_node_with_embedding("borrowing rules", None, Some(&[0.0f32, 1.0, 0.0]))
+        .unwrap();
+    let _n2 = sg
+        .add_node_with_embedding("lifetimes are hard", None, Some(&[0.0f32, 0.0, 1.0]))
+        .unwrap();
 
     // Save
     let dir = tempfile::tempdir().unwrap();
@@ -74,7 +80,10 @@ fn vector_index_survives_sharded_save_load() {
 
     // Verify standalone vector search works after load
     let results = loaded.vector_search(&[1.0f32, 0.0, 0.0], 5);
-    let ids: Vec<_> = results.iter().map(|(gid, _)| (gid.shard.0, gid.local.0)).collect();
+    let ids: Vec<_> = results
+        .iter()
+        .map(|(gid, _)| (gid.shard.0, gid.local.0))
+        .collect();
 
     assert!(
         ids.contains(&(n0.shard.0, n0.local.0)),
@@ -83,5 +92,8 @@ fn vector_index_survives_sharded_save_load() {
 
     // Also sanity-check that we have the other embeddings
     let results2 = loaded.vector_search(&[0.0f32, 1.0, 0.0], 5);
-    assert!(!results2.is_empty(), "should find at least one vector result");
+    assert!(
+        !results2.is_empty(),
+        "should find at least one vector result"
+    );
 }

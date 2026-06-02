@@ -43,21 +43,20 @@ impl KnowledgeGraph {
     /// # Errors
     /// Returns `GraphError::Other` if either node is out of bounds/deleted, or if
     /// `keep == absorb`.
-    pub fn merge_nodes(
-        &mut self,
-        keep: NodeId,
-        absorb: NodeId,
-    ) -> Result<MergeReport, GraphError> {
+    pub fn merge_nodes(&mut self, keep: NodeId, absorb: NodeId) -> Result<MergeReport, GraphError> {
         // --- Validation ---
         if keep == absorb {
-            return Err(GraphError::Other("merge_nodes: keep and absorb must differ".into()));
+            return Err(GraphError::Other(
+                "merge_nodes: keep and absorb must differ".into(),
+            ));
         }
-        let keep_idx   = keep.0 as usize;
+        let keep_idx = keep.0 as usize;
         let absorb_idx = absorb.0 as usize;
         for (id, idx, label) in [(keep, keep_idx, "keep"), (absorb, absorb_idx, "absorb")] {
             if idx >= self.nodes.len() || self.deleted.get(idx).copied().unwrap_or(true) {
                 return Err(GraphError::Other(format!(
-                    "merge_nodes: {} node {:?} is out of bounds or deleted", label, id
+                    "merge_nodes: {} node {:?} is out of bounds or deleted",
+                    label, id
                 )));
             }
         }
@@ -95,7 +94,11 @@ impl KnowledgeGraph {
             .iter()
             .map(|&eid| {
                 let e = &self.edges[eid.0 as usize];
-                EdgeData { other: e.target, strength: e.strength, props: e.properties.clone() }
+                EdgeData {
+                    other: e.target,
+                    strength: e.strength,
+                    props: e.properties.clone(),
+                }
             })
             .collect();
 
@@ -104,14 +107,22 @@ impl KnowledgeGraph {
             .iter()
             .map(|&eid| {
                 let e = &self.edges[eid.0 as usize];
-                EdgeData { other: e.source, strength: e.strength, props: e.properties.clone() }
+                EdgeData {
+                    other: e.source,
+                    strength: e.strength,
+                    props: e.properties.clone(),
+                }
             })
             .collect();
 
         // --- Helper: max-biased strength merge ---
         fn blend(a: f64, b: f64) -> f64 {
             let denom = a + b;
-            if denom == 0.0 { 0.0 } else { (a * a + b * b) / denom }
+            if denom == 0.0 {
+                0.0
+            } else {
+                (a * a + b * b) / denom
+            }
         }
 
         // --- Helper: merge properties (dominant = higher-strength source) ---
@@ -140,9 +151,15 @@ impl KnowledgeGraph {
                 // Collision: blend strengths, merge properties
                 let keep_str = self.edges[keep_edge_idx].strength;
                 let (dominant, recessive) = if keep_str >= ed.strength {
-                    (self.edges[keep_edge_idx].properties.clone(), ed.props.clone())
+                    (
+                        self.edges[keep_edge_idx].properties.clone(),
+                        ed.props.clone(),
+                    )
                 } else {
-                    (ed.props.clone(), self.edges[keep_edge_idx].properties.clone())
+                    (
+                        ed.props.clone(),
+                        self.edges[keep_edge_idx].properties.clone(),
+                    )
                 };
                 self.edges[keep_edge_idx].strength = blend(keep_str, ed.strength);
                 self.edges[keep_edge_idx].properties = merge_props(&dominant, &recessive);
@@ -170,9 +187,15 @@ impl KnowledgeGraph {
                 // Collision
                 let keep_str = self.edges[keep_edge_idx].strength;
                 let (dominant, recessive) = if keep_str >= ed.strength {
-                    (self.edges[keep_edge_idx].properties.clone(), ed.props.clone())
+                    (
+                        self.edges[keep_edge_idx].properties.clone(),
+                        ed.props.clone(),
+                    )
                 } else {
-                    (ed.props.clone(), self.edges[keep_edge_idx].properties.clone())
+                    (
+                        ed.props.clone(),
+                        self.edges[keep_edge_idx].properties.clone(),
+                    )
                 };
                 self.edges[keep_edge_idx].strength = blend(keep_str, ed.strength);
                 self.edges[keep_edge_idx].properties = merge_props(&dominant, &recessive);
@@ -246,11 +269,11 @@ mod tests {
         #[test]
         fn merge_nodes_no_collision() {
             let mut g = KnowledgeGraph::new();
-            let keep  = g.add_node("keep",  None, None);
+            let keep = g.add_node("keep", None, None);
             let absorb = g.add_node("absorb", None, None);
             let other1 = g.add_node("other1", None, None);
             let other2 = g.add_node("other2", None, None);
-            g.add_edge(keep,   other1, 0.8, vec![]);
+            g.add_edge(keep, other1, 0.8, vec![]);
             g.add_edge(absorb, other2, 0.7, vec![]);
 
             let report = g.merge_nodes(keep, absorb).unwrap();
@@ -273,12 +296,12 @@ mod tests {
         #[test]
         fn merge_nodes_collision_strength_formula() {
             let mut g = KnowledgeGraph::new();
-            let keep   = g.add_node("keep",   None, None);
+            let keep = g.add_node("keep", None, None);
             let absorb = g.add_node("absorb", None, None);
             let target = g.add_node("target", None, None);
             // Both point to target with different strengths
-            g.add_edge(keep,   target, 0.6, vec![]);  // a = 0.6
-            g.add_edge(absorb, target, 0.4, vec![]);  // b = 0.4
+            g.add_edge(keep, target, 0.6, vec![]); // a = 0.6
+            g.add_edge(absorb, target, 0.4, vec![]); // b = 0.4
 
             let report = g.merge_nodes(keep, absorb).unwrap();
 
@@ -297,7 +320,7 @@ mod tests {
         #[test]
         fn merge_nodes_self_loop_dropped() {
             let mut g = KnowledgeGraph::new();
-            let keep   = g.add_node("keep",   None, None);
+            let keep = g.add_node("keep", None, None);
             let absorb = g.add_node("absorb", None, None);
             // Edge keep→absorb: becomes a self-loop after merge
             g.add_edge(keep, absorb, 0.5, vec![]);
@@ -317,7 +340,7 @@ mod tests {
         #[test]
         fn merge_nodes_embedding_propagation() {
             let mut g = KnowledgeGraph::new();
-            let keep   = g.add_node("keep",   None, None);            // no embedding
+            let keep = g.add_node("keep", None, None); // no embedding
             let absorb = g.add_node("absorb", None, Some(&[1.0f32, 0.0])); // has embedding
 
             let report = g.merge_nodes(keep, absorb).unwrap();
@@ -329,7 +352,7 @@ mod tests {
         #[test]
         fn merge_nodes_embedding_not_overwritten() {
             let mut g = KnowledgeGraph::new();
-            let keep   = g.add_node("keep",   None, Some(&[1.0f32, 0.0]));
+            let keep = g.add_node("keep", None, Some(&[1.0f32, 0.0]));
             let absorb = g.add_node("absorb", None, Some(&[0.0f32, 1.0]));
 
             let report = g.merge_nodes(keep, absorb).unwrap();
@@ -410,7 +433,8 @@ mod tests {
         let id = g.add_node("node", None, Some(&[1.0f32, 0.0]));
         assert!(g.nodes[id.0 as usize].embedding.is_some());
 
-        g.update_node_content(id, "node", Some(&[0.0f32, 1.0])).unwrap();
+        g.update_node_content(id, "node", Some(&[0.0f32, 1.0]))
+            .unwrap();
 
         let emb = g.read_embedding(id).unwrap();
         assert!((emb[1] - 1.0f32).abs() < 1e-6);

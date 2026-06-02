@@ -7,7 +7,9 @@ use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyType};
 
 use crate::errors::to_py_err;
-use grap::{FusionWeights, GlobalNodeId, HybridWeights, NodeId, ShardId, ShardedGraph as InnerShardedGraph};
+use grap::{
+    FusionWeights, GlobalNodeId, HybridWeights, NodeId, ShardId, ShardedGraph as InnerShardedGraph,
+};
 
 /// Represents a sharded knowledge graph.
 ///
@@ -75,17 +77,15 @@ impl ShardedGraph {
         embedding: Option<Vec<f32>>,
     ) -> PyResult<(u16, u32)> {
         let emb_ref: Option<&[f32]> = embedding.as_deref();
-        let gid = self.inner.add_node_with_embedding(text, label, emb_ref).map_err(to_py_err)?;
+        let gid = self
+            .inner
+            .add_node_with_embedding(text, label, emb_ref)
+            .map_err(to_py_err)?;
         Ok((gid.shard.0, gid.local.0))
     }
 
     /// Add an edge between two global node IDs (passed as tuples).
-    fn add_edge(
-        &mut self,
-        source: (u16, u32),
-        target: (u16, u32),
-        strength: f64,
-    ) -> PyResult<()> {
+    fn add_edge(&mut self, source: (u16, u32), target: (u16, u32), strength: f64) -> PyResult<()> {
         let src = GlobalNodeId {
             shard: ShardId(source.0),
             local: NodeId(source.1),
@@ -95,7 +95,9 @@ impl ShardedGraph {
             local: NodeId(target.1),
         };
 
-        self.inner.add_edge(src, tgt, strength, vec![]).map_err(to_py_err)?;
+        self.inner
+            .add_edge(src, tgt, strength, vec![])
+            .map_err(to_py_err)?;
         Ok(())
     }
 
@@ -252,7 +254,8 @@ impl ShardedGraph {
     /// Start background maintenance (merge + vacuum + ghost cleanup) on the sharded graph.
     #[allow(deprecated)]
     fn start_background_maintenance(&mut self, interval_ms: u64) -> bool {
-        let _handle = self.inner
+        let _handle = self
+            .inner
             .start_background_maintenance(Duration::from_millis(interval_ms));
         true
     }

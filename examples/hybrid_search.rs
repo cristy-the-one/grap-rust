@@ -225,9 +225,7 @@ fn main() {
         );
     }
 
-    println!(
-        "\n🎉 Hybrid search successfully fuses text BM25 + cosine(vector) + graph strength!"
-    );
+    println!("\n🎉 Hybrid search successfully fuses text BM25 + cosine(vector) + graph strength!");
     println!("   You can now tune HybridWeights to emphasize semantic similarity (vector),");
     println!("   keyword matching (text), or relationship strength (graph).");
 

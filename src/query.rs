@@ -437,7 +437,7 @@ impl KnowledgeGraph {
                         .find(|(t, _)| *t == tag)
                         .and_then(|(_, v)| match v {
                             PropertyValue::Float(f) => Some(*f),
-                            PropertyValue::Int(i)   => Some(*i as f64),
+                            PropertyValue::Int(i) => Some(*i as f64),
                             _ => None,
                         })
                         .unwrap_or(edge.strength),
@@ -522,9 +522,9 @@ mod weight_property_tests {
         let mut g = KnowledgeGraph::new();
         let tag = g.properties.register("confidence");
 
-        let start  = g.add_node("start",  None, None);
-        let hi     = g.add_node("hi",     None, None);  // high confidence path
-        let lo     = g.add_node("lo",     None, None);  // low confidence path
+        let start = g.add_node("start", None, None);
+        let hi = g.add_node("hi", None, None); // high confidence path
+        let lo = g.add_node("lo", None, None); // low confidence path
 
         // Both edges have equal `strength = 0.5`, but different `confidence` properties.
         g.add_edge(start, hi, 0.5, vec![(tag, PropertyValue::Float(0.9))]);
@@ -541,7 +541,10 @@ mod weight_property_tests {
         // `hi` must appear before `lo` because its confidence weight is higher.
         let hi_pos = results.iter().position(|r| r.node_id == hi).unwrap();
         let lo_pos = results.iter().position(|r| r.node_id == lo).unwrap();
-        assert!(hi_pos < lo_pos, "hi-confidence node must rank before lo-confidence node");
+        assert!(
+            hi_pos < lo_pos,
+            "hi-confidence node must rank before lo-confidence node"
+        );
     }
 
     #[test]
@@ -550,7 +553,7 @@ mod weight_property_tests {
         let _tag = g.properties.register("confidence");
 
         let start = g.add_node("start", None, None);
-        let dest  = g.add_node("dest",  None, None);
+        let dest = g.add_node("dest", None, None);
         // Edge has NO confidence property — fallback to edge.strength
         g.add_edge(start, dest, 0.7, vec![]);
 
@@ -573,7 +576,7 @@ mod weight_property_tests {
     fn weight_by_property_unknown_name_is_noop() {
         let mut g = KnowledgeGraph::new();
         let start = g.add_node("start", None, None);
-        let dest  = g.add_node("dest",  None, None);
+        let dest = g.add_node("dest", None, None);
         g.add_edge(start, dest, 0.6, vec![]);
 
         // "nonexistent" is not in the registry — should silently ignore
@@ -603,14 +606,20 @@ mod relation_neighbor_tests {
         let b = g.add_node("b", None, None);
         let c = g.add_node("c", None, None);
 
-        g.add_edge(a, b, 0.8, vec![(tag, PropertyValue::Label("supports".into()))]);
-        g.add_edge(a, c, 0.7, vec![(tag, PropertyValue::Label("opposes".into()))]);
-
-        let results = g.neighbors_by_relation(
+        g.add_edge(
             a,
-            "rel",
-            PropertyValue::Label("supports".into()),
+            b,
+            0.8,
+            vec![(tag, PropertyValue::Label("supports".into()))],
         );
+        g.add_edge(
+            a,
+            c,
+            0.7,
+            vec![(tag, PropertyValue::Label("opposes".into()))],
+        );
+
+        let results = g.neighbors_by_relation(a, "rel", PropertyValue::Label("supports".into()));
 
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].0, b);
@@ -626,14 +635,15 @@ mod relation_neighbor_tests {
         let dst = g.add_node("dst", None, None);
         let other = g.add_node("other", None, None);
 
-        g.add_edge(src,   dst, 0.9, vec![(tag, PropertyValue::Label("x".into()))]);
-        g.add_edge(other, dst, 0.5, vec![(tag, PropertyValue::Label("y".into()))]);
-
-        let preds = g.predecessors_by_relation(
+        g.add_edge(src, dst, 0.9, vec![(tag, PropertyValue::Label("x".into()))]);
+        g.add_edge(
+            other,
             dst,
-            "kind",
-            PropertyValue::Label("x".into()),
+            0.5,
+            vec![(tag, PropertyValue::Label("y".into()))],
         );
+
+        let preds = g.predecessors_by_relation(dst, "kind", PropertyValue::Label("x".into()));
 
         assert_eq!(preds.len(), 1);
         assert_eq!(preds[0].0, src);
@@ -677,20 +687,14 @@ mod relation_neighbor_tests {
         let e = g.add_node("E", None, None);
 
         let supports = PropertyValue::Label("supports".into());
-        let opposes  = PropertyValue::Label("opposes".into());
+        let opposes = PropertyValue::Label("opposes".into());
 
         g.add_edge(a, b, 0.9, vec![(tag, supports.clone())]);
         g.add_edge(b, c, 0.9, vec![(tag, supports.clone())]);
         g.add_edge(c, d, 0.9, vec![(tag, supports.clone())]);
         g.add_edge(a, e, 0.9, vec![(tag, opposes)]);
 
-        let results = g.traverse_by_relation(
-            a,
-            "rel_type",
-            supports,
-            4,
-            10,
-        );
+        let results = g.traverse_by_relation(a, "rel_type", supports, 4, 10);
 
         let ids: Vec<_> = results.iter().map(|r| r.node_id).collect();
         assert!(ids.contains(&b), "B must be reachable");
@@ -719,7 +723,13 @@ mod relation_neighbor_tests {
         let ids: Vec<_> = results.iter().map(|r| r.node_id).collect();
 
         assert!(ids.contains(&b));
-        assert!(!ids.contains(&c), "C is 2 hops away, must be excluded with depth=1");
-        assert!(!ids.contains(&d), "D is 3 hops away, must be excluded with depth=1");
+        assert!(
+            !ids.contains(&c),
+            "C is 2 hops away, must be excluded with depth=1"
+        );
+        assert!(
+            !ids.contains(&d),
+            "D is 3 hops away, must be excluded with depth=1"
+        );
     }
 }

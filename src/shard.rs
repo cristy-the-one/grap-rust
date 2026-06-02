@@ -594,11 +594,11 @@ impl ShardRouter {
         // A missing or non-integer shard_count is a corrupt manifest, not a
         // defaultable situation — silently creating a 1-shard router and then
         // trying to load N shard directories would produce confusing errors.
-        let shard_count = manifest["shard_count"]
-            .as_u64()
-            .ok_or_else(|| crate::GraphError::Other(
+        let shard_count = manifest["shard_count"].as_u64().ok_or_else(|| {
+            crate::GraphError::Other(
                 "manifest.json is missing or has an invalid 'shard_count' field".to_string(),
-            ))? as u16;
+            )
+        })? as u16;
 
         let mut router = Self::new(shard_count);
 
@@ -957,10 +957,7 @@ impl ShardRouter {
         }
 
         // Global sort by score descending and truncate
-        all_results.sort_by(|a, b| {
-            b.1.partial_cmp(&a.1)
-                .unwrap_or(std::cmp::Ordering::Equal)
-        });
+        all_results.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
         all_results.truncate(top_k);
         all_results
     }
@@ -1102,9 +1099,11 @@ impl ShardRouter {
 
             self.shards[old_idx].remove_local_node(gid.local);
 
-            let new_local = self.shards[target_shard_id.0 as usize]
-                .graph
-                .add_node(&text, label.as_deref(), None);
+            let new_local = self.shards[target_shard_id.0 as usize].graph.add_node(
+                &text,
+                label.as_deref(),
+                None,
+            );
 
             let new_gid = GlobalNodeId {
                 shard: target_shard_id,
@@ -1544,7 +1543,10 @@ pub struct MaintenanceHandle {
 impl std::fmt::Debug for MaintenanceHandle {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("MaintenanceHandle")
-            .field("running", &!self.stop.load(std::sync::atomic::Ordering::Relaxed))
+            .field(
+                "running",
+                &!self.stop.load(std::sync::atomic::Ordering::Relaxed),
+            )
             .finish_non_exhaustive()
     }
 }

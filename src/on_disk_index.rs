@@ -393,7 +393,11 @@ impl SegmentBuilder {
                 existing.term_freq += 1;
                 existing.positions.extend_from_slice(&p);
             } else {
-                entries.push(Posting { doc_id, term_freq: 1, positions: p });
+                entries.push(Posting {
+                    doc_id,
+                    term_freq: 1,
+                    positions: p,
+                });
             }
         }
         doc_id
@@ -434,7 +438,7 @@ impl SegmentBuilder {
             terms,
             postings_blob: blob,
             doc_lengths: self.doc_lengths,
-            global_id_map: vec![],  // directly-indexed; uses start_global_id
+            global_id_map: vec![], // directly-indexed; uses start_global_id
         }
     }
 }
@@ -628,7 +632,12 @@ impl OnDiskIndex {
         for sealed in &mut self.sealed {
             if !sealed.segment.global_id_map.is_empty() {
                 // Post-merge segment: global_id_map[local] = original_global_id
-                if let Some(local) = sealed.segment.global_id_map.iter().position(|&gid| gid == global_id) {
+                if let Some(local) = sealed
+                    .segment
+                    .global_id_map
+                    .iter()
+                    .position(|&gid| gid == global_id)
+                {
                     sealed.segment.mark_deleted(local as u32);
                     return;
                 }
@@ -653,7 +662,10 @@ impl OnDiskIndex {
             if (local as usize) < self.active.doc_count() as usize {
                 let byte = (local as usize) / 8;
                 let bit = (local as usize) % 8;
-                return self.active.builder.deleted
+                return self
+                    .active
+                    .builder
+                    .deleted
                     .get(byte)
                     .map_or(false, |b| (b & (1 << bit)) != 0);
             }
@@ -661,7 +673,12 @@ impl OnDiskIndex {
         // Search sealed segments
         for sealed in &self.sealed {
             if !sealed.segment.global_id_map.is_empty() {
-                if let Some(local) = sealed.segment.global_id_map.iter().position(|&gid| gid == global_id) {
+                if let Some(local) = sealed
+                    .segment
+                    .global_id_map
+                    .iter()
+                    .position(|&gid| gid == global_id)
+                {
                     return sealed.segment.is_deleted(local as u32);
                 }
             } else {
@@ -709,7 +726,11 @@ impl OnDiskIndex {
         self.total_docs += seg.doc_count as u64;
         self.total_tokens += seg.doc_lengths.iter().map(|&l| l as u64).sum::<u64>();
         // start_global_id=0 is correct for merged segments that use global_id_map
-        self.sealed.push(SealedSegment { segment: seg, tier, start_global_id: 0 });
+        self.sealed.push(SealedSegment {
+            segment: seg,
+            tier,
+            start_global_id: 0,
+        });
     }
 
     /// Remove and return a sealed segment by index (used by the rebalancer for bulk segment moves).
@@ -862,7 +883,9 @@ impl OnDiskIndex {
         if self.sealed.is_empty() {
             return;
         }
-        let refs: Vec<(&OnDiskSegment, u32)> = self.sealed.iter()
+        let refs: Vec<(&OnDiskSegment, u32)> = self
+            .sealed
+            .iter()
             .map(|s| (&s.segment, s.start_global_id))
             .collect();
         let merged = merge_segments_with_offsets(&refs);
@@ -873,7 +896,9 @@ impl OnDiskIndex {
             self.add_sealed_segment(merged, 0);
             // Recompute totals after add_sealed_segment set them
             self.total_docs = self.sealed.iter().map(|s| s.segment.doc_count as u64).sum();
-            self.total_tokens = self.sealed.iter()
+            self.total_tokens = self
+                .sealed
+                .iter()
                 .flat_map(|s| s.segment.doc_lengths.iter().map(|&l| l as u64))
                 .sum();
         }
@@ -946,22 +971,37 @@ impl OnDiskIndex {
             let mut did = false;
             for (&tier, inds) in &tiers {
                 if inds.len() >= policy.segments_per_tier {
-                    let to_take: Vec<usize> = inds.iter().take(policy.segments_per_tier).copied().collect();
-                    let refs: Vec<(&OnDiskSegment, u32)> = to_take.iter()
+                    let to_take: Vec<usize> = inds
+                        .iter()
+                        .take(policy.segments_per_tier)
+                        .copied()
+                        .collect();
+                    let refs: Vec<(&OnDiskSegment, u32)> = to_take
+                        .iter()
                         .map(|&i| (&self.sealed[i].segment, self.sealed[i].start_global_id))
                         .collect();
                     let m = merge_segments_with_offsets(&refs);
-                    if m.doc_count == 0 { continue; }
+                    if m.doc_count == 0 {
+                        continue;
+                    }
                     let mut rm = to_take;
                     rm.sort_by(|a, b| b.cmp(a));
-                    for i in rm { self.sealed.remove(i); }
+                    for i in rm {
+                        self.sealed.remove(i);
+                    }
                     // Merged segment uses global_id_map — start_global_id=0
-                    self.sealed.push(SealedSegment { segment: m, tier: tier + 1, start_global_id: 0 });
+                    self.sealed.push(SealedSegment {
+                        segment: m,
+                        tier: tier + 1,
+                        start_global_id: 0,
+                    });
                     did = true;
                     break;
                 }
             }
-            if !did { break; }
+            if !did {
+                break;
+            }
         }
     }
 
@@ -990,11 +1030,13 @@ impl OnDiskIndex {
                     let df = postings.len() as f32;
                     let idf = ((n - df + 0.5) / (df + 0.5) + 1.0).ln().max(0.0);
                     for posting in &postings {
-                        let global_id = sealed.segment.get_global_id(sealed.start_global_id, posting.doc_id);
+                        let global_id = sealed
+                            .segment
+                            .get_global_id(sealed.start_global_id, posting.doc_id);
                         let tf = posting.term_freq as f32;
                         let dl = sealed.segment.doc_length(posting.doc_id) as f32;
-                        let tf_norm = (tf * (K1 + 1.0))
-                            / (tf + K1 * (1.0 - B + B * dl / avg_dl.max(1.0)));
+                        let tf_norm =
+                            (tf * (K1 + 1.0)) / (tf + K1 * (1.0 - B + B * dl / avg_dl.max(1.0)));
                         *scores.entry(global_id).or_default() += idf * tf_norm;
                     }
                 }
@@ -1009,8 +1051,8 @@ impl OnDiskIndex {
                     let global_id = self.active_start_global_id + posting.doc_id;
                     let tf = posting.term_freq as f32;
                     let dl = self.active.doc_length(posting.doc_id) as f32;
-                    let tf_norm = (tf * (K1 + 1.0))
-                        / (tf + K1 * (1.0 - B + B * dl / avg_dl.max(1.0)));
+                    let tf_norm =
+                        (tf * (K1 + 1.0)) / (tf + K1 * (1.0 - B + B * dl / avg_dl.max(1.0)));
                     *scores.entry(global_id).or_default() += idf * tf_norm;
                 }
             }
@@ -1023,8 +1065,12 @@ impl OnDiskIndex {
 
     /// Phrase / proximity search using per-term position lists.
     pub fn phrase_search(&self, terms: &[&str], max_gap: u32) -> Vec<(u32, f32)> {
-        if terms.is_empty() { return vec![]; }
-        if terms.len() == 1 { return self.search(terms); }
+        if terms.is_empty() {
+            return vec![];
+        }
+        if terms.len() == 1 {
+            return self.search(terms);
+        }
 
         // Collect per-term positions per global doc id
         let mut doc_positions: HashMap<u32, Vec<Vec<u32>>> = HashMap::new();
@@ -1033,8 +1079,11 @@ impl OnDiskIndex {
             for (term_idx, &term) in terms.iter().enumerate() {
                 if let Some(postings) = sealed.segment.get_postings(term) {
                     for posting in postings {
-                        let global_id = sealed.segment.get_global_id(sealed.start_global_id, posting.doc_id);
-                        let entry = doc_positions.entry(global_id)
+                        let global_id = sealed
+                            .segment
+                            .get_global_id(sealed.start_global_id, posting.doc_id);
+                        let entry = doc_positions
+                            .entry(global_id)
                             .or_insert_with(|| vec![vec![]; terms.len()]);
                         entry[term_idx].extend_from_slice(&posting.positions);
                     }
@@ -1044,7 +1093,8 @@ impl OnDiskIndex {
         for (term_idx, &term) in terms.iter().enumerate() {
             for posting in self.active.get_live_postings(term) {
                 let global_id = self.active_start_global_id + posting.doc_id;
-                let entry = doc_positions.entry(global_id)
+                let entry = doc_positions
+                    .entry(global_id)
                     .or_insert_with(|| vec![vec![]; terms.len()]);
                 entry[term_idx].extend_from_slice(&posting.positions);
             }
@@ -1071,14 +1121,17 @@ impl OnDiskIndex {
 
 fn compute_ondisk_proximity(term_positions: &[Vec<u32>], max_gap: u32) -> f32 {
     let n = term_positions.len();
-    if n < 2 { return 1.0; }
+    if n < 2 {
+        return 1.0;
+    }
     let mut best = 0.0f32;
     for &anchor in &term_positions[0] {
         let mut win_min = anchor;
         let mut win_max = anchor;
         let mut ok = true;
         for positions in &term_positions[1..] {
-            if let Some(&closest) = positions.iter()
+            if let Some(&closest) = positions
+                .iter()
                 .min_by_key(|&&p| (p as i64 - anchor as i64).unsigned_abs() as u32)
             {
                 win_min = win_min.min(closest);
@@ -1201,7 +1254,7 @@ pub fn merge_segments(segs: &[&OnDiskSegment]) -> OnDiskSegment {
         terms: new_terms,
         postings_blob: new_blob,
         doc_lengths: new_doc_lengths,
-        global_id_map: vec![],  // old merge_segments does not preserve global ids
+        global_id_map: vec![], // old merge_segments does not preserve global ids
     }
 }
 
@@ -1249,20 +1302,18 @@ pub fn start_merge_worker(index: Arc<Mutex<OnDiskIndex>>, interval: Duration) ->
     let (tx, rx) = mpsc::channel();
     let stats = Arc::new(Mutex::new(MergeStats::default()));
     let stats2 = stats.clone();
-    let h = thread::spawn(move || {
-        loop {
-            match rx.recv_timeout(interval) {
-                Ok(MergeCommand::Shutdown) => break,
-                Ok(MergeCommand::MergeNow) | Err(_) => {}
-            }
-            if let Ok(mut g) = index.lock() {
-                let t0 = std::time::Instant::now();
-                g.vacuum();
-                let elapsed = t0.elapsed().as_millis() as u64;
-                if let Ok(mut s) = stats2.lock() {
-                    s.merges_performed += 1;
-                    s.last_merge_duration_ms = elapsed;
-                }
+    let h = thread::spawn(move || loop {
+        match rx.recv_timeout(interval) {
+            Ok(MergeCommand::Shutdown) => break,
+            Ok(MergeCommand::MergeNow) | Err(_) => {}
+        }
+        if let Ok(mut g) = index.lock() {
+            let t0 = std::time::Instant::now();
+            g.vacuum();
+            let elapsed = t0.elapsed().as_millis() as u64;
+            if let Ok(mut s) = stats2.lock() {
+                s.merges_performed += 1;
+                s.last_merge_duration_ms = elapsed;
             }
         }
     });
@@ -1348,8 +1399,11 @@ pub fn merge_segments_with_offsets(segs: &[(&OnDiskSegment, u32)]) -> OnDiskSegm
         for tmeta in &seg.terms {
             let start = tmeta.posting_offset as usize;
             let end = start + tmeta.posting_len as usize;
-            if end > seg.postings_blob.len() { continue; }
-            if let Ok(posts) = bincode::deserialize::<Vec<Posting>>(&seg.postings_blob[start..end]) {
+            if end > seg.postings_blob.len() {
+                continue;
+            }
+            if let Ok(posts) = bincode::deserialize::<Vec<Posting>>(&seg.postings_blob[start..end])
+            {
                 for mut p in posts {
                     if let Some(new_id) = remaps[sidx].get(p.doc_id as usize).and_then(|x| *x) {
                         p.doc_id = new_id;
@@ -1369,10 +1423,19 @@ pub fn merge_segments_with_offsets(segs: &[(&OnDiskSegment, u32)]) -> OnDiskSegm
         let offset = new_blob.len() as u32;
         let len = serialized.len() as u32;
         new_blob.extend(serialized);
-        new_terms.push(TermMeta { term, df, posting_offset: offset, posting_len: len });
+        new_terms.push(TermMeta {
+            term,
+            df,
+            posting_offset: offset,
+            posting_len: len,
+        });
     }
 
-    let new_deleted = if global_live > 0 { vec![0u8; ((global_live as usize) + 7) / 8] } else { vec![] };
+    let new_deleted = if global_live > 0 {
+        vec![0u8; ((global_live as usize) + 7) / 8]
+    } else {
+        vec![]
+    };
 
     OnDiskSegment {
         doc_count: global_live,
@@ -1391,12 +1454,21 @@ mod tests {
     #[test]
     fn search_finds_indexed_documents() {
         let mut idx = OnDiskIndex::new();
-        let id0 = idx.add_document(&["rust", "ownership", "memory"], &[vec![0], vec![1], vec![2]]);
-        let id1 = idx.add_document(&["python", "garbage", "collection"], &[vec![0], vec![1], vec![2]]);
+        let id0 = idx.add_document(
+            &["rust", "ownership", "memory"],
+            &[vec![0], vec![1], vec![2]],
+        );
+        let id1 = idx.add_document(
+            &["python", "garbage", "collection"],
+            &[vec![0], vec![1], vec![2]],
+        );
         let id2 = idx.add_document(&["rust", "borrow", "checker"], &[vec![0], vec![1], vec![2]]);
 
         let results = idx.search(&["rust"]);
-        assert!(!results.is_empty(), "should find rust docs in active buffer");
+        assert!(
+            !results.is_empty(),
+            "should find rust docs in active buffer"
+        );
         let ids: Vec<u32> = results.iter().map(|(id, _)| *id).collect();
         assert!(ids.contains(&id0), "id0 should appear");
         assert!(ids.contains(&id2), "id2 should appear");
@@ -1455,9 +1527,22 @@ mod tests {
         );
         let id1 = idx.add_document(&["rust", "programming"], &[vec![0], vec![1]]);
         let results = idx.search(&["rust"]);
-        let score0 = results.iter().find(|(id, _)| *id == id0).map(|(_, s)| *s).unwrap_or(0.0);
-        let score1 = results.iter().find(|(id, _)| *id == id1).map(|(_, s)| *s).unwrap_or(0.0);
-        assert!(score0 > score1, "doc with 3x 'rust' (score={}) should score higher than 1x 'rust' (score={})", score0, score1);
+        let score0 = results
+            .iter()
+            .find(|(id, _)| *id == id0)
+            .map(|(_, s)| *s)
+            .unwrap_or(0.0);
+        let score1 = results
+            .iter()
+            .find(|(id, _)| *id == id1)
+            .map(|(_, s)| *s)
+            .unwrap_or(0.0);
+        assert!(
+            score0 > score1,
+            "doc with 3x 'rust' (score={}) should score higher than 1x 'rust' (score={})",
+            score0,
+            score1
+        );
     }
 
     #[test]
