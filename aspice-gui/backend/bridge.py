@@ -24,6 +24,7 @@ def default_examples() -> dict[str, str]:
     return {
         "ontology": str(root / "docs/examples/minimal-aspice-ontology.yaml"),
         "procedure_graph": str(root / "docs/examples/simple-aspice-gap-check.pg.yaml"),
+        "sample_knowledge": str(root / "aspice-gui" / "sample-knowledge"),
     }
 
 
@@ -31,8 +32,11 @@ def ensure_workspace(path: str | None = None) -> str:
     ws = path or str(_REPO_ROOT / "aspice-gui" / "grap-workspace")
     os.environ["GRAP_WORKSPACE"] = ws
     Path(ws).mkdir(parents=True, exist_ok=True)
-    srv._state["ws"] = None
-    srv._state["ws_root"] = None
+    for key in ("ws", "ws_root", "kg", "kg_path", "ontology", "ontology_version",
+                "pg", "current_logic_id", "pg_version"):
+        srv._state[key] = None
+    srv._state["projected_nodes"] = set()
+    srv._state["explanations"] = {}
     return ws
 
 

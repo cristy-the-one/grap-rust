@@ -81,8 +81,12 @@ def test_projected_ontology_nodes_are_ignored_as_evidence():
 
 def test_lexical_hit_below_threshold_is_still_a_gap():
     onto = _onto()
+    # Satisfaction requires the evidence to actually mention the characteristic's
+    # tokens: "weak" covers none of acceptance_criteria_defined -> still a gap,
+    # while the verification evidence covers its tokens -> satisfied.
     kg = FakeKG(lexical={"acceptance_criteria_defined": [Hit(1, 0.05, "weak")],
-                         "verification_method_specified": [Hit(2, 0.9, "strong")]})
+                         "verification_method_specified":
+                         [Hit(2, 0.9, "verification method is specified")]})
     gaps = detect_gaps(kg, onto)
     assert {g["missing_characteristic"] for g in gaps} == {"acceptance_criteria_defined"}
 
@@ -104,7 +108,9 @@ def test_high_threshold_turns_satisfied_into_gap():
 
 def test_gaps_sorted_by_confidence_desc():
     onto = _onto()
-    kg = FakeKG(lexical={"verification_method_specified": [Hit(1, 0.5, "weak")]})
+    # verification has partial coverage (2/3 tokens) -> lower gap-confidence;
+    # acceptance has no evidence -> full confidence and must sort first.
+    kg = FakeKG(lexical={"verification_method_specified": [Hit(1, 0.5, "verification method")]})
     gaps = detect_gaps(kg, onto, weights={"lexical_threshold": 0.99})
     confidences = [g["confidence"] for g in gaps]
     assert confidences == sorted(confidences, reverse=True)
@@ -123,9 +129,9 @@ def test_pg_step_nodes_are_not_evidence():
 
 def test_exclude_nodes_by_id_removes_evidence():
     onto = _onto()
-    # A strong hit with neutral text would normally satisfy the characteristic...
+    # A hit whose text covers the characteristic's tokens satisfies it...
     kg = FakeKG(lexical={"verification_method_specified":
-                         [Hit(99, 2.9, "some real-looking evidence text")]})
+                         [Hit(99, 2.9, "verification method specified evidence")]})
     assert "verification_method_specified" not in {
         g["missing_characteristic"] for g in detect_gaps(kg, onto)}
     # ...but excluding that node id (system-projected) makes it a gap.

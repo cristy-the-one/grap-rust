@@ -5,6 +5,9 @@ Every mutating capability emits a Workspace audit event (see `get_audit_log`).
 
 ## Knowledge
 - **load_knowledge_graph(path)** → `{status, node_count}`. Load an on-disk grap KG. Emits `kg_loaded`.
+- **create_knowledge_graph(path)** → `{status, node_count}`. Create a fresh on-disk KG. Emits `kg_created`.
+- **ingest_documents(path)** → `{status, files, nodes_added}`. Chunk + add .md/.txt docs under `path`
+  into the loaded KG as real evidence. Emits `documents_ingested`.
 - **load_ontology(path)** → `{status, version_hash, outcomes_projected, characteristics_projected}`.
   Parse an ASPICE ontology YAML, project it into the KG, and version it. Emits `ontology_loaded`.
 

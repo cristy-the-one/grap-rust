@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 import os
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any, Optional
 
 from fastapi import FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
@@ -16,16 +16,18 @@ from . import bridge
 
 FRONTEND = Path(__file__).resolve().parent.parent / "frontend"
 
+
+@asynccontextmanager
+async def _lifespan(app: FastAPI):
+    bridge.ensure_workspace(os.environ.get("GRAP_WORKSPACE"))
+    yield
+
+
 app = FastAPI(
     title="GRAP ASPICE Console",
     description="Browser UI for the ASPICE-oriented grap MCP capability surface",
     version="0.1.0",
-)
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
+    lifespan=_lifespan,
 )
 
 
@@ -94,11 +96,6 @@ class RunQueryBody(BaseModel):
     event_type: Optional[str] = None
 
 
-@app.on_event("startup")
-def _startup() -> None:
-    bridge.ensure_workspace(os.environ.get("GRAP_WORKSPACE"))
-
-
 @app.get("/api/health")
 def health() -> dict:
     return {"status": "ok", "repo_root": str(bridge.repo_root())}
@@ -148,6 +145,16 @@ def load_ontology(body: PathBody) -> dict:
 @app.post("/api/load/pg")
 def load_pg(body: PathBody) -> dict:
     return bridge.call("load_procedure_graph", path=body.path)
+
+
+@app.post("/api/kg/create")
+def create_kg(body: PathBody) -> dict:
+    return bridge.call("create_knowledge_graph", path=body.path)
+
+
+@app.post("/api/ingest")
+def ingest_docs(body: PathBody) -> dict:
+    return bridge.call("ingest_documents", path=body.path)
 
 
 @app.post("/api/validate/pg")
@@ -274,22 +281,22 @@ def _api_error(result: dict) -> None:
 
 @app.post("/api/wizard/bootstrap")
 def wizard_bootstrap() -> dict:
-    """One-click POC: fresh workspace KG, then example ontology + PG."""
+    """One-click POC: fresh KG + ingest sample knowledge + ontology + PG + gap preview."""
     ws = bridge.ensure_workspace()
-    kg_path = str(Path(ws) / "kg")
     ex = bridge.default_examples()
+    kg_path = str(Path(ws) / "kg")
     steps = []
-    r = bridge.call("load_knowledge_graph", path=kg_path)
-    steps.append({"knowledge_graph": r})
-    _api_error(r)
-    for label, cap, path_key in (
-        ("ontology", "load_ontology", "ontology"),
-        ("procedure_graph", "load_procedure_graph", "procedure_graph"),
+    for label, cap, kwargs in (
+        ("knowledge_graph", "create_knowledge_graph", {"path": kg_path}),
+        ("ingest", "ingest_documents", {"path": ex["sample_knowledge"]}),
+        ("ontology", "load_ontology", {"path": ex["ontology"]}),
+        ("procedure_graph", "load_procedure_graph", {"path": ex["procedure_graph"]}),
     ):
-        r = bridge.call(cap, path=ex[path_key])
+        r = bridge.call(cap, **kwargs)
         steps.append({label: r})
         _api_error(r)
-    return {"status": "ok", "steps": steps, "examples": ex, "workspace": ws}
+    gaps = bridge.call("detect_gaps", scope="all")
+    return {"status": "ok", "steps": steps, "gaps": gaps, "workspace": ws, "examples": ex}
 
 
 @app.post("/api/wizard/publish-activate")
