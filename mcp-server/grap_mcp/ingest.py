@@ -24,8 +24,12 @@ def chunk_text(text: str, max_chars: int = 800) -> List[str]:
     return chunks
 
 
-def ingest_paths(kg, root: str) -> Dict[str, Any]:
-    """Chunk + add_node every .md/.txt under `root` (file or dir). Returns counts."""
+def ingest_paths(kg, root: str, embedder=None) -> Dict[str, Any]:
+    """Chunk + add_node every .md/.txt under `root` (file or dir). Returns counts.
+
+    If `embedder` is supplied (a kee.embeddings.Embedder), each chunk is embedded
+    and stored on its node, enabling vector / hybrid search and semantic dedup.
+    """
     p = Path(root)
     if p.is_file():
         files = [p]
@@ -41,10 +45,16 @@ def ingest_paths(kg, root: str) -> Dict[str, Any]:
             text = f.read_text(encoding="utf-8")
         except OSError:
             continue
-        for i, chunk in enumerate(chunk_text(text)):
+        chunks = chunk_text(text)
+        embeddings = embedder.embed(chunks) if (embedder and chunks) else None
+        for i, chunk in enumerate(chunks):
             label = f"doc:{f.stem}#{i}"
-            kg.add_node(text=chunk, label=label)
+            if embeddings is not None:
+                kg.add_node(text=chunk, label=label, embedding=embeddings[i])
+            else:
+                kg.add_node(text=chunk, label=label)
             nodes_added += 1
             if len(labels) < 5:
                 labels.append(label)
-    return {"files": len(files), "nodes_added": nodes_added, "labels": labels}
+    return {"files": len(files), "nodes_added": nodes_added, "labels": labels,
+            "embedded": bool(embedder)}
