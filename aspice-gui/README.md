@@ -6,21 +6,45 @@ Browser UI for the **ASPICE-oriented MCP surface** (`mcp-server/grap_mcp`). It c
 
 - Python 3.11+
 - Built **pygrap** bindings (`maturin develop` in `crates/pygrap` from repo root)
-- MCP server deps: `pip install -e mcp-server` from repo root
 
-## Run
+## Setup (recommended: isolated venv)
+
+Use a **venv** so GUI dependencies do not clash with a global `fastapi 0.115` + `starlette 1.x` install (common after `jcodemunch-mcp`).
 
 From the **repository root** (worktree or main checkout):
 
 ```powershell
+.\aspice-gui\scripts\setup-venv.ps1
+```
+
+Then:
+
+```powershell
+.\aspice-gui\.venv\Scripts\Activate.ps1
 cd aspice-gui
-pip install -e ../mcp-server
-pip install -e .
-$env:PYTHONPATH = (Resolve-Path ../mcp-server).Path
-python -m uvicorn backend.main:app --app-dir . --host 127.0.0.1 --port 8765
+python -m uvicorn backend.main:app --host 127.0.0.1 --port 8765
 ```
 
 Open http://127.0.0.1:8765
+
+### Manual venv (same result)
+
+```powershell
+cd aspice-gui
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -U pip
+pip install -e .                    # fastapi>=0.128 (compatible with starlette 1.x)
+pip install -e ..\mcp-server
+pip install -e ..\crates\pygrap     # after maturin develop, if needed
+python -m uvicorn backend.main:app --host 127.0.0.1 --port 8765
+```
+
+### Why not `fastapi==0.115`?
+
+`fastapi 0.115` requires `starlette<0.39`. The MCP SDK (`mcp>=1.27`) pulls **starlette 1.x**. Installing both into the same environment triggers the resolver warning you saw. This project pins **`fastapi>=0.128`**, which works with starlette 1.x.
+
+Do **not** mix a global `pip install fastapi==0.115` with `pip install -e ..\mcp-server` unless you use a fresh venv.
 
 ## What it covers
 
