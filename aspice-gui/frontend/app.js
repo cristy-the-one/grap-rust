@@ -442,6 +442,7 @@ function renderExtract(r, container) {
   const okCls = v.ok ? "ok" : "err";
   container.append(el("div", { class: "extract-meta" },
     el("span", { class: "badge" }, `provider: ${r.provider}`),
+    r.model ? el("span", { class: "badge" }, `model: ${r.model}`) : null,
     el("span", { class: "badge" }, `embedder: ${r.embedder}`),
     el("span", { class: "badge" }, `${r.chunks} chunks → ${r.fragments} fragments`),
     el("span", { class: `badge ${okCls}` }, v.ok ? "valid" : "has errors")));
@@ -477,7 +478,10 @@ function renderExtract(r, container) {
 
 $("#btn-extract").onclick = () =>
   run(async () => {
-    const r = await post("/api/extract", { path: $("#path-extract").value });
+    const r = await post("/api/extract", {
+      path: $("#path-extract").value,
+      model: $("#model-extract").value.trim() || null,
+    });
     if (r) renderExtract(r, $("#extract-result"));
     if (r && r.status !== "error")
       toast(`Proposed ${(r.process_outcomes || []).length} outcomes`, r.validation && r.validation.ok ? "ok" : "warn");
@@ -610,6 +614,13 @@ $("#btn-get-config").onclick = () =>
     $("#path-create-kg").value = `${ws}/kg`;
     $("#path-ingest").value = ex.sample_knowledge || "";
     $("#path-extract").value = ex.sample_knowledge || "";
+    // populate the model picker from the configured LLM endpoint (non-fatal)
+    api("/api/models")
+      .then((m) => {
+        const dl = $("#model-options");
+        if (dl && m.models) m.models.forEach((id) => dl.append(el("option", { value: id })));
+      })
+      .catch(() => {});
     $("#path-onto").value = ex.ontology || "";
     $("#path-pg").value = ex.procedure_graph || "";
     $("#path-validate").value = ex.procedure_graph || "";

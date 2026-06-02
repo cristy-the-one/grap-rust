@@ -76,3 +76,18 @@ def test_get_provider_stub_via_env(monkeypatch):
     assert isinstance(llm.get_provider(), llm.StubProvider)
     monkeypatch.delenv("GRAP_LLM_STUB", raising=False)
     assert isinstance(llm.get_provider(), llm.OpenAICompatProvider)
+
+
+def test_get_provider_model_override(monkeypatch):
+    monkeypatch.delenv("GRAP_LLM_STUB", raising=False)
+    p = llm.get_provider(model="qwen3:8b")
+    assert isinstance(p, llm.OpenAICompatProvider)
+    assert p.model == "qwen3:8b"
+
+
+def test_list_models_parses_openai_shape(monkeypatch):
+    monkeypatch.setattr(llm.urllib.request, "urlopen",
+                        lambda req, timeout=None: _FakeResp(json.dumps(
+                            {"data": [{"id": "llama3.1:8b"}, {"id": "qwen3:8b"},
+                                      {"nope": 1}]}).encode("utf-8")))
+    assert llm.list_models(base_url="http://x/v1") == ["llama3.1:8b", "qwen3:8b"]

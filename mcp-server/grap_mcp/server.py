@@ -193,7 +193,8 @@ def ingest_documents(path: str) -> dict:
 
 
 @mcp.tool()
-def extract_ontology(path: str, out_path: str = None, sim: float = 0.86) -> dict:
+def extract_ontology(path: str, out_path: str = None, sim: float = 0.86,
+                     model: str = None) -> dict:
     """Propose an ontology from documents (Knowledge Extraction Engine).
 
     Reads .md/.txt under `path`, asks the configured LLM to extract ontology
@@ -201,13 +202,16 @@ def extract_ontology(path: str, out_path: str = None, sim: float = 0.86) -> dict
     writes a candidate ontology. The candidate is versioned as a *proposed*
     artifact for human review — it does NOT become the active ontology until a
     human loads/promotes it (governance stays deterministic).
+
+    `model` overrides the LLM model (e.g. "qwen3:8b"); blank uses the server
+    default (GRAP_LLM_MODEL).
     """
     denied = _require("operator")
     if denied:
         return denied
     try:
         from .kee import pipeline, llm, embeddings, validate
-        provider = llm.get_provider()
+        provider = llm.get_provider(model=model)
         embedder = embeddings.get_embedder()
         result = pipeline.extract_ontology(path, provider, embedder, sim=sim)
         onto = result["ontology"]
@@ -230,6 +234,7 @@ def extract_ontology(path: str, out_path: str = None, sim: float = 0.86) -> dict
             "out_path": out,
             "version_hash": version.hash,
             "provider": provider.name,
+            "model": getattr(provider, "model", None),
             "embedder": embedder.name,
             "chunks": result["chunks"],
             "fragments": result["fragments"],

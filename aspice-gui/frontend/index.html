@@ -147,6 +147,10 @@
           </div>
           <label for="path-extract">Folder of .md / .txt</label>
           <input id="path-extract" type="text" placeholder="…/sample-knowledge" />
+          <label for="model-extract">Model <span class="muted small">(blank = server default)</span></label>
+          <input id="model-extract" type="text" list="model-options"
+                 placeholder="e.g. llama3.1:8b" autocomplete="off" />
+          <datalist id="model-options"></datalist>
           <p class="muted small">
             LLM via <code>GRAP_LLM_BASE_URL</code> (default local Ollama); embeddings local.
             Set <code>GRAP_LLM_STUB=1</code> to dry-run offline.

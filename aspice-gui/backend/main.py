@@ -38,6 +38,7 @@ class PathBody(BaseModel):
 class ExtractBody(BaseModel):
     path: str
     sim: float = 0.86
+    model: Optional[str] = None
 
 
 class ScopeBody(BaseModel):
@@ -164,7 +165,18 @@ def ingest_docs(body: PathBody) -> dict:
 
 @app.post("/api/extract")
 def extract_ontology(body: ExtractBody) -> dict:
-    return bridge.call("extract_ontology", path=body.path, sim=body.sim)
+    return bridge.call("extract_ontology", path=body.path, sim=body.sim,
+                       model=body.model or None)
+
+
+@app.get("/api/models")
+def list_models() -> dict:
+    """Available LLM models from the configured OpenAI-compatible endpoint."""
+    try:
+        from grap_mcp.kee import llm
+        return {"status": "ok", "models": llm.list_models()}
+    except Exception as exc:  # endpoint unreachable / no server — non-fatal for the UI
+        return {"status": "error", "message": str(exc), "models": []}
 
 
 @app.post("/api/validate/pg")

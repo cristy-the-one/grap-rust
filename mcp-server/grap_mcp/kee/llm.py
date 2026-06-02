@@ -102,12 +102,26 @@ class OpenAICompatProvider:
             raise RuntimeError(f"unexpected LLM response shape: {body!r}") from exc
 
 
-def get_provider() -> LLMProvider:
+def list_models(base_url: Optional[str] = None, api_key: Optional[str] = None,
+                timeout: float = 5.0) -> List[str]:
+    """List model ids from an OpenAI-compatible `/models` endpoint (e.g. Ollama)."""
+    base = (base_url or os.environ.get("GRAP_LLM_BASE_URL", DEFAULT_BASE_URL)).rstrip("/")
+    key = api_key or os.environ.get("GRAP_LLM_API_KEY")
+    headers = {"Authorization": f"Bearer {key}"} if key else {}
+    req = urllib.request.Request(f"{base}/models", headers=headers, method="GET")
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
+        body = json.loads(resp.read().decode("utf-8"))
+    return [m["id"] for m in body.get("data", [])
+            if isinstance(m, dict) and isinstance(m.get("id"), str)]
+
+
+def get_provider(model: Optional[str] = None) -> LLMProvider:
     """Return the configured provider.
 
     `GRAP_LLM_STUB=1` forces the offline stub; otherwise an OpenAI-compatible
-    HTTP provider pointed at GRAP_LLM_BASE_URL (default local Ollama).
+    HTTP provider pointed at GRAP_LLM_BASE_URL (default local Ollama). An
+    explicit `model` overrides GRAP_LLM_MODEL (lets the UI pick a model).
     """
     if os.environ.get("GRAP_LLM_STUB"):
         return StubProvider()
-    return OpenAICompatProvider()
+    return OpenAICompatProvider(model=model or None)
