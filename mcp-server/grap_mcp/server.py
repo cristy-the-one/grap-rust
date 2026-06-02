@@ -193,6 +193,59 @@ def ingest_documents(path: str) -> dict:
 
 
 @mcp.tool()
+def extract_ontology(path: str, out_path: str = None, sim: float = 0.86) -> dict:
+    """Propose an ontology from documents (Knowledge Extraction Engine).
+
+    Reads .md/.txt under `path`, asks the configured LLM to extract ontology
+    fragments, reconciles near-duplicate concepts by embedding similarity, and
+    writes a candidate ontology. The candidate is versioned as a *proposed*
+    artifact for human review — it does NOT become the active ontology until a
+    human loads/promotes it (governance stays deterministic).
+    """
+    denied = _require("operator")
+    if denied:
+        return denied
+    try:
+        from .kee import pipeline, llm, embeddings
+        provider = llm.get_provider()
+        embedder = embeddings.get_embedder()
+        result = pipeline.extract_ontology(path, provider, embedder, sim=sim)
+        onto = result["ontology"]
+        yaml_text = pipeline.to_yaml(onto)
+        out = out_path or str(Path(_resolve_ws_root()) / "candidate-ontology.yaml")
+        Path(out).parent.mkdir(parents=True, exist_ok=True)
+        Path(out).write_text(yaml_text, encoding="utf-8")
+        version = _get_workspace().publish_ontology(
+            yaml_text, metadata={"kind": "proposed", "source": path})
+        try:
+            _get_workspace().record_event(
+                "ontology_proposed", path,
+                details={"outcomes": str(len(onto["process_outcomes"])),
+                         "provider": provider.name, "embedder": embedder.name})
+        except Exception:
+            logger.warning("audit record_event failed for ontology_proposed", exc_info=True)
+        return {
+            "status": "ok",
+            "out_path": out,
+            "version_hash": version.hash,
+            "provider": provider.name,
+            "embedder": embedder.name,
+            "chunks": result["chunks"],
+            "fragments": result["fragments"],
+            "process_outcomes": [
+                {"id": o["id"], "name": o["name"],
+                 "characteristics": o["required_characteristics"]}
+                for o in onto["process_outcomes"]],
+            "provenance": onto["provenance"],
+            "note": ("LLM proposal — review before loading. To adopt: "
+                     "load_ontology(out_path)."),
+        }
+    except Exception as e:
+        logger.exception("extract_ontology failed")
+        return {"status": "error", "message": str(e)}
+
+
+@mcp.tool()
 def load_ontology(path: str) -> dict:
     """Load an ASPICE ontology, project it into the KG, and version it."""
     denied = _require("operator")
@@ -776,7 +829,7 @@ def list_capabilities() -> dict:
     return {
         "domains": {
             "knowledge": ["load_knowledge_graph", "create_knowledge_graph",
-                          "ingest_documents", "load_ontology"],
+                          "ingest_documents", "extract_ontology", "load_ontology"],
             "pg_lifecycle": ["load_procedure_graph", "publish_pg", "promote_pg",
                              "activate", "set_production", "get_production", "list_versions"],
             "execution_reasoning": ["run_procedure", "detect_gaps", "get_explanation"],
