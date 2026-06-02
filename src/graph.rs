@@ -202,9 +202,20 @@ impl KnowledgeGraph {
         self.nodes.get(node.0 as usize).map(|n| n.label.as_deref())
     }
 
-    /// Number of nodes currently in the graph.
+    /// Size of the node id-space, including tombstoned (logically deleted)
+    /// nodes. Used as the upper bound for id iteration; see [`live_node_count`]
+    /// for the count of nodes that are actually still present.
     pub fn node_count(&self) -> usize {
         self.nodes.len()
+    }
+
+    /// Number of live (non-tombstoned) nodes. After `remove_node` / `merge_nodes`
+    /// this is less than [`node_count`]; it is the count a caller means by
+    /// "how many nodes are in the graph".
+    pub fn live_node_count(&self) -> usize {
+        (0..self.nodes.len())
+            .filter(|&i| !self.deleted.get(i).copied().unwrap_or(true))
+            .count()
     }
 
     /// Returns a reference to all edges. Exposed for CLI export / visualization tools.

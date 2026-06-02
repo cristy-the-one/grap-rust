@@ -1228,6 +1228,16 @@ impl IndexedKnowledgeGraph {
         self.graph.read_blob(node)
     }
 
+    /// Number of live (non-tombstoned) nodes (see `KnowledgeGraph::live_node_count`).
+    pub fn live_node_count(&self) -> usize {
+        self.graph.live_node_count()
+    }
+
+    /// True if a node has been logically deleted (e.g. absorbed by `merge_nodes`).
+    pub fn is_node_deleted(&self, node: NodeId) -> bool {
+        self.graph.is_node_deleted(node)
+    }
+
     /// Returns the embedding stored for a node, if any.
     pub fn read_embedding(&self, node: NodeId) -> Option<Vec<f32>> {
         self.graph.read_embedding(node)

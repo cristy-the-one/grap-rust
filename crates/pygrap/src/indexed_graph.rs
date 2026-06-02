@@ -285,6 +285,12 @@ impl IndexedKnowledgeGraph {
     ///
     /// Raises `ValueError` if the node ID is out of bounds.
     fn get_node_text(&self, id: u32) -> PyResult<String> {
+        if self.inner.is_node_deleted(NodeId(id)) {
+            return Err(pyo3::exceptions::PyValueError::new_err(format!(
+                "node {} has been deleted",
+                id
+            )));
+        }
         self.inner
             .graph
             .try_read_blob(NodeId(id))
@@ -298,6 +304,9 @@ impl IndexedKnowledgeGraph {
     ///
     /// Raises `ValueError` if the node ID is out of bounds.
     fn get_node_label(&self, id: u32) -> PyResult<Option<String>> {
+        if self.inner.is_node_deleted(NodeId(id)) {
+            return Ok(None);
+        }
         self.inner
             .graph
             .try_node_label(NodeId(id))
@@ -533,9 +542,23 @@ impl IndexedKnowledgeGraph {
             .start_background_workers(Duration::from_millis(interval_ms))
     }
 
-    /// Return the number of nodes in the graph.
+    /// Return the number of live (non-tombstoned) nodes in the graph.
+    ///
+    /// Nodes absorbed by `merge_nodes` (or removed) no longer count.
     fn node_count(&self) -> usize {
+        self.inner.live_node_count()
+    }
+
+    /// Return the size of the node id-space, including tombstoned nodes.
+    /// This is the upper bound for valid node ids; see `node_count` for the
+    /// number of nodes still present.
+    fn node_id_space(&self) -> usize {
         self.inner.graph.node_count()
+    }
+
+    /// True if a node has been logically deleted (e.g. absorbed by `merge_nodes`).
+    fn is_node_deleted(&self, id: u32) -> bool {
+        self.inner.is_node_deleted(NodeId(id))
     }
 
     /// Return the number of edges in the graph.
