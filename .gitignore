@@ -112,3 +112,7 @@ real-data-law-ro/graph/vector_index
 # Isolated agent worktrees
 .worktrees/
 
+# Licensed VDA ASPICE PAM and any ontology generated from it (local-only)
+docs/VDA_ASPICE_BlueGoldBook_Sept2017.pdf
+docs/examples/aspice-vda-ontology.yaml
+
