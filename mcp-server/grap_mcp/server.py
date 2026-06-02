@@ -206,11 +206,12 @@ def extract_ontology(path: str, out_path: str = None, sim: float = 0.86) -> dict
     if denied:
         return denied
     try:
-        from .kee import pipeline, llm, embeddings
+        from .kee import pipeline, llm, embeddings, validate
         provider = llm.get_provider()
         embedder = embeddings.get_embedder()
         result = pipeline.extract_ontology(path, provider, embedder, sim=sim)
         onto = result["ontology"]
+        validation = validate.validate_ontology(onto)
         yaml_text = pipeline.to_yaml(onto)
         out = out_path or str(Path(_resolve_ws_root()) / "candidate-ontology.yaml")
         Path(out).parent.mkdir(parents=True, exist_ok=True)
@@ -237,6 +238,7 @@ def extract_ontology(path: str, out_path: str = None, sim: float = 0.86) -> dict
                  "characteristics": o["required_characteristics"]}
                 for o in onto["process_outcomes"]],
             "provenance": onto["provenance"],
+            "validation": validation,
             "note": ("LLM proposal — review before loading. To adopt: "
                      "load_ontology(out_path)."),
         }
