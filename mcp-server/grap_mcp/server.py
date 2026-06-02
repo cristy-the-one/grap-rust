@@ -10,6 +10,7 @@ import pygrap
 from pathlib import Path
 import logging
 import os
+import shutil
 import uuid
 import json
 import time
@@ -143,6 +144,12 @@ def create_knowledge_graph(path: str) -> dict:
     if denied:
         return denied
     try:
+        # "Create" means start empty: with_merge_policy loads any graph already
+        # on disk at `path`, so clear the directory first to avoid silently
+        # reusing/accumulating stale nodes across runs.
+        target = Path(path)
+        if target.exists():
+            shutil.rmtree(target)
         kg = pygrap.IndexedKnowledgeGraph.with_merge_policy(path, 2)
         kg.save_to_dir(path)
         _state["kg"] = kg

@@ -7,14 +7,59 @@ required characteristic is checked for satisfaction using:
 An unsatisfied characteristic is a gap.
 """
 
+import re
 from typing import Any, Dict, List, Optional
 
 from .ontology import Ontology, ProcessOutcome
 
-# Default reasoner weights. `lexical_threshold` is the satisfaction cutoff;
-# text_weight/graph_weight feed the search fusion.
-DEFAULT_WEIGHTS = {"text_weight": 0.7, "graph_weight": 0.3, "lexical_threshold": 0.2}
+# Default reasoner weights. `lexical_threshold` is the satisfaction cutoff,
+# interpreted as the minimum fraction of a characteristic's distinguishing
+# tokens that must appear in real evidence (0..1). text_weight/graph_weight
+# feed the search fusion used to retrieve candidate evidence.
+#
+# Why coverage and not a raw BM25 cutoff: pygrap returns unbounded BM25 scores
+# (typically 2-9 for any token overlap), so a fixed magnitude cutoff marks every
+# characteristic "satisfied" as soon as any document is ingested -- and a strong
+# match on a shared word (e.g. "definition") wrongly satisfies a different
+# characteristic (process_definition vs interface_definition). Requiring that
+# the evidence actually contains the characteristic's own tokens is what makes
+# gap detection discriminating.
+DEFAULT_WEIGHTS = {"text_weight": 0.7, "graph_weight": 0.3, "lexical_threshold": 0.6}
 LEXICAL_THRESHOLD = DEFAULT_WEIGHTS["lexical_threshold"]
+
+# Generic connective words that carry no discriminating meaning; excluded from
+# token-coverage scoring.
+_STOPWORDS = {"a", "an", "the", "of", "for", "and", "or", "to", "in", "is",
+              "are", "be", "with", "on", "by"}
+
+
+def _content_tokens(characteristic: str) -> List[str]:
+    """Distinguishing tokens of a characteristic id (snake_case -> words)."""
+    return [t for t in characteristic.replace("_", " ").lower().split()
+            if t not in _STOPWORDS]
+
+
+def _covers(text: str, characteristic: str) -> float:
+    """Fraction (0..1) of a characteristic's distinguishing tokens present in `text`.
+
+    Light 4-char prefix-stemming lets 'verify' satisfy 'verification' and
+    'requirement' satisfy 'requirements' without matching unrelated words.
+    Short tokens (<4 chars) require an exact word match.
+    """
+    tokens = _content_tokens(characteristic)
+    if not tokens:
+        return 0.0
+    words = re.findall(r"[a-z]+", (text or "").lower())
+    present = 0
+    for tok in tokens:
+        if len(tok) < 4:
+            ok = tok in words
+        else:
+            stem = tok[:4]
+            ok = any(w.startswith(stem) for w in words)
+        if ok:
+            present += 1
+    return present / len(tokens)
 
 _OUTCOME_REF_PREFIX = "kg:aspice.process_outcome."
 
@@ -100,6 +145,7 @@ def _lexical_signals(kg, ontology: Ontology, outcome_id: str, characteristic: st
             "kind": "lexical",
             "node": getattr(h, "node", None),
             "score": getattr(h, "fused_score", 0.0),
+            "coverage": round(_covers(text, characteristic), 3),
             "snippet": text[:160],
             "query": query,
         })
@@ -129,15 +175,17 @@ def detect_gaps(kg, ontology: Ontology, pg=None, weights=None,
         for characteristic in outcome.required_characteristics:
             structural = _structural_signals(kg, outcome.id, characteristic)
             lexical = _lexical_signals(kg, ontology, outcome.id, characteristic, w, exclude_nodes)
-            satisfaction = _best_score(structural + lexical)
-            satisfied = bool(structural) or satisfaction >= w["lexical_threshold"]
+            # Satisfaction is token coverage (0..1), not raw BM25 magnitude.
+            coverage = 1.0 if structural else max(
+                (s.get("coverage", 0.0) for s in lexical), default=0.0)
+            satisfied = bool(structural) or coverage >= w["lexical_threshold"]
             if not satisfied:
                 gaps.append({
                     "outcome_id": outcome.id,
                     "outcome_name": outcome.name,
                     "missing_characteristic": characteristic,
                     "signals": {"structural": structural, "lexical": lexical},
-                    "confidence": round(1.0 - satisfaction, 3),
+                    "confidence": round(1.0 - coverage, 3),
                 })
     gaps.sort(key=lambda g: g["confidence"], reverse=True)
     return gaps
