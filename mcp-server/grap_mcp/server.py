@@ -256,6 +256,63 @@ def extract_ontology(path: str, out_path: str = None, sim: float = 0.86,
 
 
 @mcp.tool()
+def project_relations(relations: list = None) -> dict:
+    """Project extracted relations as typed edges in the current Knowledge Graph.
+
+    Each relation's `from`/`to` become nodes (deduped by label within the call)
+    and a typed edge (`relation_type`) connects them — turning KEE's proposed
+    relations into a navigable graph alongside any existing edges. Creates a
+    fresh KG in the workspace if none is loaded.
+    """
+    denied = _require("operator")
+    if denied:
+        return denied
+    relations = relations or []
+    try:
+        kg = _state.get("kg")
+        if not kg:
+            # build a dedicated relations graph (don't clobber/contend the main KG)
+            res = create_knowledge_graph(str(Path(_resolve_ws_root()) / "relations-kg"))
+            if res.get("status") == "error":
+                return res
+            kg = _state.get("kg")
+
+        node_by_label: dict = {}
+
+        def node_for(name: str) -> int:
+            label = ("kee:" + name.strip())[:120]
+            nid = node_by_label.get(label)
+            if nid is None:
+                nid = kg.add_node(text=name.strip(), label=label)
+                node_by_label[label] = nid
+            return nid
+
+        edges = 0
+        for r in relations:
+            f, t, ty = r.get("from"), r.get("to"), r.get("type")
+            if not all(isinstance(x, str) and x.strip() for x in (f, t, ty)):
+                continue
+            kg.add_edge(node_for(f), node_for(t), 0.7,
+                        {"relation_type": ty.strip(), "source": "kee_extraction"})
+            edges += 1
+
+        kg_path = _state.get("kg_path")
+        if kg_path:
+            kg.save_to_dir(kg_path)
+        try:
+            _get_workspace().record_event(
+                "relations_projected", "kee",
+                details={"edges": str(edges), "nodes": str(len(node_by_label))})
+        except Exception:
+            logger.warning("audit record_event failed for relations_projected", exc_info=True)
+        return {"status": "ok", "nodes_added": len(node_by_label), "edges_added": edges,
+                "node_count": kg.node_count(), "edge_count": kg.edge_count()}
+    except Exception as e:
+        logger.exception("project_relations failed")
+        return {"status": "error", "message": str(e)}
+
+
+@mcp.tool()
 def load_ontology(path: str) -> dict:
     """Load an ASPICE ontology, project it into the KG, and version it."""
     denied = _require("operator")
@@ -839,7 +896,8 @@ def list_capabilities() -> dict:
     return {
         "domains": {
             "knowledge": ["load_knowledge_graph", "create_knowledge_graph",
-                          "ingest_documents", "extract_ontology", "load_ontology"],
+                          "ingest_documents", "extract_ontology", "project_relations",
+                          "load_ontology"],
             "pg_lifecycle": ["load_procedure_graph", "publish_pg", "promote_pg",
                              "activate", "set_production", "get_production", "list_versions"],
             "execution_reasoning": ["run_procedure", "detect_gaps", "get_explanation"],

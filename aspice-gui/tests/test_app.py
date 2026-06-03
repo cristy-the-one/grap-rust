@@ -47,6 +47,36 @@ def test_wizard_extract_runs_full_loop_offline():
     assert "process_outcomes" in r["extracted"]
 
 
+def test_extract_stream_emits_events_and_extracted():
+    from backend import bridge
+    os.environ["GRAP_LLM_STUB"] = "1"
+    os.environ["GRAP_EMBED_BACKEND"] = "hashing"
+    try:
+        r = client.post("/api/extract/stream",
+                        json={"path": bridge.default_examples()["sample_knowledge"]})
+    finally:
+        os.environ.pop("GRAP_LLM_STUB", None)
+        os.environ.pop("GRAP_EMBED_BACKEND", None)
+    events = [json.loads(ln) for ln in r.text.splitlines() if ln.strip()]
+    types = [e["type"] for e in events]
+    assert "extract_begin" in types
+    assert "chunk_start" in types and "chunk_done" in types
+    assert types[-1] == "extracted"
+    extracted = events[-1]["extracted"]
+    assert "process_outcomes" in extracted and "relations" in extracted
+
+
+def test_project_relations_endpoint_adds_edges():
+    rels = [{"from": "Agency", "type": "concedes", "to": "Company"},
+            {"from": "Agency", "type": "concedes", "to": "Company"},   # dup edge ok
+            {"from": "Law 1", "type": "amends", "to": "Law 2"}]
+    r = client.post("/api/relations/project", json={"relations": rels}).json()
+    assert r["status"] == "ok"
+    assert r["edges_added"] == 3
+    assert r["nodes_added"] == 4            # Agency, Company, Law 1, Law 2
+    assert r["edge_count"] >= 3 and r["node_count"] >= 4
+
+
 def test_wizard_extract_stream_emits_progress_events():
     os.environ["GRAP_LLM_STUB"] = "1"
     os.environ["GRAP_EMBED_BACKEND"] = "hashing"

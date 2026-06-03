@@ -56,6 +56,10 @@ class WizardExtractBody(BaseModel):
     model: Optional[str] = None
 
 
+class RelationsBody(BaseModel):
+    relations: list = []
+
+
 class ScopeBody(BaseModel):
     scope: str = "all"
     hypothesis: Optional[str] = None
@@ -182,6 +186,12 @@ def ingest_docs(body: PathBody) -> dict:
 def extract_ontology(body: ExtractBody) -> dict:
     return bridge.call("extract_ontology", path=body.path, sim=body.sim,
                        model=body.model or None, max_files=body.max_files)
+
+
+@app.post("/api/relations/project")
+def project_relations_ep(body: RelationsBody) -> dict:
+    """Project extracted relations as typed edges in the current KG."""
+    return bridge.call("project_relations", relations=body.relations)
 
 
 @app.get("/api/models")
@@ -336,19 +346,87 @@ def wizard_bootstrap() -> dict:
     return {"status": "ok", "steps": steps, "gaps": gaps, "workspace": ws, "examples": ex}
 
 
-def _extract_events(path: Optional[str], model: Optional[str],
-                    sim: float) -> Iterator[dict]:
-    """Drive the KEE demo loop, yielding progress events as work happens.
-
-    Single source of truth for both the streaming and non-streaming endpoints:
-    the streaming endpoint serializes each event as it arrives; the plain
-    endpoint just consumes to the terminal 'done'/'error'. The 'token' events
-    are emitted from real LLM stream deltas (not a timer) — the honest signal
-    that the model is generating right now.
-    """
+def _extraction_events(corpus: str, model: Optional[str], sim: float,
+                       max_files: Optional[int] = None) -> Iterator[dict]:
+    """Extract-only event generator (no KG/adopt/gaps): prepare → per-chunk
+    stream (token events from real LLM deltas) → reconcile → version. Ends with
+    an 'extracted' event carrying the extract_ontology-shaped result. Shared by
+    the Extract card stream and the demo wizard."""
     import grap_mcp.server as srv
     from grap_mcp.kee import embeddings, extract, llm, pipeline, reconcile, validate
 
+    # provider only; embedder is deferred to reconcile so tokens flow immediately
+    yield {"type": "phase", "name": "prepare"}
+    provider = llm.get_provider(model=model or None)
+    chunks = pipeline.read_chunks(corpus, max_files=max_files)
+    yield {"type": "extract_begin", "chunks": len(chunks),
+           "provider": provider.name, "model": getattr(provider, "model", None)}
+
+    can_stream = hasattr(provider, "stream")
+    fragments = []
+    for i, (src, text) in enumerate(chunks):
+        yield {"type": "chunk_start", "i": i + 1, "n": len(chunks), "source": src}
+        parts: list[str] = []
+        ntok = 0
+        try:
+            if can_stream:
+                for delta in provider.stream(extract.SYSTEM_PROMPT,
+                                             extract.build_user_prompt(text)):
+                    parts.append(delta)
+                    ntok += 1
+                    if ntok % 6 == 0:
+                        yield {"type": "token", "i": i + 1, "n": len(chunks), "tokens": ntok}
+            else:
+                parts.append(provider.complete(extract.SYSTEM_PROMPT,
+                                               extract.build_user_prompt(text)))
+        except Exception as exc:
+            yield {"type": "chunk_error", "i": i + 1, "message": str(exc)}
+            continue
+        obj = extract.extract_json("".join(parts))
+        frag = extract.normalize_fragment(obj, src) if obj else None
+        n_out = len(frag["outcomes"]) if frag else 0
+        if frag and (frag["outcomes"] or frag["relations"]):
+            fragments.append(frag)
+        yield {"type": "chunk_done", "i": i + 1, "n": len(chunks),
+               "tokens": ntok, "outcomes": n_out}
+
+    yield {"type": "phase", "name": "reconcile"}
+    embedder = embeddings.get_embedder()
+    onto = reconcile.reconcile(fragments, embedder, sim=sim)
+    valr = validate.validate_ontology(onto)
+    yaml_text = pipeline.to_yaml(onto)
+    # use the resolved workspace root WITHOUT resetting _state (ensure_workspace
+    # clears the loaded KG, which would break the wizard's already-created KG)
+    out_path = str(Path(srv._resolve_ws_root()) / "candidate-ontology.yaml")
+    Path(out_path).write_text(yaml_text, encoding="utf-8")
+    vhash = None
+    try:
+        version = srv._get_workspace().publish_ontology(
+            yaml_text, metadata={"kind": "proposed", "source": corpus})
+        srv._get_workspace().record_event(
+            "ontology_proposed", corpus,
+            details={"outcomes": str(len(onto["process_outcomes"])),
+                     "provider": provider.name, "embedder": embedder.name})
+        vhash = version.hash
+    except Exception:
+        pass
+    extracted = {
+        "status": "ok", "out_path": out_path, "version_hash": vhash,
+        "provider": provider.name, "model": getattr(provider, "model", None),
+        "embedder": embedder.name, "chunks": len(chunks), "fragments": len(fragments),
+        "process_outcomes": [{"id": o["id"], "name": o["name"],
+                              "characteristics": o["required_characteristics"]}
+                             for o in onto["process_outcomes"]],
+        "provenance": onto["provenance"], "relations": onto.get("relations", []),
+        "validation": valr,
+    }
+    yield {"type": "extracted", "extracted": extracted}
+
+
+def _extract_events(path: Optional[str], model: Optional[str],
+                    sim: float) -> Iterator[dict]:
+    """KEE demo wizard: create KG → (extraction events) → adopt → ingest
+    evidence → detect gaps. Wraps _extraction_events."""
     try:
         ws = bridge.ensure_workspace()
         ex = bridge.default_examples()
@@ -361,74 +439,18 @@ def _extract_events(path: Optional[str], model: Optional[str],
             return
         yield {"type": "step", "name": "knowledge_graph", "status": "ok"}
 
-        # init the provider only (embedder is deferred to the reconcile phase so
-        # token streaming starts immediately instead of waiting on model load)
-        yield {"type": "phase", "name": "prepare"}
-        provider = llm.get_provider(model=model or None)
-        chunks = pipeline.read_chunks(corpus)
-        yield {"type": "extract_begin", "chunks": len(chunks),
-               "provider": provider.name, "model": getattr(provider, "model", None)}
-
-        can_stream = hasattr(provider, "stream")
-        fragments = []
-        for i, (src, text) in enumerate(chunks):
-            yield {"type": "chunk_start", "i": i + 1, "n": len(chunks), "source": src}
-            parts: list[str] = []
-            ntok = 0
-            try:
-                if can_stream:
-                    for delta in provider.stream(extract.SYSTEM_PROMPT,
-                                                 extract.build_user_prompt(text)):
-                        parts.append(delta)
-                        ntok += 1
-                        if ntok % 6 == 0:           # throttle token events
-                            yield {"type": "token", "i": i + 1, "n": len(chunks),
-                                   "tokens": ntok}
-                else:
-                    parts.append(provider.complete(extract.SYSTEM_PROMPT,
-                                                   extract.build_user_prompt(text)))
-            except Exception as exc:                # provider/network error on a chunk
-                yield {"type": "chunk_error", "i": i + 1, "message": str(exc)}
-                continue
-            obj = extract.extract_json("".join(parts))
-            frag = extract.normalize_fragment(obj, src) if obj else None
-            n_out = len(frag["outcomes"]) if frag else 0
-            if frag and (frag["outcomes"] or frag["relations"]):
-                fragments.append(frag)
-            yield {"type": "chunk_done", "i": i + 1, "n": len(chunks),
-                   "tokens": ntok, "outcomes": n_out}
-
-        yield {"type": "phase", "name": "reconcile"}
-        embedder = embeddings.get_embedder()    # load now (hidden under reconcile)
-        onto = reconcile.reconcile(fragments, embedder, sim=sim)
-        valr = validate.validate_ontology(onto)
-        yaml_text = pipeline.to_yaml(onto)
-        out_path = str(Path(ws) / "candidate-ontology.yaml")
-        Path(out_path).write_text(yaml_text, encoding="utf-8")
-        vhash = None
-        try:
-            version = srv._get_workspace().publish_ontology(
-                yaml_text, metadata={"kind": "proposed", "source": corpus})
-            srv._get_workspace().record_event(
-                "ontology_proposed", corpus,
-                details={"outcomes": str(len(onto["process_outcomes"])),
-                         "provider": provider.name, "embedder": embedder.name})
-            vhash = version.hash
-        except Exception:
-            pass
-        extracted = {
-            "status": "ok", "out_path": out_path, "version_hash": vhash,
-            "provider": provider.name, "model": getattr(provider, "model", None),
-            "embedder": embedder.name, "chunks": len(chunks),
-            "fragments": len(fragments),
-            "process_outcomes": [{"id": o["id"], "name": o["name"],
-                                  "characteristics": o["required_characteristics"]}
-                                 for o in onto["process_outcomes"]],
-            "provenance": onto["provenance"], "validation": valr,
-        }
+        extracted = None
+        for event in _extraction_events(corpus, model, sim):
+            if event["type"] == "extracted":
+                extracted = event["extracted"]
+            else:
+                yield event
+        if not extracted or extracted.get("status") == "error":
+            yield {"type": "error", "message": "extraction produced no result"}
+            return
 
         yield {"type": "phase", "name": "adopt"}
-        adopt = bridge.call("load_ontology", path=out_path)
+        adopt = bridge.call("load_ontology", path=extracted["out_path"])
         if adopt.get("status") == "error":
             yield {"type": "error", "message": adopt.get("message")}
             return
@@ -457,6 +479,21 @@ def _extract_events(path: Optional[str], model: Optional[str],
         yield {"type": "error", "message": str(exc)}
 
 
+@app.post("/api/extract/stream")
+def extract_stream(body: ExtractBody) -> StreamingResponse:
+    """Streaming Extract: NDJSON progress events (phase/chunk/token), ending with
+    an 'extracted' event (the same shape /api/extract returns). Token events are
+    forwarded from the model's real stream deltas — genuine activity."""
+    def lines() -> Iterator[str]:
+        try:
+            for event in _extraction_events(body.path, body.model or None,
+                                            body.sim, body.max_files):
+                yield json.dumps(event) + "\n"
+        except Exception as exc:
+            yield json.dumps({"type": "error", "message": str(exc)}) + "\n"
+    return StreamingResponse(lines(), media_type="application/x-ndjson")
+
+
 @app.post("/api/wizard/extract")
 def wizard_extract(body: WizardExtractBody) -> dict:
     """Non-streaming KEE demo (consumes the same event generator to its result)."""
@@ -470,11 +507,7 @@ def wizard_extract(body: WizardExtractBody) -> dict:
 
 @app.post("/api/wizard/extract/stream")
 def wizard_extract_stream(body: WizardExtractBody) -> StreamingResponse:
-    """Streaming KEE demo: NDJSON progress events (step/phase/chunk/token/done).
-
-    `token` events are forwarded from the model's real stream deltas, so a
-    progress UI can show genuine, not faked, 'the model is generating' activity.
-    """
+    """Streaming KEE demo: NDJSON progress events (step/phase/chunk/token/done)."""
     def lines() -> Iterator[str]:
         for event in _extract_events(body.path, body.model, body.sim):
             yield json.dumps(event) + "\n"

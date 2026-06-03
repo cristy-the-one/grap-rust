@@ -624,7 +624,19 @@ function renderExtract(r, container) {
   // proposed relations (knowledge-graph edges between concepts)
   const rels = r.relations || [];
   if (rels.length) {
-    container.append(el("h4", { class: "kee-h" }, `Proposed relations (${rels.length})`));
+    container.append(el("div", { class: "card-head" },
+      el("h4", { class: "kee-h" }, `Proposed relations (${rels.length})`),
+      el("button", {
+        class: "btn btn-ghost small",
+        onclick: () => run(async () => {
+          const pr = await post("/api/relations/project", { relations: rels });
+          await refreshStatus();
+          if (pr && pr.status !== "error")
+            toast(`Projected ${pr.edges_added} edges / ${pr.nodes_added} nodes ` +
+                  `(KG now ${pr.node_count} nodes, ${pr.edge_count} edges)`, "ok");
+          return pr;
+        }),
+      }, "Project as graph edges")));
     const list = el("div", { class: "relations" });
     rels.slice(0, 40).forEach((rel) => {
       list.append(el("div", { class: "relation" },
@@ -648,19 +660,57 @@ function renderExtract(r, container) {
   container.append(el("p", { class: "muted small" }, `candidate written to ${r.out_path}`));
 }
 
-$("#btn-extract").onclick = () =>
-  run(async () => {
+$("#btn-extract").onclick = async () => {
+  const box = clear($("#extract-result"));
+  const prog = keeProgressUI(box);
+  const btn = $("#btn-extract");
+  btn.disabled = true;
+  try {
     const mf = parseInt($("#max-files-extract").value, 10);
-    const r = await post("/api/extract", {
-      path: $("#path-extract").value,
-      model: $("#model-extract").value.trim() || null,
-      max_files: Number.isFinite(mf) && mf > 0 ? mf : null,
+    const resp = await fetch("/api/extract/stream", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        path: $("#path-extract").value,
+        model: $("#model-extract").value.trim() || null,
+        max_files: Number.isFinite(mf) && mf > 0 ? mf : null,
+      }),
     });
-    if (r) renderExtract(r, $("#extract-result"));
-    if (r && r.status !== "error")
-      toast(`Proposed ${(r.process_outcomes || []).length} outcomes`, r.validation && r.validation.ok ? "ok" : "warn");
-    return r;
-  });
+    if (!resp.ok || !resp.body) throw new Error(`stream failed: ${resp.status}`);
+    const reader = resp.body.getReader();
+    const dec = new TextDecoder();
+    let buf = "", extracted = null, errored = null;
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      let nl;
+      while ((nl = buf.indexOf("\n")) >= 0) {
+        const line = buf.slice(0, nl).trim();
+        buf = buf.slice(nl + 1);
+        if (!line) continue;
+        let e;
+        try { e = JSON.parse(line); } catch { continue; }
+        showRaw(e);
+        prog.on(e);
+        if (e.type === "extracted") extracted = e.extracted;
+        if (e.type === "error") errored = e.message;
+      }
+    }
+    if (errored) { toast(errored, "err"); return; }
+    if (extracted) {
+      renderExtract(extracted, clear($("#extract-result")));
+      await refreshStatus();
+      toast(`Proposed ${(extracted.process_outcomes || []).length} outcomes, ` +
+            `${(extracted.relations || []).length} relations`,
+            extracted.validation && extracted.validation.ok ? "ok" : "warn");
+    }
+  } catch (err) {
+    toast(String(err.message || err), "err");
+  } finally {
+    btn.disabled = false;
+  }
+};
 
 $("#btn-load-onto").onclick = () =>
   run(async () => { const r = await post("/api/load/ontology", { path: $("#path-onto").value }); await refreshStatus(); return r; }, "Ontology loaded");
