@@ -15,6 +15,13 @@ from pydantic import BaseModel, Field
 
 from . import bridge
 
+# The console talks to a local Ollama by default, so prefer Ollama for embeddings
+# too — a quick local HTTP call (nomic-embed-text) instead of loading
+# sentence-transformers, which keeps the reconcile phase snappy. get_embedder()
+# falls back to the hashing embedder if the endpoint is unreachable, and an
+# explicit GRAP_EMBED_BACKEND in the environment still wins.
+os.environ.setdefault("GRAP_EMBED_BACKEND", "ollama")
+
 FRONTEND = Path(__file__).resolve().parent.parent / "frontend"
 
 
