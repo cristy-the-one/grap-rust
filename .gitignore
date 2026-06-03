@@ -66,6 +66,7 @@ parts/
 sdist/
 var/
 wheels/
+!packaging/wheels/        # bundled distributable wheel(s) for the installer
 *.egg-info/
 .installed.cfg
 *.egg
