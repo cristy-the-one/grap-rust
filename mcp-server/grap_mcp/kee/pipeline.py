@@ -9,37 +9,72 @@ deterministically in tests (StubProvider + HashingEmbedder).
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from ..ingest import _EXTS, chunk_text
 from . import extract, reconcile
 
 
-def read_chunks(root: str) -> List[Tuple[str, str]]:
-    """Walk .md/.txt under `root` and return [(source_label, chunk_text), ...]."""
+def _text_and_label_from_json(obj: Any, stem: str) -> Tuple[str, str]:
+    """Extract (text, label) from a parsed JSON document.
+
+    Law-aware (titlu + text_complet, the Romanian-legal-acts schema), with a
+    generic fallback (common text fields, else all string values joined)."""
+    if isinstance(obj, dict):
+        label = (str(obj.get("id")).strip() if obj.get("id") not in (None, "") else stem)
+        title = str(obj.get("titlu") or "").strip()
+        body = str(obj.get("text_complet") or obj.get("text")
+                   or obj.get("content") or obj.get("body") or "").strip()
+        if title or body:
+            return ((title + "\n\n" + body).strip(), label)
+        parts = [v.strip() for v in obj.values() if isinstance(v, str) and v.strip()]
+        return ("\n\n".join(parts), label)
+    if isinstance(obj, list):
+        return ("\n\n".join(_text_and_label_from_json(x, stem)[0] for x in obj), stem)
+    return (str(obj or ""), stem)
+
+
+def read_chunks(root: str, max_files: Optional[int] = None) -> List[Tuple[str, str]]:
+    """Walk .md/.txt/.json under `root` → [(source_label, chunk_text), ...].
+
+    JSON files are read via the law-aware/generic extractor. `max_files` caps how
+    many files are read (a safety guard against pointing at a huge corpus — an
+    LLM call per chunk gets expensive fast)."""
     p = Path(root)
+    exts = set(_EXTS) | {".json"}
     if p.is_file():
         files = [p]
     elif p.is_dir():
-        files = sorted(f for f in p.rglob("*") if f.suffix.lower() in _EXTS)
+        files = sorted(f for f in p.rglob("*") if f.suffix.lower() in exts)
     else:
         raise FileNotFoundError(f"extract path not found: {root}")
+    if max_files is not None and max_files > 0:
+        files = files[:max_files]
     chunks: List[Tuple[str, str]] = []
     for f in files:
         try:
-            text = f.read_text(encoding="utf-8")
+            raw = f.read_text(encoding="utf-8")
         except OSError:
             continue
+        if f.suffix.lower() == ".json":
+            try:
+                text, label = _text_and_label_from_json(json.loads(raw), f.stem)
+            except ValueError:
+                continue
+        else:
+            text, label = raw, f.stem
         for i, c in enumerate(chunk_text(text)):
-            chunks.append((f"{f.stem}#{i}", c))
+            chunks.append((f"{label}#{i}", c))
     return chunks
 
 
 def extract_ontology(docs_path: str, provider, embedder, sim: float = 0.86,
-                     version: str = "kee-candidate") -> Dict[str, Any]:
+                     version: str = "kee-candidate",
+                     max_files: Optional[int] = None) -> Dict[str, Any]:
     """Run the full pipeline and return the candidate ontology + run stats."""
-    chunks = read_chunks(docs_path)
+    chunks = read_chunks(docs_path, max_files=max_files)
     fragments = extract.extract_fragments(chunks, provider)
     ontology = reconcile.reconcile(fragments, embedder, sim=sim, version=version)
     return {

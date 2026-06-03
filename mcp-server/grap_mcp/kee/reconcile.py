@@ -142,11 +142,31 @@ def reconcile(fragments: Sequence[Dict[str, Any]], embedder, sim: float = 0.86,
         })
         provenance[oid] = sorted(set(sources))
 
+    # surface proposed relations (deduped, with provenance). Kept separate from
+    # the loadable ontology schema — they enrich the knowledge graph view.
+    relations: List[dict] = []
+    rel_index: Dict[tuple, dict] = {}
+    for frag in fragments:
+        src = frag.get("source", "?")
+        for r in frag.get("relations", []):
+            f, t, ty = r.get("from"), r.get("to"), r.get("type")
+            if not all(isinstance(x, str) and x.strip() for x in (f, t, ty)):
+                continue
+            key = (f.strip().lower(), ty.strip().lower(), t.strip().lower())
+            if key not in rel_index:
+                rel = {"from": f.strip(), "type": ty.strip(), "to": t.strip(),
+                       "sources": []}
+                rel_index[key] = rel
+                relations.append(rel)
+            if src not in rel_index[key]["sources"]:
+                rel_index[key]["sources"].append(src)
+
     return {
         "version": version,
         "process_outcomes": process_outcomes,
         "mapping_hints": mapping_hints,
         "provenance": provenance,
+        "relations": relations,
     }
 
 

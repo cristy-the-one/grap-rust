@@ -194,17 +194,18 @@ def ingest_documents(path: str) -> dict:
 
 @mcp.tool()
 def extract_ontology(path: str, out_path: str = None, sim: float = 0.86,
-                     model: str = None) -> dict:
+                     model: str = None, max_files: int = None) -> dict:
     """Propose an ontology from documents (Knowledge Extraction Engine).
 
-    Reads .md/.txt under `path`, asks the configured LLM to extract ontology
-    fragments, reconciles near-duplicate concepts by embedding similarity, and
-    writes a candidate ontology. The candidate is versioned as a *proposed*
-    artifact for human review — it does NOT become the active ontology until a
-    human loads/promotes it (governance stays deterministic).
+    Reads .md/.txt/.json under `path`, asks the configured LLM to extract
+    ontology fragments, reconciles near-duplicate concepts by embedding
+    similarity, and writes a candidate ontology. The candidate is versioned as a
+    *proposed* artifact for human review — it does NOT become the active
+    ontology until a human loads/promotes it (governance stays deterministic).
 
     `model` overrides the LLM model (e.g. "qwen3:8b"); blank uses the server
-    default (GRAP_LLM_MODEL).
+    default (GRAP_LLM_MODEL). `max_files` caps how many files are read (a safety
+    guard for large corpora — one LLM call per chunk).
     """
     denied = _require("operator")
     if denied:
@@ -213,7 +214,8 @@ def extract_ontology(path: str, out_path: str = None, sim: float = 0.86,
         from .kee import pipeline, llm, embeddings, validate
         provider = llm.get_provider(model=model)
         embedder = embeddings.get_embedder()
-        result = pipeline.extract_ontology(path, provider, embedder, sim=sim)
+        result = pipeline.extract_ontology(path, provider, embedder, sim=sim,
+                                           max_files=max_files)
         onto = result["ontology"]
         validation = validate.validate_ontology(onto)
         yaml_text = pipeline.to_yaml(onto)
@@ -243,6 +245,7 @@ def extract_ontology(path: str, out_path: str = None, sim: float = 0.86,
                  "characteristics": o["required_characteristics"]}
                 for o in onto["process_outcomes"]],
             "provenance": onto["provenance"],
+            "relations": onto.get("relations", []),
             "validation": validation,
             "note": ("LLM proposal — review before loading. To adopt: "
                      "load_ontology(out_path)."),

@@ -67,6 +67,20 @@ def test_reconcile_keeps_distinct_outcomes_separate():
     assert len(onto["process_outcomes"]) == 2
 
 
+def test_reconcile_surfaces_relations_deduped_with_provenance():
+    emb = FakeEmb({"A": [1.0, 0.0], "B": [0.0, 1.0]})
+    frags = [{"source": "d#0",
+              "outcomes": [{"name": "A", "characteristics": []},
+                           {"name": "B", "characteristics": []}],
+              "relations": [{"from": "A", "type": "cites", "to": "B"},
+                            {"from": "A", "type": "cites", "to": "B"}]}]  # dup
+    onto = rc.reconcile(frags, emb, sim=0.86)
+    assert len(onto["relations"]) == 1
+    r = onto["relations"][0]
+    assert (r["from"], r["type"], r["to"]) == ("A", "cites", "B")
+    assert r["sources"] == ["d#0"]
+
+
 def test_stress_merge_nodes_collapses_duplicates_consistently():
     # three near-identical strings + one distinct -> exercises vector_search +
     # merge_nodes on real pygrap nodes; node count must stay consistent.
