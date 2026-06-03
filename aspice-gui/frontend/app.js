@@ -793,38 +793,37 @@ function edgeColor(type) {
 }
 function nodeColor(kind) { return kind === "entity" ? "#3ecf8e" : "#e8a838"; }
 
-function renderGraph(data, host, info) {
-  host.innerHTML = "";
-  const W = 880, H = 620, pad = 30;
-  const nodes = (data.nodes || []).map((n) => ({
-    ...n, x: pad + Math.random() * (W - 2 * pad), y: pad + Math.random() * (H - 2 * pad),
-  }));
-  if (!nodes.length) {
-    host.append(el("p", { class: "muted" },
-      "No connected nodes — increase Acts, or enable extracted relations."));
-    return;
-  }
-  const idx = new Map(nodes.map((n, i) => [n.id, i]));
-  const edges = (data.edges || [])
-    .filter((e) => idx.has(e.source) && idx.has(e.target))
-    .map((e) => ({ s: idx.get(e.source), t: idx.get(e.target), type: e.type }));
+// persistent, growable graph state (expand-on-click adds to it)
+const GW = 880, GH = 620, GPAD = 30;
+let legalGraph = { nodes: [], edges: [], types: [], expanded: new Set() };
 
-  // Fruchterman–Reingold layout
-  const area = W * H, k = Math.sqrt(area / nodes.length);
-  let temp = W / 8;
-  for (let it = 0; it < 320; it++) {
+function setLegalGraph(data) {
+  legalGraph = {
+    nodes: (data.nodes || []).map((n) => ({ ...n })),  // x,y assigned by layout
+    edges: (data.edges || []).map((e) => ({ ...e })),
+    types: data.edge_types || ["cites", "mentions"],
+    expanded: new Set(),
+  };
+}
+
+function _layout(nodes, edges, iters) {
+  const idx = new Map(nodes.map((n, i) => [n.id, i]));
+  const E = edges.filter((e) => idx.has(e.source) && idx.has(e.target))
+    .map((e) => ({ s: idx.get(e.source), t: idx.get(e.target) }));
+  const k = Math.sqrt((GW * GH) / Math.max(nodes.length, 1));
+  let temp = GW / 10;
+  for (let it = 0; it < iters; it++) {
     const disp = nodes.map(() => ({ x: 0, y: 0 }));
     for (let i = 0; i < nodes.length; i++) {
       for (let j = i + 1; j < nodes.length; j++) {
         let dx = nodes[i].x - nodes[j].x, dy = nodes[i].y - nodes[j].y;
         let d = Math.hypot(dx, dy) || 0.01;
-        const f = (k * k) / d;
-        const ux = dx / d, uy = dy / d;
+        const f = (k * k) / d, ux = dx / d, uy = dy / d;
         disp[i].x += ux * f; disp[i].y += uy * f;
         disp[j].x -= ux * f; disp[j].y -= uy * f;
       }
     }
-    for (const e of edges) {
+    for (const e of E) {
       let dx = nodes[e.s].x - nodes[e.t].x, dy = nodes[e.s].y - nodes[e.t].y;
       let d = Math.hypot(dx, dy) || 0.01;
       const f = (d * d) / k, ux = dx / d, uy = dy / d;
@@ -835,52 +834,107 @@ function renderGraph(data, host, info) {
       const d = Math.hypot(disp[i].x, disp[i].y) || 0.01;
       nodes[i].x += (disp[i].x / d) * Math.min(d, temp);
       nodes[i].y += (disp[i].y / d) * Math.min(d, temp);
-      nodes[i].x = Math.max(pad, Math.min(W - pad, nodes[i].x));
-      nodes[i].y = Math.max(pad, Math.min(H - pad, nodes[i].y));
+      nodes[i].x = Math.max(GPAD, Math.min(GW - GPAD, nodes[i].x));
+      nodes[i].y = Math.max(GPAD, Math.min(GH - GPAD, nodes[i].y));
     }
-    temp *= 0.965;
+    temp *= 0.96;
   }
+}
 
-  const svg = svgEl("svg", { viewBox: `0 0 ${W} ${H}`, class: "graph-svg" });
+function layoutGraph(host, info, iters = 300) {
+  host.innerHTML = "";
+  const nodes = legalGraph.nodes;
+  if (!nodes.length) {
+    host.append(el("p", { class: "muted" },
+      "No connected nodes — increase Acts, or enable extracted relations."));
+    return;
+  }
+  for (const n of nodes) {                 // seed positions for new nodes only
+    if (typeof n.x !== "number") {
+      n.x = (n.seedX ?? GPAD + Math.random() * (GW - 2 * GPAD));
+      n.y = (n.seedY ?? GPAD + Math.random() * (GH - 2 * GPAD));
+    }
+  }
+  _layout(nodes, legalGraph.edges, iters);
+
+  const byId = new Map(nodes.map((n) => [n.id, n]));
+  const svg = svgEl("svg", { viewBox: `0 0 ${GW} ${GH}`, class: "graph-svg" });
   const gEdges = svgEl("g"), gNodes = svgEl("g");
-  const lineFor = new Map();
-  edges.forEach((e) => {
+  const lines = [];
+  legalGraph.edges.forEach((e) => {
+    const a = byId.get(e.source), b = byId.get(e.target);
+    if (!a || !b) return;
     const ln = svgEl("line", {
-      x1: nodes[e.s].x, y1: nodes[e.s].y, x2: nodes[e.t].x, y2: nodes[e.t].y,
-      stroke: edgeColor(e.type), "stroke-width": e.type === "cites" ? 1.6 : 1.1,
-      "stroke-opacity": 0.55,
+      x1: a.x, y1: a.y, x2: b.x, y2: b.y, stroke: edgeColor(e.type),
+      "stroke-width": e.type === "cites" ? 1.6 : 1.1, "stroke-opacity": 0.5,
     });
     gEdges.append(ln);
-    lineFor.set(e, ln);
+    lines.push({ e, ln });
   });
-  nodes.forEach((n, i) => {
+  nodes.forEach((n) => {
     const g = svgEl("g", { class: "gnode", style: "cursor:pointer" });
+    const expanded = legalGraph.expanded.has(n.id);
     const c = svgEl("circle", {
-      cx: n.x, cy: n.y, r: n.kind === "entity" ? 5 : 6,
-      fill: nodeColor(n.kind), stroke: "#0c0f14", "stroke-width": 1,
+      cx: n.x, cy: n.y, r: n.kind === "entity" ? 5 : 6.5,
+      fill: nodeColor(n.kind), stroke: expanded ? "#e8edf5" : "#0c0f14",
+      "stroke-width": expanded ? 2 : 1,
     });
     const title = svgEl("title");
-    title.textContent = `${n.title || n.label} [${n.kind}]`;
+    title.textContent = `${n.title || n.label} [${n.kind}] — click to expand`;
     g.append(c, title);
     g.onclick = () => {
-      // highlight incident edges + show info
-      lineFor.forEach((ln, e) => {
-        const on = e.s === i || e.t === i;
-        ln.setAttribute("stroke-opacity", on ? 0.95 : 0.12);
-        ln.setAttribute("stroke-width", on ? 2.4 : 1);
+      lines.forEach(({ e, ln }) => {
+        const on = e.source === n.id || e.target === n.id;
+        ln.setAttribute("stroke-opacity", on ? 0.95 : 0.1);
       });
-      const inc = edges.filter((e) => e.s === i || e.t === i)
-        .map((e) => `${e.type} → ${nodes[e.s === i ? e.t : e.s].title || nodes[e.s === i ? e.t : e.s].label}`);
+      const inc = legalGraph.edges
+        .filter((e) => e.source === n.id || e.target === n.id)
+        .map((e) => {
+          const o = byId.get(e.source === n.id ? e.target : e.source);
+          return `${e.type} → ${o ? (o.title || o.label) : "?"}`;
+        });
       clear(info).append(
         el("div", {}, el("strong", {}, n.title || n.label),
           el("span", { class: "badge", style: "margin-left:.5rem" }, n.kind)),
-        el("div", { class: "muted small", style: "margin:.3rem 0" }, `${inc.length} edge(s)`),
-        el("div", { class: "chips" }, inc.slice(0, 20).map((x) => el("span", { class: "chip" }, x))));
+        el("div", { class: "muted small", style: "margin:.3rem 0" },
+          `${inc.length} edge(s) · click again only expands once`),
+        el("div", { class: "chips" }, inc.slice(0, 24).map((x) => el("span", { class: "chip" }, x))));
+      expandNode(n, host, info);
     };
     gNodes.append(g);
   });
   svg.append(gEdges, gNodes);
   host.append(svg);
+}
+
+async function expandNode(node, host, info) {
+  if (legalGraph.expanded.has(node.id)) return;     // already expanded
+  legalGraph.expanded.add(node.id);
+  const r = await run(() => post("/api/graph/neighbors",
+    { node_id: node.id, types: legalGraph.types.length ? legalGraph.types : null }));
+  if (!r || r.status === "error") return;
+  const have = new Set(legalGraph.nodes.map((n) => n.id));
+  let added = 0;
+  for (const nb of r.neighbors || []) {
+    if (!have.has(nb.id)) {
+      have.add(nb.id);
+      legalGraph.nodes.push({ ...nb, seedX: node.x + (Math.random() * 60 - 30),
+                              seedY: node.y + (Math.random() * 60 - 30) });
+      added++;
+    }
+  }
+  const ek = new Set(legalGraph.edges.map((e) => `${e.source}|${e.target}|${e.type}`));
+  let newEdges = 0;
+  for (const e of r.edges || []) {
+    const key = `${e.source}|${e.target}|${e.type}`;
+    if (!ek.has(key)) { ek.add(key); legalGraph.edges.push(e); newEdges++; }
+  }
+  if (added || newEdges) {
+    layoutGraph(host, info, 160);          // fewer iters: integrate, keep stable
+    toast(`+${added} node(s), +${newEdges} edge(s)`, "ok");
+  } else {
+    toast("no further neighbors", "warn");
+  }
 }
 
 function renderGraphLegend(host) {
@@ -907,8 +961,9 @@ $("#btn-legal-graph").onclick = () =>
       $("#lg-meta").textContent =
         `${c.acts} acts · ${c.cites} citations · ${c.entities || 0} entities · ` +
         `${c.relations || 0} relations → showing ${c.shown_nodes} nodes / ${c.shown_edges} edges ` +
-        `(KG: ${c.node_count} nodes, ${c.edge_count} edges)`;
-      renderGraph(r, $("#lg-graph"), $("#lg-info"));
+        `(KG: ${c.node_count} nodes, ${c.edge_count} edges) · click a node to expand`;
+      setLegalGraph(r);
+      layoutGraph($("#lg-graph"), $("#lg-info"));
       await refreshStatus();
     }
     return r;

@@ -68,6 +68,11 @@ class LegalGraphBody(BaseModel):
     model: Optional[str] = None
 
 
+class NeighborsBody(BaseModel):
+    node_id: int
+    types: Optional[list] = None
+
+
 class ScopeBody(BaseModel):
     scope: str = "all"
     hypothesis: Optional[str] = None
@@ -209,6 +214,12 @@ def legal_graph_build(body: LegalGraphBody) -> dict:
     return bridge.call("build_legal_graph", path=path, max_files=body.max_files,
                        with_relations=body.with_relations,
                        relation_files=body.relation_files, model=body.model or None)
+
+
+@app.post("/api/graph/neighbors")
+def graph_neighbors_ep(body: NeighborsBody) -> dict:
+    """Live neighbors of a node from the current KG (powers expand-on-click)."""
+    return bridge.call("graph_neighbors", node_id=body.node_id, types=body.types)
 
 
 @app.get("/api/models")

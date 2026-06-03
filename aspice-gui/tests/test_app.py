@@ -66,6 +66,28 @@ def test_extract_stream_emits_events_and_extracted():
     assert "process_outcomes" in extracted and "relations" in extracted
 
 
+def test_graph_neighbors_expand_uses_real_ids(tmp_path):
+    # build a tiny legal graph (act 2 cites act 1), then expand a node live
+    corpus = tmp_path / "acts"
+    corpus.mkdir()
+    (corpus / "1.json").write_text(json.dumps(
+        {"id": "1", "tip_act": "LEGE", "numar": "166", "data_vigoare": "1999-11-09",
+         "titlu": "Lege A", "text_complet": "x"}), encoding="utf-8")
+    (corpus / "2.json").write_text(json.dumps(
+        {"id": "2", "tip_act": "HOTARARE", "numar": "671", "data_vigoare": "2000-08-17",
+         "titlu": "HG B", "text_complet": "In temeiul LEGEA nr. 166 din 9 noiembrie 1999"}),
+        encoding="utf-8")
+    b = client.post("/api/legal-graph/build",
+                    json={"path": str(corpus), "max_files": 10, "with_relations": False}).json()
+    assert b["status"] == "ok" and b["edges"]
+    e = b["edges"][0]                                   # a 'cites' edge
+    nb = client.post("/api/graph/neighbors",
+                     json={"node_id": e["source"], "types": ["cites"]}).json()
+    assert nb["status"] == "ok"
+    assert e["target"] in {n["id"] for n in nb["neighbors"]}
+    assert all(x["type"] == "cites" for x in nb["edges"])
+
+
 def test_project_relations_endpoint_adds_edges():
     rels = [{"from": "Agency", "type": "concedes", "to": "Company"},
             {"from": "Agency", "type": "concedes", "to": "Company"},   # dup edge ok

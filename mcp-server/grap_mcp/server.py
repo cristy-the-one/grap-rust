@@ -415,6 +415,7 @@ def build_legal_graph(path: str, max_files: int = 400, with_relations: bool = Fa
             "status": "ok",
             "nodes": connected,
             "edges": shown_edges,
+            "edge_types": sorted({e["type"] for e in edges}),
             "counts": {
                 "acts": len(acts),
                 "cites": sum(1 for e in edges if e["type"] == "cites"),
@@ -428,6 +429,60 @@ def build_legal_graph(path: str, max_files: int = 400, with_relations: bool = Fa
         }
     except Exception as e:
         logger.exception("build_legal_graph failed")
+        return {"status": "error", "message": str(e)}
+
+
+@mcp.tool()
+def graph_neighbors(node_id: int, types: list = None) -> dict:
+    """Return a node's neighbors from the current KG (live), for the given
+    relation types (default 'cites'/'mentions'). Powers expand-on-click in the
+    graph view — querying the actual graph, not a precomputed snapshot."""
+    denied = _require("operator")
+    if denied:
+        return denied
+    kg = _state.get("kg")
+    if not kg:
+        return {"status": "error", "message": "no Knowledge Graph loaded"}
+    types = types or ["cites", "mentions"]
+    try:
+        seen: set = set()
+        neighbors: list = []
+        edges: list = []
+
+        def add(nid: int) -> None:
+            if nid in seen:
+                return
+            seen.add(nid)
+            try:
+                label = kg.get_node_label(nid)
+            except Exception:
+                label = None
+            try:
+                text = kg.get_node_text(nid)
+            except Exception:
+                text = label or str(nid)
+            kind = "entity" if (label or "").startswith("kee:") else "act"
+            neighbors.append({"id": nid, "label": label or f"node-{nid}",
+                              "kind": kind, "title": (text or "")[:140]})
+
+        for ty in types:
+            try:
+                outs = kg.neighbors_by_relation(node_id, "relation_type", ty)
+            except Exception:
+                outs = []
+            for nid, _s in outs:
+                add(nid)
+                edges.append({"source": node_id, "target": nid, "type": ty})
+            try:
+                ins = kg.predecessors_by_relation(node_id, "relation_type", ty)
+            except Exception:
+                ins = []
+            for pid, _s in ins:
+                add(pid)
+                edges.append({"source": pid, "target": node_id, "type": ty})
+        return {"status": "ok", "center": node_id, "neighbors": neighbors, "edges": edges}
+    except Exception as e:
+        logger.exception("graph_neighbors failed")
         return {"status": "error", "message": str(e)}
 
 
@@ -1016,7 +1071,7 @@ def list_capabilities() -> dict:
         "domains": {
             "knowledge": ["load_knowledge_graph", "create_knowledge_graph",
                           "ingest_documents", "extract_ontology", "project_relations",
-                          "build_legal_graph", "load_ontology"],
+                          "build_legal_graph", "graph_neighbors", "load_ontology"],
             "pg_lifecycle": ["load_procedure_graph", "publish_pg", "promote_pg",
                              "activate", "set_production", "get_production", "list_versions"],
             "execution_reasoning": ["run_procedure", "detect_gaps", "get_explanation"],
