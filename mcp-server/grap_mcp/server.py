@@ -401,21 +401,30 @@ def build_legal_graph(path: str, max_files: int = 400, with_relations: bool = Fa
         except Exception:
             logger.warning("audit record_event failed for legal_graph_built", exc_info=True)
 
-        # return only connected nodes (degree >= 1), capped, for display
-        degree: dict = {}
+        all_types = sorted({e["type"] for e in edges})
+        # Initial view = the CITATION BACKBONE (act nodes + 'cites' edges). The
+        # extracted entity/relation layer stays in the KG and is revealed on
+        # demand via expand-on-click (graph_neighbors). Acts that have extracted
+        # entities (a 'mentions' edge) are also shown so they can be expanded.
+        cites = [e for e in edges if e["type"] == "cites"]
+        shown_act_ids: set = set()
+        for e in cites:
+            shown_act_ids.add(e["source"])
+            shown_act_ids.add(e["target"])
         for e in edges:
-            degree[e["source"]] = degree.get(e["source"], 0) + 1
-            degree[e["target"]] = degree.get(e["target"], 0) + 1
-        connected = [node_info[n] for n in degree if n in node_info][:200]
+            if e["type"] == "mentions":
+                shown_act_ids.add(e["source"])   # the act side of a mention
+        connected = [node_info[n] for n in shown_act_ids
+                     if n in node_info and node_info[n]["kind"] == "act"][:200]
         connected_ids = {n["id"] for n in connected}
-        shown_edges = [e for e in edges
+        shown_edges = [e for e in cites
                        if e["source"] in connected_ids and e["target"] in connected_ids][:600]
 
         return {
             "status": "ok",
             "nodes": connected,
             "edges": shown_edges,
-            "edge_types": sorted({e["type"] for e in edges}),
+            "edge_types": all_types,   # all types (incl. mentions/relations) for expand
             "counts": {
                 "acts": len(acts),
                 "cites": sum(1 for e in edges if e["type"] == "cites"),
