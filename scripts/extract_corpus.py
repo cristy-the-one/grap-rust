@@ -31,7 +31,8 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "mcp-server"))
-from grap_mcp.kee import embeddings, extract, llm, pipeline, reconcile  # noqa: E402
+from grap_mcp.kee import embeddings, extract, llm, pipeline, registry  # noqa: E402
+from grap_mcp.kee.reconcile import keywords, tokenize  # noqa: E402
 
 
 def _load_checkpoint(frag_path: Path):
@@ -50,6 +51,85 @@ def _load_checkpoint(frag_path: Path):
     return done, by_i
 
 
+def _reconcile_persistent(by_i: dict, reg) -> dict:
+    """Stream fragments -> canonical ontology using the persistent registry.
+
+    Outcome names and relation endpoints are resolved against the registry
+    (cross-run dedup); progress is emitted as concepts are resolved. Output is
+    the GUI-compatible candidate-ontology schema."""
+    outcomes: dict = {}        # raw name -> {chars, sources}
+    order: list = []           # first-seen order
+    rel_raw: list = []         # (from, type, to, source)
+    for r in by_i.values():
+        src = r.get("source", "?")
+        for o in r.get("outcomes", []):
+            nm = (o.get("name") or "").strip()
+            if not nm:
+                continue
+            if nm not in outcomes:
+                outcomes[nm] = {"chars": [], "sources": set()}
+                order.append(nm)
+            outcomes[nm]["chars"].extend(o.get("characteristics", []))
+            outcomes[nm]["sources"].add(src)
+        for rel in r.get("relations", []):
+            f, t, ty = rel.get("from"), rel.get("to"), rel.get("type")
+            if all(isinstance(x, str) and x.strip() for x in (f, t, ty)):
+                rel_raw.append((f.strip(), ty.strip(), t.strip(), src))
+
+    names = list(order) + [x for (f, ty, t, s) in rel_raw for x in (f, t)]
+
+    def prog(d, n):
+        if d % 500 == 0 or d == n:
+            print(f"  reconcile: resolved {d}/{n} mentions "
+                  f"({reg.stats()['concepts']} canonical concepts)")
+
+    resolved = reg.resolve_many(names, on_progress=prog)
+    reg.save()
+
+    canon: dict = {}           # canonical id -> {name, chars, sources}
+    for nm in order:
+        c = resolved.get(nm)
+        if not c:
+            continue
+        e = canon.setdefault(c["id"], {"name": c["name"], "chars": [], "sources": set()})
+        e["chars"].extend(outcomes[nm]["chars"])
+        e["sources"] |= outcomes[nm]["sources"]
+
+    process_outcomes, mapping_hints, provenance, used = [], [], {}, set()
+    for cid, e in canon.items():
+        base = tokenize(e["name"]) or f"c{cid}"
+        oid = base if base not in used else f"{base}_{cid}"
+        used.add(oid)
+        chars, seen_t = [], set()
+        for ch in e["chars"]:
+            tok = tokenize(ch)
+            if tok and tok not in seen_t:
+                seen_t.add(tok)
+                chars.append(tok)
+        process_outcomes.append({
+            "id": oid, "name": e["name"],
+            "description": f"{e['name']} (proposed by extraction; review before promotion).",
+            "required_characteristics": chars})
+        mapping_hints.append({"outcome": oid,
+                              "indicators": [{"keywords": keywords(e["name"] + " " + " ".join(e["chars"]))}]})
+        provenance[oid] = sorted(e["sources"])
+
+    relations, idx = [], {}
+    for (f, ty, t, s) in rel_raw:
+        cf = resolved.get(f, {}).get("name", f)
+        ct = resolved.get(t, {}).get("name", t)
+        key = (cf.lower(), ty.lower(), ct.lower())
+        if key not in idx:
+            rel = {"from": cf, "type": ty, "to": ct, "sources": []}
+            idx[key] = rel
+            relations.append(rel)
+        if s not in idx[key]["sources"]:
+            idx[key]["sources"].append(s)
+
+    return {"version": "corpus-candidate", "process_outcomes": process_outcomes,
+            "mapping_hints": mapping_hints, "provenance": provenance, "relations": relations}
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -65,6 +145,11 @@ def main(argv=None) -> int:
     ap.add_argument("--workers", type=int, default=None,
                     help="concurrent requests (default = number of endpoints)")
     ap.add_argument("--sim", type=float, default=0.82, help="reconcile similarity threshold")
+    ap.add_argument("--registry", default=None,
+                    help="persistent concept-registry KG dir (default <out>/registry-kg); "
+                         "reused across runs for cross-run entity dedup")
+    ap.add_argument("--threshold", type=float, default=None,
+                    help="registry dedup similarity (default = --sim)")
     ap.add_argument("--out", default="out/corpus-ontology", help="output directory")
     ap.add_argument("--reconcile-only", action="store_true",
                     help="skip extraction; just (re)build the ontology from fragments.jsonl")
@@ -127,22 +212,26 @@ def main(argv=None) -> int:
             fout.close()
         print(f"extraction phase: {(time.time() - t0) / 60:.1f} min")
 
-    # ---- reconcile all fragments into a GUI-compatible candidate ontology ----
-    print("reconciling fragments -> candidate ontology…")
+    # ---- reconcile (streaming, persistent registry) -> GUI-compatible candidate ----
+    print("reconciling fragments -> candidate ontology (persistent registry)…")
     _, by_i = _load_checkpoint(frag_path)
-    frags = [{"source": r.get("source", "?"), "outcomes": r.get("outcomes", []),
-              "relations": r.get("relations", [])}
-             for r in by_i.values() if r.get("outcomes") or r.get("relations")]
+    by_i = {i: r for i, r in by_i.items() if r.get("outcomes") or r.get("relations")}
     emb = embeddings.get_embedder()
-    onto = reconcile.reconcile(frags, emb, sim=args.sim, version="corpus-candidate")
+    registry_dir = args.registry or str(outdir / "registry-kg")
+    threshold = args.threshold if args.threshold is not None else args.sim
+    reg = registry.ConceptRegistry(registry_dir, emb, threshold=threshold)
+    onto = _reconcile_persistent(by_i, reg)
+
     yaml_path = outdir / "candidate-ontology.yaml"
     rel_path = outdir / "relations.json"
     yaml_path.write_text(pipeline.to_yaml(onto), encoding="utf-8")
     rel_path.write_text(json.dumps(onto.get("relations", []), ensure_ascii=False, indent=2),
                         encoding="utf-8")
 
-    print(f"\nfragments used={len(frags)}  outcomes={len(onto['process_outcomes'])}  "
+    print(f"\nfragments used={len(by_i)}  outcomes={len(onto['process_outcomes'])}  "
           f"relations={len(onto.get('relations', []))}  embedder={emb.name}")
+    print(f"registry: {reg.stats()['concepts']} canonical concepts in {registry_dir} "
+          f"(reused/extended on the next run)")
     print("GUI-compatible output:")
     print(f"  ontology : {yaml_path}   (GUI: Knowledge -> Load ontology)")
     print(f"  relations: {rel_path}    (POST /api/relations/project, or the Legal graph)")
