@@ -81,6 +81,24 @@
           </div>
           <div id="dashboard-gaps"></div>
         </div>
+
+        <div class="card hero">
+          <div class="hero-head">
+            <div>
+              <h3>Knowledge Extraction demo</h3>
+              <p class="muted small">
+                The full assisted-extraction loop end to end: an LLM proposes an ontology
+                <em>from documents</em>, grap reconciles near-duplicate concepts and versions
+                the candidate, the proposal is adopted, project evidence is ingested, and the
+                deterministic reasoner finds the gaps. Calls a live model — allow ~30–90s.
+              </p>
+            </div>
+            <button type="button" class="btn btn-primary" id="btn-kee-demo">Run extraction demo</button>
+          </div>
+          <label for="kee-demo-model">Model <span class="muted small">(blank = server default)</span></label>
+          <input id="kee-demo-model" type="text" list="model-options" placeholder="e.g. llama3.1:8b" autocomplete="off" />
+          <div id="kee-demo-result"></div>
+        </div>
       </section>
 
       <!-- KNOWLEDGE -->

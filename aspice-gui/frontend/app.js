@@ -420,6 +420,82 @@ $("#btn-bootstrap").onclick = () =>
     return r;
   });
 
+/* ---------- knowledge extraction demo (one-click, mirrors demo_kee) ---------- */
+const KEE_STEP_LABELS = {
+  knowledge_graph: "Create fresh knowledge graph",
+  extract: "Extract ontology from documents (LLM)",
+  adopt_ontology: "Adopt: load the proposed ontology",
+  ingest_evidence: "Ingest project evidence",
+};
+
+function keeStepSummary(key, p) {
+  if (!p) return "";
+  if (p.status === "error") return p.message || "error";
+  switch (key) {
+    case "knowledge_graph": return "empty store ready";
+    case "extract": return `${p.provider}/${p.model || "?"} · ${p.chunks} chunks → ` +
+      `${p.fragments} fragments → ${(p.process_outcomes || []).length} outcomes`;
+    case "adopt_ontology": return `${p.outcomes_projected ?? 0} outcomes projected`;
+    case "ingest_evidence": return `${p.nodes_added ?? 0} nodes from ${p.files ?? 0} file(s)`;
+    default: return p.message || "ok";
+  }
+}
+
+function renderKeeDemo(r, container) {
+  clear(container);
+  // 1. step checklist
+  const list = el("ol", { class: "steps" });
+  (r.steps || []).forEach((entry) => {
+    const [key, p] = Object.entries(entry)[0];
+    const ok = p && p.status !== "error";
+    list.append(el("li", { class: `step ${ok ? "ok" : "err"}` },
+      el("span", { class: "step-mark" }, ok ? "✓" : "✕"),
+      el("div", {},
+        el("div", { class: "step-title" }, KEE_STEP_LABELS[key] || key),
+        el("div", { class: "muted small" }, keeStepSummary(key, p)))));
+  });
+  container.append(list);
+
+  // 2. proposed (and now adopted) ontology
+  const ex = r.extracted || {};
+  const v = ex.validation || {};
+  container.append(el("h4", { class: "kee-h" }, "Proposed ontology (adopted)"));
+  container.append(el("div", { class: "extract-meta" },
+    el("span", { class: "badge" }, `provider: ${ex.provider}`),
+    ex.model ? el("span", { class: "badge" }, `model: ${ex.model}`) : null,
+    el("span", { class: "badge" }, `embedder: ${ex.embedder}`),
+    el("span", { class: `badge ${v.ok ? "ok" : "err"}` }, v.ok ? "valid" : "has errors")));
+  (ex.process_outcomes || []).forEach((o) => {
+    const prov = (ex.provenance && ex.provenance[o.id]) || [];
+    container.append(el("div", { class: "proposed" },
+      el("div", { class: "proposed-name" }, o.name),
+      el("div", { class: "chips" }, (o.characteristics || []).map((c) => el("span", { class: "chip" }, c))),
+      prov.length ? el("div", { class: "muted small" }, `from: ${prov.join(", ")}`) : null));
+  });
+  if (!(ex.process_outcomes || []).length) {
+    container.append(el("p", { class: "muted small" },
+      "No outcomes proposed — is the LLM (GRAP_LLM_BASE_URL / Ollama) reachable and the model pulled?"));
+  }
+
+  // 3. gaps after adopting (held-out evidence)
+  container.append(el("h4", { class: "kee-h" },
+    `Gaps vs. evidence (${(r.evidence_files || []).join(", ") || "—"})`));
+  const gapsBox = el("div", {});
+  container.append(gapsBox);
+  if (r.gaps) renderGaps(r.gaps, gapsBox);
+}
+
+$("#btn-kee-demo").onclick = () =>
+  run(async () => {
+    toast("Running extraction demo (calling the model)…", "warn");
+    const r = await post("/api/wizard/extract", { path: null, model: $("#kee-demo-model").value.trim() || null });
+    if (r) renderKeeDemo(r, $("#kee-demo-result"));
+    await refreshStatus();
+    if (r && r.status !== "error")
+      toast(`Extraction demo complete — ${(r.gaps && r.gaps.gaps_found) ?? 0} gaps`, "ok");
+    return r;
+  });
+
 /* ---------- knowledge ---------- */
 $("#btn-create-kg").onclick = () =>
   run(async () => {

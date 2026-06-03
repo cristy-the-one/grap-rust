@@ -565,6 +565,7 @@ table.hits td:last-child { font-family: var(--mono); color: var(--muted); }
   margin-bottom: 0.5rem;
 }
 .proposed-name { font-weight: 600; margin-bottom: 0.35rem; }
+.kee-h { margin: 1rem 0 0.5rem; font-size: 0.9rem; color: var(--accent); }
 
 /* ---------- raw drawer ---------- */
 .raw-drawer {

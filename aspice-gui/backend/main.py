@@ -41,6 +41,12 @@ class ExtractBody(BaseModel):
     model: Optional[str] = None
 
 
+class WizardExtractBody(BaseModel):
+    path: Optional[str] = None     # corpus to extract from; default = sample knowledge
+    sim: float = 0.86
+    model: Optional[str] = None
+
+
 class ScopeBody(BaseModel):
     scope: str = "all"
     hypothesis: Optional[str] = None
@@ -319,6 +325,49 @@ def wizard_bootstrap() -> dict:
         _api_error(r)
     gaps = bridge.call("detect_gaps", scope="all")
     return {"status": "ok", "steps": steps, "gaps": gaps, "workspace": ws, "examples": ex}
+
+
+@app.post("/api/wizard/extract")
+def wizard_extract(body: WizardExtractBody) -> dict:
+    """One-click Knowledge Extraction demo (mirrors demo_kee.py end-to-end):
+    fresh KG → extract ontology from the corpus (LLM) → reconcile/validate →
+    adopt (load) the candidate → ingest a held-out slice as project evidence →
+    detect gaps. Returns the proposed ontology + the resulting gaps."""
+    ws = bridge.ensure_workspace()
+    ex = bridge.default_examples()
+    corpus = body.path or ex["sample_knowledge"]
+    kg_path = str(Path(ws) / "kg")
+    steps: list[dict] = []
+
+    def step(label: str, cap: str, **kwargs) -> dict:
+        r = bridge.call(cap, **kwargs)
+        steps.append({label: r})
+        _api_error(r)
+        return r
+
+    step("knowledge_graph", "create_knowledge_graph", path=kg_path)
+    extracted = step("extract", "extract_ontology", path=corpus,
+                     model=body.model or None, sim=body.sim)
+    out_path = extracted.get("out_path")
+    if not out_path:
+        raise HTTPException(400, "extraction did not produce a candidate ontology")
+    step("adopt_ontology", "load_ontology", path=out_path)
+
+    # Ingest all-but-one corpus doc as "project evidence" so the held-out doc's
+    # concepts surface as gaps (a meaningful assessment, like demo_kee).
+    md = sorted(str(p) for p in Path(corpus).glob("*.md"))
+    evidence = md[:-1] if len(md) > 1 else md
+    nodes = 0
+    for f in evidence:
+        r = bridge.call("ingest_documents", path=f)
+        _api_error(r)
+        nodes += r.get("nodes_added", 0)
+    steps.append({"ingest_evidence": {"status": "ok", "files": len(evidence),
+                                      "nodes_added": nodes}})
+
+    gaps = bridge.call("detect_gaps", scope="all")
+    return {"status": "ok", "steps": steps, "extracted": extracted, "gaps": gaps,
+            "evidence_files": [Path(f).name for f in evidence], "workspace": ws}
 
 
 @app.post("/api/wizard/publish-activate")
