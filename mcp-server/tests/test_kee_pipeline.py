@@ -72,6 +72,14 @@ def test_read_chunks_generic_json_fallback(tmp_path):
     assert "hello world" in text and "second value" in text
 
 
+def test_read_chunks_chunk_chars(tmp_path):
+    (tmp_path / "a.txt").write_text("word " * 500, encoding="utf-8")   # ~2500 chars, one block
+    small = pipeline.read_chunks(str(tmp_path), chunk_chars=200)
+    big = pipeline.read_chunks(str(tmp_path), chunk_chars=2000)
+    assert len(small) > len(big)                       # smaller chunks => more of them
+    assert all(len(c[1]) <= 2000 for c in big)
+
+
 def test_read_chunks_max_files_cap(tmp_path):
     for i in range(5):
         (tmp_path / f"f{i}.json").write_text(

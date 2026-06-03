@@ -36,12 +36,14 @@ def _text_and_label_from_json(obj: Any, stem: str) -> Tuple[str, str]:
     return (str(obj or ""), stem)
 
 
-def read_chunks(root: str, max_files: Optional[int] = None) -> List[Tuple[str, str]]:
+def read_chunks(root: str, max_files: Optional[int] = None,
+                chunk_chars: int = 800) -> List[Tuple[str, str]]:
     """Walk .md/.txt/.json under `root` → [(source_label, chunk_text), ...].
 
     JSON files are read via the law-aware/generic extractor. `max_files` caps how
     many files are read (a safety guard against pointing at a huge corpus — an
-    LLM call per chunk gets expensive fast)."""
+    LLM call per chunk gets expensive fast). `chunk_chars` sets the chunk size
+    (bigger = fewer LLM calls; keep modest for small models)."""
     p = Path(root)
     exts = set(_EXTS) | {".json"}
     if p.is_file():
@@ -65,7 +67,7 @@ def read_chunks(root: str, max_files: Optional[int] = None) -> List[Tuple[str, s
                 continue
         else:
             text, label = raw, f.stem
-        for i, c in enumerate(chunk_text(text)):
+        for i, c in enumerate(chunk_text(text, max_chars=chunk_chars)):
             chunks.append((f"{label}#{i}", c))
     return chunks
 

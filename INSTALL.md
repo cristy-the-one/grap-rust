@@ -69,6 +69,40 @@ Relevant environment variables (all optional):
 - `GRAP_EMBED_BACKEND` — `ollama` (default in the GUI) / `local` (sentence-transformers) / `hashing`
 - `GRAP_ROLE` — `viewer` | `operator` | `admin` (default `operator`)
 
+## Large-corpus batch extraction (`scripts/extract_corpus.py`)
+
+The interactive Extract panel calls the LLM once per chunk, sequentially — fine
+for a few files, far too slow for a whole corpus. For bulk extraction use the
+batch runner: **parallel across endpoints, bigger chunks, checkpointed/resumable**,
+emitting the same candidate-ontology the GUI loads.
+
+```powershell
+# one GPU
+python scripts\extract_corpus.py real-data-law-ro --model llama3.2:3b `
+    --chunk-chars 2000 --out out\legal-ontology
+
+# two GPUs — one Ollama per GPU, then point the runner at both:
+#   $env:CUDA_VISIBLE_DEVICES="0"; $env:OLLAMA_HOST="127.0.0.1:11434"; ollama serve
+#   $env:CUDA_VISIBLE_DEVICES="1"; $env:OLLAMA_HOST="127.0.0.1:11435"; ollama serve
+python scripts\extract_corpus.py real-data-law-ro `
+    --endpoints http://localhost:11434/v1,http://localhost:11435/v1 `
+    --model llama3.2:3b --chunk-chars 2000 --workers 4 --out out\legal-ontology
+```
+
+Notes:
+- **Resumable** — kill it (Ctrl+C twice / `taskkill /F`) any time; rerun continues
+  from `out\…\fragments.jsonl` (delete that file to start over).
+- **Model/chunk size** — `llama3.2:3b` is ~3× faster than `llama3.1:8b` and good
+  enough for proposals (noisier). `--chunk-chars 2000` is a safe size for 3b;
+  8b can go larger. Bigger chunks = fewer LLM calls.
+- **Speed** — e.g. the full law corpus: ~11 days (8b/800-char/serial) →
+  roughly **~16h** (3b/2000-char/2 GPUs). Use `--max-files N` for a quick subset.
+- **Load the result in the GUI** — Knowledge panel → *Load ontology* →
+  `out\legal-ontology\candidate-ontology.yaml`. Project the relations via
+  *POST /api/relations/project* (body = `relations.json`) or the **Legal graph**
+  panel. (A full-corpus ontology has thousands of outcomes — load a subset run
+  for an interactive demo.)
+
 ## Maintainer: rebuild the bundled wheel
 
 ```powershell
