@@ -47,6 +47,7 @@ class ExtractBody(BaseModel):
     path: str
     sim: float = 0.86
     model: Optional[str] = None
+    max_files: Optional[int] = None
 
 
 class WizardExtractBody(BaseModel):
@@ -180,7 +181,7 @@ def ingest_docs(body: PathBody) -> dict:
 @app.post("/api/extract")
 def extract_ontology(body: ExtractBody) -> dict:
     return bridge.call("extract_ontology", path=body.path, sim=body.sim,
-                       model=body.model or None)
+                       model=body.model or None, max_files=body.max_files)
 
 
 @app.get("/api/models")

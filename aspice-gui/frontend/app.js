@@ -621,6 +621,20 @@ function renderExtract(r, container) {
       prov.length ? el("div", { class: "muted small" }, `from: ${prov.join(", ")}`) : null));
   });
 
+  // proposed relations (knowledge-graph edges between concepts)
+  const rels = r.relations || [];
+  if (rels.length) {
+    container.append(el("h4", { class: "kee-h" }, `Proposed relations (${rels.length})`));
+    const list = el("div", { class: "relations" });
+    rels.slice(0, 40).forEach((rel) => {
+      list.append(el("div", { class: "relation" },
+        el("span", { class: "rel-node" }, rel.from),
+        el("span", { class: "rel-type" }, `—${rel.type}→`),
+        el("span", { class: "rel-node" }, rel.to)));
+    });
+    container.append(list);
+  }
+
   // human gate: adopt the proposal
   container.append(el("div", { class: "gap-actions" },
     el("button", {
@@ -636,9 +650,11 @@ function renderExtract(r, container) {
 
 $("#btn-extract").onclick = () =>
   run(async () => {
+    const mf = parseInt($("#max-files-extract").value, 10);
     const r = await post("/api/extract", {
       path: $("#path-extract").value,
       model: $("#model-extract").value.trim() || null,
+      max_files: Number.isFinite(mf) && mf > 0 ? mf : null,
     });
     if (r) renderExtract(r, $("#extract-result"));
     if (r && r.status !== "error")

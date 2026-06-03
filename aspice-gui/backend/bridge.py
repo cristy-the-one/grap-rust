@@ -29,7 +29,10 @@ def default_examples() -> dict[str, str]:
 
 
 def ensure_workspace(path: str | None = None) -> str:
-    ws = path or str(_REPO_ROOT / "aspice-gui" / "grap-workspace")
+    # Prefer an explicit path, then an already-configured GRAP_WORKSPACE
+    # (so callers/tests that set it stay isolated), then the GUI default.
+    ws = path or os.environ.get("GRAP_WORKSPACE") or str(
+        _REPO_ROOT / "aspice-gui" / "grap-workspace")
     os.environ["GRAP_WORKSPACE"] = ws
     Path(ws).mkdir(parents=True, exist_ok=True)
     for key in ("ws", "ws_root", "kg", "kg_path", "ontology", "ontology_version",

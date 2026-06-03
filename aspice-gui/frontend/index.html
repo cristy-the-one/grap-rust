@@ -165,13 +165,23 @@
           </div>
           <label for="path-extract">Folder of .md / .txt</label>
           <input id="path-extract" type="text" placeholder="…/sample-knowledge" />
-          <label for="model-extract">Model <span class="muted small">(blank = server default)</span></label>
-          <input id="model-extract" type="text" list="model-options"
-                 placeholder="e.g. llama3.1:8b" autocomplete="off" />
-          <datalist id="model-options"></datalist>
+          <div class="grid-2">
+            <div>
+              <label for="model-extract">Model <span class="muted small">(blank = server default)</span></label>
+              <input id="model-extract" type="text" list="model-options"
+                     placeholder="e.g. llama3.1:8b" autocomplete="off" />
+              <datalist id="model-options"></datalist>
+            </div>
+            <div>
+              <label for="max-files-extract">Max files <span class="muted small">(blank = all)</span></label>
+              <input id="max-files-extract" type="number" min="1" placeholder="e.g. 3" />
+            </div>
+          </div>
           <p class="muted small">
-            LLM via <code>GRAP_LLM_BASE_URL</code> (default local Ollama); embeddings local.
-            Set <code>GRAP_LLM_STUB=1</code> to dry-run offline.
+            Reads .md/.txt/.json (e.g. the Romanian legal acts). LLM via
+            <code>GRAP_LLM_BASE_URL</code> (local Ollama); embeddings local. One LLM
+            call per chunk — cap <em>Max files</em> on big corpora.
+            <code>GRAP_LLM_STUB=1</code> dry-runs offline.
           </p>
           <div id="extract-result"></div>
         </div>

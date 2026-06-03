@@ -566,6 +566,13 @@ table.hits td:last-child { font-family: var(--mono); color: var(--muted); }
 }
 .proposed-name { font-weight: 600; margin-bottom: 0.35rem; }
 .kee-h { margin: 1rem 0 0.5rem; font-size: 0.9rem; color: var(--accent); }
+.relations { display: flex; flex-direction: column; gap: 0.25rem; }
+.relation {
+  display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;
+  font-size: 0.82rem; padding: 0.3rem 0; border-bottom: 1px solid var(--border);
+}
+.rel-node { font-family: var(--mono); }
+.rel-type { color: var(--accent); font-size: 0.76rem; white-space: nowrap; }
 
 /* ---------- KEE live progress ---------- */
 .kee-progress { margin-top: 1rem; }
