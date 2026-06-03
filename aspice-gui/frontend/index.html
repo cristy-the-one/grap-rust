@@ -18,6 +18,7 @@
       <button type="button" class="nav" data-panel="knowledge">Knowledge</button>
       <button type="button" class="nav" data-panel="gaps">Gap analysis</button>
       <button type="button" class="nav" data-panel="lifecycle">Lifecycle</button>
+      <button type="button" class="nav" data-panel="legal-graph">Legal graph</button>
       <button type="button" class="nav" data-panel="runs">Runs &amp; temporal</button>
       <button type="button" class="nav" data-panel="quality">Quality</button>
       <button type="button" class="nav" data-panel="audit">Audit</button>
@@ -252,6 +253,44 @@
         <div class="card">
           <h3>Versions</h3>
           <div id="versions-list"><p class="muted">List versions to view.</p></div>
+        </div>
+      </section>
+
+      <!-- LEGAL GRAPH -->
+      <section id="panel-legal-graph" class="panel">
+        <h2>Legal knowledge graph</h2>
+        <p class="lead">
+          One navigable graph: the corpus's citation network (<code>cites</code> edges
+          between acts) merged with KEE's extracted entity relations (linked back to
+          their source act via <code>mentions</code> edges).
+        </p>
+        <div class="card">
+          <div class="inline-form">
+            <div>
+              <label for="lg-path">Corpus folder <span class="muted small">(blank = real-data-law-ro)</span></label>
+              <input id="lg-path" type="text" placeholder="…/real-data-law-ro" />
+            </div>
+            <div>
+              <label for="lg-max">Acts (citations)</label>
+              <input id="lg-max" type="number" min="1" value="400" />
+            </div>
+            <div>
+              <label for="lg-model">Model <span class="muted small">(relations)</span></label>
+              <input id="lg-model" type="text" list="model-options" placeholder="llama3.1:8b" autocomplete="off" />
+            </div>
+            <div class="checkbox-row">
+              <label><input id="lg-relations" type="checkbox" /> add extracted relations (LLM, slower)</label>
+            </div>
+            <div class="actions">
+              <button type="button" class="btn btn-primary" id="btn-legal-graph">Build graph</button>
+            </div>
+          </div>
+          <p class="muted small" id="lg-meta"></p>
+          <div class="graph-legend" id="lg-legend"></div>
+        </div>
+        <div class="graph-wrap">
+          <div id="lg-graph" class="graph-host"></div>
+          <div id="lg-info" class="graph-info muted small">Click a node to inspect it.</div>
         </div>
       </section>
 

@@ -779,6 +779,141 @@ $("#btn-get-production").onclick = () =>
     return r;
   });
 
+/* ---------- legal knowledge graph (SVG force-directed, self-contained) ---------- */
+const SVGNS = "http://www.w3.org/2000/svg";
+function svgEl(tag, attrs = {}) {
+  const n = document.createElementNS(SVGNS, tag);
+  for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, v);
+  return n;
+}
+function edgeColor(type) {
+  if (type === "cites") return "#5b8def";       // citation network
+  if (type === "mentions") return "#8b9bb8";     // entity ← act link
+  return "#e8a838";                              // extracted relation
+}
+function nodeColor(kind) { return kind === "entity" ? "#3ecf8e" : "#e8a838"; }
+
+function renderGraph(data, host, info) {
+  host.innerHTML = "";
+  const W = 880, H = 620, pad = 30;
+  const nodes = (data.nodes || []).map((n) => ({
+    ...n, x: pad + Math.random() * (W - 2 * pad), y: pad + Math.random() * (H - 2 * pad),
+  }));
+  if (!nodes.length) {
+    host.append(el("p", { class: "muted" },
+      "No connected nodes — increase Acts, or enable extracted relations."));
+    return;
+  }
+  const idx = new Map(nodes.map((n, i) => [n.id, i]));
+  const edges = (data.edges || [])
+    .filter((e) => idx.has(e.source) && idx.has(e.target))
+    .map((e) => ({ s: idx.get(e.source), t: idx.get(e.target), type: e.type }));
+
+  // Fruchterman–Reingold layout
+  const area = W * H, k = Math.sqrt(area / nodes.length);
+  let temp = W / 8;
+  for (let it = 0; it < 320; it++) {
+    const disp = nodes.map(() => ({ x: 0, y: 0 }));
+    for (let i = 0; i < nodes.length; i++) {
+      for (let j = i + 1; j < nodes.length; j++) {
+        let dx = nodes[i].x - nodes[j].x, dy = nodes[i].y - nodes[j].y;
+        let d = Math.hypot(dx, dy) || 0.01;
+        const f = (k * k) / d;
+        const ux = dx / d, uy = dy / d;
+        disp[i].x += ux * f; disp[i].y += uy * f;
+        disp[j].x -= ux * f; disp[j].y -= uy * f;
+      }
+    }
+    for (const e of edges) {
+      let dx = nodes[e.s].x - nodes[e.t].x, dy = nodes[e.s].y - nodes[e.t].y;
+      let d = Math.hypot(dx, dy) || 0.01;
+      const f = (d * d) / k, ux = dx / d, uy = dy / d;
+      disp[e.s].x -= ux * f; disp[e.s].y -= uy * f;
+      disp[e.t].x += ux * f; disp[e.t].y += uy * f;
+    }
+    for (let i = 0; i < nodes.length; i++) {
+      const d = Math.hypot(disp[i].x, disp[i].y) || 0.01;
+      nodes[i].x += (disp[i].x / d) * Math.min(d, temp);
+      nodes[i].y += (disp[i].y / d) * Math.min(d, temp);
+      nodes[i].x = Math.max(pad, Math.min(W - pad, nodes[i].x));
+      nodes[i].y = Math.max(pad, Math.min(H - pad, nodes[i].y));
+    }
+    temp *= 0.965;
+  }
+
+  const svg = svgEl("svg", { viewBox: `0 0 ${W} ${H}`, class: "graph-svg" });
+  const gEdges = svgEl("g"), gNodes = svgEl("g");
+  const lineFor = new Map();
+  edges.forEach((e) => {
+    const ln = svgEl("line", {
+      x1: nodes[e.s].x, y1: nodes[e.s].y, x2: nodes[e.t].x, y2: nodes[e.t].y,
+      stroke: edgeColor(e.type), "stroke-width": e.type === "cites" ? 1.6 : 1.1,
+      "stroke-opacity": 0.55,
+    });
+    gEdges.append(ln);
+    lineFor.set(e, ln);
+  });
+  nodes.forEach((n, i) => {
+    const g = svgEl("g", { class: "gnode", style: "cursor:pointer" });
+    const c = svgEl("circle", {
+      cx: n.x, cy: n.y, r: n.kind === "entity" ? 5 : 6,
+      fill: nodeColor(n.kind), stroke: "#0c0f14", "stroke-width": 1,
+    });
+    const title = svgEl("title");
+    title.textContent = `${n.title || n.label} [${n.kind}]`;
+    g.append(c, title);
+    g.onclick = () => {
+      // highlight incident edges + show info
+      lineFor.forEach((ln, e) => {
+        const on = e.s === i || e.t === i;
+        ln.setAttribute("stroke-opacity", on ? 0.95 : 0.12);
+        ln.setAttribute("stroke-width", on ? 2.4 : 1);
+      });
+      const inc = edges.filter((e) => e.s === i || e.t === i)
+        .map((e) => `${e.type} → ${nodes[e.s === i ? e.t : e.s].title || nodes[e.s === i ? e.t : e.s].label}`);
+      clear(info).append(
+        el("div", {}, el("strong", {}, n.title || n.label),
+          el("span", { class: "badge", style: "margin-left:.5rem" }, n.kind)),
+        el("div", { class: "muted small", style: "margin:.3rem 0" }, `${inc.length} edge(s)`),
+        el("div", { class: "chips" }, inc.slice(0, 20).map((x) => el("span", { class: "chip" }, x))));
+    };
+    gNodes.append(g);
+  });
+  svg.append(gEdges, gNodes);
+  host.append(svg);
+}
+
+function renderGraphLegend(host) {
+  clear(host).append(
+    el("span", { class: "leg" }, el("span", { class: "dot", style: "background:#e8a838" }), "act / entity"),
+    el("span", { class: "leg" }, el("span", { class: "dot", style: "background:#3ecf8e" }), "entity"),
+    el("span", { class: "leg" }, el("span", { class: "bar", style: "background:#5b8def" }), "cites"),
+    el("span", { class: "leg" }, el("span", { class: "bar", style: "background:#8b9bb8" }), "mentions"),
+    el("span", { class: "leg" }, el("span", { class: "bar", style: "background:#e8a838" }), "relation"));
+}
+
+$("#btn-legal-graph").onclick = () =>
+  run(async () => {
+    $("#lg-meta").textContent = "Building… (citations are fast; relations call the model)";
+    renderGraphLegend($("#lg-legend"));
+    const r = await post("/api/legal-graph/build", {
+      path: $("#lg-path").value.trim() || null,
+      max_files: parseInt($("#lg-max").value, 10) || 400,
+      with_relations: $("#lg-relations").checked,
+      model: $("#lg-model").value.trim() || null,
+    });
+    if (r && r.status !== "error") {
+      const c = r.counts || {};
+      $("#lg-meta").textContent =
+        `${c.acts} acts · ${c.cites} citations · ${c.entities || 0} entities · ` +
+        `${c.relations || 0} relations → showing ${c.shown_nodes} nodes / ${c.shown_edges} edges ` +
+        `(KG: ${c.node_count} nodes, ${c.edge_count} edges)`;
+      renderGraph(r, $("#lg-graph"), $("#lg-info"));
+      await refreshStatus();
+    }
+    return r;
+  });
+
 /* ---------- runs ---------- */
 async function loadRuns(kind) {
   const r = await run(() => api(kind ? `/api/runs?kind=${kind}` : "/api/runs"));

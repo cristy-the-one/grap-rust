@@ -60,6 +60,14 @@ class RelationsBody(BaseModel):
     relations: list = []
 
 
+class LegalGraphBody(BaseModel):
+    path: Optional[str] = None     # corpus dir; default = real-data-law-ro
+    max_files: int = 400
+    with_relations: bool = False
+    relation_files: int = 3
+    model: Optional[str] = None
+
+
 class ScopeBody(BaseModel):
     scope: str = "all"
     hypothesis: Optional[str] = None
@@ -192,6 +200,15 @@ def extract_ontology(body: ExtractBody) -> dict:
 def project_relations_ep(body: RelationsBody) -> dict:
     """Project extracted relations as typed edges in the current KG."""
     return bridge.call("project_relations", relations=body.relations)
+
+
+@app.post("/api/legal-graph/build")
+def legal_graph_build(body: LegalGraphBody) -> dict:
+    """Build one navigable legal KG (citations + extracted relations)."""
+    path = body.path or str(bridge.repo_root() / "real-data-law-ro")
+    return bridge.call("build_legal_graph", path=path, max_files=body.max_files,
+                       with_relations=body.with_relations,
+                       relation_files=body.relation_files, model=body.model or None)
 
 
 @app.get("/api/models")

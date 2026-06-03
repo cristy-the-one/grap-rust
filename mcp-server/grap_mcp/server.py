@@ -313,6 +313,125 @@ def project_relations(relations: list = None) -> dict:
 
 
 @mcp.tool()
+def build_legal_graph(path: str, max_files: int = 400, with_relations: bool = False,
+                      relation_files: int = 3, model: str = None) -> dict:
+    """Build one navigable legal KG: act nodes + citation ('cites') edges merged
+    with KEE-extracted entity relations.
+
+    Citations are resolved over up to `max_files` acts (fast, regex). When
+    `with_relations` is set, KEE runs over the first `relation_files` acts (LLM)
+    and its relations are projected as entity nodes + typed edges, linked back to
+    their source act via 'mentions' edges — connecting the two networks.
+
+    Returns the connected subgraph (nodes with at least one edge) for display,
+    plus full KG counts.
+    """
+    denied = _require("operator")
+    if denied:
+        return denied
+    try:
+        from .kee import legal, pipeline, llm, embeddings
+        acts = legal.load_acts(path, max_files=max_files)
+        if not acts:
+            return {"status": "error", "message": f"no legal-act JSON found under {path}"}
+
+        kgp = str(Path(_resolve_ws_root()) / "legal-kg")
+        res = create_knowledge_graph(kgp)
+        if res.get("status") == "error":
+            return res
+        kg = _state["kg"]
+
+        node_info: dict = {}      # node_id -> {label, kind, title}
+        id_to_node: dict = {}     # act id -> node_id
+        for a in acts:
+            label = f"act-{a['id']}"
+            nid = kg.add_node(text=(a["title"] or label)[:2000], label=label)
+            id_to_node[a["id"]] = nid
+            node_info[nid] = {"id": nid, "label": label, "kind": "act",
+                              "title": (a["title"] or label)[:140]}
+
+        edges: list = []
+        for s, t in legal.citation_pairs(acts):
+            if s in id_to_node and t in id_to_node:
+                kg.add_edge(id_to_node[s], id_to_node[t], 0.8, {"relation_type": "cites"})
+                edges.append({"source": id_to_node[s], "target": id_to_node[t], "type": "cites"})
+
+        rel_count = 0
+        if with_relations:
+            provider = llm.get_provider(model=model)
+            embedder = embeddings.get_embedder()
+            r = pipeline.extract_ontology(path, provider, embedder, sim=0.8,
+                                          max_files=relation_files)
+            relations = r["ontology"].get("relations", [])
+            rel_count = len(relations)
+            ent_node: dict = {}
+            mentions_seen: set = set()
+
+            def ent_for(name: str) -> int:
+                lbl = ("kee:" + name.strip())[:120]
+                nid = ent_node.get(lbl)
+                if nid is None:
+                    nid = kg.add_node(text=name.strip(), label=lbl)
+                    ent_node[lbl] = nid
+                    node_info[nid] = {"id": nid, "label": lbl, "kind": "entity",
+                                      "title": name.strip()[:140]}
+                return nid
+
+            for rel in relations:
+                f, t, ty = rel.get("from"), rel.get("to"), rel.get("type")
+                if not all(isinstance(x, str) and x.strip() for x in (f, t, ty)):
+                    continue
+                fn, tn = ent_for(f), ent_for(t)
+                kg.add_edge(fn, tn, 0.7, {"relation_type": ty.strip(), "source": "kee"})
+                edges.append({"source": fn, "target": tn, "type": ty.strip()})
+                # link extracted entities back to the act they came from
+                for src in rel.get("sources", []):
+                    act_id = src.split("#")[0]
+                    an = id_to_node.get(act_id)
+                    if an is not None and (an, fn) not in mentions_seen:
+                        mentions_seen.add((an, fn))
+                        kg.add_edge(an, fn, 0.5, {"relation_type": "mentions"})
+                        edges.append({"source": an, "target": fn, "type": "mentions"})
+
+        kg.save_to_dir(kgp)
+        try:
+            _get_workspace().record_event("legal_graph_built", path,
+                                          details={"acts": str(len(acts)),
+                                                   "edges": str(len(edges))})
+        except Exception:
+            logger.warning("audit record_event failed for legal_graph_built", exc_info=True)
+
+        # return only connected nodes (degree >= 1), capped, for display
+        degree: dict = {}
+        for e in edges:
+            degree[e["source"]] = degree.get(e["source"], 0) + 1
+            degree[e["target"]] = degree.get(e["target"], 0) + 1
+        connected = [node_info[n] for n in degree if n in node_info][:200]
+        connected_ids = {n["id"] for n in connected}
+        shown_edges = [e for e in edges
+                       if e["source"] in connected_ids and e["target"] in connected_ids][:600]
+
+        return {
+            "status": "ok",
+            "nodes": connected,
+            "edges": shown_edges,
+            "counts": {
+                "acts": len(acts),
+                "cites": sum(1 for e in edges if e["type"] == "cites"),
+                "relations": rel_count,
+                "entities": sum(1 for n in node_info.values() if n["kind"] == "entity"),
+                "shown_nodes": len(connected),
+                "shown_edges": len(shown_edges),
+                "node_count": kg.node_count(),
+                "edge_count": kg.edge_count(),
+            },
+        }
+    except Exception as e:
+        logger.exception("build_legal_graph failed")
+        return {"status": "error", "message": str(e)}
+
+
+@mcp.tool()
 def load_ontology(path: str) -> dict:
     """Load an ASPICE ontology, project it into the KG, and version it."""
     denied = _require("operator")
@@ -897,7 +1016,7 @@ def list_capabilities() -> dict:
         "domains": {
             "knowledge": ["load_knowledge_graph", "create_knowledge_graph",
                           "ingest_documents", "extract_ontology", "project_relations",
-                          "load_ontology"],
+                          "build_legal_graph", "load_ontology"],
             "pg_lifecycle": ["load_procedure_graph", "publish_pg", "promote_pg",
                              "activate", "set_production", "get_production", "list_versions"],
             "execution_reasoning": ["run_procedure", "detect_gaps", "get_explanation"],
