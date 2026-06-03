@@ -12,9 +12,10 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import urllib.error
 import urllib.request
-from typing import Callable, List, Optional, Protocol, runtime_checkable
+from typing import Callable, Iterator, List, Optional, Protocol, runtime_checkable
 
 DEFAULT_BASE_URL = "http://localhost:11434/v1"   # Ollama's OpenAI-compatible API
 DEFAULT_MODEL = "llama3.1"
@@ -58,6 +59,12 @@ class StubProvider:
             return r
         return self._default
 
+    def stream(self, system: str, user: str):
+        """Yield the canned response in pieces (so offline UIs still animate)."""
+        text = self.complete(system, user)
+        for piece in re.findall(r"\S+\s*", text) or [text]:
+            yield piece
+
 
 class OpenAICompatProvider:
     """Talks to any OpenAI-compatible /chat/completions server via urllib."""
@@ -100,6 +107,55 @@ class OpenAICompatProvider:
             return body["choices"][0]["message"]["content"]
         except (KeyError, IndexError, TypeError) as exc:
             raise RuntimeError(f"unexpected LLM response shape: {body!r}") from exc
+
+    def stream(self, system: str, user: str) -> Iterator[str]:
+        """Yield content deltas as the model generates them (stream:true).
+
+        Each yielded piece corresponds to tokens the model actually produced —
+        the honest 'it's working right now' signal for a progress UI.
+        """
+        url = f"{self.base_url}/chat/completions"
+        payload = {
+            "model": self.model,
+            "messages": [
+                {"role": "system", "content": system},
+                {"role": "user", "content": user},
+            ],
+            "temperature": self.temperature,
+            "stream": True,
+        }
+        headers = {"Content-Type": "application/json"}
+        if self.api_key:
+            headers["Authorization"] = f"Bearer {self.api_key}"
+        req = urllib.request.Request(url, data=json.dumps(payload).encode("utf-8"),
+                                     headers=headers, method="POST")
+        try:
+            resp = urllib.request.urlopen(req, timeout=self.timeout)
+        except (urllib.error.URLError, OSError) as exc:
+            raise RuntimeError(
+                f"LLM stream to {url} failed: {exc}. Is the server (e.g. Ollama) "
+                f"running and is model '{self.model}' available?") from exc
+        try:
+            for raw in resp:                       # iterate the chunked response by line
+                line = raw.decode("utf-8", "replace").strip()
+                if not line:
+                    continue
+                if line.startswith("data:"):       # SSE framing used by OpenAI/Ollama
+                    line = line[len("data:"):].strip()
+                if line == "[DONE]":
+                    break
+                try:
+                    obj = json.loads(line)
+                except ValueError:
+                    continue
+                choices = obj.get("choices") or []
+                if not choices:
+                    continue
+                delta = (choices[0].get("delta") or {}).get("content")
+                if delta:
+                    yield delta
+        finally:
+            resp.close()
 
 
 def list_models(base_url: Optional[str] = None, api_key: Optional[str] = None,

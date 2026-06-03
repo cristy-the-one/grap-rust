@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
+import json
 import os
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Iterator, Optional
 
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
@@ -327,47 +328,149 @@ def wizard_bootstrap() -> dict:
     return {"status": "ok", "steps": steps, "gaps": gaps, "workspace": ws, "examples": ex}
 
 
+def _extract_events(path: Optional[str], model: Optional[str],
+                    sim: float) -> Iterator[dict]:
+    """Drive the KEE demo loop, yielding progress events as work happens.
+
+    Single source of truth for both the streaming and non-streaming endpoints:
+    the streaming endpoint serializes each event as it arrives; the plain
+    endpoint just consumes to the terminal 'done'/'error'. The 'token' events
+    are emitted from real LLM stream deltas (not a timer) — the honest signal
+    that the model is generating right now.
+    """
+    import grap_mcp.server as srv
+    from grap_mcp.kee import embeddings, extract, llm, pipeline, reconcile, validate
+
+    try:
+        ws = bridge.ensure_workspace()
+        ex = bridge.default_examples()
+        corpus = path or ex["sample_knowledge"]
+        kg_path = str(Path(ws) / "kg")
+
+        kg = bridge.call("create_knowledge_graph", path=kg_path)
+        if kg.get("status") == "error":
+            yield {"type": "error", "message": kg.get("message")}
+            return
+        yield {"type": "step", "name": "knowledge_graph", "status": "ok"}
+
+        # init the provider only (embedder is deferred to the reconcile phase so
+        # token streaming starts immediately instead of waiting on model load)
+        yield {"type": "phase", "name": "prepare"}
+        provider = llm.get_provider(model=model or None)
+        chunks = pipeline.read_chunks(corpus)
+        yield {"type": "extract_begin", "chunks": len(chunks),
+               "provider": provider.name, "model": getattr(provider, "model", None)}
+
+        can_stream = hasattr(provider, "stream")
+        fragments = []
+        for i, (src, text) in enumerate(chunks):
+            yield {"type": "chunk_start", "i": i + 1, "n": len(chunks), "source": src}
+            parts: list[str] = []
+            ntok = 0
+            try:
+                if can_stream:
+                    for delta in provider.stream(extract.SYSTEM_PROMPT,
+                                                 extract.build_user_prompt(text)):
+                        parts.append(delta)
+                        ntok += 1
+                        if ntok % 6 == 0:           # throttle token events
+                            yield {"type": "token", "i": i + 1, "n": len(chunks),
+                                   "tokens": ntok}
+                else:
+                    parts.append(provider.complete(extract.SYSTEM_PROMPT,
+                                                   extract.build_user_prompt(text)))
+            except Exception as exc:                # provider/network error on a chunk
+                yield {"type": "chunk_error", "i": i + 1, "message": str(exc)}
+                continue
+            obj = extract.extract_json("".join(parts))
+            frag = extract.normalize_fragment(obj, src) if obj else None
+            n_out = len(frag["outcomes"]) if frag else 0
+            if frag and (frag["outcomes"] or frag["relations"]):
+                fragments.append(frag)
+            yield {"type": "chunk_done", "i": i + 1, "n": len(chunks),
+                   "tokens": ntok, "outcomes": n_out}
+
+        yield {"type": "phase", "name": "reconcile"}
+        embedder = embeddings.get_embedder()    # load now (hidden under reconcile)
+        onto = reconcile.reconcile(fragments, embedder, sim=sim)
+        valr = validate.validate_ontology(onto)
+        yaml_text = pipeline.to_yaml(onto)
+        out_path = str(Path(ws) / "candidate-ontology.yaml")
+        Path(out_path).write_text(yaml_text, encoding="utf-8")
+        vhash = None
+        try:
+            version = srv._get_workspace().publish_ontology(
+                yaml_text, metadata={"kind": "proposed", "source": corpus})
+            srv._get_workspace().record_event(
+                "ontology_proposed", corpus,
+                details={"outcomes": str(len(onto["process_outcomes"])),
+                         "provider": provider.name, "embedder": embedder.name})
+            vhash = version.hash
+        except Exception:
+            pass
+        extracted = {
+            "status": "ok", "out_path": out_path, "version_hash": vhash,
+            "provider": provider.name, "model": getattr(provider, "model", None),
+            "embedder": embedder.name, "chunks": len(chunks),
+            "fragments": len(fragments),
+            "process_outcomes": [{"id": o["id"], "name": o["name"],
+                                  "characteristics": o["required_characteristics"]}
+                                 for o in onto["process_outcomes"]],
+            "provenance": onto["provenance"], "validation": valr,
+        }
+
+        yield {"type": "phase", "name": "adopt"}
+        adopt = bridge.call("load_ontology", path=out_path)
+        if adopt.get("status") == "error":
+            yield {"type": "error", "message": adopt.get("message")}
+            return
+
+        yield {"type": "phase", "name": "ingest_evidence"}
+        md = sorted(str(p) for p in Path(corpus).glob("*.md"))
+        evidence = md[:-1] if len(md) > 1 else md
+        nodes = 0
+        for f in evidence:
+            r = bridge.call("ingest_documents", path=f)
+            nodes += r.get("nodes_added", 0)
+
+        yield {"type": "phase", "name": "detect_gaps"}
+        gaps = bridge.call("detect_gaps", scope="all")
+
+        result = {
+            "status": "ok", "extracted": extracted, "gaps": gaps,
+            "evidence_files": [Path(f).name for f in evidence], "workspace": ws,
+            "steps": [{"knowledge_graph": kg}, {"extract": extracted},
+                      {"adopt_ontology": adopt},
+                      {"ingest_evidence": {"status": "ok", "files": len(evidence),
+                                           "nodes_added": nodes}}],
+        }
+        yield {"type": "done", "result": result}
+    except Exception as exc:
+        yield {"type": "error", "message": str(exc)}
+
+
 @app.post("/api/wizard/extract")
 def wizard_extract(body: WizardExtractBody) -> dict:
-    """One-click Knowledge Extraction demo (mirrors demo_kee.py end-to-end):
-    fresh KG → extract ontology from the corpus (LLM) → reconcile/validate →
-    adopt (load) the candidate → ingest a held-out slice as project evidence →
-    detect gaps. Returns the proposed ontology + the resulting gaps."""
-    ws = bridge.ensure_workspace()
-    ex = bridge.default_examples()
-    corpus = body.path or ex["sample_knowledge"]
-    kg_path = str(Path(ws) / "kg")
-    steps: list[dict] = []
+    """Non-streaming KEE demo (consumes the same event generator to its result)."""
+    for event in _extract_events(body.path, body.model, body.sim):
+        if event["type"] == "error":
+            raise HTTPException(400, event["message"])
+        if event["type"] == "done":
+            return event["result"]
+    raise HTTPException(500, "extraction produced no result")
 
-    def step(label: str, cap: str, **kwargs) -> dict:
-        r = bridge.call(cap, **kwargs)
-        steps.append({label: r})
-        _api_error(r)
-        return r
 
-    step("knowledge_graph", "create_knowledge_graph", path=kg_path)
-    extracted = step("extract", "extract_ontology", path=corpus,
-                     model=body.model or None, sim=body.sim)
-    out_path = extracted.get("out_path")
-    if not out_path:
-        raise HTTPException(400, "extraction did not produce a candidate ontology")
-    step("adopt_ontology", "load_ontology", path=out_path)
+@app.post("/api/wizard/extract/stream")
+def wizard_extract_stream(body: WizardExtractBody) -> StreamingResponse:
+    """Streaming KEE demo: NDJSON progress events (step/phase/chunk/token/done).
 
-    # Ingest all-but-one corpus doc as "project evidence" so the held-out doc's
-    # concepts surface as gaps (a meaningful assessment, like demo_kee).
-    md = sorted(str(p) for p in Path(corpus).glob("*.md"))
-    evidence = md[:-1] if len(md) > 1 else md
-    nodes = 0
-    for f in evidence:
-        r = bridge.call("ingest_documents", path=f)
-        _api_error(r)
-        nodes += r.get("nodes_added", 0)
-    steps.append({"ingest_evidence": {"status": "ok", "files": len(evidence),
-                                      "nodes_added": nodes}})
-
-    gaps = bridge.call("detect_gaps", scope="all")
-    return {"status": "ok", "steps": steps, "extracted": extracted, "gaps": gaps,
-            "evidence_files": [Path(f).name for f in evidence], "workspace": ws}
+    `token` events are forwarded from the model's real stream deltas, so a
+    progress UI can show genuine, not faked, 'the model is generating' activity.
+    """
+    def lines() -> Iterator[str]:
+        for event in _extract_events(body.path, body.model, body.sim):
+            yield json.dumps(event) + "\n"
+    return StreamingResponse(lines(), media_type="application/x-ndjson")
 
 
 @app.post("/api/wizard/publish-activate")

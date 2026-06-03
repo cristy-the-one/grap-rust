@@ -485,16 +485,98 @@ function renderKeeDemo(r, container) {
   if (r.gaps) renderGaps(r.gaps, gapsBox);
 }
 
-$("#btn-kee-demo").onclick = () =>
-  run(async () => {
-    toast("Running extraction demo (calling the model)…", "warn");
-    const r = await post("/api/wizard/extract", { path: null, model: $("#kee-demo-model").value.trim() || null });
-    if (r) renderKeeDemo(r, $("#kee-demo-result"));
-    await refreshStatus();
-    if (r && r.status !== "error")
-      toast(`Extraction demo complete — ${(r.gaps && r.gaps.gaps_found) ?? 0} gaps`, "ok");
-    return r;
-  });
+const PHASE_LABELS = {
+  prepare: "Initializing model + embedder…",
+  reconcile: "Reconciling concepts (embedding & dedup)…",
+  adopt: "Adopting the proposed ontology…",
+  ingest_evidence: "Ingesting project evidence…",
+  detect_gaps: "Detecting gaps…",
+};
+
+// Live progress panel driven by REAL stream events (chunk completions + token
+// deltas), not a timer. The token counter only advances when the model emits.
+function keeProgressUI(container) {
+  const phase = el("div", { class: "kee-phase" }, "Starting…");
+  const fill = el("div", { class: "meter-fill med", style: "width:0%" });
+  const counts = el("div", { class: "muted small" }, "");
+  const live = el("div", { class: "kee-live" },
+    el("span", { class: "pulse" }), el("span", { class: "kee-live-text muted small" }, ""));
+  container.append(el("div", { class: "kee-progress" },
+    phase, el("div", { class: "meter" }, fill), counts, live));
+  const t0 = Date.now();
+  let n = 0, done = 0;
+  return {
+    on(e) {
+      const secs = ((Date.now() - t0) / 1000).toFixed(0);
+      if (e.type === "step") phase.textContent = "Knowledge graph ready";
+      else if (e.type === "phase") phase.textContent = PHASE_LABELS[e.name] || e.name;
+      else if (e.type === "extract_begin") {
+        n = e.chunks;
+        phase.textContent = `Extracting with ${e.model || e.provider}`;
+        counts.textContent = `0 / ${n} chunks`;
+      } else if (e.type === "chunk_start") {
+        live.querySelector(".kee-live-text").textContent =
+          `chunk ${e.i}/${e.n} · generating…`;
+      } else if (e.type === "token") {
+        // advances ONLY as real tokens arrive from the model
+        live.querySelector(".kee-live-text").textContent =
+          `chunk ${e.i}/${e.n} · ${e.tokens} tokens… (${secs}s)`;
+      } else if (e.type === "chunk_done") {
+        done = e.i;
+        fill.style.width = `${Math.round((done / n) * 100)}%`;
+        counts.textContent = `${done} / ${n} chunks · +${e.outcomes} outcome(s) from chunk ${e.i}`;
+      } else if (e.type === "chunk_error") {
+        live.querySelector(".kee-live-text").textContent =
+          `chunk ${e.i} failed: ${e.message}`;
+      }
+    },
+  };
+}
+
+$("#btn-kee-demo").onclick = async () => {
+  const box = clear($("#kee-demo-result"));
+  const prog = keeProgressUI(box);
+  const btn = $("#btn-kee-demo");
+  btn.disabled = true;
+  try {
+    const resp = await fetch("/api/wizard/extract/stream", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ path: null, model: $("#kee-demo-model").value.trim() || null }),
+    });
+    if (!resp.ok || !resp.body) throw new Error(`stream failed: ${resp.status}`);
+    const reader = resp.body.getReader();
+    const dec = new TextDecoder();
+    let buf = "", result = null, errored = null;
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      let nl;
+      while ((nl = buf.indexOf("\n")) >= 0) {
+        const line = buf.slice(0, nl).trim();
+        buf = buf.slice(nl + 1);
+        if (!line) continue;
+        let e;
+        try { e = JSON.parse(line); } catch { continue; }
+        showRaw(e);
+        prog.on(e);
+        if (e.type === "done") result = e.result;
+        if (e.type === "error") errored = e.message;
+      }
+    }
+    if (errored) { toast(errored, "err"); return; }
+    if (result) {
+      renderKeeDemo(result, clear($("#kee-demo-result")));
+      await refreshStatus();
+      toast(`Extraction demo complete — ${(result.gaps && result.gaps.gaps_found) ?? 0} gaps`, "ok");
+    }
+  } catch (err) {
+    toast(String(err.message || err), "err");
+  } finally {
+    btn.disabled = false;
+  }
+};
 
 /* ---------- knowledge ---------- */
 $("#btn-create-kg").onclick = () =>

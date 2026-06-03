@@ -1,3 +1,4 @@
+import json
 import os
 import sys
 import tempfile
@@ -44,3 +45,21 @@ def test_wizard_extract_runs_full_loop_offline():
     assert "verification.md" not in r["evidence_files"]
     assert r["gaps"]["status"] == "ok"
     assert "process_outcomes" in r["extracted"]
+
+
+def test_wizard_extract_stream_emits_progress_events():
+    os.environ["GRAP_LLM_STUB"] = "1"
+    os.environ["GRAP_EMBED_BACKEND"] = "hashing"
+    try:
+        r = client.post("/api/wizard/extract/stream", json={})
+    finally:
+        os.environ.pop("GRAP_LLM_STUB", None)
+        os.environ.pop("GRAP_EMBED_BACKEND", None)
+    events = [json.loads(ln) for ln in r.text.splitlines() if ln.strip()]
+    types = [e["type"] for e in events]
+    assert "extract_begin" in types
+    assert "chunk_start" in types and "chunk_done" in types
+    assert types[-1] == "done"
+    result = events[-1]["result"]
+    assert result["status"] == "ok"
+    assert "verification.md" not in result["evidence_files"]

@@ -567,6 +567,21 @@ table.hits td:last-child { font-family: var(--mono); color: var(--muted); }
 .proposed-name { font-weight: 600; margin-bottom: 0.35rem; }
 .kee-h { margin: 1rem 0 0.5rem; font-size: 0.9rem; color: var(--accent); }
 
+/* ---------- KEE live progress ---------- */
+.kee-progress { margin-top: 1rem; }
+.kee-phase { font-weight: 500; margin-bottom: 0.5rem; }
+.kee-live { display: flex; align-items: center; gap: 0.5rem; margin-top: 0.4rem; }
+.kee-live-text { font-family: var(--mono); }
+.pulse {
+  width: 9px; height: 9px; border-radius: 50%;
+  background: var(--accent); flex: none;
+  animation: kee-pulse 1s ease-in-out infinite;
+}
+@keyframes kee-pulse {
+  0%, 100% { opacity: 0.25; transform: scale(0.85); }
+  50% { opacity: 1; transform: scale(1.15); }
+}
+
 /* ---------- raw drawer ---------- */
 .raw-drawer {
   margin-top: 2rem;
