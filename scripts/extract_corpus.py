@@ -165,12 +165,38 @@ def main(argv=None) -> int:
     frag_path = outdir / "fragments.jsonl"
 
     if not args.reconcile_only:
+        # Preflight: verify each endpoint can actually serve the model BEFORE
+        # launching thousands of chunks. (A 404/connection error here is why a
+        # whole run can otherwise "succeed" with 0 fragments.)
+        print(f"preflight: testing {len(providers)} endpoint(s) with model '{args.model}'…")
+        good = []
+        for p in providers:
+            try:
+                p.complete("You are a terse assistant.", "Reply with exactly: OK")
+                print(f"  ok   {p.base_url}")
+                good.append(p)
+            except Exception as exc:
+                print(f"  FAIL {p.base_url} -> {exc}")
+        if not good:
+            print("\nAborting: no endpoint can serve the model. Fix it, then rerun "
+                  "(the checkpoint resumes). Common causes:\n"
+                  f"  - model '{args.model}' not pulled on that instance "
+                  "(run: ollama pull " + args.model + ")\n"
+                  "  - GPU can't load it (e.g. Ollama dropped Pascal/GTX-10xx support); "
+                  "try `ollama run " + args.model + " hi` to confirm generation works\n"
+                  "  - wrong --endpoints URL (must end in /v1)")
+            return 2
+        if len(good) < len(providers):
+            print(f"continuing with {len(good)}/{len(providers)} working endpoint(s)")
+        providers = good
+        workers = min(workers, max(1, len(providers) * 8))
+
         chunks = pipeline.read_chunks(args.path, max_files=args.max_files,
                                       chunk_chars=args.chunk_chars)
         total = len(chunks)
         done, _ = _load_checkpoint(frag_path)
         print(f"corpus={args.path}  chunks={total}  chunk_chars={args.chunk_chars}")
-        print(f"model={args.model}  endpoints={endpoints}  workers={workers}")
+        print(f"model={args.model}  endpoints={[p.base_url for p in providers]}  workers={workers}")
         if done:
             print(f"resuming: {len(done)} chunks already done")
 
