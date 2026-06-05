@@ -97,11 +97,20 @@ Notes:
   8b can go larger. Bigger chunks = fewer LLM calls.
 - **Speed** — e.g. the full law corpus: ~11 days (8b/800-char/serial) →
   roughly **~16h** (3b/2000-char/2 GPUs). Use `--max-files N` for a quick subset.
+- **Curate before loading (recommended for a full-corpus run)** — a full run
+  yields tens of thousands of noisy outcomes/relations. Trim to a GUI-usable
+  slice (no LLM):
+  ```powershell
+  python scripts\curate_ontology.py out\legal-ontology --top-concepts 250 --max-outcomes 600
+  ```
+  drops degenerate relation types (copulas/symbols) + keeps the most-connected
+  concepts and most-specified outcomes, writing `candidate-ontology.curated.yaml`
+  + `relations.curated.json`.
 - **Load the result in the GUI** — Knowledge panel → *Load ontology* →
-  `out\legal-ontology\candidate-ontology.yaml`. Project the relations via
-  *POST /api/relations/project* (body = `relations.json`) or the **Legal graph**
-  panel. (A full-corpus ontology has thousands of outcomes — load a subset run
-  for an interactive demo.)
+  `out\legal-ontology\candidate-ontology.curated.yaml`. Project the relations via
+  the **Legal graph** panel / *POST /api/relations/project* (body =
+  `relations.curated.json`). (Load the *curated* files — the raw full-corpus
+  ones are too large to render/assess interactively.)
 
 ## Maintainer: rebuild the bundled wheel
 
