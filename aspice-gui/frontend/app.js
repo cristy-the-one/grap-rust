@@ -969,6 +969,27 @@ $("#btn-legal-graph").onclick = () =>
     return r;
   });
 
+$("#btn-legal-graph-file").onclick = () =>
+  run(async () => {
+    const path = $("#lg-relfile").value.trim();
+    if (!path) { toast("Enter the path to a relations JSON file", "warn"); return null; }
+    $("#lg-meta").textContent = "Loading relations file…";
+    renderGraphLegend($("#lg-legend"));
+    const r = await post("/api/legal-graph/from-relations", {
+      path, top: parseInt($("#lg-reltop").value, 10) || 200,
+    });
+    if (r && r.status !== "error") {
+      const c = r.counts || {};
+      $("#lg-meta").textContent =
+        `${c.relations} relations · ${c.entities} entities → showing ` +
+        `${c.shown_nodes} nodes / ${c.shown_edges} edges · click a node to expand`;
+      setLegalGraph(r);
+      layoutGraph($("#lg-graph"), $("#lg-info"));
+      await refreshStatus();
+    }
+    return r;
+  });
+
 /* ---------- runs ---------- */
 async function loadRuns(kind) {
   const r = await run(() => api(kind ? `/api/runs?kind=${kind}` : "/api/runs"));
@@ -1028,6 +1049,7 @@ $("#btn-get-config").onclick = () =>
     $("#path-create-kg").value = `${ws}/kg`;
     $("#path-ingest").value = ex.sample_knowledge || "";
     $("#path-extract").value = ex.sample_knowledge || "";
+    $("#lg-relfile").value = `${root}/out/legal-ontology/relations.curated.json`;
     // populate the model picker from the configured LLM endpoint (non-fatal)
     api("/api/models")
       .then((m) => {

@@ -66,6 +66,21 @@ def test_extract_stream_emits_events_and_extracted():
     assert "process_outcomes" in extracted and "relations" in extracted
 
 
+def test_legal_graph_from_relations_file(tmp_path):
+    relfile = tmp_path / "relations.json"
+    relfile.write_text(json.dumps([
+        {"from": "Guvernul", "type": "emite", "to": "Ordinul 55"},
+        {"from": "Ordinul 55", "type": "privind", "to": "Aprobare formulare"},
+        {"from": "Bad", "type": "", "to": ""},          # skipped (incomplete)
+    ]), encoding="utf-8")
+    r = client.post("/api/legal-graph/from-relations",
+                    json={"path": str(relfile), "top": 50}).json()
+    assert r["status"] == "ok"
+    assert r["counts"]["relations"] == 2                # the incomplete one dropped
+    assert {e["type"] for e in r["edges"]} == {"emite", "privind"}
+    assert r["counts"]["shown_nodes"] >= 3
+
+
 def test_graph_neighbors_expand_uses_real_ids(tmp_path):
     # build a tiny legal graph (act 2 cites act 1), then expand a node live
     corpus = tmp_path / "acts"

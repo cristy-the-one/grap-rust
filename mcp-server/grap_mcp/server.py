@@ -442,6 +442,83 @@ def build_legal_graph(path: str, max_files: int = 400, with_relations: bool = Fa
 
 
 @mcp.tool()
+def legal_graph_from_relations(path: str, top: int = 200) -> dict:
+    """Load a relations JSON file (e.g. relations.curated.json from the batch
+    runner) into a fresh KG and return it for the graph view.
+
+    Each relation's endpoints become entity nodes (deduped) and a typed edge
+    connects them; the KG is saved so expand-on-click (graph_neighbors) works.
+    Returns the connected subgraph capped at the top-`top` most-connected nodes.
+    """
+    denied = _require("operator")
+    if denied:
+        return denied
+    try:
+        rels = json.loads(Path(path).read_text(encoding="utf-8"))
+    except Exception as e:
+        return {"status": "error", "message": f"cannot read relations file '{path}': {e}"}
+    if not isinstance(rels, list):
+        return {"status": "error", "message": "expected a JSON list of {from,type,to} relations"}
+    try:
+        kgp = str(Path(_resolve_ws_root()) / "relations-kg")
+        res = create_knowledge_graph(kgp)
+        if res.get("status") == "error":
+            return res
+        kg = _state["kg"]
+
+        node_info: dict = {}
+        ent: dict = {}
+
+        def ent_for(name: str) -> int:
+            lbl = ("kee:" + name.strip())[:120]
+            nid = ent.get(lbl)
+            if nid is None:
+                nid = kg.add_node(text=name.strip(), label=lbl)
+                ent[lbl] = nid
+                node_info[nid] = {"id": nid, "label": lbl, "kind": "entity",
+                                  "title": name.strip()[:140]}
+            return nid
+
+        edges: list = []
+        for r in rels:
+            f, t, ty = r.get("from"), r.get("to"), r.get("type")
+            if not all(isinstance(x, str) and x.strip() for x in (f, t, ty)):
+                continue
+            fn, tn = ent_for(f), ent_for(t)
+            kg.add_edge(fn, tn, 0.7, {"relation_type": ty.strip(), "source": "kee"})
+            edges.append({"source": fn, "target": tn, "type": ty.strip()})
+
+        kg.save_to_dir(kgp)
+        try:
+            _get_workspace().record_event("relations_graph_loaded", path,
+                                          details={"relations": str(len(edges))})
+        except Exception:
+            logger.warning("audit record_event failed for relations_graph_loaded", exc_info=True)
+
+        degree: dict = {}
+        for e in edges:
+            degree[e["source"]] = degree.get(e["source"], 0) + 1
+            degree[e["target"]] = degree.get(e["target"], 0) + 1
+        ranked = sorted(degree, key=lambda n: degree[n], reverse=True)
+        keep = set(ranked[:top]) if top and top > 0 else set(degree)
+        nodes = [node_info[n] for n in keep if n in node_info]
+        shown_edges = [e for e in edges
+                       if e["source"] in keep and e["target"] in keep][:1200]
+        return {
+            "status": "ok",
+            "nodes": nodes,
+            "edges": shown_edges,
+            "edge_types": sorted({e["type"] for e in edges}),
+            "counts": {"relations": len(edges), "entities": len(node_info),
+                       "shown_nodes": len(nodes), "shown_edges": len(shown_edges),
+                       "node_count": kg.node_count(), "edge_count": kg.edge_count()},
+        }
+    except Exception as e:
+        logger.exception("legal_graph_from_relations failed")
+        return {"status": "error", "message": str(e)}
+
+
+@mcp.tool()
 def graph_neighbors(node_id: int, types: list = None) -> dict:
     """Return a node's neighbors from the current KG (live), for the given
     relation types (default 'cites'/'mentions'). Powers expand-on-click in the
@@ -1080,7 +1157,8 @@ def list_capabilities() -> dict:
         "domains": {
             "knowledge": ["load_knowledge_graph", "create_knowledge_graph",
                           "ingest_documents", "extract_ontology", "project_relations",
-                          "build_legal_graph", "graph_neighbors", "load_ontology"],
+                          "build_legal_graph", "legal_graph_from_relations",
+                          "graph_neighbors", "load_ontology"],
             "pg_lifecycle": ["load_procedure_graph", "publish_pg", "promote_pg",
                              "activate", "set_production", "get_production", "list_versions"],
             "execution_reasoning": ["run_procedure", "detect_gaps", "get_explanation"],

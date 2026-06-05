@@ -287,6 +287,21 @@
           </div>
           <p class="muted small" id="lg-meta"></p>
           <div class="graph-legend" id="lg-legend"></div>
+          <hr class="soft" />
+          <div class="inline-form">
+            <div style="flex:1 1 420px">
+              <label for="lg-relfile">…or load a relations file (from the batch runner)</label>
+              <input id="lg-relfile" type="text"
+                     placeholder="out\legal-ontology\relations.curated.json" />
+            </div>
+            <div>
+              <label for="lg-reltop">Top concepts</label>
+              <input id="lg-reltop" type="number" min="1" value="200" />
+            </div>
+            <div class="actions">
+              <button type="button" class="btn" id="btn-legal-graph-file">Load relations file</button>
+            </div>
+          </div>
         </div>
         <div class="graph-wrap">
           <div id="lg-graph" class="graph-host"></div>

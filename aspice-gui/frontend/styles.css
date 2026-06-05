@@ -554,6 +554,7 @@ table.hits td:last-child { font-family: var(--mono); color: var(--muted); }
 .config-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
 .config-cols h4 { margin: 0 0 0.4rem; font-size: 0.85rem; color: var(--accent); }
 .err-text { color: var(--err); }
+hr.soft { border: none; border-top: 1px solid var(--border); margin: 0.9rem 0; }
 
 /* ---------- KEE proposed ontology ---------- */
 .extract-meta { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0.5rem 0 0.75rem; }
