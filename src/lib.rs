@@ -102,6 +102,8 @@ pub use serialize::{GraphMeta, RepairReport, CURRENT_GRAPH_FORMAT_VERSION};
 
 pub mod shard; // Graph sharding (Phase 4)
 
+pub mod ranking; // Rank-based fusion (RRF) and centrality scoring
+
 /// Crate-wide error type for all fallible operations in `grap`.
 ///
 /// This type is used (or will be used) by persistence, sharding, and
