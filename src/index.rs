@@ -1061,6 +1061,114 @@ impl IndexedKnowledgeGraph {
         pr
     }
 
+    /// Fuse an already-built candidate list and re-rank it.
+    ///
+    /// `vector_w`/`centrality_w` of `0.0` disable those channels.
+    /// The centrality channel is only built when `centrality_w > 0.0`.
+    /// Sorts by fused score descending and truncates to `max_results`.
+    fn fuse_combined<'a>(
+        &self,
+        mut combined: Vec<CombinedResult<'a>>,
+        text_w: f64,
+        vector_w: f64,
+        graph_w: f64,
+        centrality_w: f64,
+        mode: FusionMode,
+        max_results: usize,
+    ) -> Vec<CombinedResult<'a>> {
+        // Free (non-capturing) helper: rank a channel by a raw score.
+        fn rank_by(
+            combined: &[CombinedResult],
+            key: impl Fn(&CombinedResult) -> f64,
+        ) -> Vec<crate::NodeId> {
+            let mut idx: Vec<usize> = (0..combined.len()).collect();
+            idx.sort_by(|&i, &j| {
+                key(&combined[j])
+                    .partial_cmp(&key(&combined[i]))
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            });
+            idx.into_iter()
+                .filter(|&i| key(&combined[i]) > 0.0)
+                .map(|i| combined[i].graph_result.node_id)
+                .collect()
+        }
+
+        match mode {
+            FusionMode::Linear => {
+                for r in combined.iter_mut() {
+                    r.fused_score = r.text_score * text_w
+                        + r.vector_score * vector_w
+                        + r.graph_strength * graph_w;
+                }
+            }
+            FusionMode::Rrf { k } => {
+                use crate::ranking::{rrf_fuse, RankedChannel};
+                let mut channels = vec![
+                    RankedChannel {
+                        name: "text",
+                        weight: text_w,
+                        ranked: rank_by(&combined, |r| r.text_score),
+                    },
+                    RankedChannel {
+                        name: "vector",
+                        weight: vector_w,
+                        ranked: rank_by(&combined, |r| r.vector_score),
+                    },
+                    RankedChannel {
+                        name: "graph",
+                        weight: graph_w,
+                        ranked: rank_by(&combined, |r| r.graph_strength),
+                    },
+                ];
+                if centrality_w > 0.0 {
+                    let pr = self.pagerank_cached(None);
+                    let mut idx: Vec<usize> = (0..combined.len()).collect();
+                    idx.sort_by(|&i, &j| {
+                        let (ni, nj) = (
+                            combined[i].graph_result.node_id.0 as usize,
+                            combined[j].graph_result.node_id.0 as usize,
+                        );
+                        pr.get(nj)
+                            .unwrap_or(&0.0)
+                            .partial_cmp(pr.get(ni).unwrap_or(&0.0))
+                            .unwrap_or(std::cmp::Ordering::Equal)
+                    });
+                    let ranked: Vec<crate::NodeId> = idx
+                        .into_iter()
+                        .map(|i| combined[i].graph_result.node_id)
+                        .collect();
+                    channels.push(RankedChannel {
+                        name: "centrality",
+                        weight: centrality_w,
+                        ranked,
+                    });
+                }
+                let fused = rrf_fuse(&channels, k);
+                let pos: std::collections::HashMap<
+                    crate::NodeId,
+                    (f64, Vec<(&'static str, u32)>),
+                > = fused
+                    .into_iter()
+                    .map(|f| (f.node, (f.score, f.ranks)))
+                    .collect();
+                for r in combined.iter_mut() {
+                    if let Some((score, ranks)) = pos.get(&r.graph_result.node_id) {
+                        r.fused_score = *score;
+                        r.channel_ranks = ranks.clone();
+                    }
+                }
+            }
+        }
+
+        combined.sort_by(|a, b| {
+            b.fused_score
+                .partial_cmp(&a.fused_score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+        combined.truncate(max_results);
+        combined
+    }
+
     /// High-level "text + graph" query.
     ///
     /// 1. Runs BM25 search to find high-quality seed nodes.
@@ -1105,19 +1213,18 @@ impl IndexedKnowledgeGraph {
 
         let graph_results = builder.execute_with_text();
 
-        // Convert to rich results and apply fusion
-        let mut combined: Vec<CombinedResult> = graph_results
+        // Build candidates with raw scores; fusion is delegated to fuse_combined.
+        let combined: Vec<CombinedResult> = graph_results
             .into_iter()
             .map(|(gr, text)| {
                 let text_score = seed_scores.get(&gr.node_id).copied().unwrap_or(0.0);
                 let graph_strength = gr.cumulative_strength;
-                let fused_score = text_score * weights.text + graph_strength * weights.graph;
 
                 CombinedResult {
                     text_score,
                     vector_score: 0.0,
                     graph_strength,
-                    fused_score,
+                    fused_score: 0.0,
                     graph_result: gr,
                     text,
                     channel_ranks: Vec::new(),
@@ -1125,15 +1232,7 @@ impl IndexedKnowledgeGraph {
             })
             .collect();
 
-        // Re-rank by fused score
-        combined.sort_by(|a, b| {
-            b.fused_score
-                .partial_cmp(&a.fused_score)
-                .unwrap_or(std::cmp::Ordering::Equal)
-        });
-        combined.truncate(max_results);
-
-        combined
+        self.fuse_combined(combined, weights.text, 0.0, weights.graph, 0.0, weights.mode, max_results)
     }
 
     /// High-level hybrid "text + vector + graph" query.
@@ -1217,7 +1316,7 @@ impl IndexedKnowledgeGraph {
 
         let graph_results = builder.execute_with_text();
 
-        let mut combined: Vec<CombinedResult> = graph_results
+        let combined: Vec<CombinedResult> = graph_results
             .into_iter()
             .map(|(gr, text)| {
                 let node = gr.node_id;
@@ -1250,97 +1349,15 @@ impl IndexedKnowledgeGraph {
             })
             .collect();
 
-        match weights.mode {
-            FusionMode::Linear => {
-                for r in combined.iter_mut() {
-                    r.fused_score = r.text_score * weights.text
-                        + r.vector_score * weights.vector
-                        + r.graph_strength * weights.graph;
-                }
-            }
-            FusionMode::Rrf { k } => {
-                use crate::ranking::{rrf_fuse, RankedChannel};
-                // Rank each channel by its raw score (desc), keeping only positive scores.
-                fn rank_by(
-                    combined: &[CombinedResult],
-                    key: impl Fn(&CombinedResult) -> f64,
-                ) -> Vec<crate::NodeId> {
-                    let mut idx: Vec<usize> = (0..combined.len()).collect();
-                    idx.sort_by(|&i, &j| {
-                        key(&combined[j])
-                            .partial_cmp(&key(&combined[i]))
-                            .unwrap_or(std::cmp::Ordering::Equal)
-                    });
-                    idx.into_iter()
-                        .filter(|&i| key(&combined[i]) > 0.0)
-                        .map(|i| combined[i].graph_result.node_id)
-                        .collect()
-                }
-                let mut channels = vec![
-                    RankedChannel {
-                        name: "text",
-                        weight: weights.text,
-                        ranked: rank_by(&combined, |r| r.text_score),
-                    },
-                    RankedChannel {
-                        name: "vector",
-                        weight: weights.vector,
-                        ranked: rank_by(&combined, |r| r.vector_score),
-                    },
-                    RankedChannel {
-                        name: "graph",
-                        weight: weights.graph,
-                        ranked: rank_by(&combined, |r| r.graph_strength),
-                    },
-                ];
-                if weights.centrality > 0.0 {
-                    let pr = self.pagerank_cached(None);
-                    let mut idx: Vec<usize> = (0..combined.len()).collect();
-                    idx.sort_by(|&i, &j| {
-                        let (ni, nj) = (
-                            combined[i].graph_result.node_id.0 as usize,
-                            combined[j].graph_result.node_id.0 as usize,
-                        );
-                        pr.get(nj)
-                            .unwrap_or(&0.0)
-                            .partial_cmp(pr.get(ni).unwrap_or(&0.0))
-                            .unwrap_or(std::cmp::Ordering::Equal)
-                    });
-                    let ranked: Vec<crate::NodeId> = idx
-                        .into_iter()
-                        .map(|i| combined[i].graph_result.node_id)
-                        .collect();
-                    channels.push(RankedChannel {
-                        name: "centrality",
-                        weight: weights.centrality,
-                        ranked,
-                    });
-                }
-                let fused = rrf_fuse(&channels, k);
-                let pos: std::collections::HashMap<
-                    crate::NodeId,
-                    (f64, Vec<(&'static str, u32)>),
-                > = fused
-                    .into_iter()
-                    .map(|f| (f.node, (f.score, f.ranks)))
-                    .collect();
-                for r in combined.iter_mut() {
-                    if let Some((score, ranks)) = pos.get(&r.graph_result.node_id) {
-                        r.fused_score = *score;
-                        r.channel_ranks = ranks.clone();
-                    }
-                }
-            }
-        }
-
-        combined.sort_by(|a, b| {
-            b.fused_score
-                .partial_cmp(&a.fused_score)
-                .unwrap_or(std::cmp::Ordering::Equal)
-        });
-        combined.truncate(max_results);
-
-        combined
+        self.fuse_combined(
+            combined,
+            weights.text,
+            weights.vector,
+            weights.graph,
+            weights.centrality,
+            weights.mode,
+            max_results,
+        )
     }
 
     /// Like [`search_and_traverse_hybrid`] but with sensible default [`HybridWeights`].
@@ -1435,18 +1452,18 @@ impl IndexedKnowledgeGraph {
 
         let graph_results = builder.execute_with_text();
 
-        let mut combined: Vec<CombinedResult> = graph_results
+        // Build candidates with raw scores; fusion is delegated to fuse_combined.
+        let combined: Vec<CombinedResult> = graph_results
             .into_iter()
             .map(|(gr, text)| {
                 let text_score = seed_scores.get(&gr.node_id).copied().unwrap_or(0.0);
                 let graph_strength = gr.cumulative_strength;
-                let fused_score = text_score * weights.text + graph_strength * weights.graph;
 
                 CombinedResult {
                     text_score,
                     vector_score: 0.0,
                     graph_strength,
-                    fused_score,
+                    fused_score: 0.0,
                     graph_result: gr,
                     text,
                     channel_ranks: Vec::new(),
@@ -1454,14 +1471,7 @@ impl IndexedKnowledgeGraph {
             })
             .collect();
 
-        combined.sort_by(|a, b| {
-            b.fused_score
-                .partial_cmp(&a.fused_score)
-                .unwrap_or(std::cmp::Ordering::Equal)
-        });
-        combined.truncate(max_results);
-
-        combined
+        self.fuse_combined(combined, weights.text, 0.0, weights.graph, 0.0, weights.mode, max_results)
     }
 
     /// Convenience wrapper that uses [`FusionWeights::default()`].
@@ -2096,6 +2106,17 @@ mod tests {
             // This is a soft assertion — mainly to exercise the path
             assert!(phrase[0].score > 0.0);
         }
+    }
+
+    #[test]
+    fn text_graph_query_uses_rrf_by_default() {
+        let mut g = IndexedKnowledgeGraph::new();
+        let a = g.add_node("alpha topic", None, None);
+        let b = g.add_node("beta topic alpha", None, None);
+        g.add_edge(a, b, 0.9, vec![]);
+        let res = g.search_and_traverse_default("alpha", 5, &[], 0.0, 2, 10);
+        assert!(!res.is_empty());
+        assert!(res[0].channel_ranks.iter().any(|(n, _)| *n == "text"));
     }
 }
 
