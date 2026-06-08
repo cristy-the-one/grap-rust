@@ -9,6 +9,16 @@
 
 use std::collections::HashMap;
 
+/// Heuristic bytes-per-token used for savings estimates (the common
+/// ~4-chars-per-token rule of thumb).
+pub const BYTES_PER_TOKEN: usize = 4;
+
+/// Estimate tokens saved by sending `compact_bytes` instead of `raw_bytes`.
+/// Saturates to 0 when the compact form is not smaller.
+pub fn estimate_tokens_saved(raw_bytes: usize, compact_bytes: usize) -> usize {
+    raw_bytes.saturating_sub(compact_bytes) / BYTES_PER_TOKEN
+}
+
 /// A primitive cell value.
 #[derive(Debug, Clone, PartialEq)]
 pub enum WireValue {
@@ -301,5 +311,16 @@ mod tests {
         assert!(out.contains("@1=cites")); // "cites" interned (used 2x)
         assert!(out.contains("n,7,@1")); // row references the legend
         assert!(out.contains("__tables=n:neighbors:node_id|relation"));
+    }
+
+    #[test]
+    fn savings_is_positive_when_compact() {
+        let saved = estimate_tokens_saved(1000, 250);
+        assert_eq!(saved, (1000 - 250) / BYTES_PER_TOKEN);
+    }
+
+    #[test]
+    fn savings_saturates_to_zero_when_larger() {
+        assert_eq!(estimate_tokens_saved(100, 400), 0);
     }
 }
