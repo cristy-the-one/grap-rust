@@ -151,6 +151,135 @@ pub fn encode(tool: &str, enc_id: &str, scalars: &[WireScalar], tables: &[WireTa
     out.trim_end().to_string()
 }
 
+use std::collections::BTreeMap;
+
+/// Decoded document. Rows are column→string maps; cells are not re-typed
+/// (callers may consult `scalars`/`__stypes` if they need numerics).
+#[derive(Debug, Clone)]
+pub struct DecodedDoc {
+    /// Tool name from the `#MUNCH/1` header.
+    pub tool: String,
+    /// Encoding id from the `#MUNCH/1` header.
+    pub enc_id: String,
+    /// Top-level scalar key→value pairs (values as strings).
+    pub scalars: BTreeMap<String, String>,
+    /// Table rows keyed by the table's response key; each row is a column→value map.
+    pub tables: BTreeMap<String, Vec<BTreeMap<String, String>>>,
+}
+
+/// Reverse `encode`: parse a `#MUNCH/1` payload back into a [`DecodedDoc`].
+pub fn decode(payload: &str) -> DecodedDoc {
+    let mut lines = payload.lines();
+    let header = lines.next().unwrap_or_default();
+    let tool = header_field(header, "tool=");
+    let enc_id = header_field(header, "enc=");
+
+    let mut legend: BTreeMap<String, String> = BTreeMap::new();
+    let mut scalar_line = String::new();
+    let mut table_lines: Vec<&str> = Vec::new();
+    let mut schema: Vec<(char, String, Vec<String>)> = Vec::new();
+
+    for line in lines {
+        // legend line "@N=value"
+        if let Some(rest) = line.strip_prefix('@') {
+            if let Some((n, v)) = rest.split_once('=') {
+                legend.insert(format!("@{}", n), v.to_string());
+                continue;
+            }
+        }
+        // the single scalar line carries __tables=
+        if scalar_line.is_empty() && line.contains("__tables=") {
+            scalar_line = line.to_string();
+            schema = parse_tables_schema(line);
+            continue;
+        }
+        table_lines.push(line);
+    }
+
+    let mut scalars = BTreeMap::new();
+    for tok in scalar_line.split(' ') {
+        if tok.starts_with("__") {
+            continue;
+        }
+        if let Some((k, v)) = tok.split_once('=') {
+            scalars.insert(k.to_string(), v.to_string());
+        }
+    }
+
+    let tag_to_schema: BTreeMap<char, (String, Vec<String>)> =
+        schema.into_iter().map(|(t, k, c)| (t, (k, c))).collect();
+    let mut tables: BTreeMap<String, Vec<BTreeMap<String, String>>> = BTreeMap::new();
+    for line in table_lines {
+        if line.is_empty() {
+            continue;
+        }
+        let mut it = split_csv(line).into_iter();
+        let tag = match it.next().and_then(|s| s.chars().next()) {
+            Some(t) => t,
+            None => continue,
+        };
+        if let Some((key, cols)) = tag_to_schema.get(&tag) {
+            let mut row = BTreeMap::new();
+            for col in cols {
+                let raw = it.next().unwrap_or_default();
+                let val = legend.get(&raw).cloned().unwrap_or(raw);
+                row.insert(col.clone(), val);
+            }
+            tables.entry(key.clone()).or_default().push(row);
+        }
+    }
+    DecodedDoc { tool, enc_id, scalars, tables }
+}
+
+fn header_field(header: &str, key: &str) -> String {
+    header
+        .split_whitespace()
+        .find_map(|t| t.strip_prefix(key))
+        .unwrap_or_default()
+        .to_string()
+}
+
+fn parse_tables_schema(line: &str) -> Vec<(char, String, Vec<String>)> {
+    let spec = line
+        .split("__tables=")
+        .nth(1)
+        .unwrap_or("")
+        .split(' ')
+        .next()
+        .unwrap_or("");
+    spec.split(',')
+        .filter(|s| !s.is_empty())
+        .filter_map(|t| {
+            let mut p = t.splitn(3, ':');
+            let tag = p.next()?.chars().next()?;
+            let key = p.next()?.to_string();
+            let cols = p.next()?.split('|').map(|c| c.to_string()).collect();
+            Some((tag, key, cols))
+        })
+        .collect()
+}
+
+/// Minimal CSV split honoring the double-quoted fields `csv_escape` produces.
+fn split_csv(line: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    let mut cur = String::new();
+    let mut in_q = false;
+    let mut chars = line.chars().peekable();
+    while let Some(c) = chars.next() {
+        match c {
+            '"' if in_q && chars.peek() == Some(&'"') => {
+                cur.push('"');
+                chars.next();
+            }
+            '"' => in_q = !in_q,
+            ',' if !in_q => out.push(std::mem::take(&mut cur)),
+            _ => cur.push(c),
+        }
+    }
+    out.push(cur);
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
