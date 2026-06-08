@@ -250,6 +250,7 @@ impl KnowledgeGraph {
         }
         let new_blob = self.blobs.store(new_text);
         self.nodes[idx].blob = new_blob;
+        self.nodes[idx].content_hash = crate::lifecycle::hash::sha256_digest(new_text.as_bytes());
         if let Some(emb) = new_embedding {
             self.nodes[idx].embedding = Some(self.blobs.store_embedding(emb));
         }
@@ -438,5 +439,16 @@ mod tests {
 
         let emb = g.read_embedding(id).unwrap();
         assert!((emb[1] - 1.0f32).abs() < 1e-6);
+    }
+
+    #[test]
+    fn update_node_content_refreshes_hash() {
+        let mut g = KnowledgeGraph::new();
+        let n = g.add_node("old text", None, None);
+        let before = g.node_content_hash(n).unwrap();
+        g.update_node_content(n, "new text", None).unwrap();
+        let after = g.node_content_hash(n).unwrap();
+        assert_ne!(before, after);
+        assert_eq!(after, crate::lifecycle::hash::sha256_digest(b"new text"));
     }
 }
