@@ -48,6 +48,19 @@ impl Edge {
     }
 }
 
+/// Result of re-hashing a node's stored blob and comparing it to the
+/// stored `content_hash`. This is the self-referential ("cache") integrity
+/// check; on-disk corruption is separately guarded by CRC32 checksums.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NodeIntegrity {
+    /// Re-hash of the blob matches the stored content_hash.
+    Match,
+    /// Re-hash differs — the in-memory index is incoherent (logic bug / tamper).
+    Mismatch,
+    /// Node id is out of bounds or tombstoned.
+    Unknown,
+}
+
 /// The main in-memory knowledge graph.
 ///
 /// Nodes and edges are stored in arena-style `Vec`s. Each node owns a blob
@@ -296,6 +309,21 @@ impl KnowledgeGraph {
         let e = &self.edges[edge.0 as usize];
         (e.source, e.target)
     }
+
+    /// Re-hash a node's current blob and compare to its stored content_hash.
+    pub fn verify_node(&self, node: NodeId) -> NodeIntegrity {
+        let idx = node.0 as usize;
+        if idx >= self.nodes.len() || self.deleted.get(idx).copied().unwrap_or(true) {
+            return NodeIntegrity::Unknown;
+        }
+        let n = &self.nodes[idx];
+        let actual = crate::lifecycle::hash::sha256_digest(self.blobs.read(&n.blob).as_bytes());
+        if actual == n.content_hash {
+            NodeIntegrity::Match
+        } else {
+            NodeIntegrity::Mismatch
+        }
+    }
 }
 
 impl Default for KnowledgeGraph {
@@ -334,6 +362,14 @@ mod tests {
         let n = g.add_node("memory safety", Some("Rust"), None);
         let expected = crate::lifecycle::hash::sha256_digest(b"memory safety");
         assert_eq!(g.node_content_hash(n), Some(expected));
+    }
+
+    #[test]
+    fn verify_node_reports_match_for_intact_node() {
+        let mut g = KnowledgeGraph::new();
+        let n = g.add_node("intact", None, None);
+        assert_eq!(g.verify_node(n), crate::graph::NodeIntegrity::Match);
+        assert_eq!(g.verify_node(NodeId(999)), crate::graph::NodeIntegrity::Unknown);
     }
 }
 
