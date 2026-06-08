@@ -4,7 +4,7 @@
 
 mod activation;
 mod audit;
-mod hash;
+pub(crate) mod hash;
 mod publish;
 mod run;
 mod version;

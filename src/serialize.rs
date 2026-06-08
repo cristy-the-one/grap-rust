@@ -681,6 +681,12 @@ impl KnowledgeGraph {
                 None
             };
 
+            let content_hash = {
+                let chunk = &chunks[blob.chunk_idx as usize];
+                let start = blob.offset as usize;
+                let end = start + blob.length as usize;
+                crate::lifecycle::hash::sha256_digest(&chunk[start..end])
+            };
             rebuilt_nodes.push(crate::graph::Node {
                 blob,
                 embedding,
@@ -688,6 +694,7 @@ impl KnowledgeGraph {
                 incoming: sn.incoming.into_iter().map(EdgeId).collect(),
                 label: sn.label,
                 outgoing_property_mask: sn.outgoing_property_mask,
+                content_hash,
             });
         }
 

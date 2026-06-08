@@ -23,6 +23,9 @@ pub(crate) struct Node {
     pub(crate) incoming: Vec<EdgeId>,
     pub(crate) label: Option<String>,
     pub(crate) outgoing_property_mask: u64,
+    /// SHA-256 of the node's text blob at write time (lean [u8;32] form).
+    /// Back-filled on load of legacy graphs.
+    pub(crate) content_hash: [u8; 32],
 }
 
 /// A directed, weighted, property-carrying edge between two nodes.
@@ -93,6 +96,7 @@ impl KnowledgeGraph {
         label: Option<&str>,
         embedding: Option<&[f32]>,
     ) -> NodeId {
+        let content_hash = crate::lifecycle::hash::sha256_digest(text.as_bytes());
         let blob = self.blobs.store(text);
         let embedding_ref = embedding.map(|e| self.blobs.store_embedding(e));
 
@@ -106,6 +110,7 @@ impl KnowledgeGraph {
             incoming: Vec::new(),
             label: label.map(|s| s.to_string()),
             outgoing_property_mask: 0,
+            content_hash,
         });
         self.deleted.push(false);
         id
@@ -200,6 +205,12 @@ impl KnowledgeGraph {
     /// Bounds-checked variant of [`node_label`]. Returns `None` if id is out of range.
     pub fn try_node_label(&self, node: NodeId) -> Option<Option<&str>> {
         self.nodes.get(node.0 as usize).map(|n| n.label.as_deref())
+    }
+
+    /// Returns the stored SHA-256 content hash of a node's text blob, or
+    /// `None` if the id is out of bounds.
+    pub fn node_content_hash(&self, node: NodeId) -> Option<[u8; 32]> {
+        self.nodes.get(node.0 as usize).map(|n| n.content_hash)
     }
 
     /// Size of the node id-space, including tombstoned (logically deleted)
@@ -315,6 +326,14 @@ mod tests {
         let n = g.add_node("hello world", Some("test"), None);
         assert_eq!(g.try_read_blob(n), Some("hello world"));
         assert_eq!(g.try_node_label(n), Some(Some("test")));
+    }
+
+    #[test]
+    fn add_node_stores_content_hash() {
+        let mut g = KnowledgeGraph::new();
+        let n = g.add_node("memory safety", Some("Rust"), None);
+        let expected = crate::lifecycle::hash::sha256_digest(b"memory safety");
+        assert_eq!(g.node_content_hash(n), Some(expected));
     }
 }
 
