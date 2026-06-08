@@ -103,7 +103,8 @@ def main():
             min_strength=0.0, max_depth=2, max_results=10,
             fusion_mode="linear",
         )
-        assert hits_lin is not None, "expected results from linear search"
+        assert hits_lin, "expected linear results"
+        assert hits_lin[0].channel_ranks == [], "linear mode should not populate channel_ranks"
         print(f"linear fusion returned {len(hits_lin)} results, channel_ranks={hits_lin[0].channel_ranks!r}")
         print("fusion_mode + rrf_k + centrality_weight + channel_ranks OK")
 

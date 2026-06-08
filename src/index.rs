@@ -13,6 +13,10 @@ use crate::ids::NodeId;
 use crate::properties::PropertyValue;
 use crate::GraphError;
 
+/// (fused score, per-channel (name, 1-based rank)) for one node.
+/// Used internally by [`IndexedKnowledgeGraph::fuse_combined`] in the RRF arm.
+type FusedEntry = (f64, Vec<(&'static str, u32)>);
+
 // The on-disk text index lives as a sibling module when the feature is enabled.
 // Declared from lib.rs to keep the file at src/on_disk_text_index.rs.
 
@@ -929,7 +933,8 @@ impl IndexedKnowledgeGraph {
                 vidx.add_vector(id, emb);
             }
         }
-        *self.pagerank_cache.lock().unwrap() = None;
+        // No PageRank cache invalidation needed: content edits never touch edges,
+        // and PageRank depends only on edge topology.
         Ok(())
     }
 
@@ -1144,10 +1149,7 @@ impl IndexedKnowledgeGraph {
                     });
                 }
                 let fused = rrf_fuse(&channels, k);
-                let pos: std::collections::HashMap<
-                    crate::NodeId,
-                    (f64, Vec<(&'static str, u32)>),
-                > = fused
+                let pos: HashMap<crate::NodeId, FusedEntry> = fused
                     .into_iter()
                     .map(|f| (f.node, (f.score, f.ranks)))
                     .collect();

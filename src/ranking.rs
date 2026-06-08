@@ -15,14 +15,15 @@ pub struct RankedChannel {
 }
 
 /// A node's fused score with per-channel diagnostics.
+///
+/// Per-channel contribution amounts are derivable from `ranks` and the
+/// channel weights (contribution = weight / (k + rank)) if ever needed.
 #[derive(Debug, Clone)]
 pub struct FusedNode {
     /// The node being scored.
     pub node: NodeId,
     /// Aggregate RRF score (sum of weighted reciprocal ranks across channels).
     pub score: f64,
-    /// `(channel_name, contribution)` pairs, for explanations / debugging.
-    pub contributions: Vec<(&'static str, f64)>,
     /// `(channel_name, 1-based rank)` pairs.
     pub ranks: Vec<(&'static str, u32)>,
 }
@@ -52,11 +53,9 @@ pub fn rrf_fuse(channels: &[RankedChannel], k: f64) -> Vec<FusedNode> {
             let entry = accum.entry(nid).or_insert_with(|| FusedNode {
                 node: nid,
                 score: 0.0,
-                contributions: Vec::new(),
                 ranks: Vec::new(),
             });
             entry.score += contribution;
-            entry.contributions.push((ch.name, contribution));
             entry.ranks.push((ch.name, rank1));
         }
     }
@@ -152,5 +151,30 @@ mod tests {
         let pr = pagerank(&g, None, 0.85, 30);
         assert!(pr[hub.0 as usize] > pr[a.0 as usize]);
         assert!(pr[hub.0 as usize] > pr[b.0 as usize]);
+    }
+
+    #[test]
+    fn pagerank_mask_excludes_nonmatching_edges() {
+        use crate::properties::PropertyValue;
+        use crate::KnowledgeGraph;
+        let mut g = KnowledgeGraph::new();
+        let src = g.add_node("src", None, None);
+        let cited = g.add_node("cited", None, None);
+        let plain = g.add_node("plain", None, None);
+        let cites = g.properties.register("cites");
+        // Only this edge carries the "cites" property — it should be followed under the mask.
+        g.add_edge(src, cited, 1.0, vec![(cites, PropertyValue::Label("c".into()))]);
+        // This edge has no matching property — excluded under the mask.
+        g.add_edge(src, plain, 1.0, vec![]);
+        let mask = g.properties.build_mask(&["cites"]);
+        let pr = pagerank(&g, Some(mask), 0.85, 30);
+        // Only the "cites" edge is followed, so `cited` receives src's propagated
+        // mass while `plain` (reachable only via the untagged edge) does not.
+        assert!(
+            pr[cited.0 as usize] > pr[plain.0 as usize],
+            "cited ({}) should rank above plain ({})",
+            pr[cited.0 as usize],
+            pr[plain.0 as usize]
+        );
     }
 }

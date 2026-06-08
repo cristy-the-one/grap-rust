@@ -8,7 +8,7 @@ use pyo3::types::{PyAny, PyType};
 
 use crate::errors::to_py_err;
 use grap::{
-    FusionWeights, GlobalNodeId, HybridWeights, NodeId, ShardId, ShardedGraph as InnerShardedGraph,
+    GlobalNodeId, HybridWeights, NodeId, ShardId, ShardedGraph as InnerShardedGraph,
 };
 
 /// Represents a sharded knowledge graph.
