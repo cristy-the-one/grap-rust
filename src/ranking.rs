@@ -1,5 +1,6 @@
 //! Rank-based fusion and graph-centrality scoring for query ranking.
-use crate::ids::NodeId;
+use crate::ids::{EdgeId, NodeId};
+use crate::KnowledgeGraph;
 use std::collections::HashMap;
 
 /// One channel's ranked output: an ordered list of node ids, best first.
@@ -64,6 +65,60 @@ pub fn rrf_fuse(channels: &[RankedChannel], k: f64) -> Vec<FusedNode> {
     out
 }
 
+/// Iterative PageRank over the live node set. When `mask` is `Some`, only
+/// edges whose property bits satisfy the mask participate (so callers can
+/// ask for "centrality among `cites` edges"). `damping` ~0.85, `iters` ~30.
+/// Returns a dense vector indexed by `NodeId.0` (tombstoned nodes get 0.0).
+pub fn pagerank(g: &KnowledgeGraph, mask: Option<u64>, damping: f64, iters: u32) -> Vec<f64> {
+    let n_total = g.node_count(); // id-space size incl. tombstones
+    let live: Vec<bool> = (0..n_total)
+        .map(|i| !g.is_node_deleted(NodeId(i as u32)))
+        .collect();
+    let live_count = live.iter().filter(|&&b| b).count().max(1) as f64;
+
+    // Build outgoing adjacency honoring the optional mask.
+    let mut out: Vec<Vec<u32>> = vec![Vec::new(); n_total];
+    for (i, edge) in g.all_edges().iter().enumerate() {
+        if let Some(m) = mask {
+            if !edge.matches_mask(m) {
+                continue;
+            }
+        }
+        let (s, t) = g.edge_endpoints(EdgeId(i as u32));
+        let (s, t) = (s.0 as usize, t.0 as usize);
+        if live[s] && live[t] {
+            out[s].push(t as u32);
+        }
+    }
+
+    let base = (1.0 - damping) / live_count;
+    let mut rank: Vec<f64> = live.iter().map(|&b| if b { 1.0 / live_count } else { 0.0 }).collect();
+
+    for _ in 0..iters {
+        let mut next = vec![0.0_f64; n_total];
+        let mut dangling = 0.0;
+        for i in 0..n_total {
+            if !live[i] { continue; }
+            if out[i].is_empty() {
+                dangling += rank[i];
+            } else {
+                let share = rank[i] / out[i].len() as f64;
+                for &t in &out[i] {
+                    next[t as usize] += share;
+                }
+            }
+        }
+        let dangling_share = dangling / live_count;
+        for i in 0..n_total {
+            if live[i] {
+                next[i] = base + damping * (next[i] + dangling_share);
+            }
+        }
+        rank = next;
+    }
+    rank
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -83,5 +138,19 @@ mod tests {
         let weak = RankedChannel { name: "w", weight: 0.1, ranked: vec![NodeId(8)] };
         let fused = rrf_fuse(&[strong, weak], 60.0);
         assert_eq!(fused[0].node, NodeId(7));
+    }
+
+    #[test]
+    fn pagerank_ranks_hub_above_leaf() {
+        use crate::KnowledgeGraph;
+        let mut g = KnowledgeGraph::new();
+        let hub = g.add_node("hub", None, None);
+        let a = g.add_node("a", None, None);
+        let b = g.add_node("b", None, None);
+        g.add_edge(a, hub, 1.0, vec![]);
+        g.add_edge(b, hub, 1.0, vec![]);
+        let pr = pagerank(&g, None, 0.85, 30);
+        assert!(pr[hub.0 as usize] > pr[a.0 as usize]);
+        assert!(pr[hub.0 as usize] > pr[b.0 as usize]);
     }
 }
