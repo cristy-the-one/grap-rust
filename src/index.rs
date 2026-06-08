@@ -331,6 +331,8 @@ pub struct CombinedResult<'a> {
     pub graph_result: QueryResult,
     /// The text content of the node (borrowed from the blob store).
     pub text: &'a str,
+    /// (channel, 1-based rank) when RRF was used; empty under Linear.
+    pub channel_ranks: Vec<(&'static str, u32)>,
 }
 
 /// Diagnostic statistics about the current state of a text index backend.
@@ -790,6 +792,11 @@ pub struct IndexedKnowledgeGraph {
     /// Background merge/vacuum worker handles for on-disk text indexes.
     /// Stored here so they stay alive as long as the graph does.
     merge_workers: Vec<crate::MergeWorkerHandle>,
+
+    /// Lazily-computed global PageRank, invalidated on topology mutation.
+    /// Mutex (NOT RefCell) so the graph stays Send + Sync — pygrap's #[pyclass]
+    /// and background workers depend on that.
+    pagerank_cache: std::sync::Mutex<Option<Vec<f64>>>,
 }
 
 impl std::fmt::Debug for IndexedKnowledgeGraph {
@@ -808,6 +815,7 @@ impl IndexedKnowledgeGraph {
             text_index: Box::new(InvertedIndex::new()),
             vector_index: None,
             merge_workers: Vec::new(),
+            pagerank_cache: std::sync::Mutex::new(None),
         }
     }
 
@@ -818,6 +826,7 @@ impl IndexedKnowledgeGraph {
             text_index: Box::new(InvertedIndex::with_tokenizer(tokenizer)),
             vector_index: None,
             merge_workers: Vec::new(),
+            pagerank_cache: std::sync::Mutex::new(None),
         }
     }
 
@@ -832,6 +841,7 @@ impl IndexedKnowledgeGraph {
             text_index: Box::new(crate::on_disk_text_index::OnDiskTextIndex::new()),
             vector_index: None,
             merge_workers: Vec::new(),
+            pagerank_cache: std::sync::Mutex::new(None),
         }
     }
 
@@ -850,6 +860,7 @@ impl IndexedKnowledgeGraph {
             ),
             vector_index: None,
             merge_workers: Vec::new(),
+            pagerank_cache: std::sync::Mutex::new(None),
         }
     }
 
@@ -862,6 +873,7 @@ impl IndexedKnowledgeGraph {
             text_index: index,
             vector_index: None,
             merge_workers: Vec::new(),
+            pagerank_cache: std::sync::Mutex::new(None),
         }
     }
 
@@ -886,6 +898,7 @@ impl IndexedKnowledgeGraph {
             vidx.add_vector(id, emb);
         }
 
+        *self.pagerank_cache.lock().unwrap() = None;
         id
     }
 
@@ -916,6 +929,7 @@ impl IndexedKnowledgeGraph {
                 vidx.add_vector(id, emb);
             }
         }
+        *self.pagerank_cache.lock().unwrap() = None;
         Ok(())
     }
 
@@ -950,6 +964,7 @@ impl IndexedKnowledgeGraph {
             }
         }
 
+        *self.pagerank_cache.lock().unwrap() = None;
         Ok(report)
     }
 
@@ -1023,7 +1038,27 @@ impl IndexedKnowledgeGraph {
         strength: f64,
         props: Vec<(crate::ids::PropertyTag, PropertyValue)>,
     ) -> crate::ids::EdgeId {
-        self.graph.add_edge(source, target, strength, props)
+        let edge = self.graph.add_edge(source, target, strength, props);
+        *self.pagerank_cache.lock().unwrap() = None;
+        edge
+    }
+
+    /// Global PageRank with lazy caching for the unmasked (`mask == None`) case.
+    ///
+    /// The unmasked result is memoized in `pagerank_cache` and invalidated by
+    /// any topology mutation. Masked queries are always computed fresh (they are
+    /// rare and parameterised).
+    fn pagerank_cached(&self, mask: Option<u64>) -> Vec<f64> {
+        if mask.is_none() {
+            if let Some(pr) = self.pagerank_cache.lock().unwrap().as_ref() {
+                return pr.clone();
+            }
+        }
+        let pr = crate::ranking::pagerank(&self.graph, mask, 0.85, 30);
+        if mask.is_none() {
+            *self.pagerank_cache.lock().unwrap() = Some(pr.clone());
+        }
+        pr
     }
 
     /// High-level "text + graph" query.
@@ -1085,6 +1120,7 @@ impl IndexedKnowledgeGraph {
                     fused_score,
                     graph_result: gr,
                     text,
+                    channel_ranks: Vec::new(),
                 }
             })
             .collect();
@@ -1202,20 +1238,100 @@ impl IndexedKnowledgeGraph {
 
                 let graph_strength = gr.cumulative_strength;
 
-                let fused_score = text_score * weights.text
-                    + vector_score * weights.vector
-                    + graph_strength * weights.graph;
-
                 CombinedResult {
                     text_score,
                     vector_score,
                     graph_strength,
-                    fused_score,
+                    fused_score: 0.0,
                     graph_result: gr,
                     text,
+                    channel_ranks: Vec::new(),
                 }
             })
             .collect();
+
+        match weights.mode {
+            FusionMode::Linear => {
+                for r in combined.iter_mut() {
+                    r.fused_score = r.text_score * weights.text
+                        + r.vector_score * weights.vector
+                        + r.graph_strength * weights.graph;
+                }
+            }
+            FusionMode::Rrf { k } => {
+                use crate::ranking::{rrf_fuse, RankedChannel};
+                // Rank each channel by its raw score (desc), keeping only positive scores.
+                fn rank_by(
+                    combined: &[CombinedResult],
+                    key: impl Fn(&CombinedResult) -> f64,
+                ) -> Vec<crate::NodeId> {
+                    let mut idx: Vec<usize> = (0..combined.len()).collect();
+                    idx.sort_by(|&i, &j| {
+                        key(&combined[j])
+                            .partial_cmp(&key(&combined[i]))
+                            .unwrap_or(std::cmp::Ordering::Equal)
+                    });
+                    idx.into_iter()
+                        .filter(|&i| key(&combined[i]) > 0.0)
+                        .map(|i| combined[i].graph_result.node_id)
+                        .collect()
+                }
+                let mut channels = vec![
+                    RankedChannel {
+                        name: "text",
+                        weight: weights.text,
+                        ranked: rank_by(&combined, |r| r.text_score),
+                    },
+                    RankedChannel {
+                        name: "vector",
+                        weight: weights.vector,
+                        ranked: rank_by(&combined, |r| r.vector_score),
+                    },
+                    RankedChannel {
+                        name: "graph",
+                        weight: weights.graph,
+                        ranked: rank_by(&combined, |r| r.graph_strength),
+                    },
+                ];
+                if weights.centrality > 0.0 {
+                    let pr = self.pagerank_cached(None);
+                    let mut idx: Vec<usize> = (0..combined.len()).collect();
+                    idx.sort_by(|&i, &j| {
+                        let (ni, nj) = (
+                            combined[i].graph_result.node_id.0 as usize,
+                            combined[j].graph_result.node_id.0 as usize,
+                        );
+                        pr.get(nj)
+                            .unwrap_or(&0.0)
+                            .partial_cmp(pr.get(ni).unwrap_or(&0.0))
+                            .unwrap_or(std::cmp::Ordering::Equal)
+                    });
+                    let ranked: Vec<crate::NodeId> = idx
+                        .into_iter()
+                        .map(|i| combined[i].graph_result.node_id)
+                        .collect();
+                    channels.push(RankedChannel {
+                        name: "centrality",
+                        weight: weights.centrality,
+                        ranked,
+                    });
+                }
+                let fused = rrf_fuse(&channels, k);
+                let pos: std::collections::HashMap<
+                    crate::NodeId,
+                    (f64, Vec<(&'static str, u32)>),
+                > = fused
+                    .into_iter()
+                    .map(|f| (f.node, (f.score, f.ranks)))
+                    .collect();
+                for r in combined.iter_mut() {
+                    if let Some((score, ranks)) = pos.get(&r.graph_result.node_id) {
+                        r.fused_score = *score;
+                        r.channel_ranks = ranks.clone();
+                    }
+                }
+            }
+        }
 
         combined.sort_by(|a, b| {
             b.fused_score
@@ -1333,6 +1449,7 @@ impl IndexedKnowledgeGraph {
                     fused_score,
                     graph_result: gr,
                     text,
+                    channel_ranks: Vec::new(),
                 }
             })
             .collect();
@@ -1429,6 +1546,7 @@ impl IndexedKnowledgeGraph {
             text_index: Box::new(InvertedIndex::new()),
             vector_index: None,
             merge_workers: Vec::new(),
+            pagerank_cache: std::sync::Mutex::new(None),
         };
 
         // Rebuild the text index (simple and correct)
@@ -1581,6 +1699,7 @@ impl IndexedKnowledgeGraph {
             // In a real deployment this could be scheduled asynchronously.
             // For now we do a cheap synchronous pass (can be made lazy later).
             self.maybe_cleanup_ghost_edges_for(node);
+            *self.pagerank_cache.lock().unwrap() = None;
         }
         removed
     }
@@ -1642,6 +1761,7 @@ impl IndexedKnowledgeGraph {
             text_index,
             vector_index: None,
             merge_workers: Vec::new(),
+            pagerank_cache: std::sync::Mutex::new(None),
         };
 
         // Phase 3: Prefer fast load from persisted vector index if available.
@@ -1679,6 +1799,7 @@ impl IndexedKnowledgeGraph {
             text_index,
             vector_index: None,
             merge_workers: Vec::new(),
+            pagerank_cache: std::sync::Mutex::new(None),
         };
 
         // Phase 3: Prefer fast vector load
