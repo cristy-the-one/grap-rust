@@ -82,6 +82,31 @@ def main():
         )
         print(f"search_and_traverse_hybrid returned {len(results)} results")
 
+        # 12. fusion_mode + rrf_k + centrality_weight + channel_ranks
+        # Add a few more text-searchable nodes so the hybrid search has something to rank
+        m1 = g.add_node("memory safety in rust", label="ms1")
+        m2 = g.add_node("memory safety guarantees", label="ms2")
+        g.add_edge(m1, m2, 0.8, {"relation_type": "related"})
+
+        hits = g.search_and_traverse_hybrid(
+            "memory safety", vector=None, max_seeds=5, required_properties=[],
+            min_strength=0.0, max_depth=2, max_results=10,
+            text_weight=1.0, vector_weight=0.6, graph_weight=0.5,
+            centrality_weight=0.4, fusion_mode="rrf", rrf_k=60.0,
+        )
+        assert hits, "expected results from rrf search"
+        print("channel_ranks:", hits[0].channel_ranks)
+
+        # also confirm linear mode still works
+        hits_lin = g.search_and_traverse_hybrid(
+            "memory safety", vector=None, max_seeds=5, required_properties=[],
+            min_strength=0.0, max_depth=2, max_results=10,
+            fusion_mode="linear",
+        )
+        assert hits_lin is not None, "expected results from linear search"
+        print(f"linear fusion returned {len(hits_lin)} results, channel_ranks={hits_lin[0].channel_ranks!r}")
+        print("fusion_mode + rrf_k + centrality_weight + channel_ranks OK")
+
         # 11. get_node_content_hash / verify_node
         fresh_node = g.add_node("hash test node", label="ht")
         h = g.get_node_content_hash(fresh_node)

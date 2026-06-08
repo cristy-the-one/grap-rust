@@ -8,7 +8,8 @@ use pyo3::types::{PyAny, PyDict, PyType};
 
 use crate::errors::to_py_err;
 use grap::{
-    FusionWeights, HybridWeights, IndexedKnowledgeGraph as InnerGraph, NodeId, PropertyValue,
+    FusionMode, FusionWeights, HybridWeights, IndexedKnowledgeGraph as InnerGraph, NodeId,
+    PropertyValue,
 };
 
 /// Result returned by `IndexedKnowledgeGraph.merge_nodes(keep, absorb)`.
@@ -96,6 +97,9 @@ pub struct QueryResult {
     pub fused_score: f64,
     pub depth: u32,
     pub text: String,
+    /// Per-channel RRF ranks as a list of (channel_name, rank) tuples.
+    /// Empty when Linear fusion was used.
+    pub channel_ranks: Vec<(String, u32)>,
 }
 
 #[pymethods]
@@ -451,6 +455,11 @@ impl IndexedKnowledgeGraph {
                 fused_score: r.fused_score,
                 depth: r.graph_result.depth,
                 text: r.text.to_string(),
+                channel_ranks: r
+                    .channel_ranks
+                    .iter()
+                    .map(|(n, rank)| (n.to_string(), *rank))
+                    .collect(),
             })
             .collect())
     }
@@ -474,7 +483,10 @@ impl IndexedKnowledgeGraph {
         text_weight = 0.4,
         vector_weight = 0.4,
         graph_weight = 0.2,
+        centrality_weight = 0.4,
         traversal_weight_property = None,
+        fusion_mode = String::from("rrf"),
+        rrf_k = 60.0,
     ))]
     fn search_and_traverse_hybrid(
         &self,
@@ -488,14 +500,22 @@ impl IndexedKnowledgeGraph {
         text_weight: f64,
         vector_weight: f64,
         graph_weight: f64,
+        centrality_weight: f64,
         traversal_weight_property: Option<String>,
+        fusion_mode: String,
+        rrf_k: f64,
     ) -> PyResult<Vec<QueryResult>> {
+        let mode = match fusion_mode.as_str() {
+            "linear" => FusionMode::Linear,
+            _ => FusionMode::Rrf { k: rrf_k },
+        };
         let weights = HybridWeights {
             text: text_weight,
             vector: vector_weight,
             graph: graph_weight,
+            centrality: centrality_weight,
             traversal_weight_property,
-            ..Default::default()
+            mode,
         };
 
         let prop_refs: Vec<&str> = required_properties.iter().map(|s| s.as_str()).collect();
@@ -523,6 +543,11 @@ impl IndexedKnowledgeGraph {
                 fused_score: r.fused_score,
                 depth: r.graph_result.depth,
                 text: r.text.to_string(),
+                channel_ranks: r
+                    .channel_ranks
+                    .iter()
+                    .map(|(n, rank)| (n.to_string(), *rank))
+                    .collect(),
             })
             .collect())
     }
