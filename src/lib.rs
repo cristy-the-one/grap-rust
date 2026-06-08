@@ -78,7 +78,7 @@ pub use on_disk_index::{
 };
 pub use on_disk_text_index::OnDiskTextIndex;
 
-pub use graph::KnowledgeGraph;
+pub use graph::{KnowledgeGraph, NodeIntegrity};
 pub use ids::{EdgeId, NodeId, PropertyTag};
 pub use properties::{PropertyFilter, PropertyRegistry, PropertyValue};
 pub use query::{GraphQuery, QueryBuilder, QueryResult};

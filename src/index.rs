@@ -1228,6 +1228,16 @@ impl IndexedKnowledgeGraph {
         self.graph.read_blob(node)
     }
 
+    /// SHA-256 content hash of a node's blob (see `KnowledgeGraph::node_content_hash`).
+    pub fn node_content_hash(&self, node: NodeId) -> Option<[u8; 32]> {
+        self.graph.node_content_hash(node)
+    }
+
+    /// Self-integrity check (see `KnowledgeGraph::verify_node`).
+    pub fn verify_node(&self, node: NodeId) -> crate::graph::NodeIntegrity {
+        self.graph.verify_node(node)
+    }
+
     /// Number of live (non-tombstoned) nodes (see `KnowledgeGraph::live_node_count`).
     pub fn live_node_count(&self) -> usize {
         self.graph.live_node_count()
@@ -2100,5 +2110,13 @@ mod indexed_relation_tests {
 
         assert!(ids.contains(&b));
         assert!(ids.contains(&c));
+    }
+
+    #[test]
+    fn indexed_exposes_content_hash() {
+        let mut g = IndexedKnowledgeGraph::new();
+        let n = g.add_node("x", None, None);
+        assert!(g.node_content_hash(n).is_some());
+        assert_eq!(g.verify_node(n), crate::graph::NodeIntegrity::Match);
     }
 }

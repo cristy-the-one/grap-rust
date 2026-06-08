@@ -2,7 +2,7 @@
 Smoke test for the pygrap Phase 1 bindings.
 Tests: add_edge, get_node_text, get_node_label, update_node, merge_nodes,
        neighbors_by_relation, predecessors_by_relation, traverse_by_relation,
-       MergeReport, TraversalResult.
+       MergeReport, TraversalResult, get_node_content_hash, verify_node.
 """
 import tempfile, os
 import pygrap
@@ -81,6 +81,17 @@ def main():
             max_results=5,
         )
         print(f"search_and_traverse_hybrid returned {len(results)} results")
+
+        # 11. get_node_content_hash / verify_node
+        fresh_node = g.add_node("hash test node", label="ht")
+        h = g.get_node_content_hash(fresh_node)
+        assert h is not None, "Expected a content hash, got None"
+        assert len(h) == 64, f"Expected 64-char hex string, got len={len(h)}: {h!r}"
+        assert all(c in "0123456789abcdef" for c in h), f"Hash is not hex: {h!r}"
+        print(f"get_node_content_hash OK: {h[:16]}...")
+        v = g.verify_node(fresh_node)
+        assert v == "match", f"Expected 'match', got {v!r}"
+        print(f"verify_node OK: {v!r}")
 
     print("\nAll smoke tests passed!")
 

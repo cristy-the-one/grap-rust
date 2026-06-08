@@ -566,6 +566,23 @@ impl IndexedKnowledgeGraph {
         self.inner.graph.edge_count()
     }
 
+    /// Hex SHA-256 of the node's text, or None.
+    fn get_node_content_hash(&self, node_id: u32) -> Option<String> {
+        self.inner
+            .node_content_hash(grap::NodeId(node_id))
+            .map(|d| d.iter().map(|b| format!("{:02x}", b)).collect())
+    }
+
+    /// "match" | "mismatch" | "unknown".
+    fn verify_node(&self, node_id: u32) -> String {
+        match self.inner.verify_node(grap::NodeId(node_id)) {
+            grap::NodeIntegrity::Match => "match",
+            grap::NodeIntegrity::Mismatch => "mismatch",
+            grap::NodeIntegrity::Unknown => "unknown",
+        }
+        .to_string()
+    }
+
     /// String representation for Python (nice for debugging / notebooks).
     fn __repr__(&self) -> String {
         match &self.path {
