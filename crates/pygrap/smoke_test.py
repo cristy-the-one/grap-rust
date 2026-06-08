@@ -119,6 +119,17 @@ def main():
         assert v == "match", f"Expected 'match', got {v!r}"
         print(f"verify_node OK: {v!r}")
 
+    # 13. wire.encode_tables
+    wire = pygrap.wire.encode_tables(
+        tool="graph_neighbors", enc_id="gn1",
+        scalars=[("count", 2)],
+        tables=[("n", "neighbors", ["node_id", "relation"], [1],
+                 [[7, "cites"], [9, "cites"]])],
+    )
+    assert wire.startswith("#MUNCH/1 tool=graph_neighbors enc=gn1"), wire
+    assert "@1=cites" in wire, wire
+    print("wire encode_tables OK:\n" + wire)
+
     print("\nAll smoke tests passed!")
 
 if __name__ == "__main__":

@@ -8,6 +8,7 @@ mod errors;
 mod indexed_graph;
 mod lifecycle;
 mod sharded_graph;
+mod wire;
 
 pub use errors::GraphError;
 
@@ -36,6 +37,10 @@ fn pygrap(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<lifecycle::RetentionReport>()?;
 
     m.add_function(wrap_pyfunction!(version, m)?)?;
+
+    // Register wire submodule
+    wire::register(m)?;
+
     Ok(())
 }
 
