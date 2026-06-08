@@ -206,6 +206,24 @@ pub struct TextSearchResult {
     pub matched_terms: Vec<String>,
 }
 
+/// How channel scores are combined into a final ranking.
+#[derive(Debug, Clone, Copy)]
+pub enum FusionMode {
+    /// Legacy: weighted sum of raw per-signal scores. Kept for back-compat.
+    Linear,
+    /// Reciprocal Rank Fusion with smoothing constant `k`. The default.
+    Rrf {
+        /// Smoothing constant (higher → less top-heavy). Use [`crate::ranking::DEFAULT_RRF_K`] = 60.0.
+        k: f64,
+    },
+}
+
+impl Default for FusionMode {
+    fn default() -> Self {
+        FusionMode::Rrf { k: crate::ranking::DEFAULT_RRF_K }
+    }
+}
+
 /// Controls how the text retrieval score and the graph traversal strength
 /// are combined when producing final ranked results from the high-level
 /// search methods on [`IndexedKnowledgeGraph`].
@@ -218,6 +236,8 @@ pub struct FusionWeights {
     /// Relative weight given to the cumulative graph path strength.
     /// Higher values favor nodes reached through strong relationship chains.
     pub graph: f64,
+    /// How channel scores are combined into a final ranking.
+    pub mode: FusionMode,
 }
 
 impl Default for FusionWeights {
@@ -226,6 +246,7 @@ impl Default for FusionWeights {
         Self {
             text: 0.6,
             graph: 0.4,
+            mode: FusionMode::default(),
         }
     }
 }
@@ -243,11 +264,15 @@ pub struct HybridWeights {
     pub vector: f64,
     /// Weight given to the graph path strength.
     pub graph: f64,
+    /// Weight of the PageRank centrality channel (0.0 disables it).
+    pub centrality: f64,
     /// If `Some(name)`, use this edge property's numeric value as the
     /// traversal priority weight instead of `edge.strength`.
     /// Falls back to `edge.strength` if the property is absent on a given edge.
     /// `None` (default) preserves existing behaviour exactly.
     pub traversal_weight_property: Option<String>,
+    /// How channel scores are combined into a final ranking.
+    pub mode: FusionMode,
 }
 
 impl Default for HybridWeights {
@@ -256,7 +281,9 @@ impl Default for HybridWeights {
             text: 0.4,
             vector: 0.4,
             graph: 0.2,
+            centrality: 0.4,
             traversal_weight_property: None,
+            mode: FusionMode::default(),
         }
     }
 }
@@ -2046,6 +2073,13 @@ mod hybrid_weight_tests {
             .collect();
         assert!(without_ids.contains(&hi));
         assert!(without_ids.contains(&lo));
+    }
+
+    #[test]
+    fn hybrid_weights_default_is_rrf_with_centrality() {
+        let w = HybridWeights::default();
+        assert!(matches!(w.mode, crate::index::FusionMode::Rrf { .. }));
+        assert!(w.centrality >= 0.0);
     }
 }
 

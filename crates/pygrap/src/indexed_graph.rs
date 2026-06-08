@@ -425,6 +425,7 @@ impl IndexedKnowledgeGraph {
         let weights = FusionWeights {
             text: text_weight,
             graph: graph_weight,
+            ..Default::default()
         };
 
         // Convert Vec<String> to Vec<&str> for the Rust API
@@ -494,6 +495,7 @@ impl IndexedKnowledgeGraph {
             vector: vector_weight,
             graph: graph_weight,
             traversal_weight_property,
+            ..Default::default()
         };
 
         let prop_refs: Vec<&str> = required_properties.iter().map(|s| s.as_str()).collect();

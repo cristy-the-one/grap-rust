@@ -122,6 +122,7 @@ fn main() {
     let text_heavy = FusionWeights {
         text: 0.9,
         graph: 0.1,
+        ..Default::default()
     };
     let results =
         g.search_and_traverse("ownership borrowing", 5, &["topic"], 0.7, 3, 10, text_heavy);
@@ -141,6 +142,7 @@ fn main() {
     let graph_heavy = FusionWeights {
         text: 0.2,
         graph: 0.8,
+        ..Default::default()
     };
     let results = g.search_and_traverse("memory safety", 5, &["topic"], 0.6, 3, 10, graph_heavy);
 
@@ -202,6 +204,7 @@ fn main() {
         vector: 0.70,
         graph: 0.15,
         traversal_weight_property: None,
+        ..Default::default()
     };
 
     let vector_biased = g.search_and_traverse_hybrid(

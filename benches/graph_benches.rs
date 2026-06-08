@@ -175,6 +175,7 @@ fn bench_bitmask_pruning(c: &mut Criterion) {
                 FusionWeights {
                     text: 0.5,
                     graph: 0.5,
+                    ..Default::default()
                 },
             );
             black_box(results.len())
@@ -194,6 +195,7 @@ fn bench_bitmask_pruning(c: &mut Criterion) {
                 FusionWeights {
                     text: 0.5,
                     graph: 0.5,
+                    ..Default::default()
                 },
             );
             black_box(results.len())
@@ -286,6 +288,7 @@ fn bench_text_graph_fusion_cost(c: &mut Criterion) {
                 FusionWeights {
                     text: 0.9,
                     graph: 0.1,
+                    ..Default::default()
                 },
             );
             black_box(res.len())
@@ -304,6 +307,7 @@ fn bench_text_graph_fusion_cost(c: &mut Criterion) {
                 FusionWeights {
                     text: 0.5,
                     graph: 0.5,
+                    ..Default::default()
                 },
             );
             black_box(res.len())
@@ -322,6 +326,7 @@ fn bench_text_graph_fusion_cost(c: &mut Criterion) {
                 FusionWeights {
                     text: 0.1,
                     graph: 0.9,
+                    ..Default::default()
                 },
             );
             black_box(res.len())

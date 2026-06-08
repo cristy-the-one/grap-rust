@@ -193,6 +193,7 @@ impl ShardedGraph {
             vector: vector_weight,
             graph: graph_weight,
             traversal_weight_property: None,
+            ..Default::default()
         };
 
         let prop_refs: Vec<&str> = required_properties.iter().map(|s| s.as_str()).collect();
