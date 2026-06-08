@@ -104,6 +104,8 @@ pub mod shard; // Graph sharding (Phase 4)
 
 pub mod ranking; // Rank-based fusion (RRF) and centrality scoring
 
+pub mod wire; // Columnar string-interned wire encoding (`#MUNCH`-style)
+
 /// Crate-wide error type for all fallible operations in `grap`.
 ///
 /// This type is used (or will be used) by persistence, sharding, and
