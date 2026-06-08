@@ -681,6 +681,11 @@ impl KnowledgeGraph {
                 None
             };
 
+            // NOTE: assumes per-chunk LOCAL offsets (the portable Storage::Chunks layout
+            // this load path always builds). If a zero-copy Storage::Mmap reconstruction
+            // is ever wired in here, BlobRef.offset becomes a GLOBAL offset and this
+            // slicing breaks — switch to recomputing via `blobs.read(&blob).as_bytes()`
+            // after the BlobStore is constructed instead.
             let content_hash = {
                 let chunk = &chunks[blob.chunk_idx as usize];
                 let start = blob.offset as usize;

@@ -222,6 +222,9 @@ impl KnowledgeGraph {
 
     /// Returns the stored SHA-256 content hash of a node's text blob, or
     /// `None` if the id is out of bounds.
+    ///
+    /// Returns the stored hash even for tombstoned (deleted) nodes; use
+    /// `verify_node` if you need a liveness-aware check.
     pub fn node_content_hash(&self, node: NodeId) -> Option<[u8; 32]> {
         self.nodes.get(node.0 as usize).map(|n| n.content_hash)
     }
@@ -370,6 +373,14 @@ mod tests {
         let n = g.add_node("intact", None, None);
         assert_eq!(g.verify_node(n), crate::graph::NodeIntegrity::Match);
         assert_eq!(g.verify_node(NodeId(999)), crate::graph::NodeIntegrity::Unknown);
+    }
+
+    #[test]
+    fn verify_node_unknown_for_deleted_node() {
+        let mut g = KnowledgeGraph::new();
+        let n = g.add_node("temp", None, None);
+        assert!(g.remove_node(n)); // tombstone it
+        assert_eq!(g.verify_node(n), crate::graph::NodeIntegrity::Unknown);
     }
 }
 
