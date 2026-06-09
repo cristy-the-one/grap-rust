@@ -62,4 +62,9 @@ def encode_response(tool_name, response, requested_format=None, repo=None):
         tool=tool_name, enc_id=schema["enc_id"], scalars=scalars, tables=tables,
     )
     tokens_saved = max(0, (raw_bytes - len(payload)) // _BYTES_PER_TOKEN)
+    try:
+        from grap_mcp import telemetry as _tel
+        _tel.record(tool_name, tokens_saved)
+    except Exception:
+        pass
     return payload, {"format": "compact", "tokens_saved": tokens_saved}
