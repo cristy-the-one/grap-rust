@@ -140,6 +140,12 @@ def main():
         assert "top_central" in h, "Missing top_central in health report"
         print(f"health OK: live_nodes={h['live_nodes']}, cycle_count={h['cycle_count']}, top_central count={len(h['top_central'])}")
 
+    # 14. remove_node / is_node_deleted
+        _rm = g.add_node(text="to be removed", label="tmp")
+        assert g.remove_node(_rm) is True, "remove_node should return True for a live node"
+        assert g.is_node_deleted(_rm) is True, "node should be tombstoned after remove_node"
+        print("remove_node OK")
+
     # 11. get_node_content_hash / verify_node
         fresh_node = g.add_node("hash test node", label="ht")
         h = g.get_node_content_hash(fresh_node)

@@ -583,6 +583,11 @@ impl IndexedKnowledgeGraph {
         self.inner.graph.node_count()
     }
 
+    /// Tombstone a node (soft delete). Returns true if it was live.
+    fn remove_node(&mut self, node_id: u32) -> bool {
+        self.inner.remove_node(grap::NodeId(node_id))
+    }
+
     /// True if a node has been logically deleted (e.g. absorbed by `merge_nodes`).
     fn is_node_deleted(&self, id: u32) -> bool {
         self.inner.is_node_deleted(NodeId(id))
