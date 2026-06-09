@@ -876,6 +876,10 @@ impl ShardRouter {
     /// on each shard (using the same query vector) and then merge the top results by
     /// fused score. This is simple and gives good results for most workloads.
     ///
+    /// RRF ranks and PageRank centrality are computed in each shard's OWN local space,
+    /// then merged by raw fused score across shards — so centrality is per-shard, not global.
+    /// A fully cross-shard hybrid is a future enhancement.
+    ///
     /// A fully cross-shard best-first hybrid traversal is possible in a follow-up if needed.
     pub fn search_and_traverse_hybrid(
         &self,

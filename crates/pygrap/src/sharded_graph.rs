@@ -8,7 +8,7 @@ use pyo3::types::{PyAny, PyType};
 
 use crate::errors::to_py_err;
 use grap::{
-    GlobalNodeId, HybridWeights, NodeId, ShardId, ShardedGraph as InnerShardedGraph,
+    FusionMode, GlobalNodeId, HybridWeights, NodeId, ShardId, ShardedGraph as InnerShardedGraph,
 };
 
 /// Represents a sharded knowledge graph.
@@ -163,6 +163,16 @@ impl ShardedGraph {
     }
 
     /// Hybrid text + vector + graph search across the sharded cluster.
+    ///
+    /// `fusion_mode` is `"rrf"` (default) or `"linear"`.
+    /// `rrf_k` is the RRF rank-smoothing constant (default 60.0).
+    /// `centrality_weight` scales the PageRank contribution to scoring (default 0.4).
+    /// `traversal_weight_property` optionally prioritises edges that carry the named property
+    /// during BFS expansion (mirrors the non-sharded `search_and_traverse_hybrid` parameter).
+    ///
+    /// Note: RRF ranks and PageRank centrality are computed in each shard's own local space;
+    /// the sharded method merges results by raw fused score across shards — so centrality is
+    /// per-shard, not global.
     #[pyo3(signature = (
         query,
         vector = None,
@@ -174,6 +184,10 @@ impl ShardedGraph {
         text_weight = 0.4,
         vector_weight = 0.4,
         graph_weight = 0.2,
+        centrality_weight = 0.4,
+        traversal_weight_property = None,
+        fusion_mode = String::from("rrf"),
+        rrf_k = 60.0,
     ))]
     fn search_and_traverse_hybrid(
         &self,
@@ -187,13 +201,22 @@ impl ShardedGraph {
         text_weight: f64,
         vector_weight: f64,
         graph_weight: f64,
+        centrality_weight: f64,
+        traversal_weight_property: Option<String>,
+        fusion_mode: String,
+        rrf_k: f64,
     ) -> PyResult<Vec<ShardedQueryResult>> {
+        let mode = match fusion_mode.as_str() {
+            "linear" => FusionMode::Linear,
+            _ => FusionMode::Rrf { k: rrf_k },
+        };
         let weights = HybridWeights {
             text: text_weight,
             vector: vector_weight,
             graph: graph_weight,
-            traversal_weight_property: None,
-            ..Default::default()
+            centrality: centrality_weight,
+            traversal_weight_property,
+            mode,
         };
 
         let prop_refs: Vec<&str> = required_properties.iter().map(|s| s.as_str()).collect();

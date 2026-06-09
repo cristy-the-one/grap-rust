@@ -157,6 +157,52 @@ def main():
         assert v == "match", f"Expected 'match', got {v!r}"
         print(f"verify_node OK: {v!r}")
 
+    # 15. ShardedGraph: search_and_traverse_hybrid with fusion controls
+    with tempfile.TemporaryDirectory() as shard_tmpdir:
+        shard_path = os.path.join(shard_tmpdir, "sharded-graph")
+        sg = pygrap.ShardedGraph(shard_path, 2)
+        s1 = sg.add_node("rust memory safety", label="s1", embedding=[1.0, 0.0, 0.0])
+        s2 = sg.add_node("memory safety concepts", label="s2", embedding=[0.9, 0.1, 0.0])
+        s3 = sg.add_node("unrelated node xyz", label="s3", embedding=[0.0, 0.0, 1.0])
+        sg.add_edge(s1, s2, 0.8)
+        sg.add_edge(s2, s3, 0.5)
+
+        # RRF mode (default)
+        rrf_results = sg.search_and_traverse_hybrid(
+            "memory safety",
+            vector=None,
+            max_seeds=5,
+            max_results=10,
+            fusion_mode="rrf",
+            rrf_k=60.0,
+            centrality_weight=0.4,
+        )
+        assert isinstance(rrf_results, list), "Expected a list from sharded rrf search"
+        print(f"ShardedGraph rrf search returned {len(rrf_results)} results")
+
+        # Linear mode
+        lin_results = sg.search_and_traverse_hybrid(
+            "memory safety",
+            vector=None,
+            max_seeds=5,
+            max_results=10,
+            fusion_mode="linear",
+            centrality_weight=0.2,
+        )
+        assert isinstance(lin_results, list), "Expected a list from sharded linear search"
+        print(f"ShardedGraph linear search returned {len(lin_results)} results")
+
+        # traversal_weight_property pass-through (no exception expected)
+        twp_results = sg.search_and_traverse_hybrid(
+            "memory",
+            traversal_weight_property="confidence",
+            fusion_mode="rrf",
+        )
+        assert isinstance(twp_results, list), "Expected a list from sharded twp search"
+        print(f"ShardedGraph traversal_weight_property pass-through OK ({len(twp_results)} results)")
+
+    print("ShardedGraph fusion controls OK")
+
     # 13. wire.encode_tables
     wire = pygrap.wire.encode_tables(
         tool="graph_neighbors", enc_id="gn1",
