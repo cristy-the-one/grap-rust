@@ -1,4 +1,5 @@
 import grap_mcp.telemetry as tel
+import grap_mcp.server as s
 
 
 def test_records_and_aggregates(monkeypatch):
@@ -21,3 +22,14 @@ def test_disabled_by_default(monkeypatch):
     snap = tel.snapshot()
     assert snap["enabled"] is False
     assert snap["total_tokens_saved"] == 0
+
+
+def test_get_telemetry_tool(monkeypatch):
+    monkeypatch.setenv("GRAP_TELEMETRY", "1")
+    monkeypatch.setitem(s._state, "role", "operator")
+    tel.reset()
+    tel.record("graph_neighbors", tokens_saved=50)
+    out = s.get_telemetry()
+    assert out["status"] == "ok"
+    assert out["total_tokens_saved"] == 50
+    assert out["total_calls"] == 1

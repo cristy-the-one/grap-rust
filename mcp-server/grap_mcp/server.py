@@ -1223,6 +1223,22 @@ def set_role(role: str) -> dict:
 
 
 @mcp.tool()
+def get_telemetry() -> dict:
+    """Opt-in local telemetry: per-tool call counts and tokens saved by
+    compact wire encoding (enable via GRAP_TELEMETRY=1)."""
+    denied = _require("operator")
+    if denied:
+        return denied
+    try:
+        from grap_mcp import telemetry as _tel
+        snap = _tel.snapshot()
+        snap["status"] = "ok"
+        return snap
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
+@mcp.tool()
 def list_capabilities() -> dict:
     """Return the MCP capability taxonomy grouped by domain."""
     return {
@@ -1239,7 +1255,7 @@ def list_capabilities() -> dict:
             "governance": ["get_config", "set_weight", "set_retention", "enforce_retention"],
             "auth": ["set_role", "get_role"],
             "validation": ["validate_procedure_graph", "diff_procedure_graphs", "get_validation"],
-            "audit": ["get_audit_log", "get_status", "list_capabilities",
+            "audit": ["get_audit_log", "get_status", "get_telemetry", "list_capabilities",
                       "list_runs", "get_run", "reconstruct_run", "query_events"],
         },
         "auth": "deferred (POC: no authentication/authorization)",
