@@ -1,23 +1,28 @@
 from grap_mcp.encoding import encode_response, default_format
 
 
-def test_graph_neighbors_compact_interns_relation():
+def test_graph_neighbors_compact_two_tables():
     response = {
+        "status": "ok", "center": 5,
         "neighbors": [
-            {"node_id": 7, "relation": "cites"},
-            {"node_id": 9, "relation": "cites"},
+            {"id": 7, "label": "Brake", "kind": "act", "title": "..."},
+            {"id": 9, "label": "Signal", "kind": "act", "title": "..."},
         ],
-        "count": 2,
+        "edges": [
+            {"source": 5, "target": 7, "type": "cites"},
+            {"source": 5, "target": 9, "type": "cites"},
+        ],
     }
     payload, meta = encode_response("graph_neighbors", response, requested_format="compact")
     assert isinstance(payload, str)
     assert payload.startswith("#MUNCH/1 tool=graph_neighbors")
-    assert "@1=cites" in payload
+    assert "__tables=n:neighbors:id|label|kind|title,e:edges:source|target|type" in payload
+    assert "@1=act" in payload          # kind interned (repeats)
     assert meta["tokens_saved"] >= 0
 
 
 def test_json_is_default_passthrough():
-    response = {"neighbors": [], "count": 0}
+    response = {"status": "ok", "center": 0, "neighbors": [], "edges": []}
     payload, meta = encode_response("graph_neighbors", response, requested_format=None)
     assert payload == response          # JSON default until a decoder ships
     assert meta["format"] == "json"

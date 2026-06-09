@@ -519,10 +519,14 @@ def legal_graph_from_relations(path: str, top: int = 200) -> dict:
 
 
 @mcp.tool()
-def graph_neighbors(node_id: int, types: list = None) -> dict:
+def graph_neighbors(node_id: int, types: list = None, wire_format: str = "json"):
     """Return a node's neighbors from the current KG (live), for the given
     relation types (default 'cites'/'mentions'). Powers expand-on-click in the
-    graph view — querying the actual graph, not a precomputed snapshot."""
+    graph view — querying the actual graph, not a precomputed snapshot.
+
+    ``wire_format`` is opt-in: "json" (default) returns the usual dict; "compact"
+    returns a token-budgeted ``#MUNCH`` string produced by the Rust wire encoder.
+    """
     denied = _require("operator")
     if denied:
         return denied
@@ -566,7 +570,10 @@ def graph_neighbors(node_id: int, types: list = None) -> dict:
             for pid, _s in ins:
                 add(pid)
                 edges.append({"source": pid, "target": node_id, "type": ty})
-        return {"status": "ok", "center": node_id, "neighbors": neighbors, "edges": edges}
+        r = {"status": "ok", "center": node_id, "neighbors": neighbors, "edges": edges}
+        from .encoding import encode_response
+        payload, _meta = encode_response("graph_neighbors", r, requested_format=wire_format)
+        return payload  # dict when json (unchanged), #MUNCH string when wire_format="compact"
     except Exception as e:
         logger.exception("graph_neighbors failed")
         return {"status": "error", "message": str(e)}
