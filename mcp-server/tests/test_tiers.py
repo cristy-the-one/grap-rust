@@ -1,4 +1,7 @@
+import asyncio
 import grap_mcp.tiers as t
+import grap_mcp.server as s
+
 
 def test_tier_includes_is_cumulative():
     assert t.tier_includes("core", "core")
@@ -15,3 +18,16 @@ def test_active_tier_default_and_env(monkeypatch):
     assert t.active_tier() == "core"
     monkeypatch.setenv("GRAP_TOOL_TIER", "bogus")
     assert t.active_tier() == "full"
+
+
+def test_tiers_map_is_self_consistent():
+    for name in s._TIERS:
+        # grap_guide/suggest_queries are added in later tasks; allow them now.
+        if name in ("grap_guide", "suggest_queries"):
+            continue
+        assert hasattr(s, name), f"_TIERS references unknown tool {name}"
+
+def test_full_tier_has_known_tools():
+    names = {t.name for t in asyncio.run(s.mcp.list_tools())}
+    for n in ["graph_neighbors", "get_context_bundle", "run_experiment", "get_config", "list_capabilities"]:
+        assert n in names

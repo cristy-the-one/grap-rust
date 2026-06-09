@@ -33,6 +33,32 @@ logger = logging.getLogger("grap-mcp")
 # Create the MCP server
 mcp = FastMCP("Grap Engine")
 
+from .tiers import active_tier, tier_includes
+
+# Tool-tier policy: only core + full are listed; everything else is 'standard'.
+# Single source of truth — tune freely.
+_TIERS = {
+    "grap_guide": "core", "suggest_queries": "core", "list_capabilities": "core",
+    "get_status": "core", "create_knowledge_graph": "core", "load_knowledge_graph": "core",
+    "ingest_documents": "core", "graph_neighbors": "core", "get_context_bundle": "core",
+    "run_experiment": "full", "get_quality_metrics": "full", "adopt_experiment": "full",
+    "get_config": "full", "set_weight": "full", "set_retention": "full",
+    "enforce_retention": "full", "get_audit_log": "full", "reconstruct_run": "full",
+    "get_telemetry": "full", "build_legal_graph": "full", "legal_graph_from_relations": "full",
+}
+_ACTIVE_TIER = active_tier()
+
+
+def tiered(func):
+    """Register `func` as an MCP tool only if its tier (from _TIERS, default
+    'standard') is within the active tier. Out-of-tier tools stay defined on the
+    module (callable in tests) but are not advertised to clients."""
+    tool_tier = _TIERS.get(func.__name__, "standard")
+    if tier_includes(tool_tier, _ACTIVE_TIER):
+        return mcp.tool()(func)
+    return func
+
+
 # In-memory state for the POC
 _state = {
     "kg": None,
@@ -107,7 +133,7 @@ def _cached_validation(ws, version_hash):
 # P0 Capabilities (Tier 1 for the narrow vertical POC)
 # =============================================================================
 
-@mcp.tool()
+@tiered
 def load_knowledge_graph(path: str) -> dict:
     """
     Load a Knowledge Graph (with ontology) from disk.
@@ -137,7 +163,7 @@ def load_knowledge_graph(path: str) -> dict:
         return {"status": "error", "message": str(e)}
 
 
-@mcp.tool()
+@tiered
 def create_knowledge_graph(path: str) -> dict:
     """Create a fresh on-disk Knowledge Graph and make it the current KG."""
     denied = _require("operator")
@@ -166,7 +192,7 @@ def create_knowledge_graph(path: str) -> dict:
         return {"status": "error", "message": str(e)}
 
 
-@mcp.tool()
+@tiered
 def ingest_documents(path: str) -> dict:
     """Chunk + add .md/.txt documents under `path` into the loaded KG (real evidence)."""
     denied = _require("operator")
@@ -192,7 +218,7 @@ def ingest_documents(path: str) -> dict:
         return {"status": "error", "message": str(e)}
 
 
-@mcp.tool()
+@tiered
 def reingest_documents(path: str) -> dict:
     """Incrementally (re)ingest .md/.txt under `path`: skip unchanged chunks,
     add new/changed ones, tombstone removed ones. Non-duplicating."""
@@ -224,7 +250,7 @@ def reingest_documents(path: str) -> dict:
         return {"status": "error", "message": str(e)}
 
 
-@mcp.tool()
+@tiered
 def extract_ontology(path: str, out_path: str = None, sim: float = 0.86,
                      model: str = None, max_files: int = None) -> dict:
     """Propose an ontology from documents (Knowledge Extraction Engine).
@@ -287,7 +313,7 @@ def extract_ontology(path: str, out_path: str = None, sim: float = 0.86,
         return {"status": "error", "message": str(e)}
 
 
-@mcp.tool()
+@tiered
 def project_relations(relations: list = None) -> dict:
     """Project extracted relations as typed edges in the current Knowledge Graph.
 
@@ -344,7 +370,7 @@ def project_relations(relations: list = None) -> dict:
         return {"status": "error", "message": str(e)}
 
 
-@mcp.tool()
+@tiered
 def build_legal_graph(path: str, max_files: int = 400, with_relations: bool = False,
                       relation_files: int = 3, model: str = None) -> dict:
     """Build one navigable legal KG: act nodes + citation ('cites') edges merged
@@ -473,7 +499,7 @@ def build_legal_graph(path: str, max_files: int = 400, with_relations: bool = Fa
         return {"status": "error", "message": str(e)}
 
 
-@mcp.tool()
+@tiered
 def legal_graph_from_relations(path: str, top: int = 200) -> dict:
     """Load a relations JSON file (e.g. relations.curated.json from the batch
     runner) into a fresh KG and return it for the graph view.
@@ -550,7 +576,7 @@ def legal_graph_from_relations(path: str, top: int = 200) -> dict:
         return {"status": "error", "message": str(e)}
 
 
-@mcp.tool()
+@tiered
 def graph_neighbors(node_id: int, types: list = None, wire_format: str = "json"):
     """Return a node's neighbors from the current KG (live), for the given
     relation types (default 'cites'/'mentions'). Powers expand-on-click in the
@@ -618,7 +644,7 @@ def graph_neighbors(node_id: int, types: list = None, wire_format: str = "json")
         return {"status": "error", "message": str(e)}
 
 
-@mcp.tool()
+@tiered
 def get_session_context(sort_by: str = "recency") -> dict:
     """The MCP's working memory: recently/frequently touched nodes, recent
     queries (with negative evidence), and edits this session."""
@@ -638,7 +664,7 @@ def get_session_context(sort_by: str = "recency") -> dict:
 _CHARS_PER_TOKEN = 4
 
 
-@mcp.tool()
+@tiered
 def get_context_bundle(query: str, max_results: int = 20, token_budget: int = 2000,
                        min_strength: float = 0.3, max_depth: int = 3) -> dict:
     """Assemble a token-budgeted bundle of the most relevant KG nodes for
@@ -688,7 +714,7 @@ def get_context_bundle(query: str, max_results: int = 20, token_budget: int = 20
         return {"status": "error", "message": str(e)}
 
 
-@mcp.tool()
+@tiered
 def get_blast_radius(node_id: int, relations: list = None, max_depth: int = 10) -> dict:
     """Transitive dependents of a node — what would be impacted if it changes."""
     denied = _require("operator")
@@ -704,7 +730,7 @@ def get_blast_radius(node_id: int, relations: list = None, max_depth: int = 10) 
         return {"status": "error", "message": str(e)}
 
 
-@mcp.tool()
+@tiered
 def find_cycles() -> dict:
     """Dependency cycles (strongly-connected components) in the current KG."""
     denied = _require("operator")
@@ -720,7 +746,7 @@ def find_cycles() -> dict:
         return {"status": "error", "message": str(e)}
 
 
-@mcp.tool()
+@tiered
 def find_orphans(entry_points: list = None) -> dict:
     """Live nodes unreachable from the given entry points (or from KG roots)."""
     denied = _require("operator")
@@ -736,7 +762,7 @@ def find_orphans(entry_points: list = None) -> dict:
         return {"status": "error", "message": str(e)}
 
 
-@mcp.tool()
+@tiered
 def kg_health() -> dict:
     """Structural health snapshot of the current KG (counts, cycles, orphans, top-central)."""
     denied = _require("operator")
@@ -753,7 +779,7 @@ def kg_health() -> dict:
         return {"status": "error", "message": str(e)}
 
 
-@mcp.tool()
+@tiered
 def load_ontology(path: str) -> dict:
     """Load an ASPICE ontology, project it into the KG, and version it."""
     denied = _require("operator")
@@ -784,7 +810,7 @@ def load_ontology(path: str) -> dict:
         return {"status": "error", "message": str(e)}
 
 
-@mcp.tool()
+@tiered
 def load_procedure_graph(path: str) -> dict:
     """
     Load a Procedure Graph from a .pg.yaml file using the POC flat format.
@@ -823,7 +849,7 @@ def load_procedure_graph(path: str) -> dict:
         return {"status": "error", "message": str(e)}
 
 
-@mcp.tool()
+@tiered
 def run_procedure(scope: str = "all") -> dict:
     """
     Execute the currently active (or loaded) Procedure Graph against the KG.
@@ -930,7 +956,7 @@ def _run_gap_detection(scope: str, kind: str, extra_summary: dict = None) -> dic
         return {"status": "error", "message": str(e)}
 
 
-@mcp.tool()
+@tiered
 def detect_gaps(scope: str = "all") -> dict:
     """Detect ASPICE gaps as a production run (persists run + explanations)."""
     denied = _require("operator")
@@ -939,7 +965,7 @@ def detect_gaps(scope: str = "all") -> dict:
     return _run_gap_detection(scope, "production")
 
 
-@mcp.tool()
+@tiered
 def run_experiment(scope: str = "all", hypothesis: str = None) -> dict:
     """Run gap detection as a quarantined experiment (full audit parity with production)."""
     denied = _require("operator")
@@ -948,7 +974,7 @@ def run_experiment(scope: str = "all", hypothesis: str = None) -> dict:
     return _run_gap_detection(scope, "experiment", experiment_summary(scope, hypothesis))
 
 
-@mcp.tool()
+@tiered
 def validate_procedure_graph(path: str) -> dict:
     """Parse a PG file and validate it (publish-time rules; non-blocking)."""
     try:
@@ -959,7 +985,7 @@ def validate_procedure_graph(path: str) -> dict:
     return {"status": "ok", "path": path, **report}
 
 
-@mcp.tool()
+@tiered
 def get_validation(version_hash: str) -> dict:
     """Return the cached validation report for a published PG version."""
     report = _cached_validation(_get_workspace(), version_hash)
@@ -968,7 +994,7 @@ def get_validation(version_hash: str) -> dict:
     return {"status": "ok", "validation": report}
 
 
-@mcp.tool()
+@tiered
 def diff_procedure_graphs(path_a: str, path_b: str) -> dict:
     """Parse two PG files and return their structural diff."""
     try:
@@ -980,7 +1006,7 @@ def diff_procedure_graphs(path_a: str, path_b: str) -> dict:
     return {"status": "ok", "diff": diff_pg(pg_a, pg_b)}
 
 
-@mcp.tool()
+@tiered
 def get_explanation(target: str) -> dict:
     """Return the sectioned explanation for a gap target (e.g. 'SYS.5.BP3:acceptance_criteria_defined')."""
     exp = _state.get("explanations", {}).get(target)
@@ -989,7 +1015,7 @@ def get_explanation(target: str) -> dict:
     return {"status": "ok", "explanation": exp}
 
 
-@mcp.tool()
+@tiered
 def get_status() -> dict:
     """Developer/debugging tool. Returns current server state."""
     kg = _state.get("kg")
@@ -1019,7 +1045,7 @@ def get_status() -> dict:
     }
 
 
-@mcp.tool()
+@tiered
 def publish_pg(level: str = "draft", rationale: str = None) -> dict:
     """Publish the currently loaded Procedure Graph; runs (non-blocking) validation."""
     denied = _require("operator")
@@ -1048,7 +1074,7 @@ def publish_pg(level: str = "draft", rationale: str = None) -> dict:
         return {"status": "error", "message": str(e)}
 
 
-@mcp.tool()
+@tiered
 def promote_pg(version_hash: str, rationale: str) -> dict:
     """Promote a published PG version (rationale required); refused if validation has errors."""
     denied = _require("operator")
@@ -1079,7 +1105,7 @@ def promote_pg(version_hash: str, rationale: str) -> dict:
         return {"status": "error", "message": str(e)}
 
 
-@mcp.tool()
+@tiered
 def activate(activation_id: str, version_hash: str, weights: dict = None,
              set_as_production: bool = False, kg_version: str = None) -> dict:
     """Activate a promoted PG version with frozen weights."""
@@ -1107,7 +1133,7 @@ def activate(activation_id: str, version_hash: str, weights: dict = None,
         return {"status": "error", "message": str(e)}
 
 
-@mcp.tool()
+@tiered
 def set_production(activation_id: str) -> dict:
     """Make the given activation the production one for its PG logic."""
     denied = _require("operator")
@@ -1120,7 +1146,7 @@ def set_production(activation_id: str) -> dict:
         return {"status": "error", "message": str(e)}
 
 
-@mcp.tool()
+@tiered
 def get_production() -> dict:
     """Return the current production activation for the loaded PG logic."""
     logic_id = _state.get("current_logic_id")
@@ -1133,7 +1159,7 @@ def get_production() -> dict:
             "pg_version": act.pg_version, "is_production": act.is_production}
 
 
-@mcp.tool()
+@tiered
 def list_versions() -> dict:
     """List published PG versions in the workspace."""
     try:
@@ -1143,7 +1169,7 @@ def list_versions() -> dict:
         return {"status": "error", "message": str(e)}
 
 
-@mcp.tool()
+@tiered
 def get_audit_log() -> dict:
     """Return the workspace audit event log."""
     try:
@@ -1154,7 +1180,7 @@ def get_audit_log() -> dict:
         return {"status": "error", "message": str(e)}
 
 
-@mcp.tool()
+@tiered
 def list_runs(kind: str = None) -> dict:
     """List execution runs, optionally filtered by kind (production|experiment)."""
     try:
@@ -1165,7 +1191,7 @@ def list_runs(kind: str = None) -> dict:
         return {"status": "error", "message": str(e)}
 
 
-@mcp.tool()
+@tiered
 def get_run(run_id: str) -> dict:
     """Return a single run record."""
     try:
@@ -1179,7 +1205,7 @@ def get_run(run_id: str) -> dict:
         return {"status": "error", "message": str(e)}
 
 
-@mcp.tool()
+@tiered
 def reconstruct_run(run_id: str) -> dict:
     """Reconstruct a past run, reporting any missing frozen artifacts."""
     try:
@@ -1193,7 +1219,7 @@ def reconstruct_run(run_id: str) -> dict:
         return {"status": "error", "message": str(e)}
 
 
-@mcp.tool()
+@tiered
 def query_events(event_type: str = None, run_id: str = None) -> dict:
     """Query the Temporal Graph: by event_type, or all events for a run_id."""
     try:
@@ -1209,7 +1235,7 @@ def query_events(event_type: str = None, run_id: str = None) -> dict:
         return {"status": "error", "message": str(e)}
 
 
-@mcp.tool()
+@tiered
 def get_quality_metrics() -> dict:
     """Production-only quality view; experiment runs are excluded (quarantine boundary)."""
     try:
@@ -1218,7 +1244,7 @@ def get_quality_metrics() -> dict:
         return {"status": "error", "message": str(e)}
 
 
-@mcp.tool()
+@tiered
 def adopt_experiment(run_id: str, activation_id: str, rationale: str) -> dict:
     """Promote an experiment's PG version into production via the gated lifecycle."""
     denied = _require("operator")
@@ -1246,7 +1272,7 @@ def adopt_experiment(run_id: str, activation_id: str, rationale: str) -> dict:
             "version_hash": run.pg_version, "promoted": True, "is_production": True}
 
 
-@mcp.tool()
+@tiered
 def get_config() -> dict:
     """Return the governed configuration (weights + retention + last_changed)."""
     cfg = config_store.load_config(_resolve_ws_root())
@@ -1254,7 +1280,7 @@ def get_config() -> dict:
             "last_changed": cfg["last_changed"]}
 
 
-@mcp.tool()
+@tiered
 def set_weight(name: str, value: float, rationale: str) -> dict:
     """Set a prioritization weight (rationale required; audited)."""
     denied = _require("admin")
@@ -1274,7 +1300,7 @@ def set_weight(name: str, value: float, rationale: str) -> dict:
     return {"status": "ok", "weights": cfg["weights"], "last_changed": cfg["last_changed"]}
 
 
-@mcp.tool()
+@tiered
 def set_retention(key: str, days: int, rationale: str) -> dict:
     """Set a retention-policy value in days (rationale required; audited; not enforced)."""
     denied = _require("admin")
@@ -1294,7 +1320,7 @@ def set_retention(key: str, days: int, rationale: str) -> dict:
     return {"status": "ok", "retention": cfg["retention"], "last_changed": cfg["last_changed"]}
 
 
-@mcp.tool()
+@tiered
 def enforce_retention() -> dict:
     """Purge runs (+ orphaned explanations) older than the configured retention windows."""
     denied = _require("admin")
@@ -1315,14 +1341,14 @@ def enforce_retention() -> dict:
         return {"status": "error", "message": str(e)}
 
 
-@mcp.tool()
+@tiered
 def get_role() -> dict:
     """Return the current role and the available roles."""
     return {"status": "ok", "role": _state.get("role", "operator"),
             "roles": sorted(auth.ROLES, key=lambda r: auth.ROLES[r])}
 
 
-@mcp.tool()
+@tiered
 def set_role(role: str) -> dict:
     """Set the current role (POC simulation; no identity backend)."""
     if role not in auth.ROLES:
@@ -1331,7 +1357,7 @@ def set_role(role: str) -> dict:
     return {"status": "ok", "role": role}
 
 
-@mcp.tool()
+@tiered
 def get_telemetry() -> dict:
     """Opt-in local telemetry: per-tool call counts and tokens saved by
     compact wire encoding (enable via GRAP_TELEMETRY=1)."""
@@ -1347,7 +1373,7 @@ def get_telemetry() -> dict:
         return {"status": "error", "message": str(e)}
 
 
-@mcp.tool()
+@tiered
 def list_capabilities() -> dict:
     """Return the MCP capability taxonomy grouped by domain."""
     return {
@@ -1369,6 +1395,9 @@ def list_capabilities() -> dict:
                       "list_runs", "get_run", "reconstruct_run", "query_events",
                       "get_session_context"],
         },
+        "active_tier": _ACTIVE_TIER,
+        "tier_of": dict(_TIERS),
+        "tier_note": "Tools not in tier_of are 'standard'. Set GRAP_TOOL_TIER=core|standard|full.",
         "auth": "deferred (POC: no authentication/authorization)",
     }
 
