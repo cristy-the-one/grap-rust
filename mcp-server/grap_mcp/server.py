@@ -193,6 +193,37 @@ def ingest_documents(path: str) -> dict:
 
 
 @mcp.tool()
+def reingest_documents(path: str) -> dict:
+    """Incrementally (re)ingest .md/.txt under `path`: skip unchanged chunks,
+    add new/changed ones, tombstone removed ones. Non-duplicating."""
+    denied = _require("operator")
+    if denied:
+        return denied
+    kg = _state.get("kg")
+    if not kg:
+        return {"status": "error", "message": "Load or create a Knowledge Graph first."}
+    try:
+        from grap_mcp import incremental
+        from pathlib import Path as _P
+        kg_path = _state.get("kg_path")
+        manifest_path = str(_P(kg_path) / "ingest-manifest.json") if kg_path else None
+        result = incremental.ingest_incremental(kg, path, manifest_path=manifest_path)
+        if kg_path:
+            kg.save_to_dir(kg_path)
+        try:
+            _get_workspace().record_event("documents_reingested", path,
+                                          details={"nodes_added": str(result["nodes_added"]),
+                                                   "nodes_removed": str(result["nodes_removed"]),
+                                                   "skipped": str(result["skipped"])})
+        except Exception:
+            logger.warning("audit record_event failed for documents_reingested", exc_info=True)
+        return {"status": "ok", **result}
+    except Exception as e:
+        logger.exception("reingest_documents failed")
+        return {"status": "error", "message": str(e)}
+
+
+@mcp.tool()
 def extract_ontology(path: str, out_path: str = None, sim: float = 0.86,
                      model: str = None, max_files: int = None) -> dict:
     """Propose an ontology from documents (Knowledge Extraction Engine).
@@ -1244,7 +1275,7 @@ def list_capabilities() -> dict:
     return {
         "domains": {
             "knowledge": ["load_knowledge_graph", "create_knowledge_graph",
-                          "ingest_documents", "extract_ontology", "project_relations",
+                          "ingest_documents", "reingest_documents", "extract_ontology", "project_relations",
                           "build_legal_graph", "legal_graph_from_relations",
                           "graph_neighbors", "load_ontology",
                           "get_blast_radius", "find_cycles", "find_orphans", "kg_health"],
