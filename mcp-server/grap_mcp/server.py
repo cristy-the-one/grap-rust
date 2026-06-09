@@ -1513,12 +1513,12 @@ def reindex_entities() -> dict:
     path = _entity_index_path()
     if not kg or not path:
         return {"status": "error", "message": "Load or create a Knowledge Graph first."}
+    if not hasattr(kg, "node_id_space"):
+        return {"status": "error",
+                "message": "reindex requires a KG exposing node_id_space() (IndexedKnowledgeGraph)"}
     try:
         from grap_mcp.entity_index import EntityIndex
-        try:
-            n = kg.node_id_space()
-        except Exception:
-            n = kg.node_count()
+        n = kg.node_id_space()
         rows = []
         for nid in range(n):
             try:
@@ -1527,9 +1527,10 @@ def reindex_entities() -> dict:
                 label = kg.get_node_label(nid)
             except Exception:
                 continue
-            if label:
+            if label and label.strip():
                 rows.append((label, nid, None))
         with EntityIndex(path) as ei:
+            ei.clear()
             indexed = ei.register_many(rows)
         return {"status": "ok", "indexed": indexed}
     except Exception as e:

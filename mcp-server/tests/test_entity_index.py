@@ -56,3 +56,23 @@ def test_entity_tools_roundtrip(tmp_path, monkeypatch):
     assert 0 in s.resolve_entity("brake-by-wire")["node_ids"]
     al = s.aliases_for_node(0)
     assert al["status"] == "ok" and "REQ-1" in al["aliases"] and "brake-by-wire" in al["aliases"]
+
+
+def test_reindex_true_rebuild_and_covers_id_space(tmp_path, monkeypatch):
+    # id-space ceiling = 5 (node_id_space = max id + 1); nodes 1 and 3 are "deleted"
+    # (absent from labels). Node 4's id (4) exceeds the LIVE count (3) — it must
+    # still be reached, proving node_id_space (not node_count/live) drives iteration.
+    kg = _LabelKG({0: "A", 2: "C", 4: "E"})
+    monkeypatch.setitem(s._state, "kg", kg)
+    monkeypatch.setitem(s._state, "kg_path", str(tmp_path))
+    r1 = s.reindex_entities()
+    assert r1["status"] == "ok" and r1["indexed"] == 3
+    assert s.resolve_entity("e")["node_ids"] == [4]   # high-id live node reached
+
+    # relabel node 0, delete node 4 → a true rebuild must purge stale aliases
+    kg._labels = {0: "A2", 2: "C"}
+    r2 = s.reindex_entities()
+    assert r2["indexed"] == 2
+    assert s.resolve_entity("e")["node_ids"] == []    # stale alias for deleted node purged
+    assert s.resolve_entity("a")["node_ids"] == []    # old label of relabeled node purged
+    assert s.resolve_entity("a2")["node_ids"] == [0]

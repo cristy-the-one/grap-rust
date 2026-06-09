@@ -9,6 +9,9 @@ from typing import Iterable, List, Optional, Tuple
 
 SCHEMA_VERSION = 1
 
+# Forward-only migrations: _MIGRATIONS[i] migrates user_version i -> i+1.
+# Keep each migration idempotent (executescript implicitly commits; user_version
+# is bumped only after the script runs, so a partial failure must be re-runnable).
 _MIGRATIONS = [
     lambda c: c.executescript(
         """
@@ -80,6 +83,11 @@ class EntityIndex:
         cur = self.conn.execute("DELETE FROM aliases WHERE node_id = ?", (int(node_id),))
         self.conn.commit()
         return cur.rowcount
+
+    def clear(self) -> None:
+        """Remove all aliases (for a full rebuild)."""
+        self.conn.execute("DELETE FROM aliases")
+        self.conn.commit()
 
     def count(self) -> int:
         return self.conn.execute("SELECT COUNT(*) FROM aliases").fetchone()[0]
