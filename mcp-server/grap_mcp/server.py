@@ -1403,10 +1403,43 @@ def grap_guide() -> dict:
 
 
 @tiered
+def suggest_queries(node_id: int) -> dict:
+    """Propose concrete next tool calls for exploring `node_id` — neighbor
+    expansion, impact (blast radius), and related-context retrieval."""
+    denied = _require("operator")
+    if denied:
+        return denied
+    kg = _state.get("kg")
+    if not kg:
+        return {"status": "error", "message": "no Knowledge Graph loaded"}
+    label = None
+    snippet = ""
+    try:
+        label = kg.get_node_label(node_id)
+    except Exception:
+        pass
+    try:
+        snippet = (kg.get_node_text(node_id) or "")[:60]
+    except Exception:
+        pass
+    query_text = label or snippet or str(node_id)
+    suggestions = [
+        {"tool": "graph_neighbors", "args": {"node_id": node_id},
+         "why": "Expand this node's direct neighbors (cites/mentions)."},
+        {"tool": "get_blast_radius", "args": {"node_id": node_id},
+         "why": "See everything that transitively depends on this node."},
+        {"tool": "get_context_bundle", "args": {"query": query_text, "token_budget": 1500},
+         "why": "Retrieve a budget-packed bundle of related KG context."},
+    ]
+    return {"status": "ok", "node": node_id, "label": label, "suggestions": suggestions}
+
+
+@tiered
 def list_capabilities() -> dict:
     """Return the MCP capability taxonomy grouped by domain."""
     return {
         "domains": {
+            "discovery": ["grap_guide", "suggest_queries"],
             "knowledge": ["load_knowledge_graph", "create_knowledge_graph",
                           "ingest_documents", "reingest_documents", "extract_ontology", "project_relations",
                           "build_legal_graph", "legal_graph_from_relations",

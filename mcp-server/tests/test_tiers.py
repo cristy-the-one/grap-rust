@@ -39,3 +39,33 @@ def test_grap_guide():
     assert out["active_tier"] in ("core", "standard", "full")
     assert "core" in out["tiers"] and isinstance(out["tiers"]["core"], list)
     assert "GRAP_TOOL_TIER" in out["how_to_widen"]
+
+
+class _GuideKG:
+    def get_node_label(self, nid): return f"doc:{nid}"
+    def get_node_text(self, nid): return "brake-by-wire redundancy requirement text"
+
+def test_suggest_queries(monkeypatch):
+    monkeypatch.setitem(s._state, "kg", _GuideKG())
+    out = s.suggest_queries(5)
+    assert out["status"] == "ok" and out["node"] == 5
+    tools = {sug["tool"] for sug in out["suggestions"]}
+    assert {"graph_neighbors", "get_blast_radius", "get_context_bundle"} <= tools
+    assert all("args" in sug and "why" in sug for sug in out["suggestions"])
+
+
+import os, sys, subprocess
+
+def test_core_tier_narrows_surface():
+    mcp_server_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # .../mcp-server
+    script = ("import asyncio, grap_mcp.server as s;"
+              "names={t.name for t in asyncio.run(s.mcp.list_tools())};"
+              "print('grap_guide' in names, 'get_config' in names, len(names))")
+    env = {**os.environ, "GRAP_TOOL_TIER": "core"}
+    out = subprocess.run([sys.executable, "-c", script], capture_output=True, text=True,
+                         env=env, cwd=mcp_server_dir)
+    assert out.returncode == 0, out.stderr
+    guide, config, count = out.stdout.split()
+    assert guide == "True"       # core tool present
+    assert config == "False"     # full tool hidden in core tier
+    assert int(count) < 20       # surface much smaller than full
