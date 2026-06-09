@@ -580,6 +580,71 @@ def graph_neighbors(node_id: int, types: list = None, wire_format: str = "json")
 
 
 @mcp.tool()
+def get_blast_radius(node_id: int, relations: list = None, max_depth: int = 10) -> dict:
+    """Transitive dependents of a node — what would be impacted if it changes."""
+    denied = _require("operator")
+    if denied:
+        return denied
+    kg = _state.get("kg")
+    if not kg:
+        return {"status": "error", "message": "no Knowledge Graph loaded"}
+    try:
+        return {"status": "ok", "center": node_id,
+                "impacted": kg.blast_radius(node_id, relations, max_depth)}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
+@mcp.tool()
+def find_cycles() -> dict:
+    """Dependency cycles (strongly-connected components) in the current KG."""
+    denied = _require("operator")
+    if denied:
+        return denied
+    kg = _state.get("kg")
+    if not kg:
+        return {"status": "error", "message": "no Knowledge Graph loaded"}
+    try:
+        cycles = kg.find_cycles()
+        return {"status": "ok", "cycle_count": len(cycles), "cycles": cycles}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
+@mcp.tool()
+def find_orphans(entry_points: list = None) -> dict:
+    """Live nodes unreachable from the given entry points (or from KG roots)."""
+    denied = _require("operator")
+    if denied:
+        return denied
+    kg = _state.get("kg")
+    if not kg:
+        return {"status": "error", "message": "no Knowledge Graph loaded"}
+    try:
+        orphans = kg.find_orphans(entry_points)
+        return {"status": "ok", "orphan_count": len(orphans), "orphans": orphans}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
+@mcp.tool()
+def kg_health() -> dict:
+    """Structural health snapshot of the current KG (counts, cycles, orphans, top-central)."""
+    denied = _require("operator")
+    if denied:
+        return denied
+    kg = _state.get("kg")
+    if not kg:
+        return {"status": "error", "message": "no Knowledge Graph loaded"}
+    try:
+        h = kg.health()
+        h["status"] = "ok"
+        return h
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
+@mcp.tool()
 def load_ontology(path: str) -> dict:
     """Load an ASPICE ontology, project it into the KG, and version it."""
     denied = _require("operator")
@@ -1165,7 +1230,8 @@ def list_capabilities() -> dict:
             "knowledge": ["load_knowledge_graph", "create_knowledge_graph",
                           "ingest_documents", "extract_ontology", "project_relations",
                           "build_legal_graph", "legal_graph_from_relations",
-                          "graph_neighbors", "load_ontology"],
+                          "graph_neighbors", "load_ontology",
+                          "get_blast_radius", "find_cycles", "find_orphans", "kg_health"],
             "pg_lifecycle": ["load_procedure_graph", "publish_pg", "promote_pg",
                              "activate", "set_production", "get_production", "list_versions"],
             "execution_reasoning": ["run_procedure", "detect_gaps", "get_explanation"],
