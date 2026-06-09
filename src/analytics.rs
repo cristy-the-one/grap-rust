@@ -109,6 +109,11 @@ pub fn find_cycles(g: &KnowledgeGraph, mask: Option<u64>) -> Vec<Vec<NodeId>> {
 /// Live nodes not forward-reachable from `entry_points`. When empty, the
 /// default entry set is every root (live node with no incoming edge).
 /// Follows all edges (unmasked).
+///
+/// Note: if `entry_points` is non-empty but every id is out-of-range or
+/// tombstoned, the effective entry set is empty (no root fallback applies),
+/// so *every* live node is reported as an orphan. Pass an empty slice to get
+/// the root-based default instead.
 pub fn find_orphans(g: &KnowledgeGraph, entry_points: &[NodeId]) -> Vec<NodeId> {
     let n = g.node_count();
     let live: Vec<bool> = (0..n).map(|i| !g.is_node_deleted(NodeId(i as u32))).collect();
@@ -180,7 +185,11 @@ pub fn health_report_top(g: &KnowledgeGraph, top_n: usize) -> HealthReport {
     let pr = crate::ranking::pagerank(g, None, 0.85, 30);
     let mut ranked: Vec<(NodeId, f64)> = (0..n).filter(|&i| live[i])
         .map(|i| (NodeId(i as u32), pr[i])).collect();
-    ranked.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+    ranked.sort_by(|a, b| {
+        b.1.partial_cmp(&a.1)
+            .unwrap_or(std::cmp::Ordering::Equal)
+            .then(a.0 .0.cmp(&b.0 .0)) // explicit tie-break by ascending NodeId
+    });
     ranked.truncate(top_n);
     HealthReport { live_nodes, id_space: n, edges, isolated_nodes: isolated,
         root_nodes: roots, leaf_nodes: leaves, cycle_count, orphan_count, top_central: ranked }
