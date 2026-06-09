@@ -216,3 +216,130 @@ pub trait Telemetry: Send + Sync + 'static {
 pub struct NoopTelemetry;
 
 impl Telemetry for NoopTelemetry {}
+
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Arc;
+
+/// Internal shared counter storage for [`CountingTelemetry`].
+///
+/// Not part of the public API; users interact through [`CountingTelemetry`]
+/// and [`TelemetrySnapshot`].
+#[derive(Debug, Default)]
+struct TelemetryCounters {
+    traversal_nodes_visited: AtomicU64,
+    mask_prunes: AtomicU64,
+    remote_fetch_hits: AtomicU64,
+    remote_fetch_misses: AtomicU64,
+    rebalance_nodes_moved: AtomicU64,
+}
+
+/// A concrete [`Telemetry`] that accumulates counters in shared atomics.
+///
+/// Cheap and thread-safe. Clones share the same counters, so hand one clone
+/// to `ShardedGraph::set_telemetry` and keep another to read [`snapshot`].
+///
+/// # Example
+///
+/// ```rust
+/// use grap::{CountingTelemetry, Telemetry};
+///
+/// let t = CountingTelemetry::new();
+/// let reader = t.clone();
+/// t.record_traversal_nodes_visited(10);
+/// assert_eq!(reader.snapshot().traversal_nodes_visited, 10);
+/// ```
+///
+/// [`snapshot`]: CountingTelemetry::snapshot
+#[derive(Debug, Clone, Default)]
+pub struct CountingTelemetry {
+    inner: Arc<TelemetryCounters>,
+}
+
+/// A point-in-time copy of [`CountingTelemetry`]'s counters.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct TelemetrySnapshot {
+    /// Nodes visited during traversals.
+    pub traversal_nodes_visited: u64,
+    /// Edges rejected early by the 64-bit property mask.
+    pub mask_prunes: u64,
+    /// Remote shard fetches that hit.
+    pub remote_fetch_hits: u64,
+    /// Remote shard fetches that missed.
+    pub remote_fetch_misses: u64,
+    /// Nodes moved by rebalancing.
+    pub rebalance_nodes_moved: u64,
+}
+
+impl CountingTelemetry {
+    /// Create a fresh recorder with zeroed counters.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Read the current counter values atomically.
+    pub fn snapshot(&self) -> TelemetrySnapshot {
+        TelemetrySnapshot {
+            traversal_nodes_visited: self
+                .inner
+                .traversal_nodes_visited
+                .load(Ordering::Relaxed),
+            mask_prunes: self.inner.mask_prunes.load(Ordering::Relaxed),
+            remote_fetch_hits: self.inner.remote_fetch_hits.load(Ordering::Relaxed),
+            remote_fetch_misses: self.inner.remote_fetch_misses.load(Ordering::Relaxed),
+            rebalance_nodes_moved: self.inner.rebalance_nodes_moved.load(Ordering::Relaxed),
+        }
+    }
+}
+
+impl Telemetry for CountingTelemetry {
+    fn record_traversal_nodes_visited(&self, count: u64) {
+        self.inner
+            .traversal_nodes_visited
+            .fetch_add(count, Ordering::Relaxed);
+    }
+
+    fn record_mask_prune(&self, pruned: u64) {
+        self.inner.mask_prunes.fetch_add(pruned, Ordering::Relaxed);
+    }
+
+    fn record_remote_fetch(&self, hit: bool) {
+        if hit {
+            self.inner
+                .remote_fetch_hits
+                .fetch_add(1, Ordering::Relaxed);
+        } else {
+            self.inner
+                .remote_fetch_misses
+                .fetch_add(1, Ordering::Relaxed);
+        }
+    }
+
+    fn record_rebalance(&self, nodes_moved: u64) {
+        self.inner
+            .rebalance_nodes_moved
+            .fetch_add(nodes_moved, Ordering::Relaxed);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{CountingTelemetry, Telemetry};
+
+    #[test]
+    fn counting_telemetry_accumulates_and_snapshots() {
+        let t = CountingTelemetry::new();
+        let handle = t.clone(); // clone shares the same atomics
+        t.record_traversal_nodes_visited(3);
+        t.record_traversal_nodes_visited(2);
+        t.record_mask_prune(4);
+        t.record_remote_fetch(true);
+        t.record_remote_fetch(false);
+        t.record_rebalance(7);
+        let s = handle.snapshot();
+        assert_eq!(s.traversal_nodes_visited, 5);
+        assert_eq!(s.mask_prunes, 4);
+        assert_eq!(s.remote_fetch_hits, 1);
+        assert_eq!(s.remote_fetch_misses, 1);
+        assert_eq!(s.rebalance_nodes_moved, 7);
+    }
+}
