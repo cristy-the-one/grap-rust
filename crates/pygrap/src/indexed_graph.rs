@@ -622,6 +622,47 @@ impl IndexedKnowledgeGraph {
         }
     }
 
+    /// Transitive dependents of `node_id`; `relations` optionally restricts to those edge properties.
+    #[pyo3(signature = (node_id, relations=None, max_depth=10))]
+    fn blast_radius(&self, node_id: u32, relations: Option<Vec<String>>, max_depth: u32) -> Vec<u32> {
+        let mask = relations.as_ref().map(|r| {
+            let refs: Vec<&str> = r.iter().map(|s| s.as_str()).collect();
+            self.inner.build_property_mask(&refs)
+        });
+        self.inner.blast_radius(grap::NodeId(node_id), mask, max_depth)
+            .into_iter().map(|n| n.0).collect()
+    }
+
+    /// Dependency cycles as lists of node ids.
+    fn find_cycles(&self) -> Vec<Vec<u32>> {
+        self.inner.find_cycles(None).into_iter()
+            .map(|c| c.into_iter().map(|n| n.0).collect()).collect()
+    }
+
+    /// Orphan node ids (unreachable from entry_points, or from KG roots if None).
+    #[pyo3(signature = (entry_points=None))]
+    fn find_orphans(&self, entry_points: Option<Vec<u32>>) -> Vec<u32> {
+        let eps: Vec<grap::NodeId> = entry_points.unwrap_or_default().into_iter().map(grap::NodeId).collect();
+        self.inner.find_orphans(&eps).into_iter().map(|n| n.0).collect()
+    }
+
+    /// Structural health report as a dict.
+    fn health(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        let h = self.inner.health();
+        let d = pyo3::types::PyDict::new(py);
+        d.set_item("live_nodes", h.live_nodes)?;
+        d.set_item("id_space", h.id_space)?;
+        d.set_item("edges", h.edges)?;
+        d.set_item("isolated_nodes", h.isolated_nodes)?;
+        d.set_item("root_nodes", h.root_nodes)?;
+        d.set_item("leaf_nodes", h.leaf_nodes)?;
+        d.set_item("cycle_count", h.cycle_count)?;
+        d.set_item("orphan_count", h.orphan_count)?;
+        let tc: Vec<(u32, f64)> = h.top_central.into_iter().map(|(n, s)| (n.0, s)).collect();
+        d.set_item("top_central", tc)?;
+        Ok(d.into())
+    }
+
     /// Support for context manager: `with pygrap.IndexedKnowledgeGraph(...) as g:`
     fn __enter__(slf: PyRef<'_, Self>) -> PyRef<'_, Self> {
         slf

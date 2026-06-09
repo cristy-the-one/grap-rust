@@ -1035,6 +1035,31 @@ impl IndexedKnowledgeGraph {
         }
     }
 
+    /// Transitive dependents of a node (see `analytics::blast_radius`).
+    pub fn blast_radius(&self, node: NodeId, mask: Option<u64>, max_depth: u32) -> Vec<NodeId> {
+        crate::analytics::blast_radius(&self.graph, node, mask, max_depth)
+    }
+
+    /// Dependency cycles (see `analytics::find_cycles`).
+    pub fn find_cycles(&self, mask: Option<u64>) -> Vec<Vec<NodeId>> {
+        crate::analytics::find_cycles(&self.graph, mask)
+    }
+
+    /// Orphans / unreachable nodes (see `analytics::find_orphans`).
+    pub fn find_orphans(&self, entry_points: &[NodeId]) -> Vec<NodeId> {
+        crate::analytics::find_orphans(&self.graph, entry_points)
+    }
+
+    /// Structural health report (see `analytics::health_report`).
+    pub fn health(&self) -> crate::analytics::HealthReport {
+        crate::analytics::health_report(&self.graph)
+    }
+
+    /// Build a 64-bit edge-property mask from property names (for masked analytics).
+    pub fn build_property_mask(&self, names: &[&str]) -> u64 {
+        self.graph.properties.build_mask(names)
+    }
+
     /// Add a directed edge to the graph. Properties are encoded into the edge bitmask.
     pub fn add_edge(
         &mut self,
@@ -2296,5 +2321,16 @@ mod indexed_relation_tests {
         let n = g.add_node("x", None, None);
         assert!(g.node_content_hash(n).is_some());
         assert_eq!(g.verify_node(n), crate::graph::NodeIntegrity::Match);
+    }
+
+    #[test]
+    fn indexed_exposes_analytics() {
+        let mut g = IndexedKnowledgeGraph::new();
+        let a = g.add_node("a", None, None);
+        let b = g.add_node("b", None, None);
+        g.add_edge(a, b, 1.0, vec![]);
+        assert_eq!(g.blast_radius(b, None, 5), vec![a]);
+        assert_eq!(g.find_cycles(None).len(), 0);
+        assert_eq!(g.health().live_nodes, 2);
     }
 }

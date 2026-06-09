@@ -108,7 +108,39 @@ def main():
         print(f"linear fusion returned {len(hits_lin)} results, channel_ranks={hits_lin[0].channel_ranks!r}")
         print("fusion_mode + rrf_k + centrality_weight + channel_ranks OK")
 
-        # 11. get_node_content_hash / verify_node
+        # 13. graph analytics: blast_radius, find_cycles, find_orphans, health
+        # Build a small chain: a2 -> b2 -> c2
+        a2 = g.add_node("analytics node a", label="an-a")
+        b2 = g.add_node("analytics node b", label="an-b")
+        c2 = g.add_node("analytics node c", label="an-c")
+        g.add_edge(a2, b2, 1.0)
+        g.add_edge(b2, c2, 1.0)
+
+        # blast_radius of c2 should include a2 and b2 (transitive dependents)
+        br = g.blast_radius(c2)
+        assert a2 in br, f"Expected a2={a2} in blast_radius({c2}), got {br}"
+        assert b2 in br, f"Expected b2={b2} in blast_radius({c2}), got {br}"
+        print(f"blast_radius OK: {br}")
+
+        # No cycles in a simple chain
+        cycles = g.find_cycles()
+        assert cycles == [], f"Expected no cycles, got {cycles}"
+        print(f"find_cycles OK: {cycles}")
+
+        # find_orphans with explicit entry_points = [a2]: c2 should be reachable, nothing orphaned
+        orphans_explicit = g.find_orphans(entry_points=[a2])
+        assert c2 not in orphans_explicit, f"c2 should be reachable from a2, orphans={orphans_explicit}"
+        print(f"find_orphans (explicit) OK: {orphans_explicit}")
+
+        # health report
+        h = g.health()
+        assert isinstance(h, dict), f"Expected dict, got {type(h)}"
+        assert h["live_nodes"] >= 3, f"Expected >= 3 live nodes, got {h['live_nodes']}"
+        assert h["cycle_count"] == 0, f"Expected 0 cycles, got {h['cycle_count']}"
+        assert "top_central" in h, "Missing top_central in health report"
+        print(f"health OK: live_nodes={h['live_nodes']}, cycle_count={h['cycle_count']}, top_central count={len(h['top_central'])}")
+
+    # 11. get_node_content_hash / verify_node
         fresh_node = g.add_node("hash test node", label="ht")
         h = g.get_node_content_hash(fresh_node)
         assert h is not None, "Expected a content hash, got None"
