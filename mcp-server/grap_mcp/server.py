@@ -634,13 +634,21 @@ def get_session_context(sort_by: str = "recency") -> dict:
         return {"status": "error", "message": str(e)}
 
 
+# Token estimate heuristic; matches the wire encoder's BYTES_PER_TOKEN (encoding/__init__.py).
+_CHARS_PER_TOKEN = 4
+
+
 @mcp.tool()
 def get_context_bundle(query: str, max_results: int = 20, token_budget: int = 2000,
                        min_strength: float = 0.3, max_depth: int = 3) -> dict:
     """Assemble a token-budgeted bundle of the most relevant KG nodes for
     `query` — the Procedure-Graph 'fetch relevant KG context' step. Greedily
     packs hybrid-search hits (highest fused score first) under `token_budget`
-    (~4 chars/token) and records the query in the session journal."""
+    (~4 chars/token) and records the query in the session journal.
+
+    Assumes the indexed (single-id) KG: each hit's ``.node`` is an int. The
+    sharded graph's ``(shard, local)`` tuple ids are not supported here.
+    """
     denied = _require("operator")
     if denied:
         return denied
@@ -657,7 +665,7 @@ def get_context_bundle(query: str, max_results: int = 20, token_budget: int = 20
         used = 0
         for r in results:
             text = getattr(r, "text", "") or ""
-            toks = max(1, len(text) // 4)
+            toks = max(1, len(text) // _CHARS_PER_TOKEN)
             if used + toks > token_budget:
                 continue
             try:
