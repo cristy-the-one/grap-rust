@@ -41,6 +41,7 @@ _TIERS = {
     "grap_guide": "core", "suggest_queries": "core", "list_capabilities": "core",
     "get_status": "core", "create_knowledge_graph": "core", "load_knowledge_graph": "core",
     "ingest_documents": "core", "graph_neighbors": "core", "get_context_bundle": "core",
+    "resolve_entity": "core",
     "run_experiment": "full", "get_quality_metrics": "full", "adopt_experiment": "full",
     "get_config": "full", "set_weight": "full", "set_retention": "full",
     "enforce_retention": "full", "get_audit_log": "full", "reconstruct_run": "full",
@@ -1440,6 +1441,102 @@ def suggest_queries(node_id: int) -> dict:
     return {"status": "ok", "node": node_id, "label": label, "suggestions": suggestions}
 
 
+def _entity_index_path():
+    kg_path = _state.get("kg_path")
+    if not kg_path:
+        return None
+    from pathlib import Path as _P
+    return str(_P(kg_path) / "entity_index.db")
+
+
+@tiered
+def resolve_entity(alias: str) -> dict:
+    """Resolve an entity name/alias to KG node id(s) via the SQLite entity index
+    (exact, case-insensitive). Build it first with reindex_entities."""
+    denied = _require("operator")
+    if denied:
+        return denied
+    path = _entity_index_path()
+    if not path:
+        return {"status": "error", "message": "no Knowledge Graph path; create/load a KG first"}
+    try:
+        from grap_mcp.entity_index import EntityIndex
+        with EntityIndex(path) as ei:
+            return {"status": "ok", "alias": alias, "node_ids": ei.resolve(alias)}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
+@tiered
+def register_alias(alias: str, node_id: int, kind: str = None) -> dict:
+    """Register an alias -> node-id mapping in the entity index."""
+    denied = _require("operator")
+    if denied:
+        return denied
+    path = _entity_index_path()
+    if not path:
+        return {"status": "error", "message": "no Knowledge Graph path; create/load a KG first"}
+    try:
+        from grap_mcp.entity_index import EntityIndex
+        with EntityIndex(path) as ei:
+            ei.register(alias, node_id, kind)
+        return {"status": "ok", "alias": alias, "node_id": node_id}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
+@tiered
+def aliases_for_node(node_id: int) -> dict:
+    """List the registered aliases for a node id."""
+    denied = _require("operator")
+    if denied:
+        return denied
+    path = _entity_index_path()
+    if not path:
+        return {"status": "error", "message": "no Knowledge Graph path; create/load a KG first"}
+    try:
+        from grap_mcp.entity_index import EntityIndex
+        with EntityIndex(path) as ei:
+            return {"status": "ok", "node_id": node_id, "aliases": ei.aliases_for(node_id)}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
+@tiered
+def reindex_entities() -> dict:
+    """Rebuild the entity index from the current KG: every live node's label
+    becomes a resolvable alias. Returns the number indexed."""
+    denied = _require("operator")
+    if denied:
+        return denied
+    kg = _state.get("kg")
+    path = _entity_index_path()
+    if not kg or not path:
+        return {"status": "error", "message": "Load or create a Knowledge Graph first."}
+    try:
+        from grap_mcp.entity_index import EntityIndex
+        try:
+            n = kg.node_id_space()
+        except Exception:
+            n = kg.node_count()
+        rows = []
+        for nid in range(n):
+            try:
+                if kg.is_node_deleted(nid):
+                    continue
+                label = kg.get_node_label(nid)
+            except Exception:
+                continue
+            if label:
+                rows.append((label, nid, None))
+        with EntityIndex(path) as ei:
+            indexed = ei.register_many(rows)
+        return {"status": "ok", "indexed": indexed}
+    except Exception as e:
+        logger.exception("reindex_entities failed")
+        return {"status": "error", "message": str(e)}
+
+
 @tiered
 def list_capabilities() -> dict:
     """Return the MCP capability taxonomy grouped by domain."""
@@ -1451,7 +1548,8 @@ def list_capabilities() -> dict:
                           "build_legal_graph", "legal_graph_from_relations",
                           "graph_neighbors", "load_ontology",
                           "get_blast_radius", "find_cycles", "find_orphans", "kg_health",
-                          "get_context_bundle"],
+                          "get_context_bundle",
+                          "resolve_entity", "register_alias", "aliases_for_node", "reindex_entities"],
             "pg_lifecycle": ["load_procedure_graph", "publish_pg", "promote_pg",
                              "activate", "set_production", "get_production", "list_versions"],
             "execution_reasoning": ["run_procedure", "detect_gaps", "get_explanation"],
