@@ -1431,6 +1431,12 @@ def suggest_queries(node_id: int) -> dict:
         {"tool": "get_context_bundle", "args": {"query": query_text, "token_budget": 1500},
          "why": "Retrieve a budget-packed bundle of related KG context."},
     ]
+    # Only suggest tools actually registered under the active tier, so a
+    # narrow tier never points the agent at an unavailable tool.
+    suggestions = [
+        sug for sug in suggestions
+        if tier_includes(_TIERS.get(sug["tool"], "standard"), _ACTIVE_TIER)
+    ]
     return {"status": "ok", "node": node_id, "label": label, "suggestions": suggestions}
 
 
