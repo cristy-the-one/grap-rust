@@ -36,3 +36,25 @@ def test_get_session_context_tool():
     out = s.get_session_context()
     assert out["status"] == "ok"
     assert out["total_unique_queries"] == 1
+
+
+class _Hit:
+    def __init__(self, node, text, score):
+        self.node = node; self.text = text; self.fused_score = score
+
+class _BundleKG:
+    def search_and_traverse_hybrid(self, query, **kw):
+        return [_Hit(1, "alpha " * 50, 0.9), _Hit(2, "beta " * 50, 0.5), _Hit(3, "gamma " * 50, 0.2)]
+    def get_node_label(self, nid):
+        return f"doc:{nid}"
+
+def test_context_bundle_packs_within_budget(monkeypatch):
+    sess.reset()
+    monkeypatch.setitem(s._state, "kg", _BundleKG())
+    out = s.get_context_bundle("memory safety", token_budget=120)
+    assert out["status"] == "ok"
+    assert out["tokens_used"] <= 120
+    assert len(out["bundle"]) >= 1
+    assert out["bundle"][0]["node"] == 1
+    assert out["truncated"] is True
+    assert any(q["query"] == "memory safety" for q in sess.get_context()["recent_queries"])

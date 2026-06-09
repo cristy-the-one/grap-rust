@@ -635,6 +635,52 @@ def get_session_context(sort_by: str = "recency") -> dict:
 
 
 @mcp.tool()
+def get_context_bundle(query: str, max_results: int = 20, token_budget: int = 2000,
+                       min_strength: float = 0.3, max_depth: int = 3) -> dict:
+    """Assemble a token-budgeted bundle of the most relevant KG nodes for
+    `query` — the Procedure-Graph 'fetch relevant KG context' step. Greedily
+    packs hybrid-search hits (highest fused score first) under `token_budget`
+    (~4 chars/token) and records the query in the session journal."""
+    denied = _require("operator")
+    if denied:
+        return denied
+    kg = _state.get("kg")
+    if not kg:
+        return {"status": "error", "message": "no Knowledge Graph loaded"}
+    try:
+        from grap_mcp import session
+        results = kg.search_and_traverse_hybrid(
+            query, max_results=max_results, min_strength=min_strength, max_depth=max_depth
+        )
+        session.record_query(query, len(results))
+        bundle = []
+        used = 0
+        for r in results:
+            text = getattr(r, "text", "") or ""
+            toks = max(1, len(text) // 4)
+            if used + toks > token_budget:
+                continue
+            try:
+                label = kg.get_node_label(r.node)
+            except Exception:
+                label = None
+            bundle.append({"node": r.node, "label": label,
+                           "score": round(getattr(r, "fused_score", 0.0), 4), "text": text})
+            try:
+                session.record_node_access(r.node, "get_context_bundle")
+            except Exception:
+                pass
+            used += toks
+        return {"status": "ok", "query": query, "count": len(bundle),
+                "tokens_used": used, "token_budget": token_budget,
+                "tokens_remaining": max(0, token_budget - used),
+                "truncated": len(bundle) < len(results), "bundle": bundle}
+    except Exception as e:
+        logger.exception("get_context_bundle failed")
+        return {"status": "error", "message": str(e)}
+
+
+@mcp.tool()
 def get_blast_radius(node_id: int, relations: list = None, max_depth: int = 10) -> dict:
     """Transitive dependents of a node — what would be impacted if it changes."""
     denied = _require("operator")
@@ -1302,7 +1348,8 @@ def list_capabilities() -> dict:
                           "ingest_documents", "reingest_documents", "extract_ontology", "project_relations",
                           "build_legal_graph", "legal_graph_from_relations",
                           "graph_neighbors", "load_ontology",
-                          "get_blast_radius", "find_cycles", "find_orphans", "kg_health"],
+                          "get_blast_radius", "find_cycles", "find_orphans", "kg_health",
+                          "get_context_bundle"],
             "pg_lifecycle": ["load_procedure_graph", "publish_pg", "promote_pg",
                              "activate", "set_production", "get_production", "list_versions"],
             "execution_reasoning": ["run_procedure", "detect_gaps", "get_explanation"],
