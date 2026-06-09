@@ -602,12 +602,35 @@ def graph_neighbors(node_id: int, types: list = None, wire_format: str = "json")
             for pid, _s in ins:
                 add(pid)
                 edges.append({"source": pid, "target": node_id, "type": ty})
+        try:
+            from grap_mcp import session
+            session.record_node_access(node_id, "graph_neighbors")
+            for nb in neighbors:
+                session.record_node_access(nb["id"], "graph_neighbors")
+        except Exception:
+            pass
         r = {"status": "ok", "center": node_id, "neighbors": neighbors, "edges": edges}
         from .encoding import encode_response
         payload, _meta = encode_response("graph_neighbors", r, requested_format=wire_format)
         return payload  # dict when json (unchanged), #MUNCH string when wire_format="compact"
     except Exception as e:
         logger.exception("graph_neighbors failed")
+        return {"status": "error", "message": str(e)}
+
+
+@mcp.tool()
+def get_session_context(sort_by: str = "recency") -> dict:
+    """The MCP's working memory: recently/frequently touched nodes, recent
+    queries (with negative evidence), and edits this session."""
+    denied = _require("operator")
+    if denied:
+        return denied
+    try:
+        from grap_mcp import session
+        ctx = session.get_context(sort_by=sort_by)
+        ctx["status"] = "ok"
+        return ctx
+    except Exception as e:
         return {"status": "error", "message": str(e)}
 
 
@@ -1288,7 +1311,8 @@ def list_capabilities() -> dict:
             "auth": ["set_role", "get_role"],
             "validation": ["validate_procedure_graph", "diff_procedure_graphs", "get_validation"],
             "audit": ["get_audit_log", "get_status", "get_telemetry", "list_capabilities",
-                      "list_runs", "get_run", "reconstruct_run", "query_events"],
+                      "list_runs", "get_run", "reconstruct_run", "query_events",
+                      "get_session_context"],
         },
         "auth": "deferred (POC: no authentication/authorization)",
     }

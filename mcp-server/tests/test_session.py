@@ -25,3 +25,14 @@ def test_frequency_sort():
     sess.record_node_access(2, "t")
     ctx = sess.get_context(sort_by="frequency")
     assert ctx["nodes_accessed"][0]["node"] == 1
+
+
+import grap_mcp.server as s
+
+
+def test_get_session_context_tool():
+    sess.reset()
+    sess.record_query("q", result_count=1)
+    out = s.get_session_context()
+    assert out["status"] == "ok"
+    assert out["total_unique_queries"] == 1
