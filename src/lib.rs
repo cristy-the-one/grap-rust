@@ -102,6 +102,8 @@ pub use serialize::{GraphMeta, RepairReport, CURRENT_GRAPH_FORMAT_VERSION};
 
 pub mod shard; // Graph sharding (Phase 4)
 
+pub mod analytics; // Structural graph analytics (blast_radius, cycles, orphans, health)
+
 pub mod ranking; // Rank-based fusion (RRF) and centrality scoring
 
 pub mod wire; // Columnar string-interned wire encoding (`#MUNCH`-style)
