@@ -7,12 +7,15 @@ Chunk identity = SHA-256 of the chunk's UTF-8 bytes (matches the core node hash)
 """
 import hashlib
 import json
+import logging
 import os
 import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from .ingest import chunk_text, _EXTS
+
+logger = logging.getLogger(__name__)
 
 
 def chunk_hash(chunk: str) -> str:
@@ -25,7 +28,15 @@ def load_manifest(path: Optional[str]) -> Dict[str, Dict[str, int]]:
     try:
         with open(path, "r", encoding="utf-8") as f:
             return json.load(f)
-    except Exception:
+    except Exception as exc:
+        logger.warning(
+            "ingest manifest at %s is unreadable (%s); preserving as .corrupt and starting fresh",
+            path, exc,
+        )
+        try:
+            os.replace(path, path + ".corrupt")
+        except Exception:
+            pass
         return {}
 
 
@@ -52,9 +63,14 @@ def ingest_incremental(kg, root: str, embedder=None,
     if manifest_path is None and Path(root).is_dir():
         manifest_path = str(Path(root) / ".grap-ingest-manifest.json")
     manifest = load_manifest(manifest_path)
+    root_resolved = Path(root).resolve()
     added = removed = skipped = 0
-    for f in _files_under(root):
+    visited: set = set()
+    files_list = list(_files_under(root))
+    files_count = len(files_list)
+    for f in files_list:
         key = str(f.resolve())
+        visited.add(key)
         try:
             text = f.read_text(encoding="utf-8")
         except OSError:
@@ -88,26 +104,45 @@ def ingest_incremental(kg, root: str, embedder=None,
             manifest[key] = new_file
         else:
             manifest.pop(key, None)
+    # Reconcile deleted files: purge stale manifest entries whose path lies
+    # within root (only when root is a directory — single-file re-ingests must
+    # not touch sibling entries).
+    if Path(root).is_dir():
+        stale_keys = [k for k in manifest if k not in visited]
+        for k in stale_keys:
+            try:
+                within = Path(k).is_relative_to(root_resolved)  # py3.9+; we run 3.13
+            except (ValueError, OSError):
+                within = False
+            if within:
+                for nid in manifest[k].values():
+                    try:
+                        kg.remove_node(nid)
+                    except Exception:
+                        pass
+                    removed += 1
+                del manifest[k]
     save_manifest(manifest_path, manifest)
     return {"nodes_added": added, "nodes_removed": removed, "skipped": skipped,
-            "manifest_path": manifest_path, "embedded": bool(embedder)}
+            "files": files_count, "manifest_path": manifest_path, "embedded": bool(embedder)}
 
 
 def watch_paths(kg, root: str, embedder=None, manifest_path: Optional[str] = None,
                 interval: float = 2.0, iterations: Optional[int] = None,
                 on_change=None) -> int:
-    mtimes: Dict[str, float] = {}
+    snapshot_mtimes = None
     runs = 0
     i = 0
     while iterations is None or i < iterations:
         i += 1
-        changed = False
+        current: Dict[str, float] = {}
         for f in _files_under(root):
-            m = f.stat().st_mtime
-            if mtimes.get(str(f)) != m:
-                mtimes[str(f)] = m
-                changed = True
-        if changed:
+            try:
+                current[str(f)] = f.stat().st_mtime
+            except OSError:
+                pass
+        if current != snapshot_mtimes:   # adds, edits, AND deletions
+            snapshot_mtimes = current
             res = ingest_incremental(kg, root, embedder, manifest_path)
             runs += 1
             if on_change:

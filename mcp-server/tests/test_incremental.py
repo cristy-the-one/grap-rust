@@ -45,6 +45,25 @@ def test_watch_paths_one_iteration(tmp_path):
     assert runs == 1
 
 
+def test_incremental_tombstones_deleted_file(tmp_path):
+    a = tmp_path / "a.md"; b = tmp_path / "b.md"
+    a.write_text("Alpha only.", encoding="utf-8")
+    b.write_text("Bravo only.", encoding="utf-8")
+    man = tmp_path / "manifest.json"
+    kg = _FakeKG()
+    r1 = inc.ingest_incremental(kg, str(tmp_path), manifest_path=str(man))
+    assert r1["nodes_added"] == 2
+    live_before = len(kg.live)
+    # delete file b from disk, re-ingest
+    b.unlink()
+    r2 = inc.ingest_incremental(kg, str(tmp_path), manifest_path=str(man))
+    assert r2["nodes_removed"] == 1
+    assert len(kg.live) == live_before - 1
+    import json as _j
+    saved = _j.loads(man.read_text())
+    assert all("b.md" not in k for k in saved)  # b's manifest entry purged
+
+
 import grap_mcp.server as s
 
 

@@ -212,7 +212,8 @@ def reingest_documents(path: str) -> dict:
             kg.save_to_dir(kg_path)
         try:
             _get_workspace().record_event("documents_reingested", path,
-                                          details={"nodes_added": str(result["nodes_added"]),
+                                          details={"files": str(result.get("files", 0)),
+                                                   "nodes_added": str(result["nodes_added"]),
                                                    "nodes_removed": str(result["nodes_removed"]),
                                                    "skipped": str(result["skipped"])})
         except Exception:
