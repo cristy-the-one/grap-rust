@@ -17,7 +17,9 @@ def test_graph_neighbors_compact_two_tables():
     assert isinstance(payload, str)
     assert payload.startswith("#MUNCH/1 tool=graph_neighbors")
     assert "__tables=n:neighbors:id|label|kind|title,e:edges:source|target|type" in payload
-    assert "@1=act" in payload          # kind interned (repeats)
+    # Both repeated values are interned; assert the legend bodies are present
+    # without pinning the exact @N (interning order is value-dependent).
+    assert "=act" in payload and "=cites" in payload  # kind + type interned
     assert meta["tokens_saved"] >= 0
 
 

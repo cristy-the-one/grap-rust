@@ -80,6 +80,8 @@ fn encode_tables(
         })?;
 
         let tag_str: String = t.get_item(0)?.extract()?;
+        // Tags must be a single unique char per document (the row prefix that
+        // maps a CSV row back to its table); only the first char is used.
         let tag = tag_str.chars().next().unwrap_or('t');
         let key: String = t.get_item(1)?.extract()?;
         let cols: Vec<String> = t.get_item(2)?.extract()?;

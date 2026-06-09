@@ -22,10 +22,15 @@ pub fn estimate_tokens_saved(raw_bytes: usize, compact_bytes: usize) -> usize {
 /// A primitive cell value.
 #[derive(Debug, Clone, PartialEq)]
 pub enum WireValue {
+    /// A UTF-8 string value (the only kind that may be interned).
     Str(String),
+    /// A signed 64-bit integer.
     Int(i64),
+    /// A 64-bit floating-point number.
     Float(f64),
+    /// A boolean, rendered as `T`/`F`.
     Bool(bool),
+    /// A null/absent value, rendered as the empty string.
     Null,
 }
 
@@ -34,7 +39,7 @@ impl WireValue {
         match self {
             WireValue::Str(s) => csv_escape(s),
             WireValue::Int(i) => i.to_string(),
-            WireValue::Float(f) => format!("{}", f),
+            WireValue::Float(f) => f.to_string(),
             WireValue::Bool(b) => {
                 if *b {
                     "T".into()
@@ -51,30 +56,44 @@ impl WireValue {
 /// names, the indices of columns to string-intern, and the rows.
 #[derive(Debug, Clone)]
 pub struct WireTable {
+    /// Single-char row prefix identifying this table in the output.
     pub tag: char,
+    /// The response key this table was sourced from.
     pub key: String,
+    /// Ordered column names.
     pub cols: Vec<String>,
+    /// 0-based indices of columns whose string cells are interned.
     pub intern_cols: Vec<usize>,
+    /// The table rows; each row is a vector of cell values.
     pub rows: Vec<Vec<WireValue>>,
 }
 
 /// A top-level scalar (key, value).
 #[derive(Debug, Clone)]
 pub struct WireScalar {
+    /// The scalar's key.
     pub key: String,
+    /// The scalar's value.
     pub value: WireValue,
 }
 
 fn csv_escape(s: &str) -> String {
-    if s.contains(',') || s.contains('"') || s.contains('\n') {
+    // Quote on space too: the scalar line is space-delimited, so an unquoted
+    // value containing a space would corrupt decode. Quoted table cells with
+    // spaces are fine because the row splitter is quote-aware.
+    if s.contains(',') || s.contains('"') || s.contains('\n') || s.contains(' ') {
         format!("\"{}\"", s.replace('"', "\"\""))
     } else {
         s.to_string()
     }
 }
 
-/// Build the legend: strings appearing in interned columns >=2x and saving
-/// >=1 char when replaced by `@N` (so len > 2, since "@N" is 2 chars).
+/// Build the legend: strings appearing in interned columns >=2x, assigned
+/// `@1, @2, …` most-valuable-first (count desc, then length desc, then lexical
+/// for determinism), keeping only those where the literal is strictly longer
+/// than its assigned symbol so each reference is net-positive. This stops
+/// interning once `@N` is no longer shorter than the literal (e.g. once the
+/// symbol grows to `@10`, a 3-char literal no longer saves).
 fn build_legend(tables: &[WireTable]) -> (HashMap<String, String>, Vec<String>) {
     let mut counts: HashMap<&str, usize> = HashMap::new();
     for t in tables {
@@ -86,18 +105,27 @@ fn build_legend(tables: &[WireTable]) -> (HashMap<String, String>, Vec<String>) 
             }
         }
     }
-    let mut chosen: Vec<&str> = counts
+    let mut candidates: Vec<(&str, usize)> = counts
         .iter()
-        .filter(|(s, &c)| c >= 2 && s.len() > 2)
-        .map(|(s, _)| *s)
+        .filter(|(_, &c)| c >= 2)
+        .map(|(s, &c)| (*s, c))
         .collect();
-    chosen.sort_unstable(); // deterministic legend numbering
-    let mut map = HashMap::new();
-    let mut lines = Vec::new();
-    for (i, s) in chosen.iter().enumerate() {
-        let tok = format!("@{}", i + 1);
-        lines.push(format!("{}={}", tok, s));
-        map.insert((*s).to_string(), tok);
+    candidates.sort_by(|a, b| {
+        b.1.cmp(&a.1) // higher count first
+            .then(b.0.len().cmp(&a.0.len())) // then longer string
+            .then(a.0.cmp(b.0)) // then lexical (determinism)
+    });
+    let mut map: HashMap<String, String> = HashMap::new();
+    let mut lines: Vec<String> = Vec::new();
+    let mut next = 1usize;
+    for (s, _c) in candidates {
+        let sym = format!("@{}", next);
+        if s.len() > sym.len() {
+            // only intern when the symbol is actually shorter
+            lines.push(format!("{}={}", sym, s));
+            map.insert(s.to_string(), sym);
+            next += 1; // numbering stays dense among kept entries
+        }
     }
     (map, lines)
 }
@@ -165,6 +193,9 @@ use std::collections::BTreeMap;
 
 /// Decoded document. Rows are column→string maps; cells are not re-typed
 /// (callers may consult `scalars`/`__stypes` if they need numerics).
+///
+/// Note: `__stypes` is emitted by [`encode`] for FUTURE client decoders and is
+/// not consumed by the Rust [`decode`] — scalars always come back as strings.
 #[derive(Debug, Clone)]
 pub struct DecodedDoc {
     /// Tool name from the `#MUNCH/1` header.
@@ -207,7 +238,7 @@ pub fn decode(payload: &str) -> DecodedDoc {
     }
 
     let mut scalars = BTreeMap::new();
-    for tok in scalar_line.split(' ') {
+    for tok in split_delimited(&scalar_line, ' ') {
         if tok.starts_with("__") {
             continue;
         }
@@ -223,7 +254,7 @@ pub fn decode(payload: &str) -> DecodedDoc {
         if line.is_empty() {
             continue;
         }
-        let mut it = split_csv(line).into_iter();
+        let mut it = split_delimited(line, ',').into_iter();
         let tag = match it.next().and_then(|s| s.chars().next()) {
             Some(t) => t,
             None => continue,
@@ -269,8 +300,10 @@ fn parse_tables_schema(line: &str) -> Vec<(char, String, Vec<String>)> {
         .collect()
 }
 
-/// Minimal CSV split honoring the double-quoted fields `csv_escape` produces.
-fn split_csv(line: &str) -> Vec<String> {
+/// Split `line` on `delim`, honoring the double-quoted fields `csv_escape`
+/// produces: `""` unescapes to `"` and surrounding quotes are stripped. Used
+/// with `,` for table rows and ` ` (space) for the scalar line.
+fn split_delimited(line: &str, delim: char) -> Vec<String> {
     let mut out = Vec::new();
     let mut cur = String::new();
     let mut in_q = false;
@@ -282,7 +315,7 @@ fn split_csv(line: &str) -> Vec<String> {
                 chars.next();
             }
             '"' => in_q = !in_q,
-            ',' if !in_q => out.push(std::mem::take(&mut cur)),
+            c if c == delim && !in_q => out.push(std::mem::take(&mut cur)),
             _ => cur.push(c),
         }
     }
@@ -311,6 +344,19 @@ mod tests {
         assert!(out.contains("@1=cites")); // "cites" interned (used 2x)
         assert!(out.contains("n,7,@1")); // row references the legend
         assert!(out.contains("__tables=n:neighbors:node_id|relation"));
+    }
+
+    #[test]
+    fn scalar_string_with_space_round_trips() {
+        let scalars = vec![WireScalar {
+            key: "msg".into(),
+            value: WireValue::Str("hello world".into()),
+        }];
+        let out = encode("t", "e1", &scalars, &[]);
+        // The space-containing value must be quoted on the scalar line.
+        assert!(out.contains("msg=\"hello world\""), "{out}");
+        let doc = decode(&out);
+        assert_eq!(doc.scalars["msg"], "hello world");
     }
 
     #[test]
