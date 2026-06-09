@@ -1374,6 +1374,35 @@ def get_telemetry() -> dict:
 
 
 @tiered
+def grap_guide() -> dict:
+    """Orientation for agents: what grap can do, the active tool tier, and how
+    to widen it. Start here, then call list_capabilities for the full taxonomy."""
+    core_tools = sorted(n for n, t_ in _TIERS.items() if t_ == "core")
+    full_tools = sorted(n for n, t_ in _TIERS.items() if t_ == "full")
+    return {
+        "status": "ok",
+        "active_tier": _ACTIVE_TIER,
+        "overview": (
+            "grap is a local graph engine with three graph kinds over one store: "
+            "Knowledge (what we know), Procedure (how we do it), Temporal (what happened). "
+            "Build a KG (create/load_knowledge_graph + ingest_documents), retrieve with "
+            "graph_neighbors / get_context_bundle, analyse with get_blast_radius/find_cycles/"
+            "kg_health, and run governed procedures (publish_pg -> promote_pg -> activate -> "
+            "run_procedure / detect_gaps) with a full audit trail."
+        ),
+        "tiers": {
+            "core": core_tools,
+            "standard": "default operator tools (everything not listed core/full)",
+            "full": full_tools,
+        },
+        "how_to_widen": "Set the GRAP_TOOL_TIER env var to core | standard | full "
+                        "(default full) before starting the server to control the tool surface.",
+        "next": "Call list_capabilities for the full domain taxonomy, or "
+                "suggest_queries(node_id) to explore a specific node.",
+    }
+
+
+@tiered
 def list_capabilities() -> dict:
     """Return the MCP capability taxonomy grouped by domain."""
     return {

@@ -31,3 +31,11 @@ def test_full_tier_has_known_tools():
     names = {t.name for t in asyncio.run(s.mcp.list_tools())}
     for n in ["graph_neighbors", "get_context_bundle", "run_experiment", "get_config", "list_capabilities"]:
         assert n in names
+
+
+def test_grap_guide():
+    out = s.grap_guide()
+    assert out["status"] == "ok"
+    assert out["active_tier"] in ("core", "standard", "full")
+    assert "core" in out["tiers"] and isinstance(out["tiers"]["core"], list)
+    assert "GRAP_TOOL_TIER" in out["how_to_widen"]
