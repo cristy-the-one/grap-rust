@@ -65,19 +65,18 @@ impl BlobStore {
     /// Append text, return lightweight BlobRef.
     /// Only supported in in-memory mode (writing while using mmap mode is not intended).
     pub fn store(&mut self, text: &str) -> BlobRef {
-        // When `mmap` is enabled and the storage is a Mmap backend, log a warning and
-        // fall back to an in-memory Chunks store before writing.
+        // Copy-on-write: a write to a memory-mapped (read-mostly) store migrates the
+        // mapped bytes into a single owned chunk so every existing BlobRef (global
+        // offset, chunk_idx 0) stays valid, then we append normally. One-time cost:
+        // the corpus is copied into RAM on the first mutation after a mmap open.
         #[cfg(feature = "mmap")]
-        if matches!(self.storage, Storage::Mmap(_)) {
-            log::warn!(
-                "BlobStore::store called on a memory-mapped store; \
-                 switching to in-memory Chunks backend (existing mmap data is no longer accessible)"
-            );
-            self.storage = Storage::default();
+        if let Storage::Mmap(mmap) = &self.storage {
+            let owned: Vec<u8> = mmap.to_vec();
+            self.storage = Storage::Chunks(vec![owned]);
         }
 
         // At this point the storage is always Chunks (either originally or after the
-        // fallback above).
+        // copy-on-write migration above).
         let chunks = match &mut self.storage {
             Storage::Chunks(chunks) => chunks,
             #[cfg(feature = "mmap")]
@@ -125,10 +124,14 @@ impl BlobStore {
 
     /// Internal helper used by both `store` and `store_embedding`.
     fn store_bytes(&mut self, bytes: &[u8]) -> BlobRef {
-        // Handle mmap fallback
+        // Copy-on-write: a write to a memory-mapped (read-mostly) store migrates the
+        // mapped bytes into a single owned chunk so every existing BlobRef (global
+        // offset, chunk_idx 0) stays valid, then we append normally. One-time cost:
+        // the corpus is copied into RAM on the first mutation after a mmap open.
         #[cfg(feature = "mmap")]
-        if matches!(self.storage, Storage::Mmap(_)) {
-            self.storage = Storage::default();
+        if let Storage::Mmap(mmap) = &self.storage {
+            let owned: Vec<u8> = mmap.to_vec();
+            self.storage = Storage::Chunks(vec![owned]);
         }
 
         let chunks = match &mut self.storage {

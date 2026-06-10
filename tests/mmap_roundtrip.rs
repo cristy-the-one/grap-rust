@@ -37,3 +37,35 @@ fn indexed_mmap_open_supports_search_and_read() {
     let hits = g2.search_and_traverse_default("brake", 5, &[], 0.0, 2, 10);
     assert!(!hits.is_empty());
 }
+
+#[test]
+fn write_after_mmap_open_preserves_existing_and_adds_new() {
+    let dir = tempdir().unwrap();
+    let mut g = KnowledgeGraph::new();
+    let a = g.add_node("original mapped text", Some("A"), None);
+    g.save_to_disk(dir.path()).unwrap();
+
+    let mut g2 = KnowledgeGraph::load_mmap(dir.path()).unwrap();
+    assert!(g2.blobs_are_mapped());
+    let b = g2.add_node("newly added text", Some("B"), None); // triggers copy-on-write
+    assert!(!g2.blobs_are_mapped()); // now owned chunks
+    assert_eq!(g2.read_blob(a), "original mapped text"); // existing ref still valid
+    assert_eq!(g2.read_blob(b), "newly added text"); // new ref valid
+}
+
+#[test]
+fn mmap_open_rejects_truncated_blob_file() {
+    let dir = tempdir().unwrap();
+    let mut g = KnowledgeGraph::new();
+    g.add_node("some text here", None, None);
+    g.save_to_disk(dir.path()).unwrap();
+    let blobs = dir.path().join("graph.blobs");
+    let len = std::fs::metadata(&blobs).unwrap().len();
+    std::fs::OpenOptions::new()
+        .write(true)
+        .open(&blobs)
+        .unwrap()
+        .set_len(len.saturating_sub(3))
+        .unwrap();
+    assert!(KnowledgeGraph::load_mmap(dir.path()).is_err()); // not a panic
+}

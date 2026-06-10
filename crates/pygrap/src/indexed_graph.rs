@@ -200,9 +200,10 @@ impl IndexedKnowledgeGraph {
     /// Open an existing on-disk graph **read-mostly**, memory-mapping the node-text
     /// blobs so they stay on disk and are read zero-copy on demand (fast open, low RAM).
     ///
-    /// Best for query / RAG workloads. A subsequent mutation (add_node/add_edge/...)
-    /// transparently copies the blobs into RAM, so for ingest/write workloads use the
-    /// normal constructor (`IndexedKnowledgeGraph(path)` / `with_merge_policy`) instead.
+    /// Best for query / RAG workloads. The first mutation (add_node/add_edge/...)
+    /// copies the blobs into RAM (one-time copy-on-write), so for ingest/write
+    /// workloads use the normal constructor (`IndexedKnowledgeGraph(path)` /
+    /// `with_merge_policy`) instead.
     #[staticmethod]
     fn open_mmap(path: &str) -> PyResult<Self> {
         let dir = PathBuf::from(path);

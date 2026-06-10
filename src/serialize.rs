@@ -866,6 +866,21 @@ pub fn load_mmap(dir: &Path) -> Result<KnowledgeGraph, GraphError> {
     // chunk_idx is always 0 (the whole map is one flat region).
     let mut rebuilt_nodes = Vec::with_capacity(serializable_nodes.len());
     for sn in serializable_nodes {
+        // Defense-in-depth: validate this node's blob ref against the mapped file
+        // size BEFORE building the BlobRef, so a corrupt/out-of-range offset fails
+        // fast with InvalidData instead of panicking (or UB) later in `read()`.
+        let blob_end = sn.blob_global_offset.saturating_add(sn.blob_length as u64);
+        if blob_end > meta.blob_total_bytes {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                format!(
+                    "node blob ref [{}..{}] exceeds blob file size {}",
+                    sn.blob_global_offset, blob_end, meta.blob_total_bytes
+                ),
+            )
+            .into());
+        }
+
         let blob = BlobRef {
             chunk_idx: 0,
             offset: global_to_u32(sn.blob_global_offset)?,
@@ -878,6 +893,17 @@ pub fn load_mmap(dir: &Path) -> Result<KnowledgeGraph, GraphError> {
             sn.embedding_length,
             sn.embedding_uncompressed_len,
         ) {
+            let emb_end = off.saturating_add(len as u64);
+            if emb_end > meta.blob_total_bytes {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    format!(
+                        "node embedding ref [{}..{}] exceeds blob file size {}",
+                        off, emb_end, meta.blob_total_bytes
+                    ),
+                )
+                .into());
+            }
             Some(BlobRef {
                 chunk_idx: 0,
                 offset: global_to_u32(off)?,
