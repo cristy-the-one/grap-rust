@@ -278,6 +278,12 @@ impl KnowledgeGraph {
     /// Reclaims bytes orphaned by [`update_node_content`](Self::update_node_content),
     /// [`merge_nodes`](Self::merge_nodes), and tombstoned nodes. Node ids,
     /// edges, and all indexes are untouched (they key on [`NodeId`](crate::ids::NodeId)).
+    ///
+    /// Notes: a tombstoned node's bytes are dropped (empty blob), so its
+    /// `content_hash` becomes meaningless after compaction (it is never
+    /// verified — `verify_node` returns `Unknown` for deleted nodes). When the
+    /// source store is memory-mapped, `bytes_before` is the mapped-file length,
+    /// so `bytes_reclaimed` is a reclaim estimate rather than an exact delta.
     pub fn vacuum_blobs(&mut self) -> BlobVacuumReport {
         let bytes_before = self.blobs.total_bytes();
         let n = self.nodes.len();
