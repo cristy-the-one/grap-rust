@@ -796,19 +796,148 @@ impl KnowledgeGraph {
 
 /// Internal implementation backing `KnowledgeGraph::load_mmap` when the `mmap` feature is enabled.
 ///
-/// Currently this delegates to the portable `load_from_disk` implementation.
-/// The true zero-copy `Storage::Mmap` reconstruction path (via `BlobStore`) is prepared
-/// in the codebase and will be activated in a future change.
+/// Memory-maps `graph.blobs` read-only so node text stays on disk and is read
+/// zero-copy on demand, rather than being copied fully into RAM as the portable
+/// `load_from_disk` path does. The mapped file is treated as one flat region:
+/// each node's `BlobRef.offset` carries the GLOBAL byte offset into the map and
+/// `chunk_idx` is always 0 (see `BlobStore::read` for the `Storage::Mmap` arm).
 #[cfg(feature = "mmap")]
 pub fn load_mmap(dir: &Path) -> Result<KnowledgeGraph, GraphError> {
-    // For now we use the proven portable loader under the hood.
-    // The full zero-copy mmap storage backend (`Storage::Mmap`) and
-    // `BlobStore::from_mmap` are already implemented and ready for when
-    // we switch the reconstruction to true pointer-based reads.
-    //
-    // This still gives users the public `load_mmap` API and exercises the
-    // mmap feature flag + memmap2 dependency.
-    KnowledgeGraph::load_from_disk(dir)
+    // Read meta (version-check exactly like load_from_disk).
+    let meta_str = fs::read_to_string(dir.join("graph.meta"))?;
+    let meta: GraphMeta =
+        serde_json::from_str(&meta_str).map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+
+    if meta.version != CURRENT_GRAPH_FORMAT_VERSION {
+        return Err(GraphError::UnsupportedVersion {
+            found: meta.version,
+            supported: CURRENT_GRAPH_FORMAT_VERSION,
+        });
+    }
+
+    // Memory-map the flat blob file read-only.
+    // SAFETY: We map a file we just opened; the BlobStore owns the Mmap for as
+    // long as any &str slice derived from it is alive.
+    let blob_file = File::open(dir.join("graph.blobs"))?;
+    #[allow(unsafe_code)]
+    let mmap = unsafe { memmap2::Mmap::map(&blob_file)? };
+
+    if mmap.len() as u64 != meta.blob_total_bytes {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            format!(
+                "mapped blob file length {} does not match meta.blob_total_bytes {}",
+                mmap.len(),
+                meta.blob_total_bytes
+            ),
+        )
+        .into());
+    }
+
+    let blobs = crate::blob_store::BlobStore::from_mmap(mmap);
+
+    // Read topology (same tuple type as load_from_disk).
+    let topo_path = dir.join("graph.topo");
+    let topo_data = fs::read(topo_path)?;
+    let (serializable_nodes, serializable_edges, property_names): (
+        Vec<SerializableNode>,
+        Vec<SerializableEdge>,
+        Vec<String>,
+    ) = bincode::deserialize(&topo_data).map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+
+    // Rebuild PropertyRegistry first.
+    let mut properties = crate::properties::PropertyRegistry::new();
+    for name in property_names {
+        properties.register(&name);
+    }
+
+    // Helper: a global offset must fit in u32 because BlobRef.offset is u32.
+    fn global_to_u32(global: u64) -> Result<u32, GraphError> {
+        u32::try_from(global).map_err(|_| {
+            GraphError::Other(
+                "blob offset exceeds 4 GiB; mmap mode supports blob files up to 4 GiB - \
+                 use load_from_disk"
+                    .into(),
+            )
+        })
+    }
+
+    // Rebuild nodes. In mmap mode the BlobRef.offset is the GLOBAL offset and
+    // chunk_idx is always 0 (the whole map is one flat region).
+    let mut rebuilt_nodes = Vec::with_capacity(serializable_nodes.len());
+    for sn in serializable_nodes {
+        let blob = BlobRef {
+            chunk_idx: 0,
+            offset: global_to_u32(sn.blob_global_offset)?,
+            length: sn.blob_length,
+            uncompressed_len: sn.blob_uncompressed_len,
+        };
+
+        let embedding = if let (Some(off), Some(len), Some(ulen)) = (
+            sn.embedding_global_offset,
+            sn.embedding_length,
+            sn.embedding_uncompressed_len,
+        ) {
+            Some(BlobRef {
+                chunk_idx: 0,
+                offset: global_to_u32(off)?,
+                length: len,
+                uncompressed_len: ulen,
+            })
+        } else {
+            None
+        };
+
+        // Recompute the content hash via a zero-copy read from the map.
+        let content_hash =
+            crate::lifecycle::hash::sha256_digest(blobs.read(&blob).as_bytes());
+
+        rebuilt_nodes.push(crate::graph::Node {
+            blob,
+            embedding,
+            outgoing: sn.outgoing.into_iter().map(EdgeId).collect(),
+            incoming: sn.incoming.into_iter().map(EdgeId).collect(),
+            label: sn.label,
+            outgoing_property_mask: sn.outgoing_property_mask,
+            content_hash,
+        });
+    }
+
+    // Rebuild edges (verbatim from load_from_disk).
+    let mut rebuilt_edges = Vec::with_capacity(serializable_edges.len());
+    for se in serializable_edges {
+        let props: Vec<(PropertyTag, PropertyValue)> = se
+            .properties
+            .into_iter()
+            .map(|(tag, val)| (PropertyTag(tag), SerializablePropertyValue::into(val)))
+            .collect();
+
+        rebuilt_edges.push(crate::graph::Edge {
+            source: NodeId(se.source),
+            target: NodeId(se.target),
+            strength: se.strength,
+            properties: props,
+            property_mask: se.property_mask,
+        });
+    }
+
+    // Restore tombstones (verbatim from load_from_disk).
+    let deleted_path = dir.join("graph.deleted");
+    let deleted: Vec<bool> = if deleted_path.exists() {
+        fs::read(&deleted_path)?.iter().map(|&b| b != 0).collect()
+    } else {
+        vec![false; rebuilt_nodes.len()]
+    };
+
+    let graph = KnowledgeGraph::from_parts_with_deleted(
+        rebuilt_nodes,
+        rebuilt_edges,
+        blobs,
+        properties,
+        deleted,
+    );
+
+    Ok(graph)
 }
 
 #[cfg(test)]

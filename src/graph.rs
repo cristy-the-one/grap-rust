@@ -229,6 +229,19 @@ impl KnowledgeGraph {
         self.nodes.get(node.0 as usize).map(|n| n.content_hash)
     }
 
+    /// True if this graph's blobs are backed by a read-only memory map
+    /// (loaded via `load_mmap`) rather than owned in-RAM chunks.
+    pub fn blobs_are_mapped(&self) -> bool {
+        #[cfg(feature = "mmap")]
+        {
+            self.blobs.is_mapped()
+        }
+        #[cfg(not(feature = "mmap"))]
+        {
+            false
+        }
+    }
+
     /// Size of the node id-space, including tombstoned (logically deleted)
     /// nodes. Used as the upper bound for id iteration; see [`live_node_count`]
     /// for the count of nodes that are actually still present.
