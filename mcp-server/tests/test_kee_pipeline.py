@@ -33,7 +33,10 @@ def test_pipeline_end_to_end_and_candidate_is_loadable(tmp_path):
 
     provider = StubProvider(handler=_handler)
     embedder = HashingEmbedder(dim=128)
-    result = pipeline.extract_ontology(str(tmp_path), provider, embedder, sim=0.9)
+    # This test validates the legacy stateless path end-to-end (reconcile -> YAML
+    # -> loadable). The graph-augmented path is covered in test_kee_graph_extract.
+    result = pipeline.extract_ontology(str(tmp_path), provider, embedder, sim=0.9,
+                                       graph_augmented=False)
 
     onto = result["ontology"]
     names = {o["name"] for o in onto["process_outcomes"]}

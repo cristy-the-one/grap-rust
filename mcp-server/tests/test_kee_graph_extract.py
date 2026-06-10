@@ -68,3 +68,34 @@ def test_zero_budget_records_no_relook(tmp_path):
                                  sim=0.5, relook_ratio=0.2, workdir=str(tmp_path))
     assert out["relooks"] == 0
     assert len(provider.calls) == 1
+
+
+def test_pipeline_graph_augmented_matches_schema(tmp_path):
+    from grap_mcp.kee import pipeline
+
+    d = tmp_path / "docs"
+    d.mkdir()
+    (d / "a.txt").write_text("The Test Plan defines coverage.", encoding="utf-8")
+
+    provider = StubProvider(handler=lambda s, u: _frag_json(
+        [{"name": "Test Plan", "characteristics": ["coverage"]}]))
+    out = pipeline.extract_ontology(str(d), provider, HashingEmbedder(),
+                                    sim=0.5, graph_augmented=True)
+    onto = out["ontology"]
+    # same top-level schema keys as reconcile output
+    assert set(onto) >= {"version", "process_outcomes", "mapping_hints", "provenance", "relations"}
+    assert any(po["name"] == "Test Plan" for po in onto["process_outcomes"])
+    assert out.get("relooks") is not None  # graph path reports relooks
+
+
+def test_pipeline_old_path_still_works(tmp_path):
+    from grap_mcp.kee import pipeline
+
+    d = tmp_path / "docs"
+    d.mkdir()
+    (d / "a.txt").write_text("The Test Plan defines coverage.", encoding="utf-8")
+    provider = StubProvider(handler=lambda s, u: _frag_json(
+        [{"name": "Test Plan", "characteristics": ["coverage"]}]))
+    out = pipeline.extract_ontology(str(d), provider, HashingEmbedder(),
+                                    sim=0.86, graph_augmented=False)
+    assert "ontology" in out and "fragments" in out  # old path reports fragments
