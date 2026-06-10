@@ -65,3 +65,60 @@ def test_relation_with_ungrounded_endpoint_is_parked(tmp_path):
     assert wg.parked[0]["reason"] == "ungrounded"
     # No node was created for the ungrounded endpoint.
     assert wg.node_count() == 1
+
+
+class FakeEmb:
+    """Embedder returning caller-controlled vectors per exact string."""
+    name = "fake"
+    dim = 2
+
+    def __init__(self, mapping):
+        self.mapping = mapping
+
+    def embed(self, texts):
+        return [self.mapping[t] for t in texts]
+
+
+def _wg_fake(tmp_path, mapping, **kw):
+    return WorkingGraph(FakeEmb(mapping), workdir=str(tmp_path), **kw)
+
+
+def test_merge_threshold_too_low_wrongly_merges(tmp_path):
+    # Distinct concepts at cosine 0.8; threshold 0.5 => wrongly merged into one.
+    emb = {"aaa": [1.0, 0.0], "bbb": [0.8, 0.6]}
+    wg = _wg_fake(tmp_path, emb, merge_threshold=0.5)
+    wg.upsert_fragment({"source": "s", "outcomes": [{"name": "aaa", "characteristics": []}], "relations": []}, "s")
+    wg.upsert_fragment({"source": "s", "outcomes": [{"name": "bbb", "characteristics": []}], "relations": []}, "s")
+    assert wg.node_count() == 1
+
+
+def test_merge_threshold_high_keeps_them_separate(tmp_path):
+    emb = {"aaa": [1.0, 0.0], "bbb": [0.8, 0.6]}
+    wg = _wg_fake(tmp_path, emb, merge_threshold=0.95)
+    wg.upsert_fragment({"source": "s", "outcomes": [{"name": "aaa", "characteristics": []}], "relations": []}, "s")
+    wg.upsert_fragment({"source": "s", "outcomes": [{"name": "bbb", "characteristics": []}], "relations": []}, "s")
+    assert wg.node_count() == 2
+
+
+def test_conflicting_relation_type_is_parked_and_signaled(tmp_path):
+    wg = _wg(tmp_path, merge_threshold=0.95)
+    base = {"outcomes": [{"name": "A", "characteristics": []}, {"name": "B", "characteristics": []}]}
+    wg.upsert_fragment({"source": "s1", **base, "relations": [{"from": "A", "type": "uses", "to": "B"}]}, "s1")
+    sig = wg.upsert_fragment({"source": "s2", **base, "relations": [{"from": "A", "type": "blocks", "to": "B"}]}, "s2")
+    assert any(c["kind"] == "relation" for c in sig.conflicts)
+    assert any(p["reason"] == "conflict" for p in wg.parked)
+    # original edge preserved (first-writer-wins)
+    onto = wg.to_candidate_ontology("v")
+    assert [(r["from"], r["type"], r["to"]) for r in onto["relations"]] == [("A", "uses", "B")]
+
+
+def test_bridge_relation_raises_correlation(tmp_path):
+    wg = _wg(tmp_path, merge_threshold=0.95)
+    # Build two disconnected pairs, then a relation that bridges the two components.
+    wg.upsert_fragment({"source": "s", "outcomes": [{"name": "A", "characteristics": []}, {"name": "B", "characteristics": []}],
+                        "relations": [{"from": "A", "type": "uses", "to": "B"}]}, "s")
+    wg.upsert_fragment({"source": "s", "outcomes": [{"name": "C", "characteristics": []}, {"name": "D", "characteristics": []}],
+                        "relations": [{"from": "C", "type": "uses", "to": "D"}]}, "s")
+    sig = wg.upsert_fragment({"source": "s", "outcomes": [{"name": "B", "characteristics": []}, {"name": "C", "characteristics": []}],
+                              "relations": [{"from": "B", "type": "feeds", "to": "C"}]}, "s")
+    assert any(c["kind"] == "bridge" for c in sig.correlations)
