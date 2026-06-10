@@ -41,16 +41,25 @@ class Signals:
 @dataclass
 class _Resolution:
     node_id: int
-    created: bool
     ambiguous: bool
 
 
 class WorkingGraph:
     def __init__(self, embedder, *, merge_threshold: float = 0.86,
                  context_cap: int = 8, workdir: Optional[str] = None) -> None:
+        """Build an empty working graph.
+
+        `workdir` must be an empty or non-existent directory: this is a fresh
+        per-run graph (Phase 1). State that drives context/export — `canonical`,
+        `chars`, etc. — is only populated for nodes created in this process, so
+        pointing `workdir` at a pre-existing graph would leave those nodes
+        invisible to `context_for`/`to_candidate_ontology`. When `workdir` is
+        omitted a temp dir is created and owned (removed by `close()`).
+        """
         self.embedder = embedder
         self.merge_threshold = merge_threshold
         self.context_cap = context_cap
+        self._owned_workdir = workdir is None
         self._dir = workdir or tempfile.mkdtemp(prefix="kee-wg-")
         self.kg = pygrap.IndexedKnowledgeGraph.with_merge_policy(
             str(Path(self._dir) / "graph"), 2)
@@ -86,25 +95,38 @@ class WorkingGraph:
     def _resolve_outcome(self, name: str) -> _Resolution:
         hits = self.idx.resolve(name)
         if hits:
-            return _Resolution(hits[0], False, len(hits) > 1)
+            return _Resolution(hits[0], len(hits) > 1)
         vec = self._embed_one(name)
         matches = self.kg.vector_search(vec, 2)
         if matches and matches[0][1] >= self.merge_threshold:
             node = matches[0][0]
             ambiguous = len(matches) > 1 and matches[1][1] >= self.merge_threshold
             self.idx.register(name, node)
-            return _Resolution(node, False, ambiguous)
+            return _Resolution(node, ambiguous)
         node = self.kg.add_node(text=name, label="concept", embedding=vec)
         self.idx.register(name, node)
         self.canonical[node] = name
         self.chars.setdefault(node, [])
         self._parent[node] = node
-        return _Resolution(node, True, False)
+        return _Resolution(node, False)
 
     def node_count(self) -> int:
         return self.kg.node_count()
 
-    def upsert_fragment(self, frag: dict, source: str, relook: bool = False) -> Signals:
+    def close(self) -> None:
+        """Release the sqlite handle and, if we created it, remove the temp dir."""
+        self.idx.close()
+        if self._owned_workdir:
+            import shutil
+            shutil.rmtree(self._dir, ignore_errors=True)
+
+    def __enter__(self) -> "WorkingGraph":
+        return self
+
+    def __exit__(self, *_exc) -> None:
+        self.close()
+
+    def upsert_fragment(self, frag: dict, source: str) -> Signals:
         sig = Signals()
         fragment_nodes: Dict[str, int] = {}
         for o in frag.get("outcomes", []):
@@ -231,11 +253,12 @@ class WorkingGraph:
         provenance: Dict[str, List[str]] = {}
         relations_out: List[dict] = []
         used: Set[str] = set()
-        oid_by_node: Dict[int, str] = {}
 
         for node in sorted(self.canonical):
             label = self._canonical_label(node)
             raw_chars = self.chars.get(node, [])
+            # Reuse reconcile's (package-private) clustering to collapse near-dup
+            # characteristics, matching the legacy path's behavior exactly.
             char_clusters = rc._dedup_strings(raw_chars, self.embedder, self.merge_threshold)
             char_tokens: List[str] = []
             seen: Set[str] = set()
@@ -250,7 +273,6 @@ class WorkingGraph:
                 oid = f"{base}_{n}"
                 n += 1
             used.add(oid)
-            oid_by_node[node] = oid
             process_outcomes.append({
                 "id": oid,
                 "name": label,

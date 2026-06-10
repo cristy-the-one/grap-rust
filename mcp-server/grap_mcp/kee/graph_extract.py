@@ -39,27 +39,29 @@ def graph_extract_ontology(chunks: Sequence[Tuple[str, str]], provider, embedder
                            sim: float = 0.86, version: str = "kee-candidate",
                            relook_ratio: float = 0.2, context_cap: int = 8,
                            workdir: Optional[str] = None) -> Dict[str, Any]:
-    wg = WorkingGraph(embedder, merge_threshold=sim, context_cap=context_cap,
-                      workdir=workdir)
     budget = math.ceil(relook_ratio * len(chunks)) if chunks else 0
     relooks = 0
 
-    for source, text in chunks:
-        ctx = wg.context_for(text)
-        frag = _extract_with_context(provider, source, text, ctx)
-        if frag is None:
-            continue
-        sig = wg.upsert_fragment(frag, source)
-        if sig.warrants_relook() and relooks < budget:
-            relooks += 1
-            fctx = wg.focused_context(sig)
-            frag2 = _extract_with_context(provider, source, text, fctx)
-            if frag2 is not None:
-                wg.upsert_fragment(frag2, source, relook=True)
+    with WorkingGraph(embedder, merge_threshold=sim, context_cap=context_cap,
+                      workdir=workdir) as wg:
+        for source, text in chunks:
+            ctx = wg.context_for(text)
+            frag = _extract_with_context(provider, source, text, ctx)
+            if frag is None:
+                continue
+            sig = wg.upsert_fragment(frag, source)
+            if sig.warrants_relook() and relooks < budget:
+                relooks += 1
+                fctx = wg.focused_context(sig)
+                frag2 = _extract_with_context(provider, source, text, fctx)
+                if frag2 is not None:
+                    wg.upsert_fragment(frag2, source)
 
-    return {
-        "ontology": wg.to_candidate_ontology(version),
-        "chunks": len(chunks),
-        "relooks": relooks,
-        "parked": len(wg.parked),
-    }
+        # Materialize the result before the context manager closes the sqlite
+        # handle / removes an owned temp dir (the dict holds no live references).
+        return {
+            "ontology": wg.to_candidate_ontology(version),
+            "chunks": len(chunks),
+            "relooks": relooks,
+            "parked": len(wg.parked),
+        }
