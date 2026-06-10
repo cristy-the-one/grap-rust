@@ -100,6 +100,8 @@ Because the projection is rebuilt, **pygrap node ids are not stable** — durabl
 
 Concept embeddings are recomputed as `embed(canonical)` at projection (deterministic; keeps vector bulk out of the store). **Rejected alternative:** create+tombstone replay to force `node_id == concept_id` — every retracted concept would linger as a tombstone in every future projection (unbounded bloat).
 
+**Implementation refinement (during planning):** the explicit `_node_of/_concept_of` bridge is unnecessary in practice. If mid-run retraction is *logical* (a `_retracted` flag + in-memory edits; pygrap stays append-only during a run) and the projection is rebuilt with **compacted dense ids** at save, then the concept id always equals the pygrap node id — so no bridge map is needed, and no tombstones accumulate (retracted concepts are dropped, not replayed). Durable identity is still the canonical name; the numeric id is internal and compacted deterministically on each save. This relies only on pygrap assigning dense sequential node ids on a fresh on-disk graph, which the codebase already depends on elsewhere.
+
 ## MCP lifecycle tools (`server.py`)
 
 - `open_extraction_graph(path)` → project the store; set `_state["kg"]` to the projected KG and point `resolve_entity` at `<path>/entities.db`; return counts (concepts, edges, chunks).
