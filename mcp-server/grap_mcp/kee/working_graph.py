@@ -65,6 +65,7 @@ class WorkingGraph:
         self.rel_vocab: List[str] = []
         self.parked: List[dict] = []
         self._parent: Dict[int, int] = {}              # union-find over node ids
+        self._has_edge: Set[int] = set()               # nodes with >=1 edge (for bridge)
 
     # ---- union-find (component tracking for bridge signals) ----
     def _find(self, x: int) -> int:
@@ -162,13 +163,20 @@ class WorkingGraph:
             if existing == ty:
                 self._rel_sources[(fn, ty, tn)].add(source)
                 continue
-            bridge = self._find(fn) != self._find(tn)
+            # A "bridge" connects two pieces of EXISTING structure: it only
+            # counts when both endpoints already had an edge and sit in different
+            # components. A first edge between two freshly-created nodes is not a
+            # bridge (they start as disconnected singletons).
+            bridge = (fn in self._has_edge and tn in self._has_edge
+                      and self._find(fn) != self._find(tn))
             self.kg.add_edge(fn, tn, 1.0, {"rel": ty})
             self._edge_types[key] = ty
             self.relations.append({"from_id": fn, "to_id": tn, "type": ty})
             self._rel_sources[(fn, ty, tn)] = {source}
             if ty not in self.rel_vocab:
                 self.rel_vocab.append(ty)
+            self._has_edge.add(fn)
+            self._has_edge.add(tn)
             self._union(fn, tn)
             if bridge:
                 sig.correlations.append({"kind": "bridge", "names": [f, t]})
