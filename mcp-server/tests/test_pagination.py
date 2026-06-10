@@ -44,6 +44,17 @@ def test_explicit_limit_and_bad_cursor():
     assert page3 == items and meta3["next_cursor"] is None
 
 
+def test_cursor_past_end_and_nonnumeric_limit():
+    items = list(range(10))
+    # cursor beyond total -> empty page, no error, no further cursor
+    page, meta = pg.paginate(items, limit=5, cursor="9999")
+    assert page == [] and meta["total"] == 10 and meta["returned"] == 0
+    assert meta["next_cursor"] is None
+    # non-numeric limit -> falls back to the default cap (defensive)
+    page2, _ = pg.paginate(list(range(250)), limit="oops", cursor=None)
+    assert len(page2) == pg.DEFAULT_PAGE_LIMIT
+
+
 # ---------------------------------------------------------------------------
 # Task 2 — server-level tests for the five paginated tools
 # ---------------------------------------------------------------------------

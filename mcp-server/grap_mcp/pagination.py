@@ -27,7 +27,10 @@ def paginate(items: list, limit: Optional[int] = None,
     if limit is None:
         eff = DEFAULT_PAGE_LIMIT
     else:
-        eff = max(1, min(int(limit), MAX_PAGE_LIMIT))
+        try:
+            eff = max(1, min(int(limit), MAX_PAGE_LIMIT))
+        except (TypeError, ValueError):
+            eff = DEFAULT_PAGE_LIMIT  # defensive: non-numeric limit -> default
     end = min(total, start + eff)
     page = items[start:end]
     next_cursor = str(end) if end < total else None
