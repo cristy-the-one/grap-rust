@@ -49,7 +49,7 @@ Make `KnowledgeGraph::load_mmap` actually map `graph.blobs` into a `Storage::Mma
 4. **Unify the legacy loader** — `IndexedKnowledgeGraph::load_from_disk` (distinct from `load_from_dir`) still rebuilds an in-memory inverted index by scanning all blobs; fold it into the on-disk-segment path or mark it test-only.
 
 ### P2 — proposed (scale headroom)
-- **64-bit blob offsets / chunked mmap** — `BlobRef.offset` is `u32`, so the flat mmap path caps `graph.blobs` at 4 GiB. Lift with `u64` offsets (or a chunked mmap) when corpora exceed that.
+- ~~**64-bit blob offsets / chunked mmap**~~ **DONE** — `BlobRef.offset` widened to `u64`; the flat mmap path now supports blob files well beyond 4 GiB with no on-disk format change.
 - **CSR adjacency** — for very large graphs, a compressed-sparse-row neighbor layout improves cache locality during traversal vs per-node `Vec<EdgeId>`.
 
 ---
@@ -163,7 +163,7 @@ fn open_mmap(path: &str) -> PyResult<Self> {
 - [ ] **Commit:** `feat(pygrap): open_mmap — read-mostly memory-mapped open`.
 
 ### Caveats (documented, not blocking)
-- **4 GiB cap** in mmap mode (u32 `BlobRef.offset`); larger corpora must use the portable loader until P2's u64 offsets land. The loader returns a clear error rather than silently truncating.
+- ~~**4 GiB cap** in mmap mode (u32 `BlobRef.offset`)~~ **Lifted** — `BlobRef.offset` is now `u64`; mmap mode supports multi-GB blob files with no format change.
 - **Read-mostly:** the first write after an mmap open copies blobs to RAM (existing `BlobStore::store` fallback) — intended; ingest uses the writable path.
 - **File locking:** an mmap holds the `graph.blobs` handle for the graph's lifetime; on Windows the directory can't be deleted/overwritten while open.
 

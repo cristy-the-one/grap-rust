@@ -3,6 +3,20 @@ use grap::KnowledgeGraph;
 use tempfile::tempdir;
 
 #[test]
+fn mmap_reads_correct_text_at_nontrivial_offsets() {
+    let dir = tempdir().unwrap();
+    let mut g = KnowledgeGraph::new();
+    let mut last = grap::NodeId(0);
+    for i in 0..500 {
+        last = g.add_node(&format!("node number {i} with some body text"), None, None);
+    }
+    g.save_to_disk(dir.path()).unwrap();
+    let g2 = KnowledgeGraph::load_mmap(dir.path()).unwrap();
+    assert!(g2.blobs_are_mapped());
+    assert_eq!(g2.read_blob(last), "node number 499 with some body text");
+}
+
+#[test]
 fn mmap_open_reads_blobs_from_disk_without_copying() {
     let dir = tempdir().unwrap();
     let mut g = KnowledgeGraph::new();
