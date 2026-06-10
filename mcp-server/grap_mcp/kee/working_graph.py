@@ -16,6 +16,7 @@ from typing import Dict, List, Optional, Set, Tuple
 import pygrap
 
 from . import reconcile as rc
+from .graph_store import GraphStore, GraphState
 from ..entity_index import EntityIndex
 
 
@@ -61,6 +62,7 @@ class WorkingGraph:
         self.context_cap = context_cap
         self._owned_workdir = workdir is None
         self._dir = workdir or tempfile.mkdtemp(prefix="kee-wg-")
+        Path(self._dir).mkdir(parents=True, exist_ok=True)
         self.kg = pygrap.IndexedKnowledgeGraph.with_merge_policy(
             str(Path(self._dir) / "graph"), 2)
         self.idx = EntityIndex(str(Path(self._dir) / "entities.db"))
@@ -79,6 +81,7 @@ class WorkingGraph:
         self._char_sources: Dict[Tuple[int, str], Set[str]] = {}   # (node,text) -> chunks
         self._retracted: Set[int] = set()                  # logically removed concepts
         self._chunk_contrib: Dict[str, dict] = {}          # chunk -> {concepts,chars,edges}
+        self.manifest: Dict[str, str] = {}                 # chunk_id -> content hash
 
     # ---- union-find (component tracking for bridge signals) ----
     def _find(self, x: int) -> int:
@@ -378,3 +381,106 @@ class WorkingGraph:
             "provenance": provenance,
             "relations": relations_out,
         }
+
+    # ---- persistence (Phase 2) ----
+    def _live_concepts(self) -> List[int]:
+        """Live concept node ids (excludes retracted), ascending."""
+        return sorted(n for n in self.canonical if n not in self._retracted)
+
+    def to_state(self) -> GraphState:
+        """Snapshot live state with COMPACTED dense concept ids (0..M-1) so a
+        reload reproduces node id == concept id under the fresh projection."""
+        live = self._live_concepts()
+        remap = {old: new for new, old in enumerate(live)}
+        st = GraphState()
+        for old in live:
+            new = remap[old]
+            st.concepts[new] = self.canonical[old]
+            st.aliases[new] = list(self.aliases_by_node.get(old, []))
+            st.chars[new] = list(self.chars.get(old, []))
+            st.concept_sources[new] = sorted(self.node_sources.get(old, set()))
+        for (old, text), srcs in self._char_sources.items():
+            if old in remap:
+                st.char_sources[(remap[old], text)] = sorted(srcs)
+        for e in self.relations:
+            f, t = e["from_id"], e["to_id"]
+            if f in remap and t in remap:
+                st.edges.append((remap[f], remap[t], e["type"]))
+                srcs = self._rel_sources.get((f, e["type"], t), set())
+                st.edge_sources[(remap[f], remap[t])] = sorted(srcs)
+        st.manifest = dict(self.manifest)
+        st.rel_vocab = list(dict.fromkeys(e["type"] for e in self.relations))
+        st.parked = [{"from": p["from"], "type": p["type"], "to": p["to"],
+                      "chunk_id": p.get("source", ""), "reason": p.get("reason", "")}
+                     for p in self.parked]
+        return st
+
+    def _load_state(self, st: GraphState) -> None:
+        """Populate in-memory dicts from a (dense-id) GraphState, then project."""
+        self.canonical = dict(st.concepts)
+        self.aliases_by_node = {cid: list(al) for cid, al in st.aliases.items()}
+        self.chars = {cid: list(cs) for cid, cs in st.chars.items()}
+        self.node_sources = {cid: set(s) for cid, s in st.concept_sources.items()}
+        self._char_sources = {k: set(v) for k, v in st.char_sources.items()}
+        self.relations = [{"from_id": f, "to_id": t, "type": ty} for (f, t, ty) in st.edges]
+        self._edge_types = {(f, t): ty for (f, t, ty) in st.edges}
+        self._rel_sources = {(f, ty, t): set(st.edge_sources.get((f, t), []))
+                             for (f, t, ty) in st.edges}
+        self.rel_vocab = list(st.rel_vocab)
+        self.parked = [{"from": p["from"], "type": p["type"], "to": p["to"],
+                        "source": p["chunk_id"], "reason": p["reason"]} for p in st.parked]
+        self.manifest = dict(st.manifest)
+        self._retracted = set()
+        self._chunk_contrib = {}
+        self._parent = {}
+        self._has_edge = set()
+        for f, t, _ty in st.edges:
+            self._parent.setdefault(f, f)
+            self._parent.setdefault(t, t)
+            self._has_edge.add(f)
+            self._has_edge.add(t)
+            self._union(f, t)
+        for cid in st.concepts:
+            self._parent.setdefault(cid, cid)
+        self._project()
+
+    def _project(self) -> None:
+        """Rebuild the pygrap KG + EntityIndex from live state. Node ids come out
+        equal to the (already-dense) concept ids because we add in id order."""
+        import shutil
+        graph_dir = str(Path(self._dir) / "graph")
+        # Release the current graph handle before deleting its directory: on
+        # Windows an open pygrap handle would make rmtree silently skip files.
+        self.kg = None
+        shutil.rmtree(graph_dir, ignore_errors=True)
+        self.idx.clear()
+        self.kg = pygrap.IndexedKnowledgeGraph.with_merge_policy(graph_dir, 2)
+        for cid in sorted(self.canonical):
+            nid = self.kg.add_node(text=self.canonical[cid], label="concept",
+                                   embedding=self._embed_one(self.canonical[cid]))
+            assert nid == cid, "projection must reproduce dense concept ids"
+            for alias in self.aliases_by_node.get(cid, []):
+                self._register_alias(alias, cid)
+        for e in self.relations:
+            self.kg.add_edge(e["from_id"], e["to_id"], 1.0, {"rel": e["type"]})
+
+    def save(self) -> None:
+        """Persist truth FIRST (GraphStore), then rebuild + persist the projection."""
+        st = self.to_state()
+        with GraphStore(str(Path(self._dir) / "graph_store.db")) as store:
+            store.save(st)
+        self._load_state(st)
+        self.kg.save_to_dir(str(Path(self._dir) / "graph"))
+
+    @classmethod
+    def open(cls, workdir: str, embedder, *, merge_threshold: float = 0.86,
+             context_cap: int = 8) -> "WorkingGraph":
+        """Open an existing durable graph (or a fresh one if absent)."""
+        wg = cls(embedder, merge_threshold=merge_threshold,
+                 context_cap=context_cap, workdir=workdir)
+        store_path = Path(workdir) / "graph_store.db"
+        with GraphStore(str(store_path)) as store:
+            st = store.load()
+        if st.concepts:
+            wg._load_state(st)
+        return wg
