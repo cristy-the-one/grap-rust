@@ -228,6 +228,86 @@ fn bench_large_n_traversal(c: &mut Criterion) {
     group.finish();
 }
 
+/// Builds a large graph with *selective* vocabulary: each node draws a handful of
+/// words from a big pool, so any given query term appears in only a small fraction
+/// of documents (short posting lists). This is the realistic case — unlike
+/// `build_synthetic_graph`, whose homogeneous text makes every query term match
+/// every doc (the worst case for BM25 scan cost).
+fn build_selective_graph(node_count: usize, pool_size: usize) -> IndexedKnowledgeGraph {
+    let mut g = IndexedKnowledgeGraph::new();
+    let topic = g.graph.properties.register("topic");
+
+    // Each node gets `words_per_doc` deterministic-but-scattered words from the pool.
+    let words_per_doc = 12usize;
+    let mut ids = Vec::with_capacity(node_count);
+    for i in 0..node_count {
+        let mut text = String::with_capacity(words_per_doc * 9);
+        for j in 0..words_per_doc {
+            // Scatter across the pool so posting lists stay short and uneven.
+            let w = (i.wrapping_mul(2_654_435_761).wrapping_add(j * 40_503)) % pool_size;
+            if j > 0 {
+                text.push(' ');
+            }
+            text.push_str(&format!("word{w:05}"));
+        }
+        ids.push(g.add_node(&text, Some(&format!("N{i}")), None));
+    }
+
+    for i in 0..node_count {
+        let target = (i + 17) % node_count;
+        if target != i {
+            g.add_edge(
+                ids[i],
+                ids[target],
+                0.7,
+                vec![(topic, PropertyValue::Label("link".to_string()))],
+            );
+        }
+    }
+
+    g
+}
+
+/// Realistic-query counterpart to `large_n_fusion`: a selective query (terms that
+/// hit only a small slice of the corpus) over a 100K-node graph. Tells us whether
+/// the post-optimization BM25 path is already fast enough for typical queries —
+/// i.e. whether the WAND/early-termination work (B4) is even worth doing.
+fn bench_selective_query(c: &mut Criterion) {
+    let g = build_selective_graph(100_000, 5_000);
+
+    let mut group = c.benchmark_group("selective_query");
+    group.sample_size(30);
+
+    // Four pool words → each matches roughly node_count * words_per_doc / pool_size
+    // (~240) docs, so the scan touches ~1K postings, not 400K.
+    let query = "word00001 word00002 word00003 word00004";
+
+    group.bench_function("text_search_only_selective", |b| {
+        b.iter(|| black_box(g.search(query, 20).len()))
+    });
+
+    group.bench_function("search_and_traverse_selective", |b| {
+        b.iter(|| {
+            let res = g.search_and_traverse(
+                query,
+                20,
+                &[],
+                0.3,
+                4,
+                200,
+                FusionWeights {
+                    text: 0.5,
+                    graph: 0.5,
+                    ..Default::default()
+                },
+            );
+            black_box(res.len())
+        })
+    });
+
+    group.finish();
+}
+
 /// Attribute the query cost at scale: pure BM25 (`search`) vs the full pipeline
 /// (`search_and_traverse` = BM25 seed + pruned traversal + RRF fusion).
 ///
@@ -531,6 +611,7 @@ criterion_group!(
     benches,
     bench_large_n_traversal,
     bench_large_n_fusion,
+    bench_selective_query,
     bench_bitmask_pruning,
     bench_sharded_vs_monolithic,
     bench_rebalance_cost,
@@ -543,6 +624,7 @@ criterion_group!(
     benches,
     bench_large_n_traversal,
     bench_large_n_fusion,
+    bench_selective_query,
     bench_bitmask_pruning,
     bench_sharded_vs_monolithic,
     bench_rebalance_cost,

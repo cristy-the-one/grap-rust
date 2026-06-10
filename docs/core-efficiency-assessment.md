@@ -52,6 +52,17 @@ Make `KnowledgeGraph::load_mmap` actually map `graph.blobs` into a `Storage::Mma
 - ~~**64-bit blob offsets / chunked mmap**~~ **DONE** — `BlobRef.offset` widened to `u64`; the flat mmap path now supports blob files well beyond 4 GiB with no on-disk format change.
 - ~~**CSR adjacency**~~ **DROPPED (benchmarked, not justified).** The idea was that a compressed-sparse-row neighbor layout would improve cache locality during traversal vs per-node `Vec<EdgeId>`. The `large_n_traversal` probe in `benches/graph_benches.rs` runs the *same* bounded BFS (depth 12, 5 000-node budget, pure `traverse_by_relation`, no BM25) against arenas of 10K / 50K / 200K nodes: **27.7 µs → 32.0 µs → 31.7 µs**. There is a one-time ~15 % step crossing out of L2 into L3, then it is **flat** 50K→200K despite a 4× larger arena — per-traversal cost does not scale with graph size. CSR could at best recover that ~15 % step in the cache-resident regime and nothing at large N, which does not justify a hot-path rewrite plus on-disk-format and mutation cost (CSR is rebuild-on-edit; the arena is cheap to extend/trim, which the mission wants). The `large_n_fusion` probe then showed where the time actually goes: at 100K nodes, pure BM25 `search` = **~104 ms** vs full `search_and_traverse` = **~105 ms** — traversal + RRF fusion adds **<1 % (noise)**. *(Caveat: the synthetic corpus is homogeneous so every node matches every query term — 104 ms is a worst-case upper bound on posting-list length, not a typical selective query. The attribution — text ≫ graph — is robust regardless.)* **Conclusion: the graph engine is not the bottleneck; BM25 scoring is. Future perf work belongs in the text/fusion path, not adjacency.**
 
+### BM25 hot path — optimized + measured (DONE)
+Acting on the attribution above, three local fixes landed in `InvertedIndex` (`src/index.rs`), no format/API change:
+- **B1 — top-k selection.** `search` did a full O(M log M) sort of all *M* matched docs then truncated to `max_results`. Now uses `select_nth_unstable_by` + a sort of just the top-k.
+- **B2 — lazy matched-terms.** Dropped the per-doc `Vec<String>` accumulation (a clone + alloc for every matched doc, ~all discarded). Accumulates score only; materializes `matched_terms` by binary-searching posting lists for the *k* survivors (stays exact).
+- **B5 — O(1) average doc length.** `index_document` re-summed all `doc_lengths` on every insert (O(N)/insert → O(N²) bulk ingest). Now maintains a running `total_tokens` (re-index subtracts the old length).
+
+**Measured (`large_n_fusion`, 100K nodes, all-match worst case): ~104 ms → ~11.5 ms (−89 %, ~9×)** for both `search` and `search_and_traverse`; bulk ingest setup also markedly faster (B5).
+
+### B4 — WAND / block-max early termination — DROPPED (benchmarked, not justified)
+The remaining ~11.5 ms is the all-match worst case scoring every doc; WAND would skip docs that can't enter the top-k. But the `selective_query` probe (100K nodes, query terms that hit only a small slice of the corpus — the realistic case) measures **~54 µs** pure `search` and **~131 µs** full `search_and_traverse` — ~210× faster than the worst case and comfortably sub-millisecond. With text scoring now cheap, the traversal + RRF fixed cost is actually the larger half of a selective query. **WAND only rescues the pathological homogeneous-corpus case (a synthetic-data artifact, not real corpora); it is not worth the index-format and pivot-loop complexity. The text/fusion path is fast enough.**
+
 ---
 
 ## P0 implementation plan — true mmap read-mostly open
