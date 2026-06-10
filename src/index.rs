@@ -479,6 +479,10 @@ pub struct InvertedIndex {
     index: HashMap<TermId, PostingList>,
     document_count: u32,
     doc_lengths: Vec<u32>,
+    /// Running sum of all `doc_lengths`, maintained incrementally so
+    /// `avg_doc_length` is O(1) per insert instead of an O(N) re-sum (which
+    /// made bulk ingest O(N^2)).
+    total_tokens: u64,
     avg_doc_length: f64,
     tokenizer: Box<dyn Tokenizer>,
 }
@@ -496,6 +500,7 @@ impl InvertedIndex {
             index: HashMap::new(),
             document_count: 0,
             doc_lengths: Vec::new(),
+            total_tokens: 0,
             avg_doc_length: 0.0,
             tokenizer,
         }
@@ -517,12 +522,15 @@ impl InvertedIndex {
         if idx >= self.doc_lengths.len() {
             self.doc_lengths.resize(idx + 1, 0);
         }
+        // Maintain `total_tokens` incrementally: subtract the previous length for
+        // this slot (0 if new/just-resized) and add the new one. Equivalent to the
+        // old full re-sum, but O(1) instead of O(N) -> bulk ingest is O(N) not O(N^2).
+        let old_length = self.doc_lengths[idx];
+        self.total_tokens = self.total_tokens - old_length as u64 + doc_length as u64;
         self.doc_lengths[idx] = doc_length;
         self.document_count = self.document_count.max(idx as u32 + 1);
 
-        // Recompute average (cheap enough for now)
-        let total: u64 = self.doc_lengths.iter().map(|&l| l as u64).sum();
-        self.avg_doc_length = total as f64 / self.document_count.max(1) as f64;
+        self.avg_doc_length = self.total_tokens as f64 / self.document_count.max(1) as f64;
 
         for (term, positions) in term_positions {
             let term_id = self.interner.intern(&term);
@@ -549,16 +557,24 @@ impl InvertedIndex {
         const B: f64 = 0.75;
 
         let n = self.document_count as f64;
-        let mut scores: HashMap<u32, (f64, Vec<String>)> = HashMap::new();
+        let avgdl = self.avg_doc_length.max(1.0);
 
-        for term in &query_terms {
-            let Some(term_id) = self.interner.get(term) else {
-                continue;
-            };
-            let Some(pl) = self.index.get(&term_id) else {
-                continue;
-            };
+        // Resolve each query term to its posting list once. We reuse these refs both
+        // for scoring and for materializing `matched_terms` on the survivors.
+        let term_pls: Vec<(&str, &PostingList)> = query_terms
+            .iter()
+            .filter_map(|t| {
+                self.interner
+                    .get(t)
+                    .and_then(|id| self.index.get(&id))
+                    .map(|pl| (t.as_str(), pl))
+            })
+            .collect();
 
+        // Accumulate only the score per doc (no per-doc string list — that allocated
+        // a Vec<String> + clone for every matched doc, ~all of which never reach top-k).
+        let mut scores: HashMap<u32, f64> = HashMap::new();
+        for (_term, pl) in &term_pls {
             let df = pl.postings.len() as f64;
             let idf = ((n - df + 0.5) / (df + 0.5) + 1.0).ln();
 
@@ -567,35 +583,46 @@ impl InvertedIndex {
                 let tf = posting.frequency as f64;
                 let dl = self.doc_lengths.get(doc_id as usize).copied().unwrap_or(1) as f64;
 
-                let tf_norm = (tf * (K1 + 1.0))
-                    / (tf + K1 * (1.0 - B + B * dl / self.avg_doc_length.max(1.0)));
+                let tf_norm = (tf * (K1 + 1.0)) / (tf + K1 * (1.0 - B + B * dl / avgdl));
 
-                let score = idf * tf_norm;
-
-                let entry = scores.entry(doc_id).or_insert((0.0, Vec::new()));
-                entry.0 += score;
-                if !entry.1.contains(term) {
-                    entry.1.push(term.clone());
-                }
+                *scores.entry(doc_id).or_insert(0.0) += idf * tf_norm;
             }
         }
 
-        let mut results: Vec<TextSearchResult> = scores
-            .into_iter()
-            .map(|(doc_id, (score, terms))| TextSearchResult {
-                node_id: NodeId(doc_id),
-                score,
-                matched_terms: terms,
-            })
-            .collect();
+        let cmp = |a: &(u32, f64), b: &(u32, f64)| {
+            b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal)
+        };
 
-        results.sort_by(|a, b| {
-            b.score
-                .partial_cmp(&a.score)
-                .unwrap_or(std::cmp::Ordering::Equal)
-        });
-        results.truncate(max_results);
-        results
+        // Top-k via partial selection: O(M) partition + O(k log k) sort, instead of a
+        // full O(M log M) sort to keep only `max_results` of M matched docs.
+        let mut scored: Vec<(u32, f64)> = scores.into_iter().collect();
+        if max_results < scored.len() {
+            scored.select_nth_unstable_by(max_results, cmp);
+            scored.truncate(max_results);
+        }
+        scored.sort_by(cmp);
+
+        // Materialize matched terms only for the survivors (k is tiny): a term matched
+        // this doc iff its posting list contains it (postings are sorted by node id).
+        scored
+            .into_iter()
+            .map(|(doc_id, score)| {
+                let matched_terms: Vec<String> = term_pls
+                    .iter()
+                    .filter(|(_, pl)| {
+                        pl.postings
+                            .binary_search_by_key(&doc_id, |p| p.node_id.0)
+                            .is_ok()
+                    })
+                    .map(|(t, _)| t.to_string())
+                    .collect();
+                TextSearchResult {
+                    node_id: NodeId(doc_id),
+                    score,
+                    matched_terms,
+                }
+            })
+            .collect()
     }
 
     /// BM25 search for a phrase. Returns nodes where the terms appear close together.
@@ -2081,6 +2108,49 @@ mod tests {
         let phrase_results = idx.phrase_search("quick brown fox", 10, 5);
         assert!(!phrase_results.is_empty());
         assert_eq!(phrase_results[0].node_id, NodeId(0));
+    }
+
+    #[test]
+    fn search_top_k_ranking_and_matched_terms() {
+        let mut idx = InvertedIndex::new();
+        idx.index_document(NodeId(0), "rust ownership borrowing memory safety");
+        idx.index_document(NodeId(1), "rust ownership model");
+        idx.index_document(NodeId(2), "python garbage collection");
+
+        // Top-1 must be the single best-scoring doc (top-k partial selection path).
+        let top1 = idx.search("rust ownership", 1);
+        assert_eq!(top1.len(), 1, "max_results must cap the result count");
+
+        // matched_terms is materialized only for survivors, but must still be exact:
+        // doc 0 matches both query terms, doc 2 matches neither (excluded entirely).
+        let all = idx.search("rust ownership", 10);
+        let ids: Vec<u32> = all.iter().map(|r| r.node_id.0).collect();
+        assert!(ids.contains(&0) && ids.contains(&1));
+        assert!(!ids.contains(&2), "non-matching doc must not appear");
+
+        let r0 = all.iter().find(|r| r.node_id == NodeId(0)).unwrap();
+        let mut terms = r0.matched_terms.clone();
+        terms.sort();
+        assert_eq!(terms, vec!["ownership".to_string(), "rust".to_string()]);
+
+        // Scores must be sorted descending.
+        assert!(all.windows(2).all(|w| w[0].score >= w[1].score));
+    }
+
+    #[test]
+    fn reindexing_a_node_keeps_avg_doc_length_correct() {
+        // B5: total_tokens is maintained incrementally; re-indexing the same node
+        // must subtract the old length, not double-count it.
+        let mut idx = InvertedIndex::new();
+        idx.index_document(NodeId(0), "alpha beta gamma delta"); // 4 tokens
+        idx.index_document(NodeId(1), "one two"); // 2 tokens
+        let before = idx.stats().avg_doc_length;
+        assert!((before - 3.0).abs() < 1e-9, "expected (4+2)/2 = 3.0, got {before}");
+
+        // Re-index node 0 with a shorter body; avg must reflect the replacement.
+        idx.index_document(NodeId(0), "alpha"); // now 1 token
+        let after = idx.stats().avg_doc_length;
+        assert!((after - 1.5).abs() < 1e-9, "expected (1+2)/2 = 1.5, got {after}");
     }
 
     #[test]
