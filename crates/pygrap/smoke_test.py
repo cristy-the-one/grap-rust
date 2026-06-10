@@ -214,6 +214,20 @@ def main():
     assert "@1=cites" in wire, wire
     print("wire encode_tables OK:\n" + wire)
 
+    # --- open_mmap: read-mostly memory-mapped open ---
+    _mm_dir = tempfile.mkdtemp(prefix="pygrap-mmap-")
+    _mg = pygrap.IndexedKnowledgeGraph.with_merge_policy(_mm_dir, 2)
+    _r = _mg.add_node(text="brake-by-wire redundancy requirement", label="REQ-1")
+    _s = _mg.add_node(text="brake pedal position signal", label="SIG-1")
+    _mg.add_edge(_r, _s, 0.9, properties={"relation_type": "cites"})
+    _mg.save_to_dir(_mm_dir)
+    del _mg  # release the writable handle before mapping the same dir
+    _mm = pygrap.IndexedKnowledgeGraph.open_mmap(_mm_dir)
+    assert _mm.get_node_text(_r) == "brake-by-wire redundancy requirement", _mm.get_node_text(_r)
+    hits = _mm.search_and_traverse_hybrid("brake", vector=None, max_seeds=5, max_results=10)
+    assert hits is not None, "open_mmap search returned None"
+    print("open_mmap OK:", len(hits), "hits; first node text read zero-copy from the map")
+
     print("\nAll smoke tests passed!")
 
 if __name__ == "__main__":
