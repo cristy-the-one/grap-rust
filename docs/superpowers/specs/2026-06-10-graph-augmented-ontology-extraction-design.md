@@ -76,7 +76,7 @@ Two policies inside `upsert_fragment`.
 
 ### Resolve-or-create (→ entity consistency + alias recall)
 
-**Terminology.** An *entity* here is a concept node — created from a fragment `outcome.name` or from a `relation` endpoint. An outcome's `characteristics` attach to its entity node: on resolve-or-create they are accumulated onto the node and deduped (reusing reconcile's string clustering at export), so `to_candidate_ontology` can emit `required_characteristics` per outcome. Relation endpoints that are not also outcomes become bare entity nodes (no characteristics) so relations can still ground.
+**Terminology.** An *entity* here is a concept node, **created only from a fragment `outcome.name`** — relation endpoints never create nodes (see Relation grounding). An outcome's `characteristics` attach to its entity node: on resolve-or-create they are accumulated onto the node and deduped (reusing reconcile's string clustering at export), so `to_candidate_ontology` can emit `required_characteristics` per outcome. Because every node originates as an outcome, the export's `process_outcomes` is exactly the set of live nodes.
 
 For each extracted entity name, in order:
 
@@ -89,10 +89,11 @@ An entity resolves to **one** node the moment it reappears under any variant; ev
 
 ### Relation grounding (→ no hallucinated relations)
 
-A relation `{from, type, to}` is admitted **only if both endpoints resolve to graph entities** — pre-existing, or created from *this same fragment's* entity list:
+A relation `{from, type, to}` is admitted **only if both endpoints resolve to an existing graph entity OR to an outcome named in this same fragment** — relation endpoints are *resolve-only*, never resolve-or-create:
 
-- Both endpoints ground → add a typed edge (`add_edge`) with source provenance.
-- An endpoint names a concept the graph has never seen and the fragment did not introduce → the relation is **parked** (logged with its source for audit), not added.
+- Both endpoints ground → add a typed edge (`add_edge`, relation type carried as the single edge property `{"rel": type}`) with source provenance.
+- An endpoint matches neither an existing entity nor a same-fragment outcome → the relation is **parked** (logged with its source for audit), not added, and no node is created for it.
+- Conflict policy is first-writer-wins: if an edge already exists between the two nodes with a *different* type, the new assertion is parked (and raised as a conflict signal), never overwriting.
 
 This makes "a relation between things that don't exist" structurally impossible to commit, while parking (vs hard-dropping) keeps an audit trail.
 
