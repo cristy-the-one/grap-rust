@@ -165,3 +165,18 @@ Because `WorkingGraph` *is* a real `IndexedKnowledgeGraph` + `EntityIndex`, Phas
 
 - Exact `Context` rendering budget (how many known entities/relations to include before the prompt bloats) — start with a small cap (e.g. top-8 by vector score) and tune.
 - Whether `WorkingGraph` should hold its own `EntityIndex` on a temp path (like `stress_merge_nodes`) or an in-memory variant — prefer temp-dir to reuse existing code; confirm during planning.
+
+## Implementation status
+
+Phase 1 implemented (2026-06-10) on branch `feat/graph-augmented-extraction`:
+`kee/working_graph.py` (`WorkingGraph`, `Context`, `Signals`), `kee/graph_extract.py`
+(`graph_extract_ontology` + bounded re-look budget), `build_user_prompt_with_context`
+in `kee/extract.py`, and the `graph_augmented` branch in `kee/pipeline.py` (default
+on; legacy stateless path via `graph_augmented=False`). Output schema unchanged.
+Both resolved open questions as planned: temp-dir `EntityIndex`, top-`context_cap`
+(default 8) retrieval. Full suites green (mcp-server 174, aspice-gui 8).
+
+One refinement landed during implementation: the bridge-correlation signal only
+fires when **both** endpoints already had an edge (pre-existing structure) — a first
+edge between two freshly-created nodes is not a bridge. Phase 2 (persist + open +
+extend) remains future work.
