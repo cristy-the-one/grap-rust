@@ -31,3 +31,37 @@ def test_distinct_concepts_stay_separate(tmp_path):
     wg.upsert_fragment({"source": "s", "outcomes": [{"name": "alpha beta gamma", "characteristics": []}], "relations": []}, "s")
     wg.upsert_fragment({"source": "s", "outcomes": [{"name": "delta epsilon zeta", "characteristics": []}], "relations": []}, "s")
     assert wg.node_count() == 2
+
+
+def test_relation_with_grounded_endpoints_is_added(tmp_path):
+    wg = _wg(tmp_path, merge_threshold=0.95)
+    frag = {
+        "source": "s#0",
+        "outcomes": [{"name": "Verification", "characteristics": []},
+                     {"name": "Test Plan", "characteristics": []}],
+        "relations": [{"from": "Verification", "type": "uses", "to": "Test Plan"}],
+    }
+    wg.upsert_fragment(frag, "s#0")
+    onto = wg.to_candidate_ontology("v")
+    assert len(onto["relations"]) == 1
+    r = onto["relations"][0]
+    assert (r["from"], r["type"], r["to"]) == ("Verification", "uses", "Test Plan")
+    assert r["sources"] == ["s#0"]
+    assert wg.parked == []
+
+
+def test_relation_with_ungrounded_endpoint_is_parked(tmp_path):
+    wg = _wg(tmp_path, merge_threshold=0.95)
+    frag = {
+        "source": "s#0",
+        "outcomes": [{"name": "Verification", "characteristics": []}],
+        # "Mystery Concept" is neither an existing entity nor an outcome here
+        "relations": [{"from": "Verification", "type": "uses", "to": "Mystery Concept"}],
+    }
+    wg.upsert_fragment(frag, "s#0")
+    onto = wg.to_candidate_ontology("v")
+    assert onto["relations"] == []
+    assert len(wg.parked) == 1
+    assert wg.parked[0]["reason"] == "ungrounded"
+    # No node was created for the ungrounded endpoint.
+    assert wg.node_count() == 1

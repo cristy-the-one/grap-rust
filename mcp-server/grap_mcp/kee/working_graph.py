@@ -122,9 +122,56 @@ class WorkingGraph:
         self._relations_pass(frag, source, fragment_nodes, sig)
         return sig
 
+    def _resolve_endpoint(self, name: str, fragment_nodes: Dict[str, int]) -> Optional[int]:
+        """Resolve a relation endpoint WITHOUT creating a node. Returns a node id
+        if the name matches an existing entity (alias or embedding >= threshold)
+        or an outcome named in this same fragment; otherwise None (=> park)."""
+        if not isinstance(name, str) or not name.strip():
+            return None
+        name = name.strip()
+        hits = self.idx.resolve(name)
+        if hits:
+            return hits[0]
+        vec = self._embed_one(name)
+        matches = self.kg.vector_search(vec, 1)
+        if matches and matches[0][1] >= self.merge_threshold:
+            self.idx.register(name, matches[0][0])
+            return matches[0][0]
+        return fragment_nodes.get(rc.tokenize(name))
+
     def _relations_pass(self, frag, source, fragment_nodes, sig):
-        # Stub until Task 3; keeps upsert_fragment callable now.
-        return
+        for r in frag.get("relations", []):
+            f, t, ty = r.get("from"), r.get("to"), r.get("type")
+            if not all(isinstance(x, str) and x.strip() for x in (f, t, ty)):
+                continue
+            f, t, ty = f.strip(), t.strip(), ty.strip()
+            fn = self._resolve_endpoint(f, fragment_nodes)
+            tn = self._resolve_endpoint(t, fragment_nodes)
+            if fn is None or tn is None:
+                self.parked.append({"from": f, "type": ty, "to": t,
+                                    "source": source, "reason": "ungrounded"})
+                continue
+            key = (fn, tn)
+            existing = self._edge_types.get(key)
+            if existing is not None and existing != ty:
+                self.parked.append({"from": f, "type": ty, "to": t,
+                                    "source": source, "reason": "conflict"})
+                sig.conflicts.append({"kind": "relation",
+                                      "names": [f, t], "type": ty})
+                continue
+            if existing == ty:
+                self._rel_sources[(fn, ty, tn)].add(source)
+                continue
+            bridge = self._find(fn) != self._find(tn)
+            self.kg.add_edge(fn, tn, 1.0, {"rel": ty})
+            self._edge_types[key] = ty
+            self.relations.append({"from_id": fn, "to_id": tn, "type": ty})
+            self._rel_sources[(fn, ty, tn)] = {source}
+            if ty not in self.rel_vocab:
+                self.rel_vocab.append(ty)
+            self._union(fn, tn)
+            if bridge:
+                sig.correlations.append({"kind": "bridge", "names": [f, t]})
 
     def _canonical_label(self, node: int) -> str:
         aliases = self.idx.aliases_for(node)
