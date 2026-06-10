@@ -152,3 +152,42 @@ def test_focused_context_restricts_to_signal_entities(tmp_path):
     sig = Signals(conflicts=[{"kind": "relation", "names": ["A", "B"], "type": "blocks"}])
     fctx = wg.focused_context(sig)
     assert set(fctx.entities) == {"A", "B"}  # Z excluded
+
+
+def test_retract_changed_chunk_drops_its_facts(tmp_path):
+    wg = _wg(tmp_path, merge_threshold=0.95)
+    wg.upsert_fragment({"source": "s#0",
+                        "outcomes": [{"name": "A", "characteristics": ["old"]},
+                                     {"name": "B", "characteristics": []}],
+                        "relations": [{"from": "A", "type": "uses", "to": "B"}]}, "s#0")
+    wg.retract_chunk("s#0")
+    onto = wg.to_candidate_ontology("v")
+    assert onto["process_outcomes"] == []
+    assert onto["relations"] == []
+
+
+def test_retract_keeps_facts_with_other_provenance(tmp_path):
+    wg = _wg(tmp_path, merge_threshold=0.95)
+    base = {"outcomes": [{"name": "A", "characteristics": []}, {"name": "B", "characteristics": []}],
+            "relations": [{"from": "A", "type": "uses", "to": "B"}]}
+    wg.upsert_fragment({"source": "s1", **base}, "s1")
+    wg.upsert_fragment({"source": "s2", **base}, "s2")
+    wg.retract_chunk("s1")
+    onto = wg.to_candidate_ontology("v")
+    names = {o["name"] for o in onto["process_outcomes"]}
+    assert names == {"A", "B"}
+    assert [(r["from"], r["type"], r["to"]) for r in onto["relations"]] == [("A", "uses", "B")]
+    a = next(o for o in onto["process_outcomes"] if o["name"] == "A")
+    assert onto["provenance"][a["id"]] == ["s2"]
+
+
+def test_retract_drops_only_the_chunks_characteristic(tmp_path):
+    wg = _wg(tmp_path, merge_threshold=0.5)
+    wg.upsert_fragment({"source": "s1", "outcomes": [{"name": "Test Plan", "characteristics": ["coverage"]}], "relations": []}, "s1")
+    wg.upsert_fragment({"source": "s2", "outcomes": [{"name": "test plan", "characteristics": ["schedule"]}], "relations": []}, "s2")
+    wg.retract_chunk("s1")
+    onto = wg.to_candidate_ontology("v")
+    assert len(onto["process_outcomes"]) == 1
+    po = onto["process_outcomes"][0]
+    assert "schedule" in po["required_characteristics"]
+    assert "coverage" not in po["required_characteristics"]

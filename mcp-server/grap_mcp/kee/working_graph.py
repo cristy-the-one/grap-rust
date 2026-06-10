@@ -75,6 +75,10 @@ class WorkingGraph:
         self.parked: List[dict] = []
         self._parent: Dict[int, int] = {}              # union-find over node ids
         self._has_edge: Set[int] = set()               # nodes with >=1 edge (for bridge)
+        self.aliases_by_node: Dict[int, List[str]] = {}    # node -> [alias] (mirrors EntityIndex)
+        self._char_sources: Dict[Tuple[int, str], Set[str]] = {}   # (node,text) -> chunks
+        self._retracted: Set[int] = set()                  # logically removed concepts
+        self._chunk_contrib: Dict[str, dict] = {}          # chunk -> {concepts,chars,edges}
 
     # ---- union-find (component tracking for bridge signals) ----
     def _find(self, x: int) -> int:
@@ -91,20 +95,26 @@ class WorkingGraph:
     def _embed_one(self, text: str) -> List[float]:
         return self.embedder.embed([text])[0]
 
+    def _register_alias(self, alias: str, node: int) -> None:
+        self.idx.register(alias, node)
+        lst = self.aliases_by_node.setdefault(node, [])
+        if alias not in lst:
+            lst.append(alias)
+
     # ---- resolution ----
     def _resolve_outcome(self, name: str) -> _Resolution:
-        hits = self.idx.resolve(name)
+        hits = [h for h in self.idx.resolve(name) if h not in self._retracted]
         if hits:
             return _Resolution(hits[0], len(hits) > 1)
         vec = self._embed_one(name)
-        matches = self.kg.vector_search(vec, 2)
+        matches = [(n, s) for (n, s) in self.kg.vector_search(vec, 2) if n not in self._retracted]
         if matches and matches[0][1] >= self.merge_threshold:
             node = matches[0][0]
             ambiguous = len(matches) > 1 and matches[1][1] >= self.merge_threshold
-            self.idx.register(name, node)
+            self._register_alias(name, node)
             return _Resolution(node, ambiguous)
         node = self.kg.add_node(text=name, label="concept", embedding=vec)
-        self.idx.register(name, node)
+        self._register_alias(name, node)
         self.canonical[node] = name
         self.chars.setdefault(node, [])
         self._parent[node] = node
@@ -128,37 +138,42 @@ class WorkingGraph:
 
     def upsert_fragment(self, frag: dict, source: str) -> Signals:
         sig = Signals()
+        contrib = self._chunk_contrib.setdefault(
+            source, {"concepts": set(), "chars": set(), "edges": set()})
         fragment_nodes: Dict[str, int] = {}
         for o in frag.get("outcomes", []):
             name = o.get("name")
             if not isinstance(name, str) or not name.strip():
                 continue
             res = self._resolve_outcome(name.strip())
-            fragment_nodes[rc.tokenize(name)] = res.node_id
-            self.node_sources.setdefault(res.node_id, set()).add(source)
-            chars = self.chars.setdefault(res.node_id, [])
+            node = res.node_id
+            fragment_nodes[rc.tokenize(name)] = node
+            self.node_sources.setdefault(node, set()).add(source)
+            contrib["concepts"].add(node)
+            chars = self.chars.setdefault(node, [])
             for ch in o.get("characteristics", []):
-                if isinstance(ch, str) and ch.strip() and ch.strip() not in chars:
-                    chars.append(ch.strip())
+                if isinstance(ch, str) and ch.strip():
+                    ch = ch.strip()
+                    if ch not in chars:
+                        chars.append(ch)
+                    self._char_sources.setdefault((node, ch), set()).add(source)
+                    contrib["chars"].add((node, ch))
             if res.ambiguous:
                 sig.conflicts.append({"kind": "ambiguous", "names": [name.strip()]})
         self._relations_pass(frag, source, fragment_nodes, sig)
         return sig
 
     def _resolve_endpoint(self, name: str, fragment_nodes: Dict[str, int]) -> Optional[int]:
-        """Resolve a relation endpoint WITHOUT creating a node. Returns a node id
-        if the name matches an existing entity (alias or embedding >= threshold)
-        or an outcome named in this same fragment; otherwise None (=> park)."""
         if not isinstance(name, str) or not name.strip():
             return None
         name = name.strip()
-        hits = self.idx.resolve(name)
+        hits = [h for h in self.idx.resolve(name) if h not in self._retracted]
         if hits:
             return hits[0]
         vec = self._embed_one(name)
-        matches = self.kg.vector_search(vec, 1)
+        matches = [(n, s) for (n, s) in self.kg.vector_search(vec, 1) if n not in self._retracted]
         if matches and matches[0][1] >= self.merge_threshold:
-            self.idx.register(name, matches[0][0])
+            self._register_alias(name, matches[0][0])
             return matches[0][0]
         return fragment_nodes.get(rc.tokenize(name))
 
@@ -184,6 +199,7 @@ class WorkingGraph:
                 continue
             if existing == ty:
                 self._rel_sources[(fn, ty, tn)].add(source)
+                self._chunk_contrib[source]["edges"].add((fn, tn))
                 continue
             # A "bridge" connects two pieces of EXISTING structure: it only
             # counts when both endpoints already had an edge and sit in different
@@ -195,6 +211,7 @@ class WorkingGraph:
             self._edge_types[key] = ty
             self.relations.append({"from_id": fn, "to_id": tn, "type": ty})
             self._rel_sources[(fn, ty, tn)] = {source}
+            self._chunk_contrib[source]["edges"].add((fn, tn))
             if ty not in self.rel_vocab:
                 self.rel_vocab.append(ty)
             self._has_edge.add(fn)
@@ -202,6 +219,60 @@ class WorkingGraph:
             self._union(fn, tn)
             if bridge:
                 sig.correlations.append({"kind": "bridge", "names": [f, t]})
+
+    def retract_chunk(self, chunk_id: str) -> None:
+        """Logically remove everything `chunk_id` contributed. pygrap is NOT
+        mutated here (append-only during a run); retracted concepts are excluded
+        from resolution/context/export and dropped at the next _project."""
+        contrib = self._chunk_contrib.pop(chunk_id, None)
+        for (node, text) in (contrib["chars"] if contrib else list(self._char_sources)):
+            srcs = self._char_sources.get((node, text))
+            if srcs is None:
+                continue
+            srcs.discard(chunk_id)
+            if not srcs:
+                self._char_sources.pop((node, text), None)
+                if node in self.chars and text in self.chars[node]:
+                    self.chars[node].remove(text)
+        for (fn, tn) in (contrib["edges"] if contrib else [(e["from_id"], e["to_id"]) for e in list(self.relations)]):
+            ty = self._edge_types.get((fn, tn))
+            if ty is None:
+                continue
+            key = (fn, ty, tn)
+            srcs = self._rel_sources.get(key)
+            if srcs is not None:
+                srcs.discard(chunk_id)
+            if not srcs:
+                self._remove_edge(fn, tn, ty)
+        for node in (contrib["concepts"] if contrib else list(self.node_sources)):
+            srcs = self.node_sources.get(node)
+            if srcs is None:
+                continue
+            srcs.discard(chunk_id)
+            if not srcs:
+                self._retract_concept(node)
+        self.parked = [p for p in self.parked if p.get("source") != chunk_id]
+
+    def _remove_edge(self, fn: int, tn: int, ty: str) -> None:
+        self._edge_types.pop((fn, tn), None)
+        self._rel_sources.pop((fn, ty, tn), None)
+        self.relations = [e for e in self.relations
+                          if not (e["from_id"] == fn and e["to_id"] == tn)]
+
+    def _retract_concept(self, node: int) -> None:
+        self._retracted.add(node)
+        self.node_sources.pop(node, None)
+        self.canonical.pop(node, None)
+        self.chars.pop(node, None)
+        self.aliases_by_node.pop(node, None)
+        self._parent.pop(node, None)
+        self._has_edge.discard(node)
+        self.idx.remove_node(node)
+        for e in list(self.relations):
+            if e["from_id"] == node or e["to_id"] == node:
+                self._remove_edge(e["from_id"], e["to_id"], e["type"])
+        for key in [k for k in self._char_sources if k[0] == node]:
+            self._char_sources.pop(key, None)
 
     def _canonical_label(self, node: int) -> str:
         aliases = self.idx.aliases_for(node)
@@ -227,7 +298,8 @@ class WorkingGraph:
         if not self.canonical:
             return Context([], {}, [], [])
         vec = self._embed_one(text)
-        cand: List[int] = [nid for nid, _ in self.kg.vector_search(vec, self.context_cap)]
+        cand: List[int] = [nid for nid, _ in self.kg.vector_search(vec, self.context_cap)
+                           if nid not in self._retracted]
         low = text.lower()
         for nid, name in self.canonical.items():
             if nid in cand:
@@ -248,6 +320,11 @@ class WorkingGraph:
         return self._context_from_nodes(wanted)
 
     def to_candidate_ontology(self, version: str = "kee-candidate") -> dict:
+        # rel_vocab may contain types whose edges were all retracted; recompute.
+        self.rel_vocab = []
+        for e in self.relations:
+            if e["type"] not in self.rel_vocab:
+                self.rel_vocab.append(e["type"])
         process_outcomes: List[dict] = []
         mapping_hints: List[dict] = []
         provenance: Dict[str, List[str]] = {}
