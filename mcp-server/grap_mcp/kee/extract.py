@@ -38,6 +38,43 @@ def build_user_prompt(text: str) -> str:
     return f"Extract the ontology fragment from the following text:\n\n{text}"
 
 
+CONTEXT_INSTRUCTION = (
+    "You also have CONTEXT from a knowledge graph built from earlier text. "
+    "Reuse the exact canonical names below when the same concept appears here, "
+    "instead of inventing new names. Only assert relations grounded in THIS text."
+)
+
+
+def build_user_prompt_with_context(text: str, context) -> str:
+    """Plain user prompt, optionally prefixed with a compact KNOWN-graph block.
+
+    `context` is a kee.working_graph.Context. When it carries no entities the
+    prompt is identical to `build_user_prompt(text)` (no empty block, so early
+    chunks behave exactly like the stateless path)."""
+    if not getattr(context, "entities", None):
+        return build_user_prompt(text)
+
+    lines = [CONTEXT_INSTRUCTION, "", "KNOWN ENTITIES:"]
+    for name in context.entities:
+        chars = context.characteristics.get(name) or []
+        if chars:
+            lines.append(f"- {name} (characteristics: {', '.join(chars)})")
+        else:
+            lines.append(f"- {name}")
+    if context.relations:
+        lines.append("")
+        lines.append("KNOWN RELATIONS:")
+        for f, ty, t in context.relations:
+            lines.append(f"- {f} {ty} {t}")
+    if context.relation_vocab:
+        lines.append("")
+        lines.append("RELATION VOCABULARY (reuse where apt): "
+                     + ", ".join(context.relation_vocab))
+    lines.append("")
+    lines.append(build_user_prompt(text))
+    return "\n".join(lines)
+
+
 def _strip_fences(s: str) -> str:
     s = s.strip()
     if s.startswith("```"):

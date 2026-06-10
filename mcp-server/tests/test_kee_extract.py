@@ -67,3 +67,23 @@ def test_extract_fragments_skips_empty_outcomes_and_relations():
     provider = StubProvider(responses=['{"outcomes":[],"relations":[]}'])
     frags = ex.extract_fragments([("d#0", "nothing relevant")], provider)
     assert frags == []
+
+
+def test_build_user_prompt_with_context_includes_known_block():
+    from grap_mcp.kee.working_graph import Context
+    from grap_mcp.kee.extract import build_user_prompt_with_context
+
+    ctx = Context(
+        entities=["Test Plan", "Verification"],
+        characteristics={"Test Plan": ["coverage", "schedule"]},
+        relations=[("Verification", "uses", "Test Plan")],
+        relation_vocab=["uses", "produces"],
+    )
+    prompt = build_user_prompt_with_context("Some chunk about testing.", ctx)
+    assert "Some chunk about testing." in prompt
+    assert "Test Plan" in prompt and "Verification" in prompt
+    assert "uses" in prompt
+    # When context is empty, the prompt must equal the plain prompt (no empty block).
+    empty = Context(entities=[], characteristics={}, relations=[], relation_vocab=[])
+    from grap_mcp.kee.extract import build_user_prompt
+    assert build_user_prompt_with_context("X", empty) == build_user_prompt("X")
