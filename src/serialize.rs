@@ -317,14 +317,14 @@ impl KnowledgeGraph {
                     .copied()
                     .expect("internal error: node blob chunk_idx is out of range");
 
-                let global_offset = chunk_base + node.blob.offset as u64;
+                let global_offset = chunk_base + node.blob.offset;
 
                 let embedding_ref = node.embedding.as_ref().map(|e| {
                     let emb_base = chunk_offsets
                         .get(e.chunk_idx as usize)
                         .copied()
                         .expect("internal error: embedding blob chunk_idx out of range");
-                    (emb_base + e.offset as u64, e.length, e.uncompressed_len)
+                    (emb_base + e.offset, e.length, e.uncompressed_len)
                 });
 
                 SerializableNode {
@@ -654,7 +654,7 @@ impl KnowledgeGraph {
 
             let blob = BlobRef {
                 chunk_idx,
-                offset: local_offset,
+                offset: local_offset as u64,
                 length: sn.blob_length,
                 uncompressed_len: sn.blob_uncompressed_len,
             };
@@ -673,7 +673,7 @@ impl KnowledgeGraph {
                     })?;
                 Some(BlobRef {
                     chunk_idx: e_chunk,
-                    offset: e_off,
+                    offset: e_off as u64,
                     length: len,
                     uncompressed_len: ulen,
                 })
@@ -851,19 +851,8 @@ pub fn load_mmap(dir: &Path) -> Result<KnowledgeGraph, GraphError> {
         properties.register(&name);
     }
 
-    // Helper: a global offset must fit in u32 because BlobRef.offset is u32.
-    fn global_to_u32(global: u64) -> Result<u32, GraphError> {
-        u32::try_from(global).map_err(|_| {
-            GraphError::Other(
-                "blob offset exceeds 4 GiB; mmap mode supports blob files up to 4 GiB - \
-                 use load_from_disk"
-                    .into(),
-            )
-        })
-    }
-
-    // Rebuild nodes. In mmap mode the BlobRef.offset is the GLOBAL offset and
-    // chunk_idx is always 0 (the whole map is one flat region).
+    // Rebuild nodes. In mmap mode BlobRef.offset is the GLOBAL byte offset into the
+    // mapped flat file (u64); chunk_idx is always 0 (one flat region).
     let mut rebuilt_nodes = Vec::with_capacity(serializable_nodes.len());
     for sn in serializable_nodes {
         // Defense-in-depth: validate this node's blob ref against the mapped file
@@ -883,7 +872,7 @@ pub fn load_mmap(dir: &Path) -> Result<KnowledgeGraph, GraphError> {
 
         let blob = BlobRef {
             chunk_idx: 0,
-            offset: global_to_u32(sn.blob_global_offset)?,
+            offset: sn.blob_global_offset,
             length: sn.blob_length,
             uncompressed_len: sn.blob_uncompressed_len,
         };
@@ -906,7 +895,7 @@ pub fn load_mmap(dir: &Path) -> Result<KnowledgeGraph, GraphError> {
             }
             Some(BlobRef {
                 chunk_idx: 0,
-                offset: global_to_u32(off)?,
+                offset: off,
                 length: len,
                 uncompressed_len: ulen,
             })

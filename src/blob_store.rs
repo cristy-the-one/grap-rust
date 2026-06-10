@@ -9,13 +9,15 @@ const CHUNK_SIZE: usize = 4 * 1024 * 1024;
 
 /// Lightweight handle into a [`BlobStore`] chunk.
 ///
-/// All fields are `u32` to keep the struct small (16 bytes).
+/// `chunk_idx`, `length`, and `uncompressed_len` are `u32`; `offset` is `u64` to
+/// support blob files beyond 4 GiB in the memory-mapped backend (struct is 24 bytes).
 #[derive(Debug, Clone)]
 pub struct BlobRef {
     /// Index of the chunk inside the `BlobStore`.
     pub chunk_idx: u32,
-    /// Byte offset within that chunk where this blob starts.
-    pub offset: u32,
+    /// Byte offset: local within the chunk for in-memory `Chunks`, or the global
+    /// offset into the mapped file for `Storage::Mmap`.
+    pub offset: u64,
     /// Length of the stored (possibly compressed) bytes.
     pub length: u32,
     /// Original (uncompressed) length in bytes.
@@ -101,7 +103,7 @@ impl BlobStore {
 
         BlobRef {
             chunk_idx: chunk_idx as u32,
-            offset: offset as u32,
+            offset: offset as u64,
             length: len as u32,
             uncompressed_len: len as u32,
         }
@@ -156,7 +158,7 @@ impl BlobStore {
 
         BlobRef {
             chunk_idx: chunk_idx as u32,
-            offset: offset as u32,
+            offset: offset as u64,
             length: len as u32,
             uncompressed_len: len as u32,
         }
@@ -174,11 +176,10 @@ impl BlobStore {
             }
             #[cfg(feature = "mmap")]
             Storage::Mmap(mmap) => {
-                // In mmap mode we treat the entire mapped file as a single flat region.
-                // The saved BlobRef's "chunk_idx + offset" is interpreted as an absolute offset
-                // into the mapped file (this is how save_to_disk + load_mmap work together).
-                let start = r.offset as usize; // For mmap loads we currently store global offset in .offset
-                                               // If we ever want true chunked mmap we can reinterpret chunk_idx, but flat is simpler and fast.
+                // In mmap mode the entire file is one flat region. BlobRef.offset is the
+                // global byte offset into the map (set by load_mmap from blob_global_offset).
+                // chunk_idx is always 0 in this backend.
+                let start = r.offset as usize;
                 let end = start + r.length as usize;
 
                 // SAFETY: The mmap is owned by this BlobStore and lives at least as long as the &str.
@@ -283,5 +284,16 @@ impl BlobStore {
         Self {
             storage: Storage::Mmap(mmap),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn blobref_offset_is_u64_capable() {
+        let r = BlobRef { chunk_idx: 0, offset: (u32::MAX as u64) + 1234, length: 4, uncompressed_len: 4 };
+        assert_eq!(r.offset, 4_294_968_529);
     }
 }
