@@ -7,7 +7,7 @@ encoding is designed.
 SCHEMAS = {
     "graph_neighbors": {
         "enc_id": "gn1",
-        "scalars": ["status", "center"],
+        "scalars": ["status", "center", "total", "returned", "next_cursor"],
         "tables": [
             # `kind` repeats (entity/act) → intern index 2
             ("n", "neighbors", ["id", "label", "kind", "title"], [2]),

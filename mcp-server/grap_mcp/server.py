@@ -26,6 +26,7 @@ from .experiments import experiment_summary, quality_metrics
 from . import config as config_store
 from . import auth
 from . import ingest
+from .pagination import paginate
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("grap-mcp")
@@ -578,7 +579,8 @@ def legal_graph_from_relations(path: str, top: int = 200) -> dict:
 
 
 @tiered
-def graph_neighbors(node_id: int, types: list = None, wire_format: str = "json"):
+def graph_neighbors(node_id: int, types: list = None, wire_format: str = "json",
+                    limit: int = None, cursor: str = None):
     """Return a node's neighbors from the current KG (live), for the given
     relation types (default 'cites'/'mentions'). Powers expand-on-click in the
     graph view — querying the actual graph, not a precomputed snapshot.
@@ -629,14 +631,19 @@ def graph_neighbors(node_id: int, types: list = None, wire_format: str = "json")
             for pid, _s in ins:
                 add(pid)
                 edges.append({"source": pid, "target": node_id, "type": ty})
+        page, meta = paginate(neighbors, limit, cursor)
+        paged_ids = {n["id"] for n in page}
+        edges_page = [e for e in edges
+                      if e["source"] in paged_ids or e["target"] in paged_ids]
         try:
             from grap_mcp import session
             session.record_node_access(node_id, "graph_neighbors")
-            for nb in neighbors:
-                session.record_node_access(nb["id"], "graph_neighbors")
+            for nid in paged_ids:
+                session.record_node_access(nid, "graph_neighbors")
         except Exception:
             pass
-        r = {"status": "ok", "center": node_id, "neighbors": neighbors, "edges": edges}
+        r = {"status": "ok", "center": node_id, "neighbors": page,
+             "edges": edges_page, **meta}
         from .encoding import encode_response
         payload, _meta = encode_response("graph_neighbors", r, requested_format=wire_format)
         return payload  # dict when json (unchanged), #MUNCH string when wire_format="compact"
@@ -716,7 +723,8 @@ def get_context_bundle(query: str, max_results: int = 20, token_budget: int = 20
 
 
 @tiered
-def get_blast_radius(node_id: int, relations: list = None, max_depth: int = 10) -> dict:
+def get_blast_radius(node_id: int, relations: list = None, max_depth: int = 10,
+                     limit: int = None, cursor: str = None) -> dict:
     """Transitive dependents of a node — what would be impacted if it changes."""
     denied = _require("operator")
     if denied:
@@ -725,14 +733,15 @@ def get_blast_radius(node_id: int, relations: list = None, max_depth: int = 10) 
     if not kg:
         return {"status": "error", "message": "no Knowledge Graph loaded"}
     try:
-        return {"status": "ok", "center": node_id,
-                "impacted": kg.blast_radius(node_id, relations, max_depth)}
+        impacted = kg.blast_radius(node_id, relations, max_depth)
+        page, meta = paginate(impacted, limit, cursor)
+        return {"status": "ok", "center": node_id, "impacted": page, **meta}
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
 
 @tiered
-def find_cycles() -> dict:
+def find_cycles(limit: int = None, cursor: str = None) -> dict:
     """Dependency cycles (strongly-connected components) in the current KG."""
     denied = _require("operator")
     if denied:
@@ -742,13 +751,14 @@ def find_cycles() -> dict:
         return {"status": "error", "message": "no Knowledge Graph loaded"}
     try:
         cycles = kg.find_cycles()
-        return {"status": "ok", "cycle_count": len(cycles), "cycles": cycles}
+        page, meta = paginate(cycles, limit, cursor)
+        return {"status": "ok", "cycle_count": meta["total"], "cycles": page, **meta}
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
 
 @tiered
-def find_orphans(entry_points: list = None) -> dict:
+def find_orphans(entry_points: list = None, limit: int = None, cursor: str = None) -> dict:
     """Live nodes unreachable from the given entry points (or from KG roots)."""
     denied = _require("operator")
     if denied:
@@ -758,7 +768,8 @@ def find_orphans(entry_points: list = None) -> dict:
         return {"status": "error", "message": "no Knowledge Graph loaded"}
     try:
         orphans = kg.find_orphans(entry_points)
-        return {"status": "ok", "orphan_count": len(orphans), "orphans": orphans}
+        page, meta = paginate(orphans, limit, cursor)
+        return {"status": "ok", "orphan_count": meta["total"], "orphans": page, **meta}
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
@@ -1221,17 +1232,20 @@ def reconstruct_run(run_id: str) -> dict:
 
 
 @tiered
-def query_events(event_type: str = None, run_id: str = None) -> dict:
+def query_events(event_type: str = None, run_id: str = None,
+                 limit: int = None, cursor: str = None) -> dict:
     """Query the Temporal Graph: by event_type, or all events for a run_id."""
     try:
         ws = _get_workspace()
         if run_id:
-            events = ws.events_for_run(run_id)
+            raw = ws.events_for_run(run_id)
         else:
-            events = ws.query_events(event_type)
-        return {"events": [{"ts": e.ts, "type": e.event_type, "subject": e.subject,
-                            "links": [{"relation": r, "kind": k, "id": i} for (r, k, i) in e.links]}
-                           for e in events]}
+            raw = ws.query_events(event_type)
+        events = [{"ts": e.ts, "type": e.event_type, "subject": e.subject,
+                   "links": [{"relation": r, "kind": k, "id": i} for (r, k, i) in e.links]}
+                  for e in raw]
+        page, meta = paginate(events, limit, cursor)
+        return {"events": page, **meta}
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
