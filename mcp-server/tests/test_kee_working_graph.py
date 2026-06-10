@@ -2,7 +2,7 @@
 
 import pygrap  # noqa: F401  (ensures the binding is importable in this env)
 
-from grap_mcp.kee.working_graph import WorkingGraph
+from grap_mcp.kee.working_graph import WorkingGraph, Signals
 from grap_mcp.kee.embeddings import HashingEmbedder
 
 
@@ -122,3 +122,33 @@ def test_bridge_relation_raises_correlation(tmp_path):
     sig = wg.upsert_fragment({"source": "s", "outcomes": [{"name": "B", "characteristics": []}, {"name": "C", "characteristics": []}],
                               "relations": [{"from": "B", "type": "feeds", "to": "C"}]}, "s")
     assert any(c["kind"] == "bridge" for c in sig.correlations)
+
+
+def test_context_for_empty_graph_is_empty(tmp_path):
+    wg = _wg(tmp_path)
+    ctx = wg.context_for("anything")
+    assert ctx.entities == [] and ctx.relations == [] and ctx.relation_vocab == []
+
+
+def test_context_for_surfaces_related_known_entities(tmp_path):
+    wg = _wg(tmp_path, merge_threshold=0.95)
+    wg.upsert_fragment({"source": "s",
+                        "outcomes": [{"name": "Verification", "characteristics": ["evidence"]},
+                                     {"name": "Test Plan", "characteristics": []}],
+                        "relations": [{"from": "Verification", "type": "uses", "to": "Test Plan"}]}, "s")
+    # A chunk literally naming a known entity must surface it (substring path),
+    # along with the relation vocabulary.
+    ctx = wg.context_for("This section discusses the Test Plan and its review.")
+    assert "Test Plan" in ctx.entities
+    assert "uses" in ctx.relation_vocab
+
+
+def test_focused_context_restricts_to_signal_entities(tmp_path):
+    wg = _wg(tmp_path, merge_threshold=0.95)
+    wg.upsert_fragment({"source": "s",
+                        "outcomes": [{"name": "A", "characteristics": []}, {"name": "B", "characteristics": []},
+                                     {"name": "Z", "characteristics": []}],
+                        "relations": [{"from": "A", "type": "uses", "to": "B"}]}, "s")
+    sig = Signals(conflicts=[{"kind": "relation", "names": ["A", "B"], "type": "blocks"}])
+    fctx = wg.focused_context(sig)
+    assert set(fctx.entities) == {"A", "B"}  # Z excluded

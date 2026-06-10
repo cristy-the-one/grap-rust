@@ -179,6 +179,44 @@ class WorkingGraph:
             return min(aliases, key=lambda s: (len(s), s))
         return self.canonical.get(node, f"concept_{node}")
 
+    def _context_from_nodes(self, node_ids: List[int]) -> Context:
+        ids = [n for n in node_ids if n in self.canonical]
+        nameset = set(ids)
+        entities = [self._canonical_label(n) for n in ids]
+        characteristics = {self._canonical_label(n): list(self.chars.get(n, []))
+                           for n in ids}
+        relations: List[Tuple[str, str, str]] = []
+        for e in self.relations:
+            if e["from_id"] in nameset and e["to_id"] in nameset:
+                relations.append((self._canonical_label(e["from_id"]), e["type"],
+                                  self._canonical_label(e["to_id"])))
+        return Context(entities=entities, characteristics=characteristics,
+                       relations=relations, relation_vocab=list(self.rel_vocab))
+
+    def context_for(self, text: str) -> Context:
+        if not self.canonical:
+            return Context([], {}, [], [])
+        vec = self._embed_one(text)
+        cand: List[int] = [nid for nid, _ in self.kg.vector_search(vec, self.context_cap)]
+        low = text.lower()
+        for nid, name in self.canonical.items():
+            if nid in cand:
+                continue
+            spaced = rc.tokenize(name).replace("_", " ")
+            if (name.lower() in low) or (spaced and spaced in low):
+                cand.append(nid)
+        return self._context_from_nodes(cand[: self.context_cap * 2])
+
+    def focused_context(self, signals: Signals) -> Context:
+        # Collect node ids for every entity name named by a signal.
+        wanted: List[int] = []
+        for s in list(signals.conflicts) + list(signals.correlations):
+            for name in s.get("names", []):
+                hits = self.idx.resolve(name)
+                if hits and hits[0] not in wanted:
+                    wanted.append(hits[0])
+        return self._context_from_nodes(wanted)
+
     def to_candidate_ontology(self, version: str = "kee-candidate") -> dict:
         process_outcomes: List[dict] = []
         mapping_hints: List[dict] = []
