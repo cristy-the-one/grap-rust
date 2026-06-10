@@ -665,6 +665,19 @@ impl IndexedKnowledgeGraph {
         self.inner.find_orphans(&eps).into_iter().map(|n| n.0).collect()
     }
 
+    /// Compact the on-disk blob store: reclaim bytes orphaned by node updates,
+    /// merges, and deletions. Returns {bytes_before, bytes_after, bytes_reclaimed}.
+    /// Node ids, edges, and search indexes are unchanged. Call `save_to_dir`
+    /// afterwards to shrink the persisted `graph.blobs`.
+    fn vacuum_blobs(&mut self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        let r = self.inner.vacuum_blobs();
+        let d = pyo3::types::PyDict::new(py);
+        d.set_item("bytes_before", r.bytes_before)?;
+        d.set_item("bytes_after", r.bytes_after)?;
+        d.set_item("bytes_reclaimed", r.bytes_reclaimed)?;
+        Ok(d.into())
+    }
+
     /// Structural health report as a dict.
     fn health(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         let h = self.inner.health();

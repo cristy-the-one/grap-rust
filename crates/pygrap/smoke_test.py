@@ -228,6 +228,24 @@ def main():
     assert hits is not None, "open_mmap search returned None"
     print("open_mmap OK:", len(hits), "hits; first node text read zero-copy from the map")
 
+    # 16. vacuum_blobs: blob compaction
+    with tempfile.TemporaryDirectory() as vac_dir:
+        vg = pygrap.IndexedKnowledgeGraph(vac_dir)
+        vn = vg.add_node("brake redundancy requirement text", label="REQ-V")
+        vg.update_node(vn, "Z" * 4000)        # bloat the blob store
+        vg.update_node(vn, "brake redundancy requirement text")  # shrink back
+        report = vg.vacuum_blobs()
+        assert isinstance(report, dict), f"Expected dict, got {type(report)}"
+        assert "bytes_before" in report and "bytes_after" in report and "bytes_reclaimed" in report, \
+            f"Unexpected keys: {list(report.keys())}"
+        assert report["bytes_reclaimed"] > 0, \
+            f"Expected bytes_reclaimed > 0, got {report['bytes_reclaimed']}"
+        final_text = vg.get_node_text(vn)
+        assert final_text == "brake redundancy requirement text", \
+            f"Expected original text after vacuum, got {final_text!r}"
+        print(f"vacuum_blobs OK: bytes_reclaimed={report['bytes_reclaimed']}, "
+              f"bytes_before={report['bytes_before']}, bytes_after={report['bytes_after']}")
+
     print("\nAll smoke tests passed!")
 
 if __name__ == "__main__":

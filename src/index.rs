@@ -1872,6 +1872,17 @@ impl IndexedKnowledgeGraph {
         self.text_index.vacuum();
     }
 
+    /// Bytes currently held by the blob store (live + dead). See [`vacuum_blobs`](Self::vacuum_blobs).
+    pub fn blob_bytes(&self) -> usize {
+        self.graph.blob_bytes()
+    }
+
+    /// Compact the blob store (see [`KnowledgeGraph::vacuum_blobs`]). The text and
+    /// vector indexes are unaffected — they key on `NodeId`, which is unchanged.
+    pub fn vacuum_blobs(&mut self) -> crate::graph_ops::BlobVacuumReport {
+        self.graph.vacuum_blobs()
+    }
+
     /// Starts background merge + incremental vacuum workers for on-disk text indexes.
     ///
     /// This is the recommended high-level API for getting automatic background
@@ -2332,5 +2343,19 @@ mod indexed_relation_tests {
         assert_eq!(g.blast_radius(b, None, 5), vec![a]);
         assert_eq!(g.find_cycles(None).len(), 0);
         assert_eq!(g.health().live_nodes, 2);
+    }
+
+    #[test]
+    fn indexed_vacuum_blobs_reclaims_and_keeps_searchable() {
+        let mut g = IndexedKnowledgeGraph::new();
+        let a = g.add_node("brake redundancy requirement text", Some("REQ-1"), None);
+        g.update_node(a, &"Z".repeat(4000), None).unwrap();
+        g.update_node(a, "brake redundancy requirement text", None).unwrap();
+        let before = g.blob_bytes();
+        let rep = g.vacuum_blobs();
+        assert!(rep.bytes_reclaimed > 3000 && g.blob_bytes() < before);
+        assert_eq!(g.read_blob(a), "brake redundancy requirement text");
+        let hits = g.search_and_traverse_default("brake", 5, &[], 0.0, 2, 10);
+        assert!(hits.iter().any(|r| r.graph_result.node_id == a));
     }
 }
