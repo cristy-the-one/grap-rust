@@ -157,6 +157,122 @@ fn build_graph_with_large_blobs(node_count: usize) -> IndexedKnowledgeGraph {
     g
 }
 
+/// Builds a structurally-rich but text-light graph for *pure traversal* probing.
+///
+/// Every edge carries the same `rel == "link"` property so a BFS can follow them
+/// with `traverse_by_relation`. Text is intentionally tiny: this isolates the cost
+/// of arena adjacency pointer-chasing (`Node.outgoing -> edges[eid] -> nodes[target]`)
+/// from BM25/fusion. Targets are scattered (`(i + j*step) % n`) so at large `n` the
+/// traversal thrashes cache — the exact signature a CSR adjacency layout would target.
+fn build_traversal_graph(node_count: usize, edges_per_node: usize) -> IndexedKnowledgeGraph {
+    let mut g = IndexedKnowledgeGraph::new();
+    let rel = g.graph.properties.register("rel");
+
+    let mut ids = Vec::with_capacity(node_count);
+    for i in 0..node_count {
+        // Minimal text so setup stays fast and the BM25 index is not the bottleneck.
+        let id = g.add_node(&format!("n{i}"), Some(&format!("N{i}")), None);
+        ids.push(id);
+    }
+
+    for i in 0..node_count {
+        for j in 1..=edges_per_node {
+            let target = (i + j * 17) % node_count;
+            if target == i {
+                continue;
+            }
+            g.add_edge(
+                ids[i],
+                ids[target],
+                0.7,
+                vec![(rel, PropertyValue::Label("link".to_string()))],
+            );
+        }
+    }
+
+    g
+}
+
+/// Probe whether arena adjacency traversal becomes cache-bound at large `n`.
+///
+/// We run the *same* bounded BFS (same depth, same result budget) against graphs of
+/// very different sizes. If per-visit cost is flat across sizes, the arena layout is
+/// fine and a CSR rewrite buys nothing. If cost climbs sharply once the arena exceeds
+/// LLC, that is the empirical justification for CSR. Pure traversal — no BM25/fusion.
+fn bench_large_n_traversal(c: &mut Criterion) {
+    let mut group = c.benchmark_group("large_n_traversal");
+    // Large graphs + deep BFS: give Criterion room, keep sample count modest.
+    group.sample_size(20);
+
+    // Same BFS budget for every size so we compare per-traversal cost, not visit count.
+    let depth = 12u32;
+    let budget = 5_000usize;
+    let link = || PropertyValue::Label("link".to_string());
+
+    for &n in &[10_000usize, 50_000, 200_000] {
+        let g = build_traversal_graph(n, 6);
+        group.bench_function(format!("bfs_depth{depth}_n{n}"), |b| {
+            b.iter(|| {
+                let res = g.graph.traverse_by_relation(
+                    grap::ids::NodeId(0),
+                    "rel",
+                    link(),
+                    depth,
+                    budget,
+                );
+                black_box(res.len())
+            })
+        });
+    }
+
+    group.finish();
+}
+
+/// Attribute the query cost at scale: pure BM25 (`search`) vs the full pipeline
+/// (`search_and_traverse` = BM25 seed + pruned traversal + RRF fusion).
+///
+/// The traversal probe showed adjacency is cheap; this isolates where the
+/// *milliseconds* in a real query actually live. The delta between the two
+/// functions is the traversal + fusion overhead on top of text retrieval.
+fn bench_large_n_fusion(c: &mut Criterion) {
+    let g = build_synthetic_graph(100_000, 6);
+
+    let mut group = c.benchmark_group("large_n_fusion");
+    group.sample_size(20);
+
+    let query = "memory safety concurrency ownership";
+
+    // Pure BM25 retrieval — no traversal, no fusion.
+    group.bench_function("text_search_only_n100000", |b| {
+        b.iter(|| {
+            let res = g.search(query, 20);
+            black_box(res.len())
+        })
+    });
+
+    // Full pipeline: BM25 seed + pruned traversal + RRF fusion.
+    group.bench_function("search_and_traverse_n100000", |b| {
+        b.iter(|| {
+            let res = g.search_and_traverse(
+                query,
+                20,
+                &["topic"],
+                0.3,
+                4,
+                200,
+                FusionWeights {
+                    text: 0.5,
+                    graph: 0.5,
+                    ..Default::default()
+                },
+            );
+            black_box(res.len())
+        })
+    });
+
+    group.finish();
+}
+
 fn bench_bitmask_pruning(c: &mut Criterion) {
     let g = build_synthetic_graph(2_000, 6);
 
@@ -413,6 +529,8 @@ fn bench_mmap_cold_vs_hot(c: &mut Criterion) {
 #[cfg(feature = "mmap")]
 criterion_group!(
     benches,
+    bench_large_n_traversal,
+    bench_large_n_fusion,
     bench_bitmask_pruning,
     bench_sharded_vs_monolithic,
     bench_rebalance_cost,
@@ -423,6 +541,8 @@ criterion_group!(
 #[cfg(not(feature = "mmap"))]
 criterion_group!(
     benches,
+    bench_large_n_traversal,
+    bench_large_n_fusion,
     bench_bitmask_pruning,
     bench_sharded_vs_monolithic,
     bench_rebalance_cost,
