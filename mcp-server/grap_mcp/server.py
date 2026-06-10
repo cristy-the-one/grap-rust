@@ -1553,6 +1553,37 @@ def reindex_entities() -> dict:
 
 
 @tiered
+def compact_graph() -> dict:
+    """Reclaim disk/RAM held by dead blobs: compact the blob store (bytes orphaned
+    by node updates/merges/deletes) and vacuum deleted nodes from the text index,
+    then persist. Node ids, edges, and search results are unchanged."""
+    denied = _require("operator")
+    if denied:
+        return denied
+    kg = _state.get("kg")
+    if not kg:
+        return {"status": "error", "message": "no Knowledge Graph loaded"}
+    try:
+        report = kg.vacuum_blobs()
+        try:
+            kg.vacuum_deleted_nodes()
+        except Exception:
+            logger.warning("vacuum_deleted_nodes failed/unavailable", exc_info=True)
+        kg_path = _state.get("kg_path")
+        if kg_path:
+            kg.save_to_dir(kg_path)
+        try:
+            _get_workspace().record_event("graph_compacted", kg_path or "",
+                                          details={"bytes_reclaimed": str(report.get("bytes_reclaimed", 0))})
+        except Exception:
+            logger.warning("audit record_event failed for graph_compacted", exc_info=True)
+        return {"status": "ok", **report}
+    except Exception as e:
+        logger.exception("compact_graph failed")
+        return {"status": "error", "message": str(e)}
+
+
+@tiered
 def list_capabilities() -> dict:
     """Return the MCP capability taxonomy grouped by domain."""
     return {
@@ -1574,7 +1605,7 @@ def list_capabilities() -> dict:
             "validation": ["validate_procedure_graph", "diff_procedure_graphs", "get_validation"],
             "audit": ["get_audit_log", "get_status", "get_telemetry", "list_capabilities",
                       "list_runs", "get_run", "reconstruct_run", "query_events",
-                      "get_session_context"],
+                      "get_session_context", "compact_graph"],
         },
         "active_tier": _ACTIVE_TIER,
         "tier_of": dict(_TIERS),
