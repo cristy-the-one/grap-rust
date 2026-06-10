@@ -62,7 +62,7 @@ pub mod lifecycle; // Versioning, activation, and lifecycle (Task 01)
 
 // Re-exports for ergonomic use
 pub use crate::index::TextIndex;
-pub use graph_ops::MergeReport;
+pub use graph_ops::{BlobVacuumReport, MergeReport};
 pub use lifecycle::{
     Activation, ActivationState, AuditEvent, ChangeStatus, ContentHash, EventLink, LifecycleError,
     PublishLevel, ReconstructionReport, RetentionReport, RunKind, RunRecord, RunStatus, Version,

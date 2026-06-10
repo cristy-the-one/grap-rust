@@ -24,6 +24,17 @@ pub struct MergeReport {
     pub embedding_updated: bool,
 }
 
+/// Outcome of a [`KnowledgeGraph::vacuum_blobs`] compaction.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BlobVacuumReport {
+    /// Blob-store bytes before compaction (incl. dead/orphaned bytes).
+    pub bytes_before: usize,
+    /// Blob-store bytes after compaction (live blobs only).
+    pub bytes_after: usize,
+    /// Bytes reclaimed (`bytes_before - bytes_after`).
+    pub bytes_reclaimed: usize,
+}
+
 impl KnowledgeGraph {
     /// Merge `absorb` into `keep`, redirecting all edges and soft-deleting `absorb`.
     ///
@@ -256,6 +267,52 @@ impl KnowledgeGraph {
         }
         Ok(())
     }
+
+    /// Bytes currently held by the blob store (live + dead). See [`vacuum_blobs`](Self::vacuum_blobs).
+    pub fn blob_bytes(&self) -> usize {
+        self.blobs.total_bytes()
+    }
+
+    /// Compact the blob store: rebuild it from only the live nodes' current
+    /// blob + embedding bytes and remap each [`BlobRef`](crate::blob_store::BlobRef).
+    /// Reclaims bytes orphaned by [`update_node_content`](Self::update_node_content),
+    /// [`merge_nodes`](Self::merge_nodes), and tombstoned nodes. Node ids,
+    /// edges, and all indexes are untouched (they key on [`NodeId`](crate::ids::NodeId)).
+    pub fn vacuum_blobs(&mut self) -> BlobVacuumReport {
+        let bytes_before = self.blobs.total_bytes();
+        let n = self.nodes.len();
+        let mut new_blobs = crate::blob_store::BlobStore::new();
+        let mut new_refs: Vec<(crate::blob_store::BlobRef, Option<crate::blob_store::BlobRef>)> =
+            Vec::with_capacity(n);
+        // Pass 1: copy live bytes into a fresh store, recording new refs.
+        for i in 0..n {
+            let deleted = self.deleted.get(i).copied().unwrap_or(false);
+            if deleted {
+                new_refs.push((new_blobs.store(""), None));
+                continue;
+            }
+            let text = self.blobs.read(&self.nodes[i].blob).to_string();
+            let emb: Option<Vec<f32>> = self.nodes[i]
+                .embedding
+                .as_ref()
+                .and_then(|e| self.blobs.read_embedding(e));
+            let bref = new_blobs.store(&text);
+            let eref = emb.map(|v| new_blobs.store_embedding(&v));
+            new_refs.push((bref, eref));
+        }
+        // Pass 2: reassign refs (old store no longer borrowed).
+        for (i, (bref, eref)) in new_refs.into_iter().enumerate() {
+            self.nodes[i].blob = bref;
+            self.nodes[i].embedding = eref;
+        }
+        self.blobs = new_blobs;
+        let bytes_after = self.blobs.total_bytes();
+        BlobVacuumReport {
+            bytes_before,
+            bytes_after,
+            bytes_reclaimed: bytes_before.saturating_sub(bytes_after),
+        }
+    }
 }
 
 #[cfg(test)]
@@ -450,5 +507,41 @@ mod tests {
         let after = g.node_content_hash(n).unwrap();
         assert_ne!(before, after);
         assert_eq!(after, crate::lifecycle::hash::sha256_digest(b"new text"));
+    }
+
+    #[test]
+    fn vacuum_blobs_reclaims_orphaned_and_tombstoned_bytes() {
+        let mut g = KnowledgeGraph::new();
+        let a = g.add_node("a short node", Some("A"), None);
+        let b = g.add_node("b node to be deleted with a fairly long body", Some("B"), None);
+        g.update_node_content(a, &"X".repeat(5000), None).unwrap();
+        g.update_node_content(a, "tiny", None).unwrap();
+        assert!(g.remove_node(b));
+
+        let before = g.blob_bytes();
+        let report = g.vacuum_blobs();
+        let after = g.blob_bytes();
+
+        assert_eq!(report.bytes_before, before);
+        assert_eq!(report.bytes_after, after);
+        assert!(report.bytes_reclaimed > 5000);
+        assert!(after < before);
+        assert_eq!(g.read_blob(a), "tiny");
+        assert_eq!(g.verify_node(a), crate::graph::NodeIntegrity::Match);
+        assert!(g.is_node_deleted(b));
+    }
+
+    #[test]
+    fn vacuum_blobs_preserves_edges_and_embeddings() {
+        let mut g = KnowledgeGraph::new();
+        let a = g.add_node("alpha", Some("A"), Some(&[1.0_f32, 2.0, 3.0]));
+        let b = g.add_node("beta", Some("B"), None);
+        g.add_edge(a, b, 0.9, vec![]);
+        g.update_node_content(a, "alpha-v2", Some(&[4.0_f32, 5.0, 6.0])).unwrap();
+        g.vacuum_blobs();
+        assert_eq!(g.read_blob(a), "alpha-v2");
+        assert_eq!(g.read_embedding(a), Some(vec![4.0_f32, 5.0, 6.0]));
+        assert_eq!(g.edge_count(), 1);
+        assert_eq!(g.node_label(a), Some("A"));
     }
 }

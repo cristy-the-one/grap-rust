@@ -239,6 +239,16 @@ impl BlobStore {
         }
     }
 
+    /// Total bytes currently held by the store (sum of chunk lengths, or the
+    /// mapped-file length). Includes dead/orphaned bytes — `vacuum_blobs` reclaims them.
+    pub fn total_bytes(&self) -> usize {
+        match &self.storage {
+            Storage::Chunks(c) => c.iter().map(|chunk| chunk.len()).sum(),
+            #[cfg(feature = "mmap")]
+            Storage::Mmap(m) => m.len(),
+        }
+    }
+
     /// Returns the number of chunks (only meaningful in in-memory mode).
     pub fn chunk_count(&self) -> usize {
         match &self.storage {
