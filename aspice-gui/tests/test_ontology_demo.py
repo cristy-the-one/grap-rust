@@ -155,3 +155,17 @@ def test_open_snapshot_export(tmp_path, monkeypatch):
     exp = client.get("/api/ontology/export",
                      params={"workdir": wd, "out_path": str(out)}).json()
     assert exp["status"] == "ok" and out.exists()
+
+
+def test_index_serves_app_js():
+    import sys, os, tempfile
+    from pathlib import Path as _P
+    root = _P(__file__).resolve().parents[2]
+    sys.path.insert(0, str(root / "aspice-gui"))
+    sys.path.insert(0, str(root / "mcp-server"))
+    os.environ.setdefault("GRAP_WORKSPACE", tempfile.mkdtemp(prefix="demo-ws-"))
+    from fastapi.testclient import TestClient
+    from backend.main import app
+    client = TestClient(app)
+    html = client.get("/").text
+    assert "/assets/app.js" in html

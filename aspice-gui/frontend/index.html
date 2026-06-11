@@ -19,6 +19,7 @@
       <button type="button" class="nav" data-panel="gaps">Gap analysis</button>
       <button type="button" class="nav" data-panel="lifecycle">Lifecycle</button>
       <button type="button" class="nav" data-panel="legal-graph">Legal graph</button>
+      <button type="button" class="nav" data-panel="ontology">Persistent ontology</button>
       <button type="button" class="nav" data-panel="runs">Runs &amp; temporal</button>
       <button type="button" class="nav" data-panel="quality">Quality</button>
       <button type="button" class="nav" data-panel="audit">Audit</button>
@@ -306,6 +307,51 @@
         <div class="graph-wrap">
           <div id="lg-graph" class="graph-host"></div>
           <div id="lg-info" class="graph-info muted small">Click a node to inspect it.</div>
+        </div>
+      </section>
+
+      <!-- PERSISTENT ONTOLOGY -->
+      <section id="panel-ontology" class="panel">
+        <h2>Persistent ontology</h2>
+        <p class="lead">
+          Build and <em>grow</em> a persistent extraction graph from a legal corpus.
+          Each run is incremental — new chunks are extracted, changed chunks re-extracted,
+          and removed chunks retracted — then the concept/relation graph is rendered.
+          Click a concept for its characteristics and provenance; double-click to expand
+          its neighbourhood from the graph.
+        </p>
+        <div class="card">
+          <div class="inline-form">
+            <div style="flex:1 1 280px">
+              <label for="onto-corpus">Corpus folder</label>
+              <input id="onto-corpus" type="text" value="demo/corpus/ro-law" />
+            </div>
+            <div style="flex:1 1 280px">
+              <label for="onto-workdir">Persistent graph dir</label>
+              <input id="onto-workdir" type="text" value="demo/workspace/ro-law-graph" />
+            </div>
+            <div>
+              <label for="onto-sim">Dedup similarity</label>
+              <input id="onto-sim" type="number" step="0.01" min="0" max="1" value="0.86" />
+            </div>
+            <div class="actions">
+              <button type="button" class="btn btn-primary" id="onto-build">Build / Grow Ontology</button>
+            </div>
+          </div>
+          <p class="muted small" id="onto-status">Idle.</p>
+          <div class="tiles" id="onto-dashboard">
+            <div class="tile"><div class="tile-val" id="onto-stat-concepts">—</div><div class="tile-label muted small">Concepts</div></div>
+            <div class="tile"><div class="tile-val" id="onto-stat-edges">—</div><div class="tile-label muted small">Edges</div></div>
+            <div class="tile"><div class="tile-val" id="onto-stat-added">—</div><div class="tile-label muted small">Added</div></div>
+            <div class="tile"><div class="tile-val" id="onto-stat-changed">—</div><div class="tile-label muted small">Changed</div></div>
+            <div class="tile"><div class="tile-val" id="onto-stat-removed">—</div><div class="tile-label muted small">Removed</div></div>
+            <div class="tile"><div class="tile-val" id="onto-stat-relooks">—</div><div class="tile-label muted small">Re-looks</div></div>
+            <div class="tile"><div class="tile-val" id="onto-stat-parked">—</div><div class="tile-label muted small">Parked</div></div>
+          </div>
+        </div>
+        <div class="graph-wrap">
+          <div id="onto-graph" class="graph-host"></div>
+          <div id="onto-detail" class="graph-info muted small">Click a concept to inspect it; double-click to expand.</div>
         </div>
       </section>
 

@@ -395,6 +395,10 @@ document.querySelectorAll(".nav").forEach((btn) => {
     document.querySelectorAll(".panel").forEach((p) => p.classList.remove("active"));
     btn.classList.add("active");
     $(`#panel-${btn.dataset.panel}`).classList.add("active");
+    // Lazily load any pre-existing persistent ontology the first time its panel opens.
+    if (btn.dataset.panel === "ontology" && typeof showOntoExisting === "function") {
+      showOntoExisting();
+    }
   });
 });
 
@@ -841,7 +845,13 @@ function _layout(nodes, edges, iters) {
   }
 }
 
-function layoutGraph(host, info, iters = 300) {
+// opts (all optional) let a second consumer (the persistent-ontology panel)
+// reuse this exact renderer without forking it:
+//   onSelect(node, info)  — custom detail renderer (default: legal-graph chips)
+//   beforeExpand()        — async hook run once before the first neighbours call
+//                           (e.g. /api/ontology/open so _state["kg"] is set)
+//   expandOnDouble        — expand on dblclick instead of click (single = select)
+function layoutGraph(host, info, iters = 300, opts = {}) {
   host.innerHTML = "";
   const nodes = legalGraph.nodes;
   if (!nodes.length) {
@@ -882,11 +892,13 @@ function layoutGraph(host, info, iters = 300) {
     const title = svgEl("title");
     title.textContent = `${n.title || n.label} [${n.kind}] — click to expand`;
     g.append(c, title);
-    g.onclick = () => {
-      lines.forEach(({ e, ln }) => {
-        const on = e.source === n.id || e.target === n.id;
-        ln.setAttribute("stroke-opacity", on ? 0.95 : 0.1);
-      });
+    const highlight = () => lines.forEach(({ e, ln }) => {
+      const on = e.source === n.id || e.target === n.id;
+      ln.setAttribute("stroke-opacity", on ? 0.95 : 0.1);
+    });
+    const select = () => {
+      highlight();
+      if (opts.onSelect) { opts.onSelect(n, info); return; }
       const inc = legalGraph.edges
         .filter((e) => e.source === n.id || e.target === n.id)
         .map((e) => {
@@ -899,17 +911,26 @@ function layoutGraph(host, info, iters = 300) {
         el("div", { class: "muted small", style: "margin:.3rem 0" },
           `${inc.length} edge(s) · click again only expands once`),
         el("div", { class: "chips" }, inc.slice(0, 24).map((x) => el("span", { class: "chip" }, x))));
-      expandNode(n, host, info);
     };
+    if (opts.expandOnDouble) {
+      g.onclick = select;
+      g.ondblclick = () => expandNode(n, host, info, opts);
+    } else {
+      g.onclick = () => { select(); expandNode(n, host, info, opts); };
+    }
     gNodes.append(g);
   });
   svg.append(gEdges, gNodes);
   host.append(svg);
 }
 
-async function expandNode(node, host, info) {
+async function expandNode(node, host, info, opts = {}) {
   if (legalGraph.expanded.has(node.id)) return;     // already expanded
   legalGraph.expanded.add(node.id);
+  if (opts.beforeExpand) {
+    const ok = await opts.beforeExpand();
+    if (ok === false) { legalGraph.expanded.delete(node.id); return; }
+  }
   const r = await run(() => post("/api/graph/neighbors",
     { node_id: node.id, types: legalGraph.types.length ? legalGraph.types : null }));
   if (!r || r.status === "error") return;
@@ -930,7 +951,7 @@ async function expandNode(node, host, info) {
     if (!ek.has(key)) { ek.add(key); legalGraph.edges.push(e); newEdges++; }
   }
   if (added || newEdges) {
-    layoutGraph(host, info, 160);          // fewer iters: integrate, keep stable
+    layoutGraph(host, info, 160, opts);    // fewer iters: integrate, keep stable
     toast(`+${added} node(s), +${newEdges} edge(s)`, "ok");
   } else {
     toast("no further neighbors", "warn");
@@ -989,6 +1010,156 @@ $("#btn-legal-graph-file").onclick = () =>
     }
     return r;
   });
+
+/* ---------- persistent ontology (reuses the SVG renderer + stream reader) ---------- */
+// Map an ontology snapshot ({nodes:[{id,name,characteristics,provenance}], edges})
+// onto the legal-graph renderer's shape (label/kind) without losing the metadata.
+function ontoSnapshotToGraph(snap) {
+  return {
+    nodes: (snap.nodes || []).map((n) => ({
+      id: n.id, label: n.name, title: n.name, kind: "concept",
+      characteristics: n.characteristics || [], provenance: n.provenance || [],
+    })),
+    edges: (snap.edges || []).map((e) => ({
+      source: e.source, target: e.target, type: e.type, sources: e.sources || [],
+    })),
+    edge_types: [...new Set((snap.edges || []).map((e) => e.type))],
+  };
+}
+
+// Custom side-panel renderer: name + characteristics + provenance.
+function renderOntoDetail(n, info) {
+  clear(info).append(
+    el("div", {}, el("strong", {}, n.title || n.label || n.id),
+      el("span", { class: "badge", style: "margin-left:.5rem" }, "concept")),
+    el("div", { class: "muted small", style: "margin:.4rem 0 .2rem" }, "characteristics"),
+    (n.characteristics && n.characteristics.length)
+      ? el("div", { class: "chips" }, n.characteristics.map((c) => el("span", { class: "chip" }, c)))
+      : el("p", { class: "muted small" }, "none"),
+    el("div", { class: "muted small", style: "margin:.5rem 0 .2rem" }, "provenance"),
+    (n.provenance && n.provenance.length)
+      ? el("div", { class: "chips" }, n.provenance.map((p) => el("span", { class: "chip" }, p)))
+      : el("p", { class: "muted small" }, "none"),
+    el("p", { class: "muted small", style: "margin-top:.5rem" }, "double-click to expand neighbours"));
+}
+
+let _ontoOpened = false;     // /api/ontology/open called once per workdir grow
+function ontoOpts() {
+  return {
+    onSelect: renderOntoDetail,
+    expandOnDouble: true,
+    beforeExpand: async () => {
+      if (_ontoOpened) return true;
+      const r = await run(() => post("/api/ontology/open",
+        { workdir: $("#onto-workdir").value.trim() }));
+      if (!r || r.status === "error") return false;
+      _ontoOpened = true;
+      return true;
+    },
+  };
+}
+
+function renderOntoSnapshot(snap) {
+  setLegalGraph(ontoSnapshotToGraph(snap));
+  layoutGraph($("#onto-graph"), $("#onto-detail"), 300, ontoOpts());
+}
+
+function fillOntoStats(s) {
+  const set = (id, v) => { $(`#onto-stat-${id}`).textContent = v == null ? "—" : String(v); };
+  set("concepts", s.concepts);
+  set("edges", s.edges);
+  set("added", s.added);
+  set("changed", s.changed);
+  set("removed", s.removed);
+  set("relooks", s.relooks);
+  set("parked", s.parked);
+}
+
+$("#onto-build").onclick = async () => {
+  const btn = $("#onto-build");
+  const status = $("#onto-status");
+  const workdir = $("#onto-workdir").value.trim();
+  const corpus_path = $("#onto-corpus").value.trim();
+  const sim = parseFloat($("#onto-sim").value);
+  btn.disabled = true;
+  status.textContent = "Starting…";
+  _ontoOpened = false;     // the graph just changed; re-open before expanding
+  try {
+    const resp = await fetch("/api/ontology/extend", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ workdir, corpus_path, sim: Number.isFinite(sim) ? sim : 0.86 }),
+    });
+    if (!resp.ok || !resp.body) throw new Error(`stream failed: ${resp.status}`);
+    const reader = resp.body.getReader();
+    const dec = new TextDecoder();
+    let buf = "", done = null, errored = null;
+    for (;;) {
+      const { value, done: rd } = await reader.read();
+      if (rd) break;
+      buf += dec.decode(value, { stream: true });
+      let nl;
+      while ((nl = buf.indexOf("\n")) >= 0) {
+        const line = buf.slice(0, nl).trim();
+        buf = buf.slice(nl + 1);
+        if (!line) continue;
+        let ev;
+        try { ev = JSON.parse(line); } catch { continue; }
+        showRaw(ev);
+        const phase = ev.phase || ev.type;
+        if (phase === "diff") {
+          status.textContent = `diff: ${ev.new ?? 0} new / ${ev.changed ?? 0} changed / ${ev.removed ?? 0} removed`;
+        } else if (phase === "chunk") {
+          status.textContent = `extracting ${ev.i}/${ev.n}: ${ev.source}`;
+        } else if (phase === "done") {
+          done = ev;
+        } else if (phase === "error") {
+          errored = ev.message;
+        }
+      }
+    }
+    if (errored) { status.textContent = `error: ${errored}`; toast(errored, "err"); return; }
+    if (done) {
+      const stats = done.stats || done;
+      fillOntoStats(stats);
+      status.textContent =
+        `done · +${done.added ?? 0} / ~${done.changed ?? 0} / -${done.removed ?? 0} · ` +
+        `${stats.concepts ?? 0} concepts, ${stats.edges ?? 0} edges`;
+      if (done.snapshot) renderOntoSnapshot(done.snapshot);
+      await refreshStatus();
+      toast(`Ontology grown — ${stats.concepts ?? 0} concepts`, "ok");
+    }
+  } catch (err) {
+    status.textContent = `error: ${err.message || err}`;
+    toast(String(err.message || err), "err");
+  } finally {
+    btn.disabled = false;
+  }
+};
+
+// On first reveal of the panel: try to open + render any pre-existing graph.
+let _ontoPanelShown = false;
+async function showOntoExisting() {
+  if (_ontoPanelShown) return;
+  _ontoPanelShown = true;
+  const workdir = $("#onto-workdir").value.trim();
+  if (!workdir) return;
+  try {
+    const opened = await post("/api/ontology/open", { workdir });
+    if (opened && opened.status === "ok") {
+      _ontoOpened = true;
+      const snap = await api(`/api/ontology/snapshot?workdir=${encodeURIComponent(workdir)}`);
+      if (snap && (snap.nodes || []).length) {
+        fillOntoStats(snap.stats || {});
+        renderOntoSnapshot(snap);
+        $("#onto-status").textContent =
+          `loaded existing · ${(snap.stats || {}).concepts ?? snap.nodes.length} concepts`;
+      }
+    }
+  } catch {
+    /* no pre-existing graph yet — first Build creates it. Stay quiet. */
+  }
+}
 
 /* ---------- runs ---------- */
 async function loadRuns(kind) {
