@@ -54,3 +54,26 @@ def test_extend_changed_and_removed(tmp_path):
     names = {o["name"] for o in out["ontology"]["process_outcomes"]}
     assert names == {"Gamma"}
     assert out["changed"] == 1 and out["removed"] == 1
+
+
+def test_server_lifecycle_tools(tmp_path, monkeypatch):
+    import grap_mcp.server as s
+    from grap_mcp.kee.llm import StubProvider
+    from grap_mcp.kee.embeddings import HashingEmbedder
+
+    monkeypatch.setattr(s, "get_provider", lambda model=None: StubProvider(handler=_handler))
+    monkeypatch.setattr(s, "get_embedder", lambda: HashingEmbedder())
+
+    wd = str(tmp_path / "g")
+    docs = tmp_path / "docs"; docs.mkdir()
+    (docs / "a.txt").write_text("alpha topic", encoding="utf-8")
+
+    ext = s.extend_extraction_graph(wd, str(docs), sim=0.9)
+    assert ext["added"] == 1
+
+    opened = s.open_extraction_graph(wd)
+    assert opened["concepts"] == 1
+    assert s._state.get("kg") is not None
+
+    exported = s.export_ontology(wd)
+    assert any(o["name"] == "Alpha" for o in exported["ontology"]["process_outcomes"])

@@ -27,6 +27,10 @@ from . import config as config_store
 from . import auth
 from . import ingest
 from .pagination import paginate
+# Module-level provider/embedder factories so lifecycle tools (and tests that
+# monkeypatch s.get_provider / s.get_embedder) share one indirection point.
+from .kee.llm import get_provider
+from .kee.embeddings import get_embedder
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("grap-mcp")
@@ -312,6 +316,78 @@ def extract_ontology(path: str, out_path: str = None, sim: float = 0.86,
         }
     except Exception as e:
         logger.exception("extract_ontology failed")
+        return {"status": "error", "message": str(e)}
+
+
+@tiered
+def open_extraction_graph(path: str) -> dict:
+    """Open a durable extraction graph and load its projection as the active KG
+    so the existing graph/query tools operate on it. Returns counts."""
+    denied = _require("operator")
+    if denied:
+        return denied
+    try:
+        from .kee.working_graph import WorkingGraph
+        wg = WorkingGraph.open(path, get_embedder())
+        _state["kg"] = wg.kg
+        _state["extraction_workdir"] = path
+        out = {"status": "ok",
+               "concepts": len(wg._live_concepts()),
+               "edges": len(wg.relations),
+               "chunks": len(wg.manifest)}
+        wg.close()  # non-owned workdir: releases the sqlite handle only; wg.kg stays valid
+        return out
+    except Exception as e:
+        logger.exception("open_extraction_graph failed")
+        return {"status": "error", "message": str(e)}
+
+
+@tiered
+def extend_extraction_graph(path: str, docs_path: str, model: str = None,
+                            sim: float = 0.86, relook_ratio: float = 0.2,
+                            max_files: int = None) -> dict:
+    """Sync a durable extraction graph to `docs_path` (new/changed/removed) and
+    persist it, then load its projection as the active KG. Returns sync stats."""
+    denied = _require("operator")
+    if denied:
+        return denied
+    try:
+        from .kee.graph_extract import extend_graph_ontology
+        from .kee.working_graph import WorkingGraph
+        out = extend_graph_ontology(path, docs_path, get_provider(model), get_embedder(),
+                                    sim=sim, relook_ratio=relook_ratio, max_files=max_files)
+        wg = WorkingGraph.open(path, get_embedder())
+        _state["kg"] = wg.kg
+        _state["extraction_workdir"] = path
+        wg.close()  # non-owned workdir: releases the sqlite handle only; wg.kg stays valid
+        out["status"] = "ok"
+        return {k: out[k] for k in ("status", "added", "changed", "removed",
+                                    "concepts", "edges", "relooks", "parked")}
+    except Exception as e:
+        logger.exception("extend_extraction_graph failed")
+        return {"status": "error", "message": str(e)}
+
+
+@tiered
+def export_ontology(path: str, out_path: str = None) -> dict:
+    """Export the durable graph's candidate ontology (and optionally write YAML)."""
+    denied = _require("operator")
+    if denied:
+        return denied
+    try:
+        from .kee.working_graph import WorkingGraph
+        from .kee.pipeline import to_yaml
+        wg = WorkingGraph.open(path, get_embedder())
+        onto = wg.to_candidate_ontology()
+        wg.close()
+        result = {"status": "ok", "ontology": onto}
+        if out_path:
+            with open(out_path, "w", encoding="utf-8") as f:
+                f.write(to_yaml(onto))
+            result["yaml_path"] = out_path
+        return result
+    except Exception as e:
+        logger.exception("export_ontology failed")
         return {"status": "error", "message": str(e)}
 
 
@@ -1591,6 +1667,7 @@ def list_capabilities() -> dict:
             "discovery": ["grap_guide", "suggest_queries"],
             "knowledge": ["load_knowledge_graph", "create_knowledge_graph",
                           "ingest_documents", "reingest_documents", "extract_ontology", "project_relations",
+                          "open_extraction_graph", "extend_extraction_graph", "export_ontology",
                           "build_legal_graph", "legal_graph_from_relations",
                           "graph_neighbors", "load_ontology",
                           "get_blast_radius", "find_cycles", "find_orphans", "kg_health",
