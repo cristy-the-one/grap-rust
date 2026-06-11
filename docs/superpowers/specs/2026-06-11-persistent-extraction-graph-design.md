@@ -139,3 +139,21 @@ Thin wrappers, "full" tier, using `get_provider`/`get_embedder` (matching the ex
 
 - Whether `GraphStore` and the projected `EntityIndex` should share one sqlite file or stay separate (`graph_store.db` vs `entities.db`). Lean: separate, because the projected `EntityIndex` is disposable/rebuilt while `graph_store.db` is the truth — keeping them apart avoids accidentally treating a projection as authoritative. Confirm during planning.
 - Exact `extend` behavior when `docs_path` is a single file vs a directory (mirror `read_chunks`, which already handles both).
+
+## Implementation status
+
+Phase 2 implemented (2026-06-11) on branch `feat/persistent-extraction-graph`:
+`kee/graph_store.py` (`GraphStore` + `GraphState`), `WorkingGraph` persistence
+(`save`/`open`/`to_state`/`_load_state`/`_project`, per-chunk provenance,
+`retract_chunk`), `kee/graph_extract.extend_graph_ontology`, and the
+`open_extraction_graph`/`extend_extraction_graph`/`export_ontology` MCP tools
+(registered in the `knowledge` capability domain, reusing existing KG query tools
+via `_state["kg"]`). The `_node_of/_concept_of` bridge proved unnecessary: mid-run
+retraction is logical (pygrap append-only) and the projection compacts to dense ids
+on save, so concept id == node id throughout. Both open questions resolved as the
+leans predicted: separate `graph_store.db` (truth) vs `entities.db` (projection);
+`docs_path` handles file or directory via `read_chunks`. No new Rust. Full suites
+green (mcp-server 186, aspice-gui 8). Resolved during code review: `GraphStore.load`
+normalizes empty `concept_sources`; `save` rolls back on error; `WorkingGraph`
+cleans `_parent`/`_has_edge` and filters `_retracted` from `context_for` on
+retraction; `_project` releases the pygrap handle before `rmtree` (Windows-safe).
