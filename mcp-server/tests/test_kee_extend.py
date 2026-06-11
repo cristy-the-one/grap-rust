@@ -77,3 +77,28 @@ def test_server_lifecycle_tools(tmp_path, monkeypatch):
 
     exported = s.export_ontology(wd)
     assert any(o["name"] == "Alpha" for o in exported["ontology"]["process_outcomes"])
+
+
+def test_extend_emits_progress_events(tmp_path):
+    wd = str(tmp_path / "g")
+    docs = tmp_path / "docs"; docs.mkdir()
+    (docs / "a.txt").write_text("alpha topic", encoding="utf-8")
+
+    events = []
+    extend_graph_ontology(wd, str(docs), StubProvider(handler=_handler),
+                          HashingEmbedder(), sim=0.9,
+                          progress=lambda ev: events.append(ev))
+    phases = [e.get("phase") for e in events]
+    assert "diff" in phases and "done" in phases
+    diff = next(e for e in events if e.get("phase") == "diff")
+    assert diff["new"] == 1 and diff["changed"] == 0 and diff["removed"] == 0
+    assert any(e.get("phase") == "chunk" for e in events)
+
+
+def test_extend_progress_default_none_is_unchanged(tmp_path):
+    wd = str(tmp_path / "g")
+    docs = tmp_path / "docs"; docs.mkdir()
+    (docs / "a.txt").write_text("alpha topic", encoding="utf-8")
+    out = extend_graph_ontology(wd, str(docs), StubProvider(handler=_handler),
+                                HashingEmbedder(), sim=0.9)
+    assert out["added"] == 1

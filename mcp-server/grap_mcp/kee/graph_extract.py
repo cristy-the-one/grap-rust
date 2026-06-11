@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import logging
 import math
-from typing import Any, Dict, Optional, Sequence, Tuple
+from typing import Any, Callable, Dict, Optional, Sequence, Tuple
 
 from . import extract
 from .. import incremental
@@ -72,7 +72,8 @@ def graph_extract_ontology(chunks: Sequence[Tuple[str, str]], provider, embedder
 def extend_graph_ontology(workdir: str, docs_path: str, provider, embedder, *,
                           sim: float = 0.86, version: str = "kee-candidate",
                           relook_ratio: float = 0.2, context_cap: int = 8,
-                          max_files: Optional[int] = None) -> Dict[str, Any]:
+                          max_files: Optional[int] = None,
+                          progress: Optional[Callable[[dict], None]] = None) -> Dict[str, Any]:
     """Open the durable graph at `workdir`, sync it to `docs_path`, save, return stats.
 
     new chunk -> extract; changed chunk (hash differs) -> retract old + re-extract;
@@ -80,6 +81,10 @@ def extend_graph_ontology(workdir: str, docs_path: str, provider, embedder, *,
     """
     wg = WorkingGraph.open(workdir, embedder, merge_threshold=sim, context_cap=context_cap)
     try:
+        def _emit(ev):
+            if progress is not None:
+                progress(ev)
+
         chunks = read_chunks(docs_path, max_files=max_files)
         current = {src: text for (src, text) in chunks}
         hashes = {src: incremental.chunk_hash(text) for src, text in current.items()}
@@ -97,7 +102,10 @@ def extend_graph_ontology(workdir: str, docs_path: str, provider, embedder, *,
         to_extract = [(s, current[s]) for s in new + changed]
         budget = math.ceil(relook_ratio * len(to_extract)) if to_extract else 0
         relooks = 0
-        for source, text in to_extract:
+        _emit({"phase": "diff", "new": len(new), "changed": len(changed),
+               "removed": len(removed)})
+        for i, (source, text) in enumerate(to_extract):
+            _emit({"phase": "chunk", "i": i + 1, "n": len(to_extract), "source": source})
             ctx = wg.context_for(text)
             frag = _extract_with_context(provider, source, text, ctx)
             if frag is None:
@@ -112,6 +120,9 @@ def extend_graph_ontology(workdir: str, docs_path: str, provider, embedder, *,
 
         ontology = wg.to_candidate_ontology(version)
         wg.save()
+        _emit({"phase": "done", "added": len(new), "changed": len(changed),
+               "removed": len(removed), "concepts": len(wg._live_concepts()),
+               "edges": len(wg.relations), "relooks": relooks, "parked": len(wg.parked)})
         return {
             "ontology": ontology,
             "added": len(new), "changed": len(changed), "removed": len(removed),
