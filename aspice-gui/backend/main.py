@@ -632,6 +632,35 @@ def wizard_publish_activate(body: PublishBody) -> dict:
     return {"status": "ok", "publish": pub, "promote": prom, "activate": act}
 
 
+class OntologyOpenBody(BaseModel):
+    workdir: str
+
+
+@app.post("/api/ontology/open")
+def ontology_open(body: OntologyOpenBody) -> dict:
+    """Open a persistent extraction graph as the active KG (powers graph queries)."""
+    r = bridge.call("open_extraction_graph", path=body.workdir)
+    _api_error(r)
+    return r
+
+
+@app.get("/api/ontology/snapshot")
+def ontology_snapshot_ep(workdir: str) -> dict:
+    """Graph snapshot (nodes/edges/stats) for the current persistent ontology."""
+    from .ontology_view import ontology_snapshot
+    r = bridge.call("export_ontology", path=workdir)
+    _api_error(r)
+    return ontology_snapshot(r)
+
+
+@app.get("/api/ontology/export")
+def ontology_export_ep(workdir: str, out_path: Optional[str] = None) -> dict:
+    """Export the candidate-ontology YAML for the persistent graph."""
+    r = bridge.call("export_ontology", path=workdir, out_path=out_path)
+    _api_error(r)
+    return r
+
+
 if FRONTEND.is_dir():
     app.mount("/assets", StaticFiles(directory=FRONTEND), name="assets")
 

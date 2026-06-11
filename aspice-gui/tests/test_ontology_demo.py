@@ -114,3 +114,44 @@ def test_extend_endpoint_streams_and_persists(tmp_path, monkeypatch):
     assert done["added"] == 1
     assert "snapshot" in done and any(n["name"] == "Operator de date"
                                       for n in done["snapshot"]["nodes"])
+
+
+def test_open_snapshot_export(tmp_path, monkeypatch):
+    import sys, os, tempfile, json as _json
+    from pathlib import Path as _P
+    root = _P(__file__).resolve().parents[2]
+    sys.path.insert(0, str(root / "aspice-gui"))
+    sys.path.insert(0, str(root / "mcp-server"))
+    os.environ.setdefault("GRAP_WORKSPACE", tempfile.mkdtemp(prefix="demo-ws-"))
+
+    import grap_mcp.kee.llm as llm
+    import grap_mcp.kee.embeddings as emb
+    from grap_mcp.kee.llm import StubProvider
+    from grap_mcp.kee.embeddings import HashingEmbedder
+    monkeypatch.setattr(llm, "get_provider", lambda model=None: StubProvider(
+        handler=lambda s, u: _json.dumps({"outcomes": [{"name": "Operator de date",
+                                          "characteristics": []}], "relations": []})))
+    monkeypatch.setattr(emb, "get_embedder", lambda *a, **k: HashingEmbedder())
+
+    from fastapi.testclient import TestClient
+    from backend.main import app
+    client = TestClient(app)
+
+    wd = str(tmp_path / "graph")
+    docs = tmp_path / "docs"; docs.mkdir()
+    (docs / "a.json").write_text(_json.dumps({"id": "L-1",
+        "text_complet": "Operatorul de date."}), encoding="utf-8")
+    with client.stream("POST", "/api/ontology/extend",
+                       json={"workdir": wd, "corpus_path": str(docs), "sim": 0.9}) as r:
+        list(r.iter_lines())
+
+    opened = client.post("/api/ontology/open", json={"workdir": wd}).json()
+    assert opened["status"] == "ok" and opened["concepts"] == 1
+
+    snap = client.get("/api/ontology/snapshot", params={"workdir": wd}).json()
+    assert any(n["name"] == "Operator de date" for n in snap["nodes"])
+
+    out = tmp_path / "out.yaml"
+    exp = client.get("/api/ontology/export",
+                     params={"workdir": wd, "out_path": str(out)}).json()
+    assert exp["status"] == "ok" and out.exists()
