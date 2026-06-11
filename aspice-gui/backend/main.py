@@ -68,6 +68,14 @@ class LegalGraphBody(BaseModel):
     model: Optional[str] = None
 
 
+class OntologyExtendBody(BaseModel):
+    workdir: str
+    corpus_path: str
+    model: Optional[str] = None
+    sim: float = 0.86
+    max_files: Optional[int] = None
+
+
 class NeighborsBody(BaseModel):
     node_id: int
     types: Optional[list] = None
@@ -530,6 +538,57 @@ def extract_stream(body: ExtractBody) -> StreamingResponse:
                 yield json.dumps(event) + "\n"
         except Exception as exc:
             yield json.dumps({"type": "error", "message": str(exc)}) + "\n"
+    return StreamingResponse(lines(), media_type="application/x-ndjson")
+
+
+@app.post("/api/ontology/extend")
+def ontology_extend(body: OntologyExtendBody) -> StreamingResponse:
+    """Build/grow the persistent extraction graph from a corpus, streaming NDJSON
+    progress (diff/chunk/done). The terminal 'done' event carries the snapshot."""
+    import queue
+    import threading
+    from grap_mcp.kee import llm, embeddings
+    from grap_mcp.kee.graph_extract import extend_graph_ontology
+    from .ontology_view import ontology_snapshot
+
+    q: "queue.Queue[dict]" = queue.Queue()
+    _SENTINEL = {"__end__": True}
+
+    def worker():
+        try:
+            provider = llm.get_provider(model=body.model or None)
+            embedder = embeddings.get_embedder()
+            out = extend_graph_ontology(
+                body.workdir, body.corpus_path, provider, embedder,
+                sim=body.sim, max_files=body.max_files,
+                progress=lambda ev: q.put(ev))
+            snap = ontology_snapshot(out)
+            q.put({"phase": "result", "stats": snap["stats"], "snapshot": snap})
+        except Exception as exc:  # noqa: BLE001
+            q.put({"phase": "error", "message": str(exc)})
+        finally:
+            q.put(_SENTINEL)
+
+    def lines() -> Iterator[str]:
+        t = threading.Thread(target=worker, daemon=True)
+        t.start()
+        pending_done = None
+        while True:
+            ev = q.get()
+            if ev is _SENTINEL:
+                break
+            phase = ev.get("phase")
+            if phase == "done":
+                pending_done = ev
+            elif phase == "result":
+                merged = dict(pending_done or {"phase": "done"})
+                merged["snapshot"] = ev["snapshot"]
+                merged["stats"] = ev["stats"]
+                yield json.dumps(merged) + "\n"
+                pending_done = None
+            else:
+                yield json.dumps(ev) + "\n"
+        t.join()
     return StreamingResponse(lines(), media_type="application/x-ndjson")
 
 

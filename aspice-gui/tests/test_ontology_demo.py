@@ -67,3 +67,50 @@ def test_ontology_snapshot_drops_unresolvable_edge():
               "relations": [{"from": "A", "type": "x", "to": "Ghost", "sources": []}]}}
     snap = ontology_snapshot(export)
     assert snap["edges"] == []
+
+
+def test_extend_endpoint_streams_and_persists(tmp_path, monkeypatch):
+    import os, sys, tempfile, json as _json
+    from pathlib import Path as _P
+    root = _P(__file__).resolve().parents[2]
+    # match test_app.py: aspice-gui/ on path for `backend.main`, mcp-server/ for grap_mcp
+    sys.path.insert(0, str(root / "aspice-gui"))
+    sys.path.insert(0, str(root / "mcp-server"))
+    os.environ.setdefault("GRAP_WORKSPACE", tempfile.mkdtemp(prefix="gui-test-ws-"))
+
+    import grap_mcp.kee.llm as llm
+    import grap_mcp.kee.embeddings as emb
+    from grap_mcp.kee.llm import StubProvider
+    from grap_mcp.kee.embeddings import HashingEmbedder
+
+    def _handler(system, user):
+        if "operator" in user.lower():
+            return _json.dumps({"outcomes": [{"name": "Operator de date",
+                                              "characteristics": ["securitate"]}],
+                                "relations": []})
+        return "{}"
+
+    monkeypatch.setattr(llm, "get_provider", lambda model=None: StubProvider(handler=_handler))
+    monkeypatch.setattr(emb, "get_embedder", lambda *a, **k: HashingEmbedder())
+
+    from fastapi.testclient import TestClient
+    from backend.main import app
+    client = TestClient(app)
+
+    wd = str(tmp_path / "graph")
+    docs = tmp_path / "docs"; docs.mkdir()
+    # one document -> one chunk (read_chunks emits a chunk per non-empty field,
+    # so omit `titlu` to keep `added == 1`)
+    (docs / "a.json").write_text(_json.dumps(
+        {"id": "L-1", "text_complet": "Operatorul de date raspunde."}),
+        encoding="utf-8")
+
+    with client.stream("POST", "/api/ontology/extend",
+                       json={"workdir": wd, "corpus_path": str(docs), "sim": 0.9}) as r:
+        events = [_json.loads(line) for line in r.iter_lines() if line]
+    phases = [e.get("phase") or e.get("type") for e in events]
+    assert "diff" in phases and "done" in phases
+    done = next(e for e in events if e.get("phase") == "done")
+    assert done["added"] == 1
+    assert "snapshot" in done and any(n["name"] == "Operator de date"
+                                      for n in done["snapshot"]["nodes"])
