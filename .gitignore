@@ -67,6 +67,11 @@ sdist/
 var/
 wheels/
 !packaging/wheels/        # bundled distributable wheel(s) for the installer
+# Keep the demo wheel-drop placeholders tracked, but not the wheel binaries.
+!demo/win/wheels/
+demo/win/wheels/*
+!demo/win/wheels/.gitkeep
+!demo/win/wheels/README.md
 *.egg-info/
 .installed.cfg
 *.egg
