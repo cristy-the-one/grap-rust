@@ -18,11 +18,13 @@ Get-Content $envFile | ForEach-Object {
     }
 }
 
-# Start Ollama if it is not already serving.
-if (-not (Get-Process ollama -ErrorAction SilentlyContinue)) {
-    Write-Host "Starting Ollama..." -ForegroundColor Yellow
-    Start-Process ollama -ArgumentList "serve" -WindowStyle Hidden
-    Start-Sleep -Seconds 3
+# Start Ollama if it is not already serving. Probe the API rather than the
+# process list (the desktop app's process is not named `ollama`).
+. (Join-Path $PSScriptRoot "common.ps1")
+if (-not (Test-OllamaUp)) {
+    $ollama = Resolve-Ollama
+    if (-not $ollama) { throw "Ollama not found. Run  pwsh -File .\demo\win\bootstrap.ps1  first." }
+    Start-OllamaServer $ollama
 }
 
 # Port: prefer ASPICE_GUI_PORT from demo.env, else 8080. uvicorn.run() in

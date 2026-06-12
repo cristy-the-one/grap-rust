@@ -8,6 +8,28 @@ on:
   workflow_dispatch:
 
 jobs:
+  ps-scripts-parse:
+    # The Windows demo scripts have no runtime coverage in CI; at minimum
+    # every committed .ps1 must pass the PowerShell language parser.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: PowerShell scripts must parse
+        shell: pwsh
+        run: |
+          $failed = $false
+          Get-ChildItem -Recurse -Filter *.ps1 | ForEach-Object {
+            $errs = $null
+            [void][System.Management.Automation.Language.Parser]::ParseFile($_.FullName, [ref]$null, [ref]$errs)
+            foreach ($e in $errs) {
+              $failed = $true
+              Write-Host "::error file=$($_.FullName),line=$($e.Extent.StartLineNumber)::$($e.Message)"
+            }
+          }
+          if ($failed) { exit 1 }
+          Write-Host "All .ps1 scripts parse cleanly."
+
   smoke:
     runs-on: ubuntu-latest
 

@@ -16,6 +16,10 @@ No cloud APIs, no API keys, everything runs on your machine.
 
 ## Prerequisites
 
+- **A full clone of this repository.** The demo scripts install
+  `mcp-server/` and serve `aspice-gui/` from the checkout, so the `demo`
+  folder cannot be copied to another machine on its own — clone the whole
+  repo (the prebuilt `pygrap` wheel is bundled in `demo/win/wheels/`).
 - **Windows 11 x64**
 - A recent **NVIDIA driver** strongly recommended (the LLM runs on GPU; CPU
   fallback works but is slow). ~10 GB of free VRAM is comfortable for the
@@ -56,6 +60,30 @@ incrementally.
 | `GRAP_EMBED_MODEL`   | `bge-m3`                                |
 | `GRAP_WORKSPACE`     | `<repo>/demo/workspace`                 |
 | `ASPICE_GUI_PORT`    | `8080`                                  |
+
+## Performance & scale
+
+Extraction makes **one LLM call per chunk** (plus up to 20% "re-look" calls),
+sequentially. Cost is therefore `total characters / chunk size` calls. The
+panel shows a live ETA once extraction starts; sanity-check the projected
+time before committing to a big corpus.
+
+Knobs in the Persistent Ontology panel:
+
+- **Max files** — start with 5–10 files, grow the graph incrementally
+  (re-running Extend only processes new/changed content).
+- **Chunk size (chars)** — default 800. For large corpora 3000–4000 cuts the
+  number of LLM calls ~4–5x at some granularity cost. **Changing it
+  re-chunks and re-extracts the entire graph**, so pick it before the first
+  big run.
+- **Model** — `qwen2.5:7b-instruct-q4_K_M` is roughly 2x faster than the
+  default 14B and usually adequate for extraction; pull it and set
+  `GRAP_LLM_MODEL` in `demo.env`.
+
+If throughput seems far below a few chunks per second of model output, run
+`ollama ps` while extracting — it must report `100% GPU`. A `cpu`/mixed
+split means the model spilled out of VRAM (close other GPU apps or use a
+smaller model/quant).
 
 ## Troubleshooting
 

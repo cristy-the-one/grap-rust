@@ -3,10 +3,11 @@
 `bootstrap.ps1` installs a prebuilt `pygrap` wheel from this directory so the
 demo machine does not need a Rust toolchain.
 
-**The wheel is intentionally not committed to git** (the repo `.gitignore`
-ignores `wheels/`, and binary build artifacts are kept out of version
-control). It must be produced on a build machine and dropped here, or built
-automatically by `bootstrap.ps1` when a Rust + maturin toolchain is present.
+**The wheel is committed to git** (`.gitignore` carves out
+`demo/win/wheels/pygrap-*.whl` from the general `wheels/` ignore) so that a
+plain `git clone` is enough to run the demo. If it is ever absent,
+`bootstrap.ps1` builds it automatically when a Rust + maturin toolchain is
+present, or tells you how to build it elsewhere.
 
 ## Build it (Python 3.13 x64 + Rust + maturin)
 

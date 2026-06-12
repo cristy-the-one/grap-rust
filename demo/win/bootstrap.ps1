@@ -6,53 +6,104 @@
     dedicated venv (.venv-demo), installs the bundled prebuilt pygrap wheel
     (or builds it when maturin/Rust are present and the wheel is absent),
     installs the GUI/server deps, and writes demo.env wiring the local stack.
+
+    Requires a full grap-rust checkout (mcp-server/, aspice-gui/) - the demo
+    folder cannot be copied out of the repository on its own.
 #>
 $ErrorActionPreference = "Stop"
 $RepoRoot = (Resolve-Path "$PSScriptRoot\..\..").Path
 Write-Host "== grap ro-law ontology demo: bootstrap ==" -ForegroundColor Cyan
 
+# $ErrorActionPreference does not cover native exit codes, so every critical
+# external command goes through Invoke-Step to fail fast instead of letting a
+# broken install report "Bootstrap complete".
+function Invoke-Step {
+    param([string]$What, [scriptblock]$Action)
+    & $Action
+    if ($LASTEXITCODE -ne 0) { throw "$What failed (exit code $LASTEXITCODE)." }
+}
+
+foreach ($required in "mcp-server\pyproject.toml", "aspice-gui\backend\main.py") {
+    if (-not (Test-Path (Join-Path $RepoRoot $required))) {
+        throw ("{0} not found under {1}. The demo needs the full grap-rust checkout; run this script from inside the repository, not from a copied demo folder." -f $required, $RepoRoot)
+    }
+}
+
 try { & nvidia-smi --query-gpu=name,memory.total --format=csv,noheader | ForEach-Object { Write-Host "GPU: $_" } }
 catch { Write-Warning "nvidia-smi not found - Ollama will fall back to CPU (slow)." }
 
 # --- Ollama --------------------------------------------------------------
-if (-not (Get-Command ollama -ErrorAction SilentlyContinue)) {
+. (Join-Path $PSScriptRoot "common.ps1")
+
+$ollama = Resolve-Ollama
+if (-not $ollama) {
     Write-Host "Installing Ollama..." -ForegroundColor Yellow
-    try { winget install --id Ollama.Ollama -e --accept-source-agreements --accept-package-agreements }
-    catch { throw "winget install failed. Install Ollama from https://ollama.com/download then re-run." }
-    if (-not (Get-Command ollama -ErrorAction SilentlyContinue)) {
-        throw "Ollama installed but not on PATH yet. Open a new terminal and re-run this script."
+    if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
+        throw "winget not available. Install Ollama from https://ollama.com/download then re-run this script."
     }
-} else { Write-Host "Ollama present." }
+    Invoke-Step "winget install Ollama" {
+        & winget install --id Ollama.Ollama -e --accept-source-agreements --accept-package-agreements
+    }
+    $ollama = Resolve-Ollama
+    if (-not $ollama) {
+        throw "Ollama installed but not found on PATH or in $env:LOCALAPPDATA\Programs\Ollama. Open a new terminal and re-run this script."
+    }
+}
+Write-Host "Ollama: $ollama" -ForegroundColor Green
+
+# `ollama pull` talks to the local server, so make sure one is running first.
+if (-not (Test-OllamaUp)) { Start-OllamaServer $ollama }
 
 Write-Host "Pulling models (first run downloads ~10GB)..." -ForegroundColor Yellow
-ollama pull qwen2.5:14b-instruct-q4_K_M
-ollama pull bge-m3
+Invoke-Step "ollama pull qwen2.5:14b-instruct-q4_K_M" { & $ollama pull qwen2.5:14b-instruct-q4_K_M }
+Invoke-Step "ollama pull bge-m3" { & $ollama pull bge-m3 }
 
 # --- Python venv ---------------------------------------------------------
-if (-not (Get-Command python -ErrorAction SilentlyContinue)) { throw "Python 3.13 x64 not found on PATH." }
-$ver = (& python -c "import sys;print(f'{sys.version_info.major}.{sys.version_info.minor}')").Trim()
-if ($ver -ne "3.13") { throw "Python $ver found; this demo's bundled pygrap wheel needs Python 3.13 x64." }
-$is64 = (& python -c "import sys;print(sys.maxsize > 2**32)").Trim()
-if ($is64 -ne "True") { throw "32-bit Python found; this demo needs Python 3.13 x64." }
+function Resolve-Python313 {
+    # Try the py launcher pinned to 3.13 first, then plain `python`. Probing
+    # with -c also filters out the Microsoft Store stub, which is on PATH on
+    # pristine systems but only prints an install hint and exits non-zero.
+    $candidates = @(
+        @{ Exe = "py";     Args = @("-3.13") },
+        @{ Exe = "python"; Args = @() }
+    )
+    foreach ($c in $candidates) {
+        $cmd = Get-Command $c.Exe -ErrorAction SilentlyContinue
+        if (-not $cmd) { continue }
+        $probe = & $cmd.Source @($c.Args) -c "import sys;print(f'{sys.version_info.major}.{sys.version_info.minor} {sys.maxsize > 2**32}')" 2>$null
+        if ($LASTEXITCODE -ne 0 -or -not $probe) { continue }
+        $ver, $is64 = -split "$probe"
+        if ($ver -eq "3.13" -and $is64 -eq "True") {
+            return @{ Exe = $cmd.Source; Args = $c.Args }
+        }
+        Write-Host "Skipping $($cmd.Source): Python $ver, 64-bit=$is64 (need 3.13 x64 for the bundled pygrap wheel)."
+    }
+    return $null
+}
+
+$py = Resolve-Python313
+if (-not $py) {
+    throw "Python 3.13 x64 not found (checked 'py -3.13' and 'python'; the Microsoft Store stub does not count). Install it from https://www.python.org/downloads/ then re-run this script."
+}
 
 $venv = Join-Path $RepoRoot ".venv-demo"
-if (-not (Test-Path $venv)) { & python -m venv $venv }
 $vpy = Join-Path $venv "Scripts\python.exe"
-& $vpy -m pip install --upgrade pip
+if (-not (Test-Path $vpy)) {
+    Invoke-Step "venv creation" { & $py.Exe @($py.Args) -m venv $venv }
+}
+Invoke-Step "pip upgrade" { & $vpy -m pip install --upgrade pip }
 
 # --- pygrap wheel (use bundled; build if absent and toolchain present) ---
 $wheelDir = Join-Path $PSScriptRoot "wheels"
 $wheel = Get-ChildItem $wheelDir -Filter "pygrap-*win_amd64.whl" -ErrorAction SilentlyContinue | Select-Object -First 1
 if (-not $wheel) {
     Write-Host "No bundled pygrap wheel found; attempting to build one..." -ForegroundColor Yellow
-    $haveMaturin = ($null -ne (Get-Command maturin -ErrorAction SilentlyContinue)) -or `
-                   (& $vpy -c "import maturin" 2>$null; $LASTEXITCODE -eq 0)
-    $haveCargo = $null -ne (Get-Command cargo -ErrorAction SilentlyContinue)
-    if ($haveCargo) {
-        if (-not (Get-Command maturin -ErrorAction SilentlyContinue)) { & $vpy -m pip install maturin }
+    if (Get-Command cargo -ErrorAction SilentlyContinue) {
+        # maturin must live in the venv: the build runs via `$vpy -m maturin`.
+        Invoke-Step "maturin install" { & $vpy -m pip install maturin }
         $manifest = Join-Path $RepoRoot "crates\pygrap\Cargo.toml"
         Write-Host "Building pygrap wheel (release) - this can take a few minutes..." -ForegroundColor Yellow
-        & $vpy -m maturin build --release -m $manifest --out $wheelDir
+        Invoke-Step "pygrap wheel build" { & $vpy -m maturin build --release -m $manifest --out $wheelDir }
         $wheel = Get-ChildItem $wheelDir -Filter "pygrap-*win_amd64.whl" -ErrorAction SilentlyContinue | Select-Object -First 1
     }
     if (-not $wheel) {
@@ -66,14 +117,14 @@ if (-not $wheel) {
     }
 }
 Write-Host "Installing pygrap wheel: $($wheel.Name)" -ForegroundColor Green
-& $vpy -m pip install --force-reinstall $wheel.FullName
+Invoke-Step "pygrap wheel install" { & $vpy -m pip install --force-reinstall $wheel.FullName }
 
 # --- Server + GUI deps ---------------------------------------------------
 # mcp-server is a real package (declares mcp + PyYAML; pygrap already satisfied
 # by the wheel above). Install it editable so grap_mcp's deps are resolved,
 # then add the FastAPI GUI deps used by aspice-gui/backend.
-& $vpy -m pip install -e (Join-Path $RepoRoot "mcp-server")
-& $vpy -m pip install fastapi "uvicorn[standard]" pydantic
+Invoke-Step "mcp-server install" { & $vpy -m pip install -e (Join-Path $RepoRoot "mcp-server") }
+Invoke-Step "GUI deps install" { & $vpy -m pip install fastapi "uvicorn[standard]" pydantic }
 
 # --- demo.env ------------------------------------------------------------
 $envPath = Join-Path $PSScriptRoot "demo.env"

@@ -67,11 +67,13 @@ sdist/
 var/
 wheels/
 !packaging/wheels/        # bundled distributable wheel(s) for the installer
-# Keep the demo wheel-drop placeholders tracked, but not the wheel binaries.
+# Keep the demo wheels dir tracked, including the bundled pygrap wheel:
+# the win demo promises to work from a plain clone with no Rust toolchain.
 !demo/win/wheels/
 demo/win/wheels/*
 !demo/win/wheels/.gitkeep
 !demo/win/wheels/README.md
+!demo/win/wheels/pygrap-*.whl
 *.egg-info/
 .installed.cfg
 *.egg
