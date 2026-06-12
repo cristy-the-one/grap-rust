@@ -345,9 +345,15 @@ def open_extraction_graph(path: str) -> dict:
 @tiered
 def extend_extraction_graph(path: str, docs_path: str, model: str = None,
                             sim: float = 0.86, relook_ratio: float = 0.2,
-                            max_files: int = None) -> dict:
+                            max_files: int = None, chunk_chars: int = 800,
+                            concurrency: int = 1) -> dict:
     """Sync a durable extraction graph to `docs_path` (new/changed/removed) and
-    persist it, then load its projection as the active KG. Returns sync stats."""
+    persist it, then load its projection as the active KG. Returns sync stats.
+
+    `chunk_chars` controls chunk size (bigger -> fewer LLM calls); changing it
+    on an existing workdir re-chunks and re-extracts everything.
+    `concurrency` runs that many LLM calls in parallel per window (needs a
+    backend that accepts parallel requests, e.g. OLLAMA_NUM_PARALLEL)."""
     denied = _require("operator")
     if denied:
         return denied
@@ -355,7 +361,8 @@ def extend_extraction_graph(path: str, docs_path: str, model: str = None,
         from .kee.graph_extract import extend_graph_ontology
         from .kee.working_graph import WorkingGraph
         out = extend_graph_ontology(path, docs_path, get_provider(model), get_embedder(),
-                                    sim=sim, relook_ratio=relook_ratio, max_files=max_files)
+                                    sim=sim, relook_ratio=relook_ratio, max_files=max_files,
+                                    chunk_chars=chunk_chars, concurrency=concurrency)
         wg = WorkingGraph.open(path, get_embedder())
         _state["kg"] = wg.kg
         _state["extraction_workdir"] = path

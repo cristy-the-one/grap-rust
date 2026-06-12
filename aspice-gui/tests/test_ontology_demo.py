@@ -116,6 +116,92 @@ def test_extend_endpoint_streams_and_persists(tmp_path, monkeypatch):
                                       for n in done["snapshot"]["nodes"])
 
 
+def test_extend_honors_chunk_controls(tmp_path, monkeypatch):
+    # chunk_chars and max_files must reach the extraction pipeline: two long
+    # docs but max_files=1 + a huge chunk size -> exactly one chunk extracted
+    import os, sys, tempfile, json as _json
+    from pathlib import Path as _P
+    root = _P(__file__).resolve().parents[2]
+    sys.path.insert(0, str(root / "aspice-gui"))
+    sys.path.insert(0, str(root / "mcp-server"))
+    os.environ.setdefault("GRAP_WORKSPACE", tempfile.mkdtemp(prefix="gui-test-ws-"))
+
+    import grap_mcp.kee.llm as llm
+    import grap_mcp.kee.embeddings as emb
+    from grap_mcp.kee.llm import StubProvider
+    from grap_mcp.kee.embeddings import HashingEmbedder
+    monkeypatch.setattr(llm, "get_provider", lambda model=None: StubProvider(
+        handler=lambda s, u: _json.dumps({"outcomes": [{"name": "Operator de date",
+                                          "characteristics": []}], "relations": []})))
+    monkeypatch.setattr(emb, "get_embedder", lambda *a, **k: HashingEmbedder())
+
+    from fastapi.testclient import TestClient
+    from backend.main import app
+    client = TestClient(app)
+
+    docs = tmp_path / "docs"; docs.mkdir()
+    long_text = "Operatorul de date raspunde. " * 100          # ~2.9K chars
+    (docs / "a.json").write_text(_json.dumps({"id": "L-1", "text_complet": long_text}),
+                                 encoding="utf-8")
+    (docs / "b.json").write_text(_json.dumps({"id": "L-2", "text_complet": long_text}),
+                                 encoding="utf-8")
+
+    with client.stream("POST", "/api/ontology/extend",
+                       json={"workdir": str(tmp_path / "g"), "corpus_path": str(docs),
+                             "sim": 0.9, "chunk_chars": 20_000, "max_files": 1}) as r:
+        events = [_json.loads(line) for line in r.iter_lines() if line]
+    done = next(e for e in events if e.get("phase") == "done")
+    assert done["added"] == 1
+
+
+def test_extend_endpoint_passes_concurrency(tmp_path, monkeypatch):
+    # `concurrency` must reach the extraction pipeline (windowed parallel LLM
+    # calls); spy on extend_graph_ontology to verify the passthrough.
+    import os, sys, tempfile, json as _json
+    from pathlib import Path as _P
+    root = _P(__file__).resolve().parents[2]
+    sys.path.insert(0, str(root / "aspice-gui"))
+    sys.path.insert(0, str(root / "mcp-server"))
+    os.environ.setdefault("GRAP_WORKSPACE", tempfile.mkdtemp(prefix="gui-test-ws-"))
+
+    import grap_mcp.kee.llm as llm
+    import grap_mcp.kee.embeddings as emb
+    import grap_mcp.kee.graph_extract as gx
+    from grap_mcp.kee.llm import StubProvider
+    from grap_mcp.kee.embeddings import HashingEmbedder
+    monkeypatch.setattr(llm, "get_provider", lambda model=None: StubProvider(
+        handler=lambda s, u: _json.dumps({"outcomes": [{"name": "Operator de date",
+                                          "characteristics": []}], "relations": []})))
+    monkeypatch.setattr(emb, "get_embedder", lambda *a, **k: HashingEmbedder())
+
+    seen = {}
+    real = gx.extend_graph_ontology
+
+    def spy(*args, **kwargs):
+        seen.update(kwargs)
+        return real(*args, **kwargs)
+
+    monkeypatch.setattr(gx, "extend_graph_ontology", spy)
+
+    from fastapi.testclient import TestClient
+    from backend.main import app
+    client = TestClient(app)
+
+    docs = tmp_path / "docs"; docs.mkdir()
+    for i in range(3):
+        (docs / f"d{i}.json").write_text(_json.dumps(
+            {"id": f"L-{i}", "text_complet": f"Operatorul de date {i}."}),
+            encoding="utf-8")
+
+    with client.stream("POST", "/api/ontology/extend",
+                       json={"workdir": str(tmp_path / "g"), "corpus_path": str(docs),
+                             "sim": 0.9, "concurrency": 3}) as r:
+        events = [_json.loads(line) for line in r.iter_lines() if line]
+    assert seen.get("concurrency") == 3
+    done = next(e for e in events if e.get("phase") == "done")
+    assert done["added"] == 3
+
+
 def test_open_snapshot_export(tmp_path, monkeypatch):
     import sys, os, tempfile, json as _json
     from pathlib import Path as _P

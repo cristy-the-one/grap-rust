@@ -74,11 +74,15 @@ class OntologyExtendBody(BaseModel):
     model: Optional[str] = None
     sim: float = 0.86
     max_files: Optional[int] = None
+    chunk_chars: int = 800
+    concurrency: int = 1           # parallel LLM calls per window (1 = sequential)
 
 
 class NeighborsBody(BaseModel):
     node_id: int
     types: Optional[list] = None
+    limit: Optional[int] = None
+    cursor: Optional[str] = None
 
 
 class RelationsFileBody(BaseModel):
@@ -145,6 +149,8 @@ class ExplainBody(BaseModel):
 class RunQueryBody(BaseModel):
     run_id: Optional[str] = None
     event_type: Optional[str] = None
+    limit: Optional[int] = None
+    cursor: Optional[str] = None
 
 
 @app.get("/api/health")
@@ -232,7 +238,8 @@ def legal_graph_build(body: LegalGraphBody) -> dict:
 @app.post("/api/graph/neighbors")
 def graph_neighbors_ep(body: NeighborsBody) -> dict:
     """Live neighbors of a node from the current KG (powers expand-on-click)."""
-    return bridge.call("graph_neighbors", node_id=body.node_id, types=body.types)
+    return bridge.call("graph_neighbors", node_id=body.node_id, types=body.types,
+                       limit=body.limit, cursor=body.cursor)
 
 
 @app.post("/api/legal-graph/from-relations")
@@ -360,7 +367,8 @@ def reconstruct_run(run_id: str) -> dict:
 
 @app.post("/api/events/query")
 def query_events(body: RunQueryBody) -> dict:
-    return bridge.call("query_events", event_type=body.event_type, run_id=body.run_id)
+    return bridge.call("query_events", event_type=body.event_type, run_id=body.run_id,
+                       limit=body.limit, cursor=body.cursor)
 
 
 @app.get("/api/quality")
@@ -561,6 +569,7 @@ def ontology_extend(body: OntologyExtendBody) -> StreamingResponse:
             out = extend_graph_ontology(
                 body.workdir, body.corpus_path, provider, embedder,
                 sim=body.sim, max_files=body.max_files,
+                chunk_chars=body.chunk_chars, concurrency=body.concurrency,
                 progress=lambda ev: q.put(ev))
             snap = ontology_snapshot(out)
             q.put({"phase": "result", "stats": snap["stats"], "snapshot": snap})

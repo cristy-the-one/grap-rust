@@ -328,7 +328,7 @@ function renderAudit(events) {
       el("span", { class: "feed-ts muted small" }, fmtTs(e.ts)))));
 }
 
-function renderEvents(events) {
+function renderEvents(events, page = {}) {
   const f = clear($("#events-feed"));
   if (!events.length) { f.append(el("p", { class: "muted small" }, "No matching events.")); return; }
   events.slice().reverse().forEach((e) => {
@@ -339,6 +339,12 @@ function renderEvents(events) {
       links.length ? el("div", { class: "chips" }, links) : null,
       el("span", { class: "feed-ts muted small" }, fmtTs(e.ts))));
   });
+  if (page.next) {
+    f.append(el("button", {
+      class: "btn btn-ghost small",
+      onclick: () => run(fetchEventsPage),
+    }, `Load more (${events.length}/${page.total})`));
+  }
 }
 
 /* ---------- quality tiles ---------- */
@@ -799,7 +805,7 @@ function nodeColor(kind) { return kind === "entity" ? "#3ecf8e" : "#e8a838"; }
 
 // persistent, growable graph state (expand-on-click adds to it)
 const GW = 880, GH = 620, GPAD = 30;
-let legalGraph = { nodes: [], edges: [], types: [], expanded: new Set() };
+let legalGraph = { nodes: [], edges: [], types: [], expanded: new Set(), cursors: new Map() };
 
 function setLegalGraph(data) {
   legalGraph = {
@@ -807,6 +813,7 @@ function setLegalGraph(data) {
     edges: (data.edges || []).map((e) => ({ ...e })),
     types: data.edge_types || ["cites", "mentions"],
     expanded: new Set(),
+    cursors: new Map(),       // node id -> next_cursor for partially-loaded neighbors
   };
 }
 
@@ -909,7 +916,7 @@ function layoutGraph(host, info, iters = 300, opts = {}) {
         el("div", {}, el("strong", {}, n.title || n.label),
           el("span", { class: "badge", style: "margin-left:.5rem" }, n.kind)),
         el("div", { class: "muted small", style: "margin:.3rem 0" },
-          `${inc.length} edge(s) · click again only expands once`),
+          `${inc.length} edge(s) · click again loads more neighbors when available`),
         el("div", { class: "chips" }, inc.slice(0, 24).map((x) => el("span", { class: "chip" }, x))));
     };
     if (opts.expandOnDouble) {
@@ -925,15 +932,20 @@ function layoutGraph(host, info, iters = 300, opts = {}) {
 }
 
 async function expandNode(node, host, info, opts = {}) {
-  if (legalGraph.expanded.has(node.id)) return;     // already expanded
+  const cursor = legalGraph.cursors.get(node.id) || null;
+  if (legalGraph.expanded.has(node.id) && !cursor) return;   // fully expanded
+  const firstPage = !legalGraph.expanded.has(node.id);
   legalGraph.expanded.add(node.id);
-  if (opts.beforeExpand) {
+  if (firstPage && opts.beforeExpand) {
     const ok = await opts.beforeExpand();
     if (ok === false) { legalGraph.expanded.delete(node.id); return; }
   }
   const r = await run(() => post("/api/graph/neighbors",
-    { node_id: node.id, types: legalGraph.types.length ? legalGraph.types : null }));
+    { node_id: node.id, types: legalGraph.types.length ? legalGraph.types : null,
+      cursor }));
   if (!r || r.status === "error") return;
+  if (r.next_cursor) legalGraph.cursors.set(node.id, r.next_cursor);
+  else legalGraph.cursors.delete(node.id);
   const have = new Set(legalGraph.nodes.map((n) => n.id));
   let added = 0;
   for (const nb of r.neighbors || []) {
@@ -950,9 +962,13 @@ async function expandNode(node, host, info, opts = {}) {
     const key = `${e.source}|${e.target}|${e.type}`;
     if (!ek.has(key)) { ek.add(key); legalGraph.edges.push(e); newEdges++; }
   }
+  const more = r.next_cursor
+    ? ` — ${r.total} total, click again for more` : "";
   if (added || newEdges) {
     layoutGraph(host, info, 160, opts);    // fewer iters: integrate, keep stable
-    toast(`+${added} node(s), +${newEdges} edge(s)`, "ok");
+    toast(`+${added} node(s), +${newEdges} edge(s)${more}`, "ok");
+  } else if (r.next_cursor) {
+    toast(`no new nodes in this page${more}`, "ok");
   } else {
     toast("no further neighbors", "warn");
   }
@@ -1081,14 +1097,23 @@ $("#onto-build").onclick = async () => {
   const workdir = $("#onto-workdir").value.trim();
   const corpus_path = $("#onto-corpus").value.trim();
   const sim = parseFloat($("#onto-sim").value);
+  const maxFiles = parseInt($("#onto-max-files").value, 10);
+  const chunkChars = parseInt($("#onto-chunk-chars").value, 10);
+  const concurrency = parseInt($("#onto-concurrency").value, 10);
   btn.disabled = true;
   status.textContent = "Starting…";
   _ontoOpened = false;     // the graph just changed; re-open before expanding
+  const startedAt = Date.now();
   try {
     const resp = await fetch("/api/ontology/extend", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ workdir, corpus_path, sim: Number.isFinite(sim) ? sim : 0.86 }),
+      body: JSON.stringify({
+        workdir, corpus_path, sim: Number.isFinite(sim) ? sim : 0.86,
+        max_files: Number.isFinite(maxFiles) && maxFiles > 0 ? maxFiles : null,
+        chunk_chars: Number.isFinite(chunkChars) && chunkChars >= 200 ? chunkChars : 800,
+        concurrency: Number.isFinite(concurrency) && concurrency > 1 ? concurrency : 1,
+      }),
     });
     if (!resp.ok || !resp.body) throw new Error(`stream failed: ${resp.status}`);
     const reader = resp.body.getReader();
@@ -1110,7 +1135,14 @@ $("#onto-build").onclick = async () => {
         if (phase === "diff") {
           status.textContent = `diff: ${ev.new ?? 0} new / ${ev.changed ?? 0} changed / ${ev.removed ?? 0} removed`;
         } else if (phase === "chunk") {
-          status.textContent = `extracting ${ev.i}/${ev.n}: ${ev.source}`;
+          let eta = "";
+          if (ev.i > 1) {
+            const perChunk = (Date.now() - startedAt) / (ev.i - 1);
+            const leftMs = perChunk * (ev.n - ev.i + 1);
+            const m = Math.round(leftMs / 60000);
+            eta = m >= 90 ? ` · ~${(m / 60).toFixed(1)}h left` : m >= 1 ? ` · ~${m}m left` : " · <1m left";
+          }
+          status.textContent = `extracting ${ev.i}/${ev.n}: ${ev.source}${eta}`;
         } else if (phase === "done") {
           done = ev;
         } else if (phase === "error") {
@@ -1170,12 +1202,23 @@ $("#btn-runs-all").onclick = () => loadRuns(null);
 $("#btn-runs-prod").onclick = () => loadRuns("production");
 $("#btn-runs-exp").onclick = () => loadRuns("experiment");
 
+let eventsState = { type: null, events: [], next: null };
+
+async function fetchEventsPage() {
+  const r = await post("/api/events/query",
+    { event_type: eventsState.type, cursor: eventsState.next });
+  if (!r || r.status === "error") return r;
+  eventsState.events.push(...(r.events || []));
+  eventsState.next = r.next_cursor || null;
+  renderEvents(eventsState.events, { next: eventsState.next, total: r.total });
+  return r;
+}
+
 $("#btn-query-events").onclick = () =>
   run(async () => {
     const type = $("#event-type").value.trim();
-    const r = await post("/api/events/query", { event_type: type || null });
-    if (r) renderEvents(r.events || []);
-    return r;
+    eventsState = { type: type || null, events: [], next: null };
+    return fetchEventsPage();
   });
 
 /* ---------- quality / audit ---------- */

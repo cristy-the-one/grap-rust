@@ -70,6 +70,25 @@ def test_zero_budget_records_no_relook(tmp_path):
     assert len(provider.calls) == 1
 
 
+def test_graph_extract_concurrency_processes_all_chunks(tmp_path):
+    names = ("Alpha", "Beta", "Gamma", "Delta")
+
+    def handler(system, user):
+        for name in names:
+            if name.lower() in user:
+                return _frag_json([{"name": name, "characteristics": []}])
+        return "{}"
+
+    provider = StubProvider(handler=handler)
+    chunks = [(f"c#{i}", f"about {n.lower()}") for i, n in enumerate(names)]
+    out = graph_extract_ontology(chunks, provider, HashingEmbedder(), sim=0.9,
+                                 workdir=str(tmp_path), concurrency=3)
+    assert out["chunks"] == 4
+    got = [po["name"] for po in out["ontology"]["process_outcomes"]]
+    assert got == list(names)        # all chunks processed, upserted in order
+    assert len(provider.calls) == 4
+
+
 def test_pipeline_graph_augmented_matches_schema(tmp_path):
     from grap_mcp.kee import pipeline
 

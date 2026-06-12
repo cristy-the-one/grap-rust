@@ -56,6 +56,25 @@ def test_extend_changed_and_removed(tmp_path):
     assert out["changed"] == 1 and out["removed"] == 1
 
 
+def test_extend_honors_chunk_chars(tmp_path):
+    # bigger chunks -> fewer chunks -> fewer LLM calls (the cost lever for
+    # large corpora); default stays 800
+    docs = tmp_path / "docs"; docs.mkdir()
+    (docs / "a.txt").write_text("alpha topic " * 200, encoding="utf-8")  # ~2.4K chars
+
+    p_small = StubProvider(handler=_handler)
+    out_small = extend_graph_ontology(tmp_path.joinpath("g-small").as_posix(),
+                                      str(docs), p_small, HashingEmbedder(), sim=0.9)
+    assert out_small["added"] > 1                  # default 800-char chunks
+
+    p_big = StubProvider(handler=_handler)
+    out_big = extend_graph_ontology(tmp_path.joinpath("g-big").as_posix(),
+                                    str(docs), p_big, HashingEmbedder(), sim=0.9,
+                                    chunk_chars=10_000)
+    assert out_big["added"] == 1                   # whole doc in one chunk
+    assert len(p_big.calls) < len(p_small.calls)
+
+
 def test_server_lifecycle_tools(tmp_path, monkeypatch):
     import grap_mcp.server as s
     from grap_mcp.kee.llm import StubProvider
@@ -102,3 +121,73 @@ def test_extend_progress_default_none_is_unchanged(tmp_path):
     out = extend_graph_ontology(wd, str(docs), StubProvider(handler=_handler),
                                 HashingEmbedder(), sim=0.9)
     assert out["added"] == 1
+
+
+def _three_docs(tmp_path):
+    docs = tmp_path / "docs"; docs.mkdir()
+    (docs / "a.txt").write_text("alpha topic", encoding="utf-8")
+    (docs / "b.txt").write_text("beta topic", encoding="utf-8")
+    (docs / "c.txt").write_text("gamma topic", encoding="utf-8")
+    return docs
+
+
+def test_extend_concurrency_one_matches_default(tmp_path):
+    docs = _three_docs(tmp_path)
+    out_default = extend_graph_ontology(str(tmp_path / "g1"), str(docs),
+                                        StubProvider(handler=_handler),
+                                        HashingEmbedder(), sim=0.9)
+    out_c1 = extend_graph_ontology(str(tmp_path / "g2"), str(docs),
+                                   StubProvider(handler=_handler),
+                                   HashingEmbedder(), sim=0.9, concurrency=1)
+    assert out_c1 == out_default
+
+
+def test_extend_concurrency_processes_all_chunks(tmp_path):
+    docs = _three_docs(tmp_path)
+    p = StubProvider(handler=_handler)
+    out = extend_graph_ontology(str(tmp_path / "g"), str(docs), p,
+                                HashingEmbedder(), sim=0.9, concurrency=4)
+    assert out["added"] == 3
+    names = {o["name"] for o in out["ontology"]["process_outcomes"]}
+    assert names == {"Alpha", "Beta", "Gamma"}
+    assert len(p.calls) == 3
+
+
+def test_extend_concurrent_upserts_in_chunk_order(tmp_path):
+    # The earliest chunk finishes LAST, yet upserts must land in chunk order.
+    # process_outcomes is ordered by node id, i.e. by upsert order.
+    import time
+    delays = {"alpha": 0.2, "beta": 0.1, "gamma": 0.0}
+
+    def slow(system, user):
+        for k, d in delays.items():
+            if k in user:
+                time.sleep(d)
+        return _handler(system, user)
+
+    docs = _three_docs(tmp_path)
+    out = extend_graph_ontology(str(tmp_path / "g"), str(docs),
+                                StubProvider(handler=slow), HashingEmbedder(),
+                                sim=0.9, concurrency=4)
+    names = [o["name"] for o in out["ontology"]["process_outcomes"]]
+    assert names == ["Alpha", "Beta", "Gamma"]
+
+
+def test_extend_concurrent_progress_in_order(tmp_path):
+    docs = _three_docs(tmp_path)
+    events = []
+    extend_graph_ontology(str(tmp_path / "g"), str(docs),
+                          StubProvider(handler=_handler), HashingEmbedder(),
+                          sim=0.9, concurrency=2, progress=events.append)
+    assert events[0]["phase"] == "diff" and events[-1]["phase"] == "done"
+    assert [e["i"] for e in events if e["phase"] == "chunk"] == [1, 2, 3]
+
+
+def test_server_extend_accepts_concurrency(tmp_path, monkeypatch):
+    import grap_mcp.server as s
+    monkeypatch.setattr(s, "get_provider", lambda model=None: StubProvider(handler=_handler))
+    monkeypatch.setattr(s, "get_embedder", lambda: HashingEmbedder())
+    docs = _three_docs(tmp_path)
+    ext = s.extend_extraction_graph(str(tmp_path / "g"), str(docs), sim=0.9,
+                                    concurrency=2)
+    assert ext["status"] == "ok" and ext["added"] == 3

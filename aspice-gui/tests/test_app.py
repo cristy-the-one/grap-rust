@@ -103,6 +103,56 @@ def test_graph_neighbors_expand_uses_real_ids(tmp_path):
     assert all(x["type"] == "cites" for x in nb["edges"])
 
 
+def test_graph_neighbors_pagination_cursor_fetches_next_page(tmp_path):
+    # a hub with >100 neighbors must page: first call returns next_cursor,
+    # second call with that cursor returns the remaining (disjoint) neighbors
+    relfile = tmp_path / "relations.json"
+    relfile.write_text(json.dumps(
+        [{"from": "Hub", "type": "rel", "to": f"Spoke {i}"} for i in range(120)]),
+        encoding="utf-8")
+    r = client.post("/api/legal-graph/from-relations",
+                    json={"path": str(relfile), "top": 200}).json()
+    assert r["status"] == "ok" and r["counts"]["relations"] == 120
+    hub = r["edges"][0]["source"]
+
+    p1 = client.post("/api/graph/neighbors",
+                     json={"node_id": hub, "types": ["rel"]}).json()
+    assert p1["status"] == "ok"
+    assert p1["total"] == 120 and p1["returned"] == 100
+    assert p1["next_cursor"]
+
+    p2 = client.post("/api/graph/neighbors",
+                     json={"node_id": hub, "types": ["rel"],
+                           "cursor": p1["next_cursor"]}).json()
+    assert p2["status"] == "ok"
+    assert p2["returned"] == 20 and p2["next_cursor"] is None
+    ids1 = {n["id"] for n in p1["neighbors"]}
+    ids2 = {n["id"] for n in p2["neighbors"]}
+    assert len(ids1) == 100 and len(ids2) == 20 and not (ids1 & ids2)
+
+    lim = client.post("/api/graph/neighbors",
+                      json={"node_id": hub, "types": ["rel"], "limit": 10}).json()
+    assert lim["returned"] == 10 and lim["next_cursor"]
+
+
+def test_query_events_pagination_cursor_fetches_next_page(tmp_path):
+    # record two events of the same type, then page through them one at a time
+    for i in range(2):
+        relfile = tmp_path / f"relations-{i}.json"
+        relfile.write_text(json.dumps(
+            [{"from": f"A{i}", "type": "rel", "to": f"B{i}"}]), encoding="utf-8")
+        assert client.post("/api/legal-graph/from-relations",
+                           json={"path": str(relfile)}).json()["status"] == "ok"
+    q = {"event_type": "relations_graph_loaded", "limit": 1}
+    p1 = client.post("/api/events/query", json=q).json()
+    assert p1["returned"] == 1 and p1["total"] >= 2
+    assert p1["next_cursor"]
+    p2 = client.post("/api/events/query",
+                     json={**q, "cursor": p1["next_cursor"]}).json()
+    assert p2["returned"] == 1
+    assert p2["events"] != p1["events"]
+
+
 def test_project_relations_endpoint_adds_edges():
     rels = [{"from": "Agency", "type": "concedes", "to": "Company"},
             {"from": "Agency", "type": "concedes", "to": "Company"},   # dup edge ok

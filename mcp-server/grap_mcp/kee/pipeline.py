@@ -74,7 +74,7 @@ def read_chunks(root: str, max_files: Optional[int] = None,
 
 def extract_ontology(docs_path: str, provider, embedder, sim: float = 0.86,
                      version: str = "kee-candidate",
-                     max_files: Optional[int] = None,
+                     max_files: Optional[int] = None, chunk_chars: int = 800,
                      graph_augmented: bool = True) -> Dict[str, Any]:
     """Run the extraction pipeline and return the candidate ontology + run stats.
 
@@ -82,7 +82,7 @@ def extract_ontology(docs_path: str, provider, embedder, sim: float = 0.86,
     (live KG context + entity resolution + relation grounding + bounded
     re-looks). `graph_augmented=False` runs the legacy stateless path
     (per-chunk extract -> embedding reconcile)."""
-    chunks = read_chunks(docs_path, max_files=max_files)
+    chunks = read_chunks(docs_path, max_files=max_files, chunk_chars=chunk_chars)
     if graph_augmented:
         from .graph_extract import graph_extract_ontology
         return graph_extract_ontology(chunks, provider, embedder,

@@ -334,6 +334,18 @@
               <label for="onto-sim">Dedup similarity</label>
               <input id="onto-sim" type="number" step="0.01" min="0" max="1" value="0.86" />
             </div>
+            <div>
+              <label for="onto-max-files" title="Cap how many corpus files are read (blank = all). One LLM call per chunk — start small.">Max files</label>
+              <input id="onto-max-files" type="number" min="1" step="1" placeholder="all" />
+            </div>
+            <div>
+              <label for="onto-chunk-chars" title="Chunk size in characters. Bigger chunks = fewer LLM calls (faster, coarser); changing it re-extracts the whole graph.">Chunk size (chars)</label>
+              <input id="onto-chunk-chars" type="number" min="200" step="100" value="800" />
+            </div>
+            <div>
+              <label for="onto-concurrency" title="LLM calls in flight at once. Needs a backend that accepts parallel requests (e.g. Ollama with OLLAMA_NUM_PARALLEL). 1 = fully sequential extraction.">Parallel LLM calls</label>
+              <input id="onto-concurrency" type="number" min="1" step="1" value="1" />
+            </div>
             <div class="actions">
               <button type="button" class="btn btn-primary" id="onto-build">Build / Grow Ontology</button>
             </div>
