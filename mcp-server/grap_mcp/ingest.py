@@ -57,10 +57,10 @@ def ingest_paths(kg, root: str, embedder=None) -> Dict[str, Any]:
             if len(labels) < 5:
                 labels.append(label)
             # Capture core content hash for consistency with KEE/extraction (provenance).
-            if hasattr(kg, "node_content_hash"):
+            if hasattr(kg, "get_node_content_hash"):
                 try:
-                    h = kg.node_content_hash(nid)
-                    # could store in manifest or side, for now just computed
+                    h = kg.get_node_content_hash(nid)
+                    # could store in manifest or side, for now just computed (h is hex str)
                 except Exception:
                     pass
     return {"files": len(files), "nodes_added": nodes_added, "labels": labels,

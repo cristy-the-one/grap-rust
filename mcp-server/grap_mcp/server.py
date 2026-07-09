@@ -401,8 +401,8 @@ def extract_ontology(path: str, out_path: str = None, sim: float = 0.86,
             yaml_text, metadata={"kind": "proposed", "source": path})
         try:
             _get_workspace().record_event(
-                "ontology_proposed", path,
-                details={"outcomes": str(len(onto["process_outcomes"])),
+                "ontology_proposed", version.hash,
+                details={"source": path, "outcomes": str(len(onto["process_outcomes"])),
                          "provider": provider.name, "embedder": embedder.name})
         except Exception:
             logger.warning("audit record_event failed for ontology_proposed", exc_info=True)
@@ -413,13 +413,13 @@ def extract_ontology(path: str, out_path: str = None, sim: float = 0.86,
             "provider": provider.name,
             "model": getattr(provider, "model", None),
             "embedder": embedder.name,
-            "chunks": result["chunks"],
-            "fragments": result["fragments"],
+            "chunks": result.get("chunks", 0),
+            "fragments": result.get("fragments", result.get("relooks", 0)),
             "process_outcomes": [
                 {"id": o["id"], "name": o["name"],
                  "characteristics": o["required_characteristics"]}
                 for o in onto["process_outcomes"]],
-            "provenance": onto["provenance"],
+            "provenance": onto.get("provenance", []),
             "relations": onto.get("relations", []),
             "validation": validation,
             "concept_hashes": onto.get("concept_hashes", {}),
@@ -559,7 +559,7 @@ def adopt_proposed_ontology(version_hash: str, rationale: str = None) -> dict:
                 verified = 0
                 for oid, h in list(chashes.items())[:5]:  # sample
                     # Note: oids in proposal may not directly map to nodes, but we can note.
-                    if h and kg.node_content_hash:  # if method
+                    if h and hasattr(kg, "get_node_content_hash"):
                         # simplistic, would need mapping; for now just presence
                         verified += 1
                 if chashes:

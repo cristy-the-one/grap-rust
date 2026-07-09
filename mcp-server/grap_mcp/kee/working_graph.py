@@ -139,12 +139,12 @@ class WorkingGraph:
         self.chars.setdefault(node, [])
         self._parent[node] = node
         # Capture core content hash for integrity, provenance, and future dedup using hardened node hashes.
-        if hasattr(self.kg, "node_content_hash"):
+        if hasattr(self.kg, "get_node_content_hash"):
             try:
-                h = self.kg.node_content_hash(node)
+                h = self.kg.get_node_content_hash(node)
                 if h:
-                    self.concept_hashes[node] = hhex = "".join(f"{b:02x}" for b in h)
-                    self._hash_to_node[hhex] = node
+                    self.concept_hashes[node] = h
+                    self._hash_to_node[h] = node
             except Exception:
                 pass
         try:
@@ -508,13 +508,12 @@ class WorkingGraph:
             nid = self.kg.add_node(text=self.canonical[cid], label="concept",
                                    embedding=self._embed_one(self.canonical[cid]))
             assert nid == cid, "projection must reproduce dense concept ids"
-            if hasattr(self.kg, "node_content_hash"):
+            if hasattr(self.kg, "get_node_content_hash"):
                 try:
-                    h = self.kg.node_content_hash(nid)
+                    h = self.kg.get_node_content_hash(nid)
                     if h:
-                        hhex = "".join(f"{b:02x}" for b in h)
-                        self.concept_hashes[nid] = hhex
-                        self._hash_to_node[hhex] = nid
+                        self.concept_hashes[nid] = h
+                        self._hash_to_node[h] = nid
                 except Exception:
                     pass
             for alias in self.aliases_by_node.get(cid, []):

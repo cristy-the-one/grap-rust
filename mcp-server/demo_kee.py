@@ -94,6 +94,15 @@ def main() -> int:
         print("Using offline StubProvider + HashingEmbedder "
               "(pass --real + GRAP_LLM_BASE_URL for a real model)")
 
+    # Wire the demo-controlled provider/embedder into the server module's factories.
+    # This ensures extract_ontology (and other KEE tools) use our stub (with corpus-specific
+    # responses) + hashing embedder instead of defaulting to a network LLM.
+    import grap_mcp.kee.llm as llm_mod
+    import grap_mcp.kee.embeddings as emb_mod
+    llm_mod.get_provider = lambda model=None: provider
+    emb_mod.get_embedder = lambda: embedder
+    os.environ["GRAP_LLM_STUB"] = "1"
+
     banner("1. Extract + reconcile  (3 docs, 2 describe the same concept) - using server path for versioning")
     os.environ["GRAP_WORKSPACE"] = str(workdir / "ws")
     os.environ["GRAP_ROLE"] = "operator"
@@ -115,26 +124,30 @@ def main() -> int:
     prop = s.get_proposed_ontology(ext_res.get("version_hash"))
     print("get_proposed keys:", list(prop.keys()) if isinstance(prop, dict) else type(prop))
 
-    banner("4. Adopt with rationale + ingest evidence + gaps")
+    banner("4. Prepare target KG then Adopt with rationale (full governance loop)")
+    kgp = str(workdir / "kg")
+    print("create_knowledge_graph:", s.create_knowledge_graph(kgp)["status"])
     adopt = s.adopt_proposed_ontology(ext_res.get("version_hash"), rationale="Demo: reviewed proposal with core hashes and graph-aug extraction; adopting for use.")
     print("adopt status:", adopt.get("status") if isinstance(adopt, dict) else adopt)
 
-    kgp = str(workdir / "kg")
-    print("create_knowledge_graph:", s.create_knowledge_graph(kgp)["status"])
+    banner("5. Ingest evidence + use adopted ontology for gap detection")
     ev = workdir / "evidence"
     ev.mkdir()
     (ev / "verification.md").write_text(CORPUS["verification.md"], encoding="utf-8")
     ing = s.ingest_documents(str(ev))
     print(f"ingest evidence: {ing['nodes_added']} nodes")
-    gaps = s.detect_gaps()
+    gaps = s.detect_gaps(wire_format="json")
     print(f"\ngaps_found={gaps.get('gaps_found')} (demo shows unmet characteristics):")
     for g in gaps.get("gaps", [])[:3]:
         print(f"  GAP {g.get('outcome_id')}:{g.get('missing_characteristic')}")
 
-    print("\nDone (updated portable non-banal KEE demo). "
-          "Shows graph-aug extract via server (versioned proposal with hashes), "
-          "review with list/get, adopt with rationale, then use in gaps. "
-          "All offline with stub. Pass --real for live model (portable with local Ollama).")
+    print("\nDone (portable non-banal KEE demo). "
+          "Shows: graph-augmented extract (working graph context during proposal), "
+          "version_hash + concept_hashes for provenance/dedup, "
+          "full governance: extract (propose) → list/get proposed → adopt with required rationale (audited), "
+          "then adopt drives gap detection on fresh evidence ingest. "
+          "Stub+temp dirs by default (no LLM, fully offline/portable). "
+          "Pass --real + GRAP_LLM_BASE_URL for live model (still portable with local Ollama).")
     return 0
 
 
