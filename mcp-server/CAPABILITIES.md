@@ -9,9 +9,14 @@ Every mutating capability emits a Workspace audit event (see `get_audit_log`).
 - **ingest_documents(path)** → `{status, files, nodes_added, embedded}`. Chunk + add .md/.txt docs
   under `path` into the loaded KG as real evidence (optionally with embeddings). Emits `documents_ingested`.
 - **extract_ontology(path, out_path=None, sim=0.86)** → `{status, out_path, version_hash, process_outcomes,
-  provenance, validation, ...}`. Knowledge Extraction Engine: LLM proposes ontology fragments from
-  documents, reconciled by embedding similarity, written as a **proposed** candidate and versioned for
-  human review (does not become active until loaded). Emits `ontology_proposed`. See `grap_mcp/kee/`.
+  provenance, validation, concept_hashes, ...}`. Knowledge Extraction Engine: LLM proposes ontology fragments from
+  documents (graph-augmented context by default), reconciled (now with core content-hash exact dedup support),
+  written as a **proposed** candidate and versioned for human review. Emits `ontology_proposed`. See `grap_mcp/kee/`.
+- **list_proposed_ontologies()** → list of proposed versions (with hashes/sources) for review.
+- **get_proposed_ontology(version_hash)** → raw/parsed proposal details (incl. concept_hashes for provenance).
+- **adopt_proposed_ontology(version_hash, rationale)** → adopt after review (audited, rationale required); loads and activates.
+
+(See `mcp-server/demo_kee.py` for a portable stub-based example of the extraction + review flow. For a more complete non-banal demo exercising list/get/adopt with hashes and graph-aug, call the server tools directly in sequence after `extract_ontology` (stub by default for portability).)
 - **load_ontology(path)** → `{status, version_hash, outcomes_projected, characteristics_projected}`.
   Parse an ASPICE ontology YAML, project it into the KG, and version it. Emits `ontology_loaded`.
 

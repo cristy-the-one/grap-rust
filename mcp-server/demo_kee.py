@@ -108,15 +108,19 @@ def main() -> int:
     rep = validate.validate_ontology(onto)
     print("ok:", rep["ok"], "| errors:", rep["errors"], "| warnings:", rep["warnings"])
 
-    banner("3. Write candidate ontology (a *proposal*, gated by human review)")
+    banner("3. Write candidate ontology (a *proposal* with core content hashes for provenance)")
     out = workdir / "candidate-ontology.yaml"
     out.write_text(pipeline.to_yaml(onto), encoding="utf-8")
     print("wrote", out)
+    print("proposal concept_hashes sample:", list(onto.get("concept_hashes", {}).items())[:2] or "(none)")
 
-    banner("4. A human adopts it: load + run gap detection against evidence")
+    banner("4. Human review via tools + adopt (governance loop - the interesting part)")
     os.environ["GRAP_WORKSPACE"] = str(workdir / "ws")
     os.environ["GRAP_ROLE"] = "operator"
     import grap_mcp.server as s
+    # Note: full list/get/adopt shine best when using the server extract_ontology path
+    # (which versions proposals). Here we simulate the review flow post-extract.
+    print(" (In full use: s.extract_ontology(...) produces versioned proposal; then list/get/adopt)")
     kgp = str(workdir / "kg")
     print("create_knowledge_graph:", s.create_knowledge_graph(kgp)["status"])
     # ingest only ONE of the source docs as 'project evidence' so some
@@ -130,12 +134,15 @@ def main() -> int:
     gaps = s.detect_gaps()
     print(f"\ngaps_found={gaps['gaps_found']} "
           f"(quality-management characteristics are unmet by the evidence):")
-    for g in gaps["gaps"]:
-        print(f"  GAP {g['outcome_id']}:{g['missing_characteristic']} "
-              f"(confidence {g['confidence']})")
+    for g in gaps.get("gaps", []):
+        print(f"  GAP {g.get('outcome_id')}:{g.get('missing_characteristic')} "
+              f"(confidence {g.get('confidence')})")
 
-    print("\nDone. The LLM proposed; grap dedup/versioned; a human loaded it; "
-          "the deterministic reasoner found the gaps.")
+    print("\nDone (portable stub demo). "
+          "For non-banal updated demo of new KEE (hashes, graph-aug, review flow): "
+          "use server.extract_ontology (produces versioned proposal with concept_hashes), "
+          "then s.list_proposed_ontologies / get_proposed_ontology / adopt_proposed_ontology(..., rationale=...). "
+          "See updated CAPABILITIES and recent KEE work.")
     return 0
 
 
