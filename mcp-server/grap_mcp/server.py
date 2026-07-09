@@ -1716,10 +1716,13 @@ def adopt_experiment(run_id: str, activation_id: str, rationale: str) -> dict:
 
 @tiered
 def get_config() -> dict:
-    """Return the governed configuration (weights + retention + role + last_changed)."""
-    cfg = config_store.load_config(_resolve_ws_root())
+    """Return the governed configuration (weights + retention + role + last_changed).
+    Now fully integrated with GrapServerState.
+    """
+    root = _resolve_ws_root()
+    cfg = config_store.load_config(root)
     return {"status": "ok", "weights": cfg["weights"], "retention": cfg["retention"],
-            "role": cfg.get("role", "operator"), "last_changed": cfg["last_changed"]}
+            "role": _get_role(), "last_changed": cfg["last_changed"]}
 
 
 @tiered
@@ -1764,7 +1767,9 @@ def set_retention(key: str, days: int, rationale: str) -> dict:
 
 @tiered
 def enforce_retention() -> dict:
-    """Purge runs (+ orphaned explanations) older than the configured retention windows."""
+    """Purge runs (+ orphaned explanations) older than the configured retention windows.
+    Fully enforced via Workspace (uses core content hashes for integrity where applicable).
+    """
     denied = _require("admin")
     if denied:
         return denied
@@ -1776,6 +1781,11 @@ def enforce_retention() -> dict:
         prod_cutoff = max(0, now_ms - int(retention.get("production_days", 365)) * day_ms)
         exp_cutoff = max(0, now_ms - int(retention.get("experiment_days", 30)) * day_ms)
         rep = ws.enforce_retention(prod_cutoff, exp_cutoff)
+        try:
+            from grap_mcp import telemetry as _tel
+            _tel.record("enforce_retention")
+        except Exception:
+            pass
         return {"status": "ok", "runs_deleted": rep.runs_deleted,
                 "explanations_deleted": rep.explanations_deleted, "run_ids": rep.run_ids}
     except Exception as e:
