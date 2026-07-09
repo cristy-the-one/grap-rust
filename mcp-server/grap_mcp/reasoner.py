@@ -125,6 +125,11 @@ def _structural_signals(kg, outcome_id: str, characteristic: str) -> List[Dict[s
     if hasattr(kg, "has_characteristic"):
         try:
             if kg.has_characteristic(outcome_id, characteristic):
+                if _session:
+                    try:
+                        _session.record_query(f"structural:{outcome_id}:{characteristic}", 1)
+                    except Exception:
+                        pass
                 return [{"kind": "structural", "detail": f"{outcome_id}:{characteristic} present"}]
         except Exception:
             return []
