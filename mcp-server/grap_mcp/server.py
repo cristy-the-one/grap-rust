@@ -807,8 +807,12 @@ def get_context_bundle(query: str, max_results: int = 20, token_budget: int = 20
 
 @tiered
 def get_blast_radius(node_id: int, relations: list = None, max_depth: int = 10,
-                     limit: int = None, cursor: str = None) -> dict:
-    """Transitive dependents of a node — what would be impacted if it changes."""
+                     limit: int = None, cursor: str = None,
+                     wire_format: str = "json") -> dict:
+    """Transitive dependents of a node — what would be impacted if it changes.
+
+    Supports ``wire_format="compact"`` for token-efficient #MUNCH encoding.
+    """
     denied = _require("operator")
     if denied:
         return denied
@@ -818,14 +822,20 @@ def get_blast_radius(node_id: int, relations: list = None, max_depth: int = 10,
     try:
         impacted = kg.blast_radius(node_id, relations, max_depth)
         page, meta = paginate(impacted, limit, cursor)
-        return {"status": "ok", "center": node_id, "impacted": page, **meta}
+        r = {"status": "ok", "center": node_id, "impacted": page, **meta}
+        from .encoding import encode_response
+        payload, _meta = encode_response("get_blast_radius", r, requested_format=wire_format)
+        return payload
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
 
 @tiered
-def find_cycles(limit: int = None, cursor: str = None) -> dict:
-    """Dependency cycles (strongly-connected components) in the current KG."""
+def find_cycles(limit: int = None, cursor: str = None, wire_format: str = "json") -> dict:
+    """Dependency cycles (strongly-connected components) in the current KG.
+
+    Supports ``wire_format="compact"`` for token-efficient #MUNCH encoding.
+    """
     denied = _require("operator")
     if denied:
         return denied
@@ -835,14 +845,21 @@ def find_cycles(limit: int = None, cursor: str = None) -> dict:
     try:
         cycles = kg.find_cycles()
         page, meta = paginate(cycles, limit, cursor)
-        return {"status": "ok", "cycle_count": meta["total"], "cycles": page, **meta}
+        r = {"status": "ok", "cycle_count": meta["total"], "cycles": page, **meta}
+        from .encoding import encode_response
+        payload, _meta = encode_response("find_cycles", r, requested_format=wire_format)
+        return payload
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
 
 @tiered
-def find_orphans(entry_points: list = None, limit: int = None, cursor: str = None) -> dict:
-    """Live nodes unreachable from the given entry points (or from KG roots)."""
+def find_orphans(entry_points: list = None, limit: int = None, cursor: str = None,
+                wire_format: str = "json") -> dict:
+    """Live nodes unreachable from the given entry points (or from KG roots).
+
+    Supports ``wire_format="compact"`` for token-efficient #MUNCH encoding.
+    """
     denied = _require("operator")
     if denied:
         return denied
@@ -852,14 +869,20 @@ def find_orphans(entry_points: list = None, limit: int = None, cursor: str = Non
     try:
         orphans = kg.find_orphans(entry_points)
         page, meta = paginate(orphans, limit, cursor)
-        return {"status": "ok", "orphan_count": meta["total"], "orphans": page, **meta}
+        r = {"status": "ok", "orphan_count": meta["total"], "orphans": page, **meta}
+        from .encoding import encode_response
+        payload, _meta = encode_response("find_orphans", r, requested_format=wire_format)
+        return payload
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
 
 @tiered
-def kg_health() -> dict:
-    """Structural health snapshot of the current KG (counts, cycles, orphans, top-central)."""
+def kg_health(wire_format: str = "json") -> dict:
+    """Structural health snapshot of the current KG (counts, cycles, orphans, top-central).
+
+    Supports ``wire_format="compact"`` (falls back to JSON if no schema).
+    """
     denied = _require("operator")
     if denied:
         return denied
@@ -869,7 +892,9 @@ def kg_health() -> dict:
     try:
         h = kg.health()
         h["status"] = "ok"
-        return h
+        from .encoding import encode_response
+        payload, _meta = encode_response("kg_health", h, requested_format=wire_format)
+        return payload
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
@@ -1729,7 +1754,7 @@ def list_capabilities() -> dict:
         "tier_of": dict(_TIERS),
         "tier_note": "Tools not in tier_of are 'standard'. Set GRAP_TOOL_TIER=core|standard|full.",
         "auth": "deferred (POC: no authentication/authorization)",
-        "wire_note": "Several tools (graph_neighbors, list_runs, query_events, detect_gaps, get_audit_log) accept optional wire_format='json'|'compact' for #MUNCH token-efficient encoding when pygrap.wire is available.",
+        "wire_note": "Many tools (graph_neighbors, list_runs, query_events, detect_gaps, get_audit_log, get_blast_radius, find_cycles, find_orphans, kg_health) accept optional wire_format='json'|'compact' for #MUNCH token-efficient encoding when pygrap.wire is available.",
     }
 
 

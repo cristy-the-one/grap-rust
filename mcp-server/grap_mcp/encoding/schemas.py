@@ -36,4 +36,25 @@ SCHEMAS = {
             ("g", "gaps", ["outcome_id", "characteristic", "score"], []),
         ],
     },
+    "get_blast_radius": {
+        "enc_id": "br1",
+        "scalars": ["status", "center", "total", "returned", "next_cursor"],
+        "tables": [
+            ("i", "impacted", ["id"], []),
+        ],
+    },
+    "find_orphans": {
+        "enc_id": "fo1",
+        "scalars": ["status", "orphan_count", "total", "returned", "next_cursor"],
+        "tables": [
+            ("o", "orphans", ["id"], []),
+        ],
+    },
+    "find_cycles": {
+        "enc_id": "fc1",
+        "scalars": ["status", "cycle_count", "total", "returned", "next_cursor"],
+        "tables": [
+            ("c", "cycles", ["cycle"], []),  # cycles are lists; represent as stringified for wire POC
+        ],
+    },
 }
