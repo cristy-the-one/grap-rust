@@ -94,56 +94,47 @@ def main() -> int:
         print("Using offline StubProvider + HashingEmbedder "
               "(pass --real + GRAP_LLM_BASE_URL for a real model)")
 
-    banner("1. Extract + reconcile  (3 docs, 2 describe the same concept)")
-    result = pipeline.extract_ontology(str(docs), provider, embedder, sim=0.82)
-    onto = result["ontology"]
-    print(f"chunks={result['chunks']}  fragments={result['fragments']}  "
-          f"-> {len(onto['process_outcomes'])} canonical outcomes after dedup")
-    for o in onto["process_outcomes"]:
-        srcs = ", ".join(onto["provenance"].get(o["id"], []))
-        print(f"  - {o['name']}  [{', '.join(o['required_characteristics'])}]")
-        print(f"      from: {srcs}")
-
-    banner("2. Validate the candidate")
-    rep = validate.validate_ontology(onto)
-    print("ok:", rep["ok"], "| errors:", rep["errors"], "| warnings:", rep["warnings"])
-
-    banner("3. Write candidate ontology (a *proposal* with core content hashes for provenance)")
-    out = workdir / "candidate-ontology.yaml"
-    out.write_text(pipeline.to_yaml(onto), encoding="utf-8")
-    print("wrote", out)
-    print("proposal concept_hashes sample:", list(onto.get("concept_hashes", {}).items())[:2] or "(none)")
-
-    banner("4. Human review via tools + adopt (governance loop - the interesting part)")
+    banner("1. Extract + reconcile  (3 docs, 2 describe the same concept) - using server path for versioning")
     os.environ["GRAP_WORKSPACE"] = str(workdir / "ws")
     os.environ["GRAP_ROLE"] = "operator"
     import grap_mcp.server as s
-    s._state.reset()  # clean for portable demo runs
-    # Note: full list/get/adopt shine best when using the server extract_ontology path
-    # (which versions proposals). Here we simulate the review flow post-extract.
-    print(" (In full use: s.extract_ontology(...) produces versioned proposal; then list/get/adopt)")
+    s._state.reset()  # ensure clean portable state
+    # Use server extract which versions the proposal with hashes etc.
+    ext_res = s.extract_ontology(str(docs), out_path=str(workdir / "candidate-ontology.yaml"), sim=0.82)
+    print("extract_ontology status:", ext_res.get("status"))
+    print("version_hash:", ext_res.get("version_hash"))
+    print("concept_hashes sample:", list(ext_res.get("concept_hashes", {}).items())[:2] or "(none)")
+    print("process_outcomes:", len(ext_res.get("process_outcomes", [])))
+
+    banner("2. Validate (via proposal)")
+    # Validation is in the extract result
+    print("validation:", ext_res.get("validation"))
+
+    banner("3. Human review via tools (list, get) - non-banal governance")
+    print("list_proposed:", s.list_proposed_ontologies())
+    prop = s.get_proposed_ontology(ext_res.get("version_hash"))
+    print("get_proposed keys:", list(prop.keys()) if isinstance(prop, dict) else type(prop))
+
+    banner("4. Adopt with rationale + ingest evidence + gaps")
+    adopt = s.adopt_proposed_ontology(ext_res.get("version_hash"), rationale="Demo: reviewed proposal with core hashes and graph-aug extraction; adopting for use.")
+    print("adopt status:", adopt.get("status") if isinstance(adopt, dict) else adopt)
+
     kgp = str(workdir / "kg")
     print("create_knowledge_graph:", s.create_knowledge_graph(kgp)["status"])
-    # ingest only ONE of the source docs as 'project evidence' so some
-    # characteristics are covered and others remain gaps
     ev = workdir / "evidence"
     ev.mkdir()
     (ev / "verification.md").write_text(CORPUS["verification.md"], encoding="utf-8")
     ing = s.ingest_documents(str(ev))
     print(f"ingest evidence: {ing['nodes_added']} nodes")
-    print("load proposed ontology:", s.load_ontology(str(out))["status"])
     gaps = s.detect_gaps()
-    print(f"\ngaps_found={gaps['gaps_found']} "
-          f"(quality-management characteristics are unmet by the evidence):")
-    for g in gaps.get("gaps", []):
-        print(f"  GAP {g.get('outcome_id')}:{g.get('missing_characteristic')} "
-              f"(confidence {g.get('confidence')})")
+    print(f"\ngaps_found={gaps.get('gaps_found')} (demo shows unmet characteristics):")
+    for g in gaps.get("gaps", [])[:3]:
+        print(f"  GAP {g.get('outcome_id')}:{g.get('missing_characteristic')}")
 
-    print("\nDone (portable stub demo). "
-          "For non-banal updated demo of new KEE (hashes, graph-aug, review flow): "
-          "use server.extract_ontology (produces versioned proposal with concept_hashes), "
-          "then s.list_proposed_ontologies / get_proposed_ontology / adopt_proposed_ontology(..., rationale=...). "
-          "See updated CAPABILITIES and recent KEE work.")
+    print("\nDone (updated portable non-banal KEE demo). "
+          "Shows graph-aug extract via server (versioned proposal with hashes), "
+          "review with list/get, adopt with rationale, then use in gaps. "
+          "All offline with stub. Pass --real for live model (portable with local Ollama).")
     return 0
 
 
