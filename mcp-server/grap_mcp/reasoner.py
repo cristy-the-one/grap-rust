@@ -32,8 +32,8 @@ except Exception:
 # the evidence actually contains the characteristic's own tokens is what makes
 # gap detection discriminating.
 DEFAULT_WEIGHTS = {
-    "text_weight": 0.7,
-    "graph_weight": 0.3,
+    "text_weight": 0.6,
+    "graph_weight": 0.2,
     "centrality_weight": 0.2,   # boost from PageRank centrality (RRF channel) - more default now
     "lexical_threshold": 0.6,
 }
