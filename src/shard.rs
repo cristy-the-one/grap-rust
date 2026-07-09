@@ -397,6 +397,24 @@ impl ShardRouter {
         })
     }
 
+    /// Returns the SHA-256 content hash of the node's text blob (or None if not found).
+    pub fn node_content_hash(&self, gid: GlobalNodeId) -> Option<[u8; 32]> {
+        let shard_idx = gid.shard.0 as usize;
+        if shard_idx >= self.shards.len() {
+            return None;
+        }
+        self.shards[shard_idx].graph.node_content_hash(gid.local)
+    }
+
+    /// Self-integrity check for a globally addressed node.
+    pub fn verify_node(&self, gid: GlobalNodeId) -> crate::graph::NodeIntegrity {
+        let shard_idx = gid.shard.0 as usize;
+        if shard_idx >= self.shards.len() {
+            return crate::graph::NodeIntegrity::Unknown;
+        }
+        self.shards[shard_idx].graph.verify_node(gid.local)
+    }
+
     /// Removes a node from the cluster.
     ///
     /// - Marks a tombstone in the owning shard's text index.
@@ -1187,6 +1205,16 @@ impl ShardedGraph {
         embedding: Option<&[f32]>,
     ) -> Result<GlobalNodeId, crate::GraphError> {
         self.router.add_node_with_embedding(text, label, embedding)
+    }
+
+    /// Returns the SHA-256 content hash of a node's text (global id).
+    pub fn node_content_hash(&self, gid: GlobalNodeId) -> Option<[u8; 32]> {
+        self.router.node_content_hash(gid)
+    }
+
+    /// Verify that the stored content hash for a node matches its current blob.
+    pub fn verify_node(&self, gid: GlobalNodeId) -> crate::graph::NodeIntegrity {
+        self.router.verify_node(gid)
     }
 
     /// Adds a directed edge between two globally-addressed nodes with the given strength and properties.

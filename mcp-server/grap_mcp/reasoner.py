@@ -24,7 +24,12 @@ from .ontology import Ontology, ProcessOutcome
 # characteristic (process_definition vs interface_definition). Requiring that
 # the evidence actually contains the characteristic's own tokens is what makes
 # gap detection discriminating.
-DEFAULT_WEIGHTS = {"text_weight": 0.7, "graph_weight": 0.3, "lexical_threshold": 0.6}
+DEFAULT_WEIGHTS = {
+    "text_weight": 0.7,
+    "graph_weight": 0.3,
+    "centrality_weight": 0.15,   # light boost from PageRank centrality (RRF channel)
+    "lexical_threshold": 0.6,
+}
 LEXICAL_THRESHOLD = DEFAULT_WEIGHTS["lexical_threshold"]
 
 # Generic connective words that carry no discriminating meaning; excluded from
@@ -128,11 +133,30 @@ def _lexical_signals(kg, ontology: Ontology, outcome_id: str, characteristic: st
     # text searches have terms to match.
     query = f"{characteristic} {characteristic.replace('_', ' ')} {keywords}".strip()
     try:
-        hits = kg.search_and_traverse(
-            query, max_seeds=5, required_properties=[], min_strength=0.0,
-            max_depth=1, max_results=5,
-            text_weight=weights["text_weight"], graph_weight=weights["graph_weight"],
-        )
+        # Prefer the modern hybrid with RRF + optional centrality when available.
+        # This brings in the core RRF + PageRank investment.
+        if hasattr(kg, "search_and_traverse_hybrid"):
+            hits = kg.search_and_traverse_hybrid(
+                query,
+                vector=None,
+                max_seeds=5,
+                property_names=[],
+                min_strength=0.0,
+                max_depth=1,
+                max_results=5,
+                text_weight=weights.get("text_weight", 0.7),
+                vector_weight=0.0,
+                graph_weight=weights.get("graph_weight", 0.3),
+                centrality_weight=weights.get("centrality_weight", 0.15),  # light structural importance boost
+                fusion_mode="rrf",
+                rrf_k=60.0,
+            )
+        else:
+            hits = kg.search_and_traverse(
+                query, max_seeds=5, required_properties=[], min_strength=0.0,
+                max_depth=1, max_results=5,
+                text_weight=weights.get("text_weight", 0.7), graph_weight=weights.get("graph_weight", 0.3),
+            )
     except Exception:
         hits = []
     signals = []

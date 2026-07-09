@@ -112,6 +112,31 @@ impl ShardedGraph {
         Ok(removed)
     }
 
+    /// Hex SHA-256 content hash of a node's text (or None).
+    fn get_node_content_hash(&self, gid: (u16, u32)) -> Option<String> {
+        let global_id = GlobalNodeId {
+            shard: ShardId(gid.0),
+            local: NodeId(gid.1),
+        };
+        self.inner.node_content_hash(global_id).map(|bytes| {
+            bytes.iter().map(|b| format!("{:02x}", b)).collect()
+        })
+    }
+
+    /// "match" | "mismatch" | "unknown" for the node's content integrity.
+    fn verify_node(&self, gid: (u16, u32)) -> String {
+        let global_id = GlobalNodeId {
+            shard: ShardId(gid.0),
+            local: NodeId(gid.1),
+        };
+        match self.inner.verify_node(global_id) {
+            grap::NodeIntegrity::Match => "match",
+            grap::NodeIntegrity::Mismatch => "mismatch",
+            grap::NodeIntegrity::Unknown => "unknown",
+        }
+        .to_string()
+    }
+
     /// Aggressively clean up ghost edges that point to deleted nodes.
     fn cleanup_ghost_edges(&mut self) {
         self.inner.cleanup_ghost_edges();
