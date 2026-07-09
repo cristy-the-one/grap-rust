@@ -202,6 +202,20 @@ def _get_role() -> str:
     return _state.role or "operator"
 
 
+def _get_telemetry_snapshot():
+    """Clean helper for telemetry snapshot in status."""
+    try:
+        import grap_mcp.telemetry as t
+        if t._enabled():
+            snap = t.snapshot()
+            snap["enabled"] = True
+            return snap
+        else:
+            return {"enabled": False, "note": "enable with GRAP_TELEMETRY=1"}
+    except Exception:
+        return {"enabled": False, "error": "telemetry module unavailable"}
+
+
 def _require(required: str):
     """Return an error dict if the current role is below `required`, else None."""
     current = _get_role()
@@ -1457,7 +1471,7 @@ def get_status() -> dict:
             "extraction_workdir": getattr(_state, "extraction_workdir", None),
         },
         "state_class": "GrapServerState (robust refactor in progress)",
-        "telemetry": (lambda: (lambda mod: mod.snapshot() if mod._enabled() else {"enabled": False, "note": "enable with GRAP_TELEMETRY=1"})(__import__('grap_mcp.telemetry', fromlist=['snapshot', '_enabled'])))()
+        "telemetry": _get_telemetry_snapshot()
     }
 
 
