@@ -1346,6 +1346,11 @@ def _run_gap_detection(scope: str, kind: str, extra_summary: dict = None) -> dic
             weights = config_store.load_config(_resolve_ws_root())["weights"]
         gaps = reasoner.detect_gaps(kg, ontology, pg, weights=weights,
                                     exclude_nodes=getattr(_state, "projected_nodes", set()))
+        try:
+            from grap_mcp import session
+            session.record_query(f"gaps:{scope}", len(gaps))
+        except Exception:
+            pass
         explanations = {}
         hashes = []
         for gap in gaps:
