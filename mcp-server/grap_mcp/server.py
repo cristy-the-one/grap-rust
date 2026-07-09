@@ -1194,6 +1194,11 @@ def load_ontology(path: str) -> dict:
         _state.projected_nodes.update(projection.get("projected_node_ids", []))
         _get_workspace().record_event("ontology_loaded", path,
                                       details={"outcomes": str(projection["outcomes_projected"])})
+        try:
+            from grap_mcp import telemetry as _tel
+            _tel.record("load_ontology")
+        except Exception:
+            pass
         return {
             "status": "ok",
             "path": path,
@@ -1448,6 +1453,7 @@ def get_status() -> dict:
             "role": _get_role(),
         },
         "state_class": "GrapServerState (robust refactor in progress)",
+        "telemetry": (lambda: __import__('grap_mcp.telemetry', fromlist=['snapshot']).snapshot() if os.environ.get("GRAP_TELEMETRY") == "1" else {"enabled": False, "note": "enable with GRAP_TELEMETRY=1"})(),
     }
 
 
