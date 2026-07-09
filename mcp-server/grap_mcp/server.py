@@ -1724,6 +1724,7 @@ def list_capabilities() -> dict:
         "tier_of": dict(_TIERS),
         "tier_note": "Tools not in tier_of are 'standard'. Set GRAP_TOOL_TIER=core|standard|full.",
         "auth": "deferred (POC: no authentication/authorization)",
+        "wire_note": "Several tools (graph_neighbors, list_runs, query_events, detect_gaps, get_audit_log) accept optional wire_format='json'|'compact' for #MUNCH token-efficient encoding when pygrap.wire is available.",
     }
 
 
