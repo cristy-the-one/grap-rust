@@ -190,6 +190,11 @@ class WorkingGraph:
             if res.ambiguous:
                 sig.conflicts.append({"kind": "ambiguous", "names": [name.strip()]})
         self._relations_pass(frag, source, fragment_nodes, sig)
+        try:
+            from .. import session
+            session.record_node_access(0, "working_graph_upsert")  # placeholder
+        except Exception:
+            pass
         return sig
 
     def _resolve_endpoint(self, name: str, fragment_nodes: Dict[str, int]) -> Optional[int]:
