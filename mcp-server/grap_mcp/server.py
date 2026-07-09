@@ -823,6 +823,14 @@ def get_blast_radius(node_id: int, relations: list = None, max_depth: int = 10,
         impacted = kg.blast_radius(node_id, relations, max_depth)
         page, meta = paginate(impacted, limit, cursor)
         r = {"status": "ok", "center": node_id, "impacted": page, **meta}
+        try:
+            from grap_mcp import session
+            session.record_node_access(node_id, "get_blast_radius")
+            for n in page[:5]:  # sample
+                if isinstance(n, dict):
+                    session.record_node_access(n.get("id", 0), "blast_impact")
+        except Exception:
+            pass
         from .encoding import encode_response
         payload, _meta = encode_response("get_blast_radius", r, requested_format=wire_format)
         return payload
