@@ -1408,12 +1408,12 @@ def get_explanation(target: str) -> dict:
 
 @tiered
 def get_status() -> dict:
-    """Developer/debugging tool. Returns current server state."""
-    kg = _state.get("kg")
-    pg = _state.get("pg")
-    logic_id = _state.get("current_logic_id")
+    """Developer/debugging tool. Returns current server state (now using GrapServerState)."""
+    kg = _state.kg
+    pg = _state.pg
+    logic_id = _state.current_logic_id
     production = None
-    if logic_id and _state.get("ws"):
+    if logic_id and _state.ws:
         prod = _state.ws.current_production(logic_id)
         production = prod.activation_id if prod else None
 
@@ -1429,10 +1429,12 @@ def get_status() -> dict:
             "step_count": len(pg.steps) if pg and hasattr(pg, "steps") else 0,
         },
         "lifecycle": {
-            "workspace_open": _state.get("ws") is not None,
+            "workspace_open": _state.ws is not None,
             "logic_id": logic_id,
             "production_id": production,
+            "role": _get_role(),
         },
+        "state_class": "GrapServerState (robust refactor in progress)",
     }
 
 
