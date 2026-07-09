@@ -324,8 +324,8 @@ def extract_ontology(path: str, out_path: str = None, sim: float = 0.86,
 def list_proposed_ontologies() -> dict:
     """List versioned ontology proposals (from KEE extract) that are candidates for human review/promotion.
 
-    These are stored via publish_ontology with kind=proposed. Use the version_hash
-    with load_ontology to inspect, then promote/activate for production use."""
+    Use adopt_proposed_ontology(version_hash, rationale) to adopt after review.
+    These are stored via publish_ontology with kind=proposed."""
     denied = _require("operator")
     if denied:
         return denied
@@ -363,6 +363,65 @@ def list_proposed_ontologies() -> dict:
         return {"status": "ok", "proposed": proposed, "count": len(proposed),
                 "note": "Proposals from extract_ontology are versioned; inspect via load or audit."}
     except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
+@tiered
+def adopt_proposed_ontology(version_hash: str, rationale: str = None) -> dict:
+    """Adopt a KEE-proposed ontology version (by its content hash) into the active KG.
+
+    Fetches the versioned yaml from the workspace, projects it, and loads it as the
+    active ontology (publishing a new versioned snapshot with adoption metadata).
+    Requires a rationale for full audit trail. This completes the human-review loop.
+    """
+    denied = _require("operator")
+    if denied:
+        return denied
+    if not rationale or not rationale.strip():
+        return {"status": "error", "message": "rationale is required for adoption"}
+    kg = _state.get("kg")
+    if not kg:
+        return {"status": "error", "message": "Load a Knowledge Graph first."}
+    try:
+        ws = _get_workspace()
+        raw = ws.get_record(version_hash)
+        if not raw:
+            return {"status": "error", "message": f"Unknown version '{version_hash}'."}
+        # Write to temp to reuse loader (or parse directly); keep simple with temp.
+        import tempfile, os
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False, encoding="utf-8") as tf:
+            tf.write(raw)
+            tmp_path = tf.name
+        try:
+            ontology = onto_loader.load_ontology_from_file(tmp_path)
+            projection = onto_loader.project_ontology_to_grap(ontology, kg)
+            # Re-publish the adopted version (new hash) with adoption info.
+            version = ws.publish_ontology(
+                raw, metadata={"version": ontology.version, "adopted_from": version_hash, "rationale": rationale}
+            )
+            _state["ontology"] = ontology
+            _state["ontology_version"] = version.hash
+            _state["projected_nodes"].update(projection.get("projected_node_ids", []))
+            ws.record_event(
+                "ontology_adopted", version_hash,
+                details={"new_version": version.hash, "outcomes": str(projection["outcomes_projected"])},
+                rationale=rationale
+            )
+            return {
+                "status": "ok",
+                "adopted_from": version_hash,
+                "new_version_hash": version.hash,
+                "outcomes_projected": projection["outcomes_projected"],
+                "characteristics_projected": projection["characteristics_projected"],
+                "note": "Ontology adopted and active. Review via get_status or run procedures."
+            }
+        finally:
+            try:
+                os.unlink(tmp_path)
+            except Exception:
+                pass
+    except Exception as e:
+        logger.exception("adopt_proposed_ontology failed")
         return {"status": "error", "message": str(e)}
 
 
@@ -1787,7 +1846,7 @@ def list_capabilities() -> dict:
         "domains": {
             "discovery": ["grap_guide", "suggest_queries"],
             "knowledge": ["load_knowledge_graph", "create_knowledge_graph",
-                          "ingest_documents", "reingest_documents", "extract_ontology", "list_proposed_ontologies", "project_relations",
+                          "ingest_documents", "reingest_documents", "extract_ontology", "list_proposed_ontologies", "adopt_proposed_ontology", "project_relations",
                           "open_extraction_graph", "extend_extraction_graph", "export_ontology",
                           "build_legal_graph", "legal_graph_from_relations",
                           "graph_neighbors", "load_ontology",
