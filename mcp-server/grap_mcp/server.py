@@ -468,6 +468,11 @@ def get_proposed_ontology(version_hash: str) -> dict:
             pass
         except Exception:
             pass
+        try:
+            from grap_mcp import telemetry as _tel
+            _tel.record("get_proposed_ontology")
+        except Exception:
+            pass
         return {
             "status": "ok",
             "version_hash": version_hash,
@@ -520,6 +525,11 @@ def adopt_proposed_ontology(version_hash: str, rationale: str = None) -> dict:
                 details={"new_version": version.hash, "outcomes": str(projection["outcomes_projected"])},
                 rationale=rationale
             )
+            try:
+                from grap_mcp import telemetry as _tel
+                _tel.record("adopt_proposed_ontology")
+            except Exception:
+                pass
             return {
                 "status": "ok",
                 "adopted_from": version_hash,
