@@ -432,7 +432,7 @@ def extract_ontology(path: str, out_path: str = None, sim: float = 0.86,
 
 
 @tiered
-def list_proposed_ontologies() -> dict:
+def list_proposed_ontologies(limit: int = None, cursor: str = None) -> dict:
     """List versioned ontology proposals (from KEE extract) that are candidates for human review/promotion.
 
     Use adopt_proposed_ontology(version_hash, rationale) to adopt after review.
@@ -450,8 +450,9 @@ def list_proposed_ontologies() -> dict:
             versions = ws.list_versions() or []  # may be PG only
         except Exception:
             pass
+        page, meta = paginate(versions, limit, cursor)
         proposed = []
-        for v in versions:
+        for v in page:
             try:
                 # metadata may be on Version in some paths
                 meta = getattr(v, "metadata", {}) or {}
@@ -467,11 +468,12 @@ def list_proposed_ontologies() -> dict:
         if not proposed:
             try:
                 events = ws.query_events("ontology_proposed") or []
-                for e in events[-10:]:
+                page_events, meta_events = paginate(events, limit, cursor)
+                for e in page_events:
                     proposed.append({"version_hash": e.subject, "from_audit": True})
             except Exception:
                 pass
-        return {"status": "ok", "proposed": proposed, "count": len(proposed),
+        return {"status": "ok", "proposed": proposed, "count": len(proposed), **meta,
                 "note": "Proposals from extract_ontology are versioned; inspect via load or audit."}
     except Exception as e:
         return {"status": "error", "message": str(e)}
