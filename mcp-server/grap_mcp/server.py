@@ -387,6 +387,11 @@ def extract_ontology(path: str, out_path: str = None, sim: float = 0.86,
         result = pipeline.extract_ontology(path, provider, embedder, sim=sim,
                                            max_files=max_files)
         onto = result["ontology"]
+        try:
+            from grap_mcp import session
+            session.record_query(f"extract_ontology:{path}", result.get("fragments", 0))
+        except Exception:
+            pass
         validation = validate.validate_ontology(onto)
         yaml_text = pipeline.to_yaml(onto)
         out = out_path or str(Path(_resolve_ws_root()) / "candidate-ontology.yaml")
