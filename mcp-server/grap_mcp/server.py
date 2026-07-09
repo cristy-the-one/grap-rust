@@ -94,6 +94,7 @@ class GrapServerState:
         self.ontology_version = None
         self.projected_nodes = set()
         self.explanations = {}
+        self.extraction_workdir = None
 
     def reset(self):
         """Clear volatile session state (keep ws if open)."""
@@ -106,6 +107,7 @@ class GrapServerState:
         self.ontology_version = None
         self.projected_nodes = set()
         self.explanations = {}
+        self.extraction_workdir = None
 
     def set_kg(self, kg, path=None):
         """Set kg and path, clear related caches."""
@@ -1452,6 +1454,7 @@ def get_status() -> dict:
             "production_id": production,
             "role": _get_role(),
             "retention": config_store.load_config(_resolve_ws_root()).get("retention", {}),
+            "extraction_workdir": getattr(_state, "extraction_workdir", None),
         },
         "state_class": "GrapServerState (robust refactor in progress)",
         "telemetry": (lambda: (lambda mod: mod.snapshot() if mod._enabled() else {"enabled": False, "note": "enable with GRAP_TELEMETRY=1"})(__import__('grap_mcp.telemetry', fromlist=['snapshot', '_enabled'])))()
