@@ -1355,6 +1355,11 @@ def query_events(event_type: str = None, run_id: str = None,
                   for e in raw]
         page, meta = paginate(events, limit, cursor)
         r = {"events": page, **meta, "count": len(page)}
+        try:
+            from grap_mcp import session
+            session.record_query(f"events:{event_type or 'all'}", len(page))
+        except Exception:
+            pass
         from .encoding import encode_response
         payload, _meta = encode_response("query_events", r, requested_format=wire_format)
         return payload
