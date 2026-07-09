@@ -188,18 +188,8 @@ def _resolve_ws_root():
 
 
 def _get_role() -> str:
-    """Effective current role: persisted in config (governed), env override for bootstrap, default operator."""
-    if _state.role is None:
-        root = _resolve_ws_root()
-        cfg = config_store.load_config(root)
-        env_role = os.environ.get("GRAP_ROLE")
-        role = env_role or cfg.get("role", "operator")
-        if "role" not in cfg or cfg.get("role") != role:
-            cfg["role"] = role
-            cfg["last_changed"] = int(time.time() * 1000)
-            config_store.save_config(root, cfg)
-        _state.role = role
-    return _state.role or "operator"
+    """Effective current role: delegated to state (persisted/governed)."""
+    return _state.get_role()
 
 
 def _get_telemetry_snapshot():
@@ -1827,15 +1817,7 @@ def set_role(role: str, rationale: str = None) -> dict:
         return {"status": "error", "message": f"unknown role '{role}'"}
     if not rationale:
         return {"status": "error", "message": "rationale is required"}
-    root = _resolve_ws_root()
-    cfg = config_store.load_config(root)
-    old_role = cfg.get("role", "operator")
-    cfg["role"] = role
-    cfg["last_changed"] = int(time.time() * 1000)
-    config_store.save_config(root, cfg)
-    _state.role = role  # update in-mem
-    _get_workspace().record_event("role_changed", f"{old_role}->{role}",
-                                  details={"from": old_role, "to": role}, rationale=rationale)
+    _state.set_role(role, rationale)  # delegates to state (handles persist/audit)
     return {"status": "ok", "role": role}
 
 
