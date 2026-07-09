@@ -147,6 +147,11 @@ class WorkingGraph:
                     self._hash_to_node[hhex] = node
             except Exception:
                 pass
+        try:
+            from .. import session
+            session.record_node_access(node, "resolve_outcome")
+        except Exception:
+            pass
         return _Resolution(node, False)
 
     def node_count(self) -> int:
