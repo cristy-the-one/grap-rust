@@ -1052,12 +1052,20 @@ def _run_gap_detection(scope: str, kind: str, extra_summary: dict = None) -> dic
 
 
 @tiered
-def detect_gaps(scope: str = "all") -> dict:
-    """Detect ASPICE gaps as a production run (persists run + explanations)."""
+def detect_gaps(scope: str = "all", wire_format: str = "json") -> dict:
+    """Detect ASPICE gaps as a production run (persists run + explanations).
+
+    Supports ``wire_format="compact"`` for token-efficient #MUNCH encoding on the gaps table.
+    """
     denied = _require("operator")
     if denied:
         return denied
-    return _run_gap_detection(scope, "production")
+    result = _run_gap_detection(scope, "production")
+    if isinstance(result, dict) and result.get("status") == "ok":
+        from .encoding import encode_response
+        payload, _meta = encode_response("detect_gaps", result, requested_format=wire_format)
+        return payload
+    return result
 
 
 @tiered
@@ -1265,23 +1273,37 @@ def list_versions() -> dict:
 
 
 @tiered
-def get_audit_log() -> dict:
-    """Return the workspace audit event log."""
+def get_audit_log(wire_format: str = "json") -> dict:
+    """Return the workspace audit event log.
+
+    Supports ``wire_format="compact"`` for token-efficient #MUNCH encoding.
+    """
     try:
         events = _get_workspace().read_audit()
-        return {"events": [{"ts": e.ts, "type": e.event_type, "subject": e.subject,
-                            "rationale": e.rationale} for e in events]}
+        r = {"events": [{"ts": e.ts, "type": e.event_type, "subject": e.subject,
+                         "rationale": e.rationale} for e in events],
+             "count": len(events)}
+        from .encoding import encode_response
+        payload, _meta = encode_response("query_events", r, requested_format=wire_format)
+        return payload
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
 
 @tiered
-def list_runs(kind: str = None) -> dict:
-    """List execution runs, optionally filtered by kind (production|experiment)."""
+def list_runs(kind: str = None, wire_format: str = "json") -> dict:
+    """List execution runs, optionally filtered by kind (production|experiment).
+
+    Supports ``wire_format="compact"`` for token-efficient #MUNCH encoding.
+    """
     try:
         runs = _get_workspace().list_runs(kind)
-        return {"runs": [{"run_id": r.run_id, "kind": r.kind, "status": r.status,
-                          "gaps_found": r.gaps_found} for r in runs]}
+        r = {"runs": [{"run_id": r.run_id, "kind": r.kind, "status": r.status,
+                       "gaps_found": r.gaps_found} for r in runs],
+             "count": len(runs)}
+        from .encoding import encode_response
+        payload, _meta = encode_response("list_runs", r, requested_format=wire_format)
+        return payload
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
@@ -1316,8 +1338,12 @@ def reconstruct_run(run_id: str) -> dict:
 
 @tiered
 def query_events(event_type: str = None, run_id: str = None,
-                 limit: int = None, cursor: str = None) -> dict:
-    """Query the Temporal Graph: by event_type, or all events for a run_id."""
+                 limit: int = None, cursor: str = None,
+                 wire_format: str = "json") -> dict:
+    """Query the Temporal Graph: by event_type, or all events for a run_id.
+
+    Supports ``wire_format="compact"`` for token-efficient #MUNCH encoding on the events table.
+    """
     try:
         ws = _get_workspace()
         if run_id:
@@ -1328,7 +1354,10 @@ def query_events(event_type: str = None, run_id: str = None,
                    "links": [{"relation": r, "kind": k, "id": i} for (r, k, i) in e.links]}
                   for e in raw]
         page, meta = paginate(events, limit, cursor)
-        return {"events": page, **meta}
+        r = {"events": page, **meta, "count": len(page)}
+        from .encoding import encode_response
+        payload, _meta = encode_response("query_events", r, requested_format=wire_format)
+        return payload
     except Exception as e:
         return {"status": "error", "message": str(e)}
 

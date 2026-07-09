@@ -15,4 +15,25 @@ SCHEMAS = {
             ("e", "edges", ["source", "target", "type"], [2]),
         ],
     },
+    "list_runs": {
+        "enc_id": "lr1",
+        "scalars": ["status", "count"],
+        "tables": [
+            ("r", "runs", ["run_id", "kind", "status", "gaps_found", "activation_id"], []),
+        ],
+    },
+    "query_events": {
+        "enc_id": "qe1",
+        "scalars": ["status", "count"],
+        "tables": [
+            ("e", "events", ["ts", "type", "subject"], [1, 2]),  # type and subject often repeat
+        ],
+    },
+    "detect_gaps": {
+        "enc_id": "dg1",
+        "scalars": ["status", "gaps_found", "scope"],
+        "tables": [
+            ("g", "gaps", ["outcome_id", "characteristic", "score"], []),
+        ],
+    },
 }
