@@ -1598,10 +1598,10 @@ def adopt_experiment(run_id: str, activation_id: str, rationale: str) -> dict:
 
 @tiered
 def get_config() -> dict:
-    """Return the governed configuration (weights + retention + last_changed)."""
+    """Return the governed configuration (weights + retention + role + last_changed)."""
     cfg = config_store.load_config(_resolve_ws_root())
     return {"status": "ok", "weights": cfg["weights"], "retention": cfg["retention"],
-            "last_changed": cfg["last_changed"]}
+            "role": cfg.get("role", "operator"), "last_changed": cfg["last_changed"]}
 
 
 @tiered
