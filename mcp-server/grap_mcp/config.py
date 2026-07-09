@@ -14,6 +14,7 @@ def default_config() -> Dict[str, Any]:
     return {
         "weights": {},
         "retention": {"production_days": 365, "experiment_days": 30},
+        "role": "operator",
         "last_changed": None,
     }
 

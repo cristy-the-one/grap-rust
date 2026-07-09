@@ -180,10 +180,10 @@ async def run_demo():
             show(await call(session, "enforce_retention"), "status", "runs_deleted", "explanations_deleted")
 
             narrate(14, "Role-based access", "Mutations require a sufficient role.")
-            await call(session, "set_role", role="viewer")
+            await call(session, "set_role", role="viewer", rationale="demo downgrade")
             denied = await call(session, "publish_pg")
             print(f"    viewer publish: {denied.get('status')} ({denied.get('message')})")
-            await call(session, "set_role", role="admin")
+            await call(session, "set_role", role="admin", rationale="demo restore")
 
             narrate(15, "Summary", "Final workspace state.")
             versions = await call(session, "list_versions")

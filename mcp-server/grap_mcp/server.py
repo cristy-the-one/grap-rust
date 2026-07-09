@@ -74,7 +74,7 @@ _state = {
     "current_logic_id": None,   # pg_logic_id of the loaded/active PG
     "pg_version": None,         # content hash of the last published PG
     "kg_path": None,            # on-disk path of the current KG (for ingest persistence)
-    "role": os.environ.get("GRAP_ROLE", "operator"),  # current role (POC simulation)
+    "role": None,  # loaded from config or env on first use (now governed/persisted)
     "ontology": None,           # parsed Ontology model
     "ontology_version": None,   # ontology version hash in the workspace
     "projected_nodes": set(),   # KG node ids of system-projected nodes (not evidence)
@@ -98,9 +98,24 @@ def _resolve_ws_root():
     return _state["ws_root"]
 
 
+def _get_role() -> str:
+    """Effective current role: persisted in config (governed), env override for bootstrap, default operator."""
+    if _state.get("role") is None:
+        root = _resolve_ws_root()
+        cfg = config_store.load_config(root)
+        env_role = os.environ.get("GRAP_ROLE")
+        role = env_role or cfg.get("role", "operator")
+        if "role" not in cfg or cfg["role"] != role:
+            cfg["role"] = role
+            cfg["last_changed"] = int(time.time() * 1000)
+            config_store.save_config(root, cfg)
+        _state["role"] = role
+    return _state.get("role", "operator")
+
+
 def _require(required: str):
     """Return an error dict if the current role is below `required`, else None."""
-    current = _state.get("role", "operator")
+    current = _get_role()
     if not auth.role_allows(current, required):
         return {"status": "error",
                 "message": f"requires '{required}' role (current: '{current}')"}
@@ -1652,17 +1667,30 @@ def enforce_retention() -> dict:
 
 @tiered
 def get_role() -> dict:
-    """Return the current role and the available roles."""
-    return {"status": "ok", "role": _state.get("role", "operator"),
+    """Return the current role and the available roles (now persisted/governed in config)."""
+    return {"status": "ok", "role": _get_role(),
             "roles": sorted(auth.ROLES, key=lambda r: auth.ROLES[r])}
 
 
 @tiered
-def set_role(role: str) -> dict:
-    """Set the current role (POC simulation; no identity backend)."""
+def set_role(role: str, rationale: str = None) -> dict:
+    """Set the current role (requires admin + rationale; persisted + audited)."""
+    denied = _require("admin")
+    if denied:
+        return denied
     if role not in auth.ROLES:
         return {"status": "error", "message": f"unknown role '{role}'"}
-    _state["role"] = role
+    if not rationale:
+        return {"status": "error", "message": "rationale is required"}
+    root = _resolve_ws_root()
+    cfg = config_store.load_config(root)
+    old_role = cfg.get("role", "operator")
+    cfg["role"] = role
+    cfg["last_changed"] = int(time.time() * 1000)
+    config_store.save_config(root, cfg)
+    _state["role"] = role  # update in-mem
+    _get_workspace().record_event("role_changed", f"{old_role}->{role}",
+                                  details={"from": old_role, "to": role}, rationale=rationale)
     return {"status": "ok", "role": role}
 
 
