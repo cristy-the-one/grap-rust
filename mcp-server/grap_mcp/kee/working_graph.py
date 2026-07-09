@@ -8,6 +8,7 @@ ontology in the same schema as reconcile. No LLM here.
 
 from __future__ import annotations
 
+import hashlib
 import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -83,6 +84,7 @@ class WorkingGraph:
         self._chunk_contrib: Dict[str, dict] = {}          # chunk -> {concepts,chars,edges}
         self.manifest: Dict[str, str] = {}                 # chunk_id -> content hash
         self.concept_hashes: Dict[int, str] = {}           # node -> hex content_hash from core (provenance + dedup)
+        self._hash_to_node: Dict[str, int] = {}            # content hash -> node for exact dedup
 
     # ---- union-find (component tracking for bridge signals) ----
     def _find(self, x: int) -> int:
@@ -99,6 +101,10 @@ class WorkingGraph:
     def _embed_one(self, text: str) -> List[float]:
         return self.embedder.embed([text])[0]
 
+    def _content_hash(self, text: str) -> str:
+        """Compute content hash using same algo as core (for dedup/provenance)."""
+        return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
     def _register_alias(self, alias: str, node: int) -> None:
         self.idx.register(alias, node)
         lst = self.aliases_by_node.setdefault(node, [])
@@ -110,6 +116,16 @@ class WorkingGraph:
         hits = [h for h in self.idx.resolve(name) if h not in self._retracted]
         if hits:
             return _Resolution(hits[0], len(hits) > 1)
+
+        # Highest-leverage dedup: exact content hash match (core-style sha of text)
+        # before falling to vector similarity. Ensures identical concepts dedup perfectly.
+        name_h = self._content_hash(name)
+        if name_h in self._hash_to_node:
+            node = self._hash_to_node[name_h]
+            if node not in self._retracted:
+                self._register_alias(name, node)
+                return _Resolution(node, False)
+
         vec = self._embed_one(name)
         matches = [(n, s) for (n, s) in self.kg.vector_search(vec, 2) if n not in self._retracted]
         if matches and matches[0][1] >= self.merge_threshold:
@@ -127,7 +143,8 @@ class WorkingGraph:
             try:
                 h = self.kg.node_content_hash(node)
                 if h:
-                    self.concept_hashes[node] = "".join(f"{b:02x}" for b in h)
+                    self.concept_hashes[node] = hhex = "".join(f"{b:02x}" for b in h)
+                    self._hash_to_node[hhex] = node
             except Exception:
                 pass
         return _Resolution(node, False)
@@ -445,6 +462,7 @@ class WorkingGraph:
                         "source": p["chunk_id"], "reason": p["reason"]} for p in st.parked]
         self.manifest = dict(st.manifest)
         self.concept_hashes = dict(st.concept_hashes)
+        self._hash_to_node = {h: nid for nid, h in self.concept_hashes.items()}
         self._retracted = set()
         self._chunk_contrib = {}
         self._parent = {}
@@ -478,7 +496,9 @@ class WorkingGraph:
                 try:
                     h = self.kg.node_content_hash(nid)
                     if h:
-                        self.concept_hashes[nid] = "".join(f"{b:02x}" for b in h)
+                        hhex = "".join(f"{b:02x}" for b in h)
+                        self.concept_hashes[nid] = hhex
+                        self._hash_to_node[hhex] = nid
                 except Exception:
                     pass
             for alias in self.aliases_by_node.get(cid, []):

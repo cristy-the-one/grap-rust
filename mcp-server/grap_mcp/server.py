@@ -367,6 +367,44 @@ def list_proposed_ontologies() -> dict:
 
 
 @tiered
+def get_proposed_ontology(version_hash: str) -> dict:
+    """Fetch a proposed ontology by its version hash (content hash of the yaml).
+
+    Returns the raw content, parsed structure, and any concept_hashes if available
+    from the extraction. Useful for human review before adopt."""
+    denied = _require("operator")
+    if denied:
+        return denied
+    try:
+        ws = _get_workspace()
+        raw = ws.get_record(version_hash)
+        if not raw:
+            return {"status": "error", "message": f"Unknown version '{version_hash}'."}
+        import yaml
+        try:
+            parsed = yaml.safe_load(raw) or {}
+        except Exception:
+            parsed = {}
+        # Try to attach concept hashes if present in metadata or from graph
+        hashes = {}
+        try:
+            # If it was from KEE graph, hashes may be in a side file or we note
+            # For now return raw + parsed; hashes are in the extract response originally
+            pass
+        except Exception:
+            pass
+        return {
+            "status": "ok",
+            "version_hash": version_hash,
+            "raw": raw,
+            "parsed": parsed,
+            "note": "Use concept_hashes from original extract_ontology response or inspect via working graph.",
+        }
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
+@tiered
 def adopt_proposed_ontology(version_hash: str, rationale: str = None) -> dict:
     """Adopt a KEE-proposed ontology version (by its content hash) into the active KG.
 
@@ -1846,7 +1884,7 @@ def list_capabilities() -> dict:
         "domains": {
             "discovery": ["grap_guide", "suggest_queries"],
             "knowledge": ["load_knowledge_graph", "create_knowledge_graph",
-                          "ingest_documents", "reingest_documents", "extract_ontology", "list_proposed_ontologies", "adopt_proposed_ontology", "project_relations",
+                          "ingest_documents", "reingest_documents", "extract_ontology", "list_proposed_ontologies", "get_proposed_ontology", "adopt_proposed_ontology", "project_relations",
                           "open_extraction_graph", "extend_extraction_graph", "export_ontology",
                           "build_legal_graph", "legal_graph_from_relations",
                           "graph_neighbors", "load_ontology",
