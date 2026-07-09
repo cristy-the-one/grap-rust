@@ -1451,6 +1451,7 @@ def get_status() -> dict:
             "logic_id": logic_id,
             "production_id": production,
             "role": _get_role(),
+            "retention": config_store.load_config(_resolve_ws_root()).get("retention", {}),
         },
         "state_class": "GrapServerState (robust refactor in progress)",
         "telemetry": (lambda: __import__('grap_mcp.telemetry', fromlist=['snapshot']).snapshot() if os.environ.get("GRAP_TELEMETRY") == "1" else {"enabled": False, "note": "enable with GRAP_TELEMETRY=1"})(),
