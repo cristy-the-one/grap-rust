@@ -97,7 +97,7 @@ def extract_ontology(docs_path: str, provider, embedder, sim: float = 0.86,
 
 
 def to_yaml(ontology: Dict[str, Any]) -> str:
-    """Serialize only the loadable ontology fields (drops provenance)."""
+    """Serialize only the loadable ontology fields (drops provenance, keeps concept_hashes for verification)."""
     import yaml
 
     loadable = {
@@ -105,7 +105,10 @@ def to_yaml(ontology: Dict[str, Any]) -> str:
         "process_outcomes": ontology.get("process_outcomes", []),
         "mapping_hints": ontology.get("mapping_hints", []),
     }
+    if "concept_hashes" in ontology:
+        loadable["concept_hashes"] = ontology["concept_hashes"]
     header = ("# Candidate ontology proposed by the Knowledge Extraction Engine.\n"
-              "# Review before promoting — LLM extraction is a proposal, not ground truth.\n\n")
+              "# Review before promoting — LLM extraction is a proposal, not ground truth.\n"
+              "# concept_hashes (if present) are core node content hashes for provenance.\n\n")
     return header + yaml.safe_dump(loadable, sort_keys=False, allow_unicode=True,
                                    default_flow_style=False)
