@@ -1762,7 +1762,7 @@ def list_capabilities() -> dict:
         "tier_of": dict(_TIERS),
         "tier_note": "Tools not in tier_of are 'standard'. Set GRAP_TOOL_TIER=core|standard|full.",
         "auth": "deferred (POC: no authentication/authorization)",
-        "wire_note": "Many tools (graph_neighbors, list_runs, query_events, detect_gaps, get_audit_log, get_blast_radius, find_cycles, find_orphans, kg_health) accept optional wire_format='json'|'compact' for #MUNCH token-efficient encoding when pygrap.wire is available.",
+        "wire_note": "Wire is now DEFAULT='compact' for tools with schemas (massive agent token win). Tools: graph_neighbors, list_runs, query_events, detect_gaps, get_audit_log, get_blast_radius, find_cycles, find_orphans, kg_health etc. Override with wire_format='json' or GRAP_WIRE_FORMAT=json.",
     }
 
 
