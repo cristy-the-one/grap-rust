@@ -118,6 +118,7 @@ def main() -> int:
     os.environ["GRAP_WORKSPACE"] = str(workdir / "ws")
     os.environ["GRAP_ROLE"] = "operator"
     import grap_mcp.server as s
+    s._state.reset()  # clean for portable demo runs
     # Note: full list/get/adopt shine best when using the server extract_ontology path
     # (which versions proposals). Here we simulate the review flow post-extract.
     print(" (In full use: s.extract_ontology(...) produces versioned proposal; then list/get/adopt)")
