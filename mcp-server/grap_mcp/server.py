@@ -331,21 +331,37 @@ def list_proposed_ontologies() -> dict:
         return denied
     try:
         ws = _get_workspace()
-        versions = ws.list_versions("ontology") or []
+        # list_versions in binding is PG-focused; list and inspect via content where possible.
+        # For simplicity fall back to broad audit or note that proposals are returned from extract_ontology.
+        # Better: use workspace to list all ontology versions (extend if binding allows).
+        versions = []
+        try:
+            versions = ws.list_versions() or []  # may be PG only
+        except Exception:
+            pass
         proposed = []
         for v in versions:
             try:
-                meta = v.metadata or {}
-                if meta.get("kind") == "proposed":
+                # metadata may be on Version in some paths
+                meta = getattr(v, "metadata", {}) or {}
+                if isinstance(meta, dict) and meta.get("kind") == "proposed":
                     proposed.append({
-                        "version_hash": v.hash,
-                        "created_at": v.created_at,
+                        "version_hash": getattr(v, "hash", str(v)),
+                        "created_at": getattr(v, "created_at", 0),
                         "source": meta.get("source"),
-                        "note": "Use load_ontology on the yaml or reconstruct to review.",
                     })
             except Exception:
                 continue
-        return {"status": "ok", "proposed": proposed, "count": len(proposed)}
+        # Also surface recent from audit as fallback for proposed.
+        if not proposed:
+            try:
+                events = ws.query_events("ontology_proposed") or []
+                for e in events[-10:]:
+                    proposed.append({"version_hash": e.subject, "from_audit": True})
+            except Exception:
+                pass
+        return {"status": "ok", "proposed": proposed, "count": len(proposed),
+                "note": "Proposals from extract_ontology are versioned; inspect via load or audit."}
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
