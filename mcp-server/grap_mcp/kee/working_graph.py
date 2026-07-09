@@ -340,6 +340,7 @@ class WorkingGraph:
         process_outcomes: List[dict] = []
         mapping_hints: List[dict] = []
         provenance: Dict[str, List[str]] = {}
+        outcome_hashes: Dict[str, str] = {}
         relations_out: List[dict] = []
         used: Set[str] = set()
 
@@ -368,6 +369,8 @@ class WorkingGraph:
                 "description": f"{label} (proposed by extraction; review before promotion).",
                 "required_characteristics": char_tokens,
             })
+            if node in self.concept_hashes:
+                outcome_hashes[oid] = self.concept_hashes[node]
             mapping_hints.append({
                 "outcome": oid,
                 "indicators": [{"keywords": rc.keywords(label + " " + " ".join(raw_chars))}],
@@ -389,7 +392,7 @@ class WorkingGraph:
             "mapping_hints": mapping_hints,
             "provenance": provenance,
             "relations": relations_out,
-            "concept_hashes": {str(node): h for node, h in self.concept_hashes.items() if node in self.canonical},
+            "concept_hashes": outcome_hashes,
         }
 
     # ---- persistence (Phase 2) ----
