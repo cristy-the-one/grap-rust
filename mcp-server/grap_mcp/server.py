@@ -1743,7 +1743,7 @@ def set_weight(name: str, value: float, rationale: str) -> dict:
 
 @tiered
 def set_retention(key: str, days: int, rationale: str) -> dict:
-    """Set a retention-policy value in days (rationale required; audited; not enforced)."""
+    """Set a retention-policy value in days (rationale required; audited). Enforcement via enforce_retention()."""
     denied = _require("admin")
     if denied:
         return denied
