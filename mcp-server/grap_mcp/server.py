@@ -65,30 +65,90 @@ def tiered(func):
     return func
 
 
-# In-memory state for the POC
-_state = {
-    "kg": None,
-    "pg": None,                 # Will hold a ProcedureGraph object
-    "ws": None,                 # lifecycle Workspace (Rust-backed)
-    "ws_root": None,            # workspace root path (for the config store)
-    "current_logic_id": None,   # pg_logic_id of the loaded/active PG
-    "pg_version": None,         # content hash of the last published PG
-    "kg_path": None,            # on-disk path of the current KG (for ingest persistence)
-    "role": None,  # loaded from config or env on first use (now governed/persisted)
-    "ontology": None,           # parsed Ontology model
-    "ontology_version": None,   # ontology version hash in the workspace
-    "projected_nodes": set(),   # KG node ids of system-projected nodes (not evidence)
-    "explanations": {},         # target -> explanation dict (POC, in-memory)
-}
+class GrapServerState:
+    """Encapsulates server state. Goal: move away from pure global dict for robustness.
+    Persisted aspects (role, config) come from workspace; volatile (kg, pg, explanations)
+    are in-memory for the session. Supports future multi-session or restart recovery.
+    """
+    def __init__(self):
+        self.kg = None
+        self.pg = None
+        self.ws = None
+        self.ws_root = None
+        self.current_logic_id = None
+        self.pg_version = None
+        self.kg_path = None
+        self.role = None
+        self.ontology = None
+        self.ontology_version = None
+        self.projected_nodes = set()
+        self.explanations = {}
+
+    def reset(self):
+        """Clear volatile session state (keep ws if open)."""
+        self.kg = None
+        self.pg = None
+        self.current_logic_id = None
+        self.pg_version = None
+        self.kg_path = None
+        self.ontology = None
+        self.ontology_version = None
+        self.projected_nodes = set()
+        self.explanations = {}
+
+    def get_role(self) -> str:
+        if self.role is None:
+            root = self.ws_root or os.environ.get("GRAP_WORKSPACE", "./grap-workspace")
+            cfg = config_store.load_config(root)
+            env_role = os.environ.get("GRAP_ROLE")
+            role = env_role or cfg.get("role", "operator")
+            if "role" not in cfg or cfg.get("role") != role:
+                cfg["role"] = role
+                cfg["last_changed"] = int(time.time() * 1000)
+                config_store.save_config(root, cfg)
+            self.role = role
+        return self.role
+
+    def set_role(self, role: str, rationale: str = None):
+        if role not in auth.ROLES:
+            raise ValueError(f"unknown role {role}")
+        root = self.ws_root or os.environ.get("GRAP_WORKSPACE", "./grap-workspace")
+        cfg = config_store.load_config(root)
+        old = cfg.get("role", "operator")
+        cfg["role"] = role
+        cfg["last_changed"] = int(time.time() * 1000)
+        config_store.save_config(root, cfg)
+        self.role = role
+        if self.ws:
+            try:
+                self.ws.record_event("role_changed", f"{old}->{role}",
+                                     details={"from": old, "to": role}, rationale=rationale)
+            except Exception:
+                pass
+
+# Global instance. Backed by class for robustness (future multi-session support,
+# cleaner reloads, less fragile global mutation).
+_state = GrapServerState()
+
+# Support dict protocol for existing test monkeypatches (setitem on "role" etc.)
+# and any remaining _state["key"] accesses during transition.
+_state.__getitem__ = lambda k: getattr(_state, k, None)
+_state.__setitem__ = lambda k, v: setattr(_state, k, v)
+_state.get = lambda k, d=None: getattr(_state, k, d)
 
 
 def _get_workspace():
-    """Lazily open the lifecycle workspace (env GRAP_WORKSPACE or ./grap-workspace)."""
-    if _state["ws"] is None:
+    """Lazily open the lifecycle workspace (env GRAP_WORKSPACE or ./grap-workspace).
+    On (re)load, reset volatile state and ensure governed role is loaded.
+    """
+    if _state.ws is None:
         root = os.environ.get("GRAP_WORKSPACE", "./grap-workspace")
-        _state["ws"] = pygrap.Workspace.open(root)
-        _state["ws_root"] = root
-    return _state["ws"]
+        _state.ws = pygrap.Workspace.open(root)
+        _state.ws_root = root
+        _state.reset()  # clear old kg/pg/ontology etc for clean session
+        # Ensure role is loaded from persisted config (governed)
+        _ = _get_role()
+    return _state.ws
 
 
 def _resolve_ws_root():
