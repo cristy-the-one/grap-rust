@@ -201,6 +201,12 @@ def _lexical_signals(kg, ontology: Ontology, outcome_id: str, characteristic: st
         if node in recent_boost_nodes:
             base_score *= 1.25
 
+        if _session and node is not None:
+            try:
+                _session.record_node_access(node, "reasoner_lexical")
+            except Exception:
+                pass
+
         signals.append({
             "kind": "lexical",
             "node": node,
