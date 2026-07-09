@@ -34,7 +34,7 @@ except Exception:
 DEFAULT_WEIGHTS = {
     "text_weight": 0.7,
     "graph_weight": 0.3,
-    "centrality_weight": 0.15,   # light boost from PageRank centrality (RRF channel)
+    "centrality_weight": 0.2,   # boost from PageRank centrality (RRF channel) - more default now
     "lexical_threshold": 0.6,
 }
 LEXICAL_THRESHOLD = DEFAULT_WEIGHTS["lexical_threshold"]
