@@ -34,3 +34,17 @@ def test_role_in_default_and_roundtrip(tmp_path):
     save_config(str(tmp_path), cfg)
     loaded = load_config(str(tmp_path))
     assert loaded["role"] == "admin"
+
+
+def test_grap_server_state_reset_and_role():
+    # Cross-cut test for P2 robust state (minimal, no full ws)
+    from grap_mcp.server import GrapServerState
+    st = GrapServerState()
+    st.role = "viewer"
+    st.kg = "dummy"
+    st.explanations = {"a": 1}
+    assert st.role == "viewer"
+    st.reset()
+    assert st.kg is None
+    assert st.explanations == {}
+    assert st.role == "viewer"  # role not volatile
