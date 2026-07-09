@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Knowledge Extraction Engine — end-to-end demo (offline by default).
 
+See `mcp-server/KEE_DEMO_CLIENT_TUTORIAL.md` for complete client-machine setup instructions.
+
 Runs the full assisted-extraction loop on a small bundled corpus:
 
     docs -> chunk -> LLM extract fragments -> embedding reconcile (dedup)
