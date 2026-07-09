@@ -1625,16 +1625,17 @@ def get_audit_log(limit: int = None, cursor: str = None, wire_format: str = "com
 
 
 @tiered
-def list_runs(kind: str = None, wire_format: str = "compact") -> dict:
+def list_runs(kind: str = None, limit: int = None, cursor: str = None, wire_format: str = "compact") -> dict:
     """List execution runs, optionally filtered by kind (production|experiment).
 
     Supports ``wire_format="compact"`` for token-efficient #MUNCH encoding.
     """
     try:
         runs = _get_workspace().list_runs(kind)
+        page, meta = paginate(runs, limit, cursor)
         r = {"runs": [{"run_id": r.run_id, "kind": r.kind, "status": r.status,
-                       "gaps_found": r.gaps_found} for r in runs],
-             "count": len(runs)}
+                       "gaps_found": r.gaps_found} for r in page],
+             "count": len(page), **meta}
         from .encoding import encode_response
         payload, _meta = encode_response("list_runs", r, requested_format=wire_format)
         return payload
