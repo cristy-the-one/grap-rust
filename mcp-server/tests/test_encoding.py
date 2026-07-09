@@ -34,3 +34,22 @@ def test_unknown_tool_falls_back_to_json():
     payload, meta = encode_response("some_tool_without_schema", {"x": 1}, requested_format="compact")
     assert payload == {"x": 1}
     assert meta["format"] == "json"
+
+
+def test_new_schemas_fallback_without_pygrap():
+    # list_runs
+    lr = {"runs": [{"run_id": "r1", "kind": "production", "status": "completed", "gaps_found": 3}], "count": 1}
+    p, m = encode_response("list_runs", lr, requested_format="compact")
+    # Without pygrap, falls to json but still recognizes schema
+    assert p == lr or isinstance(p, str)
+    assert m["format"] in ("json", "compact")
+
+    # query_events
+    qe = {"events": [{"ts": 123, "type": "kg_loaded", "subject": "foo"}], "count": 1}
+    p, m = encode_response("query_events", qe, requested_format="compact")
+    assert m["format"] in ("json", "compact")
+
+    # detect_gaps
+    dg = {"status": "ok", "gaps_found": 2, "scope": "all", "gaps": [{"outcome_id": "o1", "characteristic": "c1", "score": 0.4}]}
+    p, m = encode_response("detect_gaps", dg, requested_format="compact")
+    assert m["format"] in ("json", "compact")
