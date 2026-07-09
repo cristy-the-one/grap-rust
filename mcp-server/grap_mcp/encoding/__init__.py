@@ -1,12 +1,14 @@
 """Optional compact #MUNCH-style wire encoding for MCP tool responses.
 
-JSON is the default; compact is opt-in per call until a client decoder ships.
+Compact is now the default for tools that have schemas (high-leverage token
+savings for agents). Set GRAP_WIRE_FORMAT=json to force traditional dicts.
 The encoding itself is produced exclusively by the Rust core via
 ``pygrap.wire.encode_tables`` — there is intentionally no second (Python)
 encoder, so the wire format has a single source of truth. If the native
 binding is unavailable, we degrade to JSON rather than emit a divergent format.
 """
 import json
+import os
 
 from .schemas import SCHEMAS
 
@@ -15,8 +17,12 @@ _BYTES_PER_TOKEN = 4
 
 
 def default_format(repo=None) -> str:
-    # Flip to "auto" once a client-side decoder is deployed.
-    return "json"
+    env = os.environ.get("GRAP_WIRE_FORMAT", "").lower()
+    if env in _FORMATS:
+        return env
+    # High-leverage default: use compact for schema'd tools to save agent context.
+    # Clients that don't handle the #MUNCH string can override via param or env.
+    return "compact"
 
 
 def _normalize(fmt, fallback):

@@ -662,7 +662,7 @@ def legal_graph_from_relations(path: str, top: int = 200) -> dict:
 
 
 @tiered
-def graph_neighbors(node_id: int, types: list = None, wire_format: str = "json",
+def graph_neighbors(node_id: int, types: list = None, wire_format: str = "compact",
                     limit: int = None, cursor: str = None):
     """Return a node's neighbors from the current KG (live), for the given
     relation types (default 'cites'/'mentions'). Powers expand-on-click in the
@@ -808,7 +808,7 @@ def get_context_bundle(query: str, max_results: int = 20, token_budget: int = 20
 @tiered
 def get_blast_radius(node_id: int, relations: list = None, max_depth: int = 10,
                      limit: int = None, cursor: str = None,
-                     wire_format: str = "json") -> dict:
+                     wire_format: str = "compact") -> dict:
     """Transitive dependents of a node — what would be impacted if it changes.
 
     Supports ``wire_format="compact"`` for token-efficient #MUNCH encoding.
@@ -839,7 +839,7 @@ def get_blast_radius(node_id: int, relations: list = None, max_depth: int = 10,
 
 
 @tiered
-def find_cycles(limit: int = None, cursor: str = None, wire_format: str = "json") -> dict:
+def find_cycles(limit: int = None, cursor: str = None, wire_format: str = "compact") -> dict:
     """Dependency cycles (strongly-connected components) in the current KG.
 
     Supports ``wire_format="compact"`` for token-efficient #MUNCH encoding.
@@ -863,7 +863,7 @@ def find_cycles(limit: int = None, cursor: str = None, wire_format: str = "json"
 
 @tiered
 def find_orphans(entry_points: list = None, limit: int = None, cursor: str = None,
-                wire_format: str = "json") -> dict:
+                wire_format: str = "compact") -> dict:
     """Live nodes unreachable from the given entry points (or from KG roots).
 
     Supports ``wire_format="compact"`` for token-efficient #MUNCH encoding.
@@ -886,7 +886,7 @@ def find_orphans(entry_points: list = None, limit: int = None, cursor: str = Non
 
 
 @tiered
-def kg_health(wire_format: str = "json") -> dict:
+def kg_health(wire_format: str = "compact") -> dict:
     """Structural health snapshot of the current KG (counts, cycles, orphans, top-central).
 
     Supports ``wire_format="compact"`` (falls back to JSON if no schema).
@@ -1085,7 +1085,7 @@ def _run_gap_detection(scope: str, kind: str, extra_summary: dict = None) -> dic
 
 
 @tiered
-def detect_gaps(scope: str = "all", wire_format: str = "json") -> dict:
+def detect_gaps(scope: str = "all", wire_format: str = "compact") -> dict:
     """Detect ASPICE gaps as a production run (persists run + explanations).
 
     Supports ``wire_format="compact"`` for token-efficient #MUNCH encoding on the gaps table.
@@ -1306,7 +1306,7 @@ def list_versions() -> dict:
 
 
 @tiered
-def get_audit_log(wire_format: str = "json") -> dict:
+def get_audit_log(wire_format: str = "compact") -> dict:
     """Return the workspace audit event log.
 
     Supports ``wire_format="compact"`` for token-efficient #MUNCH encoding.
@@ -1324,7 +1324,7 @@ def get_audit_log(wire_format: str = "json") -> dict:
 
 
 @tiered
-def list_runs(kind: str = None, wire_format: str = "json") -> dict:
+def list_runs(kind: str = None, wire_format: str = "compact") -> dict:
     """List execution runs, optionally filtered by kind (production|experiment).
 
     Supports ``wire_format="compact"`` for token-efficient #MUNCH encoding.
@@ -1372,7 +1372,7 @@ def reconstruct_run(run_id: str) -> dict:
 @tiered
 def query_events(event_type: str = None, run_id: str = None,
                  limit: int = None, cursor: str = None,
-                 wire_format: str = "json") -> dict:
+                 wire_format: str = "compact") -> dict:
     """Query the Temporal Graph: by event_type, or all events for a run_id.
 
     Supports ``wire_format="compact"`` for token-efficient #MUNCH encoding on the events table.

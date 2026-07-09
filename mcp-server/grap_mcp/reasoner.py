@@ -12,6 +12,13 @@ from typing import Any, Dict, List, Optional
 
 from .ontology import Ontology, ProcessOutcome
 
+# Session integration for same-session searchability (high-leverage for
+# in-session knowledge added during a run).
+try:
+    from . import session as _session
+except Exception:
+    _session = None
+
 # Default reasoner weights. `lexical_threshold` is the satisfaction cutoff,
 # interpreted as the minimum fraction of a characteristic's distinguishing
 # tokens that must appear in real evidence (0..1). text_weight/graph_weight
@@ -132,6 +139,13 @@ def _lexical_signals(kg, ontology: Ontology, outcome_id: str, characteristic: st
     # its readable form and the mapping-hint keywords, so both exact and natural
     # text searches have terms to match.
     query = f"{characteristic} {characteristic.replace('_', ' ')} {keywords}".strip()
+    # Record the query for session journal (negative evidence is valuable).
+    if _session:
+        try:
+            _session.record_query(query, 0)  # will be updated after hits
+        except Exception:
+            pass
+
     try:
         # Prefer the modern hybrid with RRF + optional centrality when available.
         # This brings in the core RRF + PageRank investment.
@@ -159,19 +173,42 @@ def _lexical_signals(kg, ontology: Ontology, outcome_id: str, characteristic: st
             )
     except Exception:
         hits = []
+
+    # Use session context for same-session boost (high-leverage: recently touched
+    # evidence or nodes from this run get a boost so in-session knowledge wins).
+    recent_boost_nodes = set()
+    if _session:
+        try:
+            ctx = _session.get_context(max_nodes=30)
+            recent_boost_nodes = {item.get("node") for item in ctx.get("nodes_accessed", []) if item.get("node") is not None}
+            if hits:
+                try:
+                    _session.record_query(query, len(hits))
+                except Exception:
+                    pass
+        except Exception:
+            pass
     signals = []
     for h in hits:
         text = getattr(h, "text", "") or ""
         node = getattr(h, "node", None)
         if _is_projected(kg, node, text, exclude_nodes):
             continue  # ignore system-projected nodes; only real evidence counts
+
+        base_score = getattr(h, "fused_score", 0.0)
+        # Session boost: nodes touched in this session get a multiplier.
+        # This makes "same-session searchability" real in gap detection.
+        if node in recent_boost_nodes:
+            base_score *= 1.25
+
         signals.append({
             "kind": "lexical",
-            "node": getattr(h, "node", None),
-            "score": getattr(h, "fused_score", 0.0),
+            "node": node,
+            "score": base_score,
             "coverage": round(_covers(text, characteristic), 3),
             "snippet": text[:160],
             "query": query,
+            "session_boosted": node in recent_boost_nodes,
         })
     return signals
 
