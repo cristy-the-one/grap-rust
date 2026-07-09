@@ -1454,7 +1454,7 @@ def get_status() -> dict:
             "retention": config_store.load_config(_resolve_ws_root()).get("retention", {}),
         },
         "state_class": "GrapServerState (robust refactor in progress)",
-        "telemetry": (lambda: __import__('grap_mcp.telemetry', fromlist=['snapshot']).snapshot() if os.environ.get("GRAP_TELEMETRY") == "1" else {"enabled": False, "note": "enable with GRAP_TELEMETRY=1"})(),
+        "telemetry": (lambda: (lambda mod: mod.snapshot() if mod._enabled() else {"enabled": False, "note": "enable with GRAP_TELEMETRY=1"})(__import__('grap_mcp.telemetry', fromlist=['snapshot', '_enabled'])))()
     }
 
 
