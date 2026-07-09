@@ -107,6 +107,22 @@ class GrapServerState:
         self.projected_nodes = set()
         self.explanations = {}
 
+    def set_kg(self, kg, path=None):
+        """Set kg and path, clear related caches."""
+        self.kg = kg
+        self.kg_path = path
+        # optionally clear projected if new kg
+
+    def set_ontology(self, ontology, version=None):
+        self.ontology = ontology
+        if version:
+            self.ontology_version = version
+
+    def clear_kg(self):
+        self.kg = None
+        self.kg_path = None
+        self.projected_nodes = set()
+
     def get_role(self) -> str:
         if self.role is None:
             root = self.ws_root or os.environ.get("GRAP_WORKSPACE", "./grap-workspace")
@@ -164,24 +180,24 @@ def _get_workspace():
 
 def _resolve_ws_root():
     """Return the workspace root path, opening the workspace if needed."""
-    if _state.get("ws_root") is None:
+    if _state.ws_root is None:
         _get_workspace()
     return _state.ws_root
 
 
 def _get_role() -> str:
     """Effective current role: persisted in config (governed), env override for bootstrap, default operator."""
-    if _state.get("role") is None:
+    if _state.role is None:
         root = _resolve_ws_root()
         cfg = config_store.load_config(root)
         env_role = os.environ.get("GRAP_ROLE")
         role = env_role or cfg.get("role", "operator")
-        if "role" not in cfg or cfg["role"] != role:
+        if "role" not in cfg or cfg.get("role") != role:
             cfg["role"] = role
             cfg["last_changed"] = int(time.time() * 1000)
             config_store.save_config(root, cfg)
         _state.role = role
-    return _state.get("role", "operator")
+    return _state.role or "operator"
 
 
 def _require(required: str):
@@ -213,7 +229,7 @@ def _cached_validation(ws, version_hash):
         if not raw:
             return None
         report = json.loads(raw)
-        if report.get("ontology_version") != _state.get("ontology_version"):
+        if report.get("ontology_version") != getattr(_state, "ontology_version", None):
             return None
         return report
     except Exception:
@@ -237,8 +253,7 @@ def load_knowledge_graph(path: str) -> dict:
         return denied
     try:
         kg = pygrap.IndexedKnowledgeGraph.with_merge_policy(path, 2)
-        _state.kg = kg
-        _state.kg_path = path
+        _state.set_kg(kg, path)
         try:
             _get_workspace().record_event("kg_loaded", path,
                                           details={"node_count": str(kg.node_count())})
@@ -270,8 +285,7 @@ def create_knowledge_graph(path: str) -> dict:
             shutil.rmtree(target)
         kg = pygrap.IndexedKnowledgeGraph.with_merge_policy(path, 2)
         kg.save_to_dir(path)
-        _state.kg = kg
-        _state.kg_path = path
+        _state.set_kg(kg, path)
         _state.projected_nodes = set()
         try:
             _get_workspace().record_event("kg_created", path,
@@ -290,12 +304,12 @@ def ingest_documents(path: str) -> dict:
     denied = _require("operator")
     if denied:
         return denied
-    kg = _state.get("kg")
+    kg = _state.kg
     if not kg:
         return {"status": "error", "message": "Load or create a Knowledge Graph first."}
     try:
         result = ingest.ingest_paths(kg, path)
-        kg_path = _state.get("kg_path")
+        kg_path = _state.kg_path
         if kg_path:
             kg.save_to_dir(kg_path)
         try:
@@ -317,13 +331,13 @@ def reingest_documents(path: str) -> dict:
     denied = _require("operator")
     if denied:
         return denied
-    kg = _state.get("kg")
+    kg = _state.kg
     if not kg:
         return {"status": "error", "message": "Load or create a Knowledge Graph first."}
     try:
         from grap_mcp import incremental
         from pathlib import Path as _P
-        kg_path = _state.get("kg_path")
+        kg_path = _state.kg_path
         manifest_path = str(_P(kg_path) / "ingest-manifest.json") if kg_path else None
         result = incremental.ingest_incremental(kg, path, manifest_path=manifest_path)
         if kg_path:
@@ -508,7 +522,7 @@ def adopt_proposed_ontology(version_hash: str, rationale: str = None) -> dict:
         return denied
     if not rationale or not rationale.strip():
         return {"status": "error", "message": "rationale is required for adoption"}
-    kg = _state.get("kg")
+    kg = _state.kg
     if not kg:
         return {"status": "error", "message": "Load a Knowledge Graph first."}
     try:
@@ -543,8 +557,7 @@ def adopt_proposed_ontology(version_hash: str, rationale: str = None) -> dict:
             version = ws.publish_ontology(
                 raw, metadata={"version": ontology.version, "adopted_from": version_hash, "rationale": rationale}
             )
-            _state.ontology = ontology
-            _state.ontology_version = version.hash
+            _state.set_ontology(ontology, version.hash)
             _state.projected_nodes.update(projection.get("projected_node_ids", []))
             ws.record_event(
                 "ontology_adopted", version_hash,
@@ -584,7 +597,7 @@ def open_extraction_graph(path: str) -> dict:
     try:
         from .kee.working_graph import WorkingGraph
         wg = WorkingGraph.open(path, get_embedder())
-        _state.kg = wg.kg
+        _state.set_kg(wg.kg, path)  # use new method
         _state.extraction_workdir = path
         out = {"status": "ok",
                "concepts": len(wg._live_concepts()),
@@ -619,7 +632,7 @@ def extend_extraction_graph(path: str, docs_path: str, model: str = None,
                                     sim=sim, relook_ratio=relook_ratio, max_files=max_files,
                                     chunk_chars=chunk_chars, concurrency=concurrency)
         wg = WorkingGraph.open(path, get_embedder())
-        _state.kg = wg.kg
+        _state.set_kg(wg.kg, path)
         _state.extraction_workdir = path
         wg.close()  # non-owned workdir: releases the sqlite handle only; wg.kg stays valid
         out["status"] = "ok"
@@ -667,13 +680,13 @@ def project_relations(relations: list = None) -> dict:
         return denied
     relations = relations or []
     try:
-        kg = _state.get("kg")
+        kg = _state.kg
         if not kg:
             # build a dedicated relations graph (don't clobber/contend the main KG)
             res = create_knowledge_graph(str(Path(_resolve_ws_root()) / "relations-kg"))
             if res.get("status") == "error":
                 return res
-            kg = _state.get("kg")
+            kg = _state.kg
 
         node_by_label: dict = {}
 
@@ -694,7 +707,7 @@ def project_relations(relations: list = None) -> dict:
                         {"relation_type": ty.strip(), "source": "kee_extraction"})
             edges += 1
 
-        kg_path = _state.get("kg_path")
+        kg_path = _state.kg_path
         if kg_path:
             kg.save_to_dir(kg_path)
         try:
@@ -929,7 +942,7 @@ def graph_neighbors(node_id: int, types: list = None, wire_format: str = "compac
     denied = _require("operator")
     if denied:
         return denied
-    kg = _state.get("kg")
+    kg = _state.kg
     if not kg:
         return {"status": "error", "message": "no Knowledge Graph loaded"}
     types = types or ["cites", "mentions"]
@@ -1024,7 +1037,7 @@ def get_context_bundle(query: str, max_results: int = 20, token_budget: int = 20
     denied = _require("operator")
     if denied:
         return denied
-    kg = _state.get("kg")
+    kg = _state.kg
     if not kg:
         return {"status": "error", "message": "no Knowledge Graph loaded"}
     try:
@@ -1071,7 +1084,7 @@ def get_blast_radius(node_id: int, relations: list = None, max_depth: int = 10,
     denied = _require("operator")
     if denied:
         return denied
-    kg = _state.get("kg")
+    kg = _state.kg
     if not kg:
         return {"status": "error", "message": "no Knowledge Graph loaded"}
     try:
@@ -1102,7 +1115,7 @@ def find_cycles(limit: int = None, cursor: str = None, wire_format: str = "compa
     denied = _require("operator")
     if denied:
         return denied
-    kg = _state.get("kg")
+    kg = _state.kg
     if not kg:
         return {"status": "error", "message": "no Knowledge Graph loaded"}
     try:
@@ -1126,7 +1139,7 @@ def find_orphans(entry_points: list = None, limit: int = None, cursor: str = Non
     denied = _require("operator")
     if denied:
         return denied
-    kg = _state.get("kg")
+    kg = _state.kg
     if not kg:
         return {"status": "error", "message": "no Knowledge Graph loaded"}
     try:
@@ -1149,7 +1162,7 @@ def kg_health(wire_format: str = "compact") -> dict:
     denied = _require("operator")
     if denied:
         return denied
-    kg = _state.get("kg")
+    kg = _state.kg
     if not kg:
         return {"status": "error", "message": "no Knowledge Graph loaded"}
     try:
@@ -1168,7 +1181,7 @@ def load_ontology(path: str) -> dict:
     denied = _require("operator")
     if denied:
         return denied
-    kg = _state.get("kg")
+    kg = _state.kg
     if not kg:
         return {"status": "error", "message": "Load a Knowledge Graph first."}
     try:
@@ -1213,7 +1226,7 @@ def load_procedure_graph(path: str) -> dict:
 
         # Attempt early projection into the KG (POC)
         projection_result = {}
-        kg = _state.get("kg")
+        kg = _state.kg
         if kg:
             projection_result = pg_loader.project_to_grap(pg, kg)
             _state.projected_nodes.update(projection_result.get("projected_node_ids", []))
@@ -1244,12 +1257,12 @@ def run_procedure(scope: str = "all") -> dict:
         return denied
 
     activation = None
-    logic_id = _state.get("current_logic_id")
-    if logic_id and _state.get("ws"):
+    logic_id = _state.current_logic_id
+    if logic_id and _state.ws:
         activation = _state.ws.current_production(logic_id)
 
-    pg = _state.get("pg")
-    kg = _state.get("kg")
+    pg = _state.pg
+    kg = _state.kg
 
     if not kg:
         return {"status": "error", "message": "No Knowledge Graph loaded."}
@@ -1261,16 +1274,16 @@ def run_procedure(scope: str = "all") -> dict:
         step_count = len(pg.steps) if hasattr(pg, "steps") else 0
 
         ws = _get_workspace()
-        ontology = _state.get("ontology")
+        ontology = _state.ontology
         run_id = f"run-{uuid.uuid4().hex[:8]}"
         activation_id = activation.activation_id if activation else None
         pg_version = activation.pg_version if activation else None
-        kg_version = (activation.kg_version if activation else None) or _state.get("ontology_version")
+        kg_version = (activation.kg_version if activation else None) or getattr(_state, "ontology_version", None)
         ws.start_run(run_id, kind="production", activation_id=activation_id,
                      pg_version=pg_version, kg_version=kg_version, scope=scope)
 
         gaps = (reasoner.detect_gaps(kg, ontology, pg,
-                                     exclude_nodes=_state.get("projected_nodes"))
+                                     exclude_nodes=getattr(_state, "projected_nodes", set()))
                 if ontology else [])
         ws.complete_run(run_id, status="completed", gaps_found=len(gaps),
                         explanation_hashes=[], summary={"scope": scope})
@@ -1293,18 +1306,18 @@ def run_procedure(scope: str = "all") -> dict:
 
 def _run_gap_detection(scope: str, kind: str, extra_summary: dict = None) -> dict:
     """Run gap detection as a tracked run (production or experiment)."""
-    kg = _state.get("kg")
-    ontology = _state.get("ontology")
+    kg = _state.kg
+    ontology = _state.ontology
     if not kg or not ontology:
         return {"status": "error", "message": "KG and ontology must be loaded first."}
     try:
         ws = _get_workspace()
-        pg = _state.get("pg")
-        logic_id = _state.get("current_logic_id")
+        pg = _state.pg
+        logic_id = _state.current_logic_id
         activation = ws.current_production(logic_id) if logic_id else None
         activation_id = activation.activation_id if activation else None
-        pg_version = (activation.pg_version if activation else None) or _state.get("pg_version")
-        kg_version = (activation.kg_version if activation else None) or _state.get("ontology_version")
+        pg_version = (activation.pg_version if activation else None) or getattr(_state, "pg_version", None)
+        kg_version = (activation.kg_version if activation else None) or getattr(_state, "ontology_version", None)
 
         run_id = f"run-{uuid.uuid4().hex[:8]}"
         ws.start_run(run_id, kind=kind, activation_id=activation_id,
@@ -1315,12 +1328,12 @@ def _run_gap_detection(scope: str, kind: str, extra_summary: dict = None) -> dic
         else:
             weights = config_store.load_config(_resolve_ws_root())["weights"]
         gaps = reasoner.detect_gaps(kg, ontology, pg, weights=weights,
-                                    exclude_nodes=_state.get("projected_nodes"))
+                                    exclude_nodes=getattr(_state, "projected_nodes", set()))
         explanations = {}
         hashes = []
         for gap in gaps:
             oc = ontology.outcome(gap["outcome_id"])
-            exp = reasoner.explain_gap(gap, _state.get("ontology_version"),
+            exp = reasoner.explain_gap(gap, getattr(_state, "ontology_version", None),
                                        expected=oc.description if oc else "")
             explanations[exp["target"]] = exp
             version = ws.record_explanation(json.dumps(exp), metadata={"target": exp["target"]})
@@ -1372,7 +1385,7 @@ def validate_procedure_graph(path: str) -> dict:
         pg = pg_loader.load_from_file(path)
     except Exception as e:
         return {"status": "error", "message": str(e)}
-    report = validate_for_publish(pg, _state.get("kg"), _state.get("ontology"))
+    report = validate_for_publish(pg, _state.kg, _state.ontology)
     return {"status": "ok", "path": path, **report}
 
 
@@ -1400,7 +1413,7 @@ def diff_procedure_graphs(path_a: str, path_b: str) -> dict:
 @tiered
 def get_explanation(target: str) -> dict:
     """Return the sectioned explanation for a gap target (e.g. 'SYS.5.BP3:acceptance_criteria_defined')."""
-    exp = _state.get("explanations", {}).get(target)
+    exp = (_state.explanations or {}).get(target)
     if not exp:
         return {"status": "error", "message": f"No explanation for target '{target}'. Run detect_gaps first."}
     return {"status": "ok", "explanation": exp}
@@ -1444,7 +1457,7 @@ def publish_pg(level: str = "draft", rationale: str = None) -> dict:
     denied = _require("operator")
     if denied:
         return denied
-    pg = _state.get("pg")
+    pg = _state.pg
     if not pg:
         return {"status": "error", "message": "No Procedure Graph loaded."}
     try:
@@ -1455,8 +1468,8 @@ def publish_pg(level: str = "draft", rationale: str = None) -> dict:
         _state.current_logic_id = pg.name
         _state.pg_version = version.hash
 
-        report = validate_for_publish(pg, _state.get("kg"), _state.get("ontology"))
-        report["ontology_version"] = _state.get("ontology_version")
+        report = validate_for_publish(pg, _state.kg, _state.ontology)
+        report["ontology_version"] = getattr(_state, "ontology_version", None)
         ws.record_validation(version.hash, json.dumps(report), report["ok"])
 
         return {"status": "ok", "version_hash": version.hash, "level": level,
@@ -1482,8 +1495,8 @@ def promote_pg(version_hash: str, rationale: str) -> dict:
             if not raw:
                 return {"status": "error", "message": f"Unknown version '{version_hash}'."}
             pg = pg_loader.load_from_string(raw)
-            report = validate_for_publish(pg, _state.get("kg"), _state.get("ontology"))
-            report["ontology_version"] = _state.get("ontology_version")
+            report = validate_for_publish(pg, _state.kg, _state.ontology)
+            report["ontology_version"] = getattr(_state, "ontology_version", None)
             ws.record_validation(version_hash, json.dumps(report), report["ok"])
 
         if report["errors"]:
@@ -1505,8 +1518,8 @@ def activate(activation_id: str, version_hash: str, weights: dict = None,
     denied = _require("operator")
     if denied:
         return denied
-    pg = _state.get("pg")
-    logic_id = _state.get("current_logic_id") or (pg.name if pg else None)
+    pg = _state.pg
+    logic_id = _state.current_logic_id or (pg.name if pg else None)
     if not logic_id:
         return {"status": "error", "message": "No PG logic id known; load and publish a PG first."}
     try:
@@ -1542,7 +1555,7 @@ def set_production(activation_id: str) -> dict:
 @tiered
 def get_production() -> dict:
     """Return the current production activation for the loaded PG logic."""
-    logic_id = _state.get("current_logic_id")
+    logic_id = _state.current_logic_id
     if not logic_id:
         return {"active": False, "message": "No PG logic loaded."}
     act = _get_workspace().current_production(logic_id)
@@ -1844,7 +1857,7 @@ def suggest_queries(node_id: int) -> dict:
     denied = _require("operator")
     if denied:
         return denied
-    kg = _state.get("kg")
+    kg = _state.kg
     if not kg:
         return {"status": "error", "message": "no Knowledge Graph loaded"}
     label = None
@@ -1876,7 +1889,7 @@ def suggest_queries(node_id: int) -> dict:
 
 
 def _entity_index_path():
-    kg_path = _state.get("kg_path")
+    kg_path = _state.kg_path
     if not kg_path:
         return None
     from pathlib import Path as _P
@@ -1943,7 +1956,7 @@ def reindex_entities() -> dict:
     denied = _require("operator")
     if denied:
         return denied
-    kg = _state.get("kg")
+    kg = _state.kg
     path = _entity_index_path()
     if not kg or not path:
         return {"status": "error", "message": "Load or create a Knowledge Graph first."}
@@ -1980,7 +1993,7 @@ def compact_graph() -> dict:
     denied = _require("operator")
     if denied:
         return denied
-    kg = _state.get("kg")
+    kg = _state.kg
     if not kg:
         return {"status": "error", "message": "no Knowledge Graph loaded"}
     try:
@@ -1989,7 +2002,7 @@ def compact_graph() -> dict:
             kg.vacuum_deleted_nodes()
         except Exception:
             logger.warning("vacuum_deleted_nodes failed/unavailable", exc_info=True)
-        kg_path = _state.get("kg_path")
+        kg_path = _state.kg_path
         if kg_path:
             kg.save_to_dir(kg_path)
         try:
