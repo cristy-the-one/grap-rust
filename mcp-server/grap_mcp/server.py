@@ -1606,16 +1606,17 @@ def list_versions() -> dict:
 
 
 @tiered
-def get_audit_log(wire_format: str = "compact") -> dict:
+def get_audit_log(limit: int = None, cursor: str = None, wire_format: str = "compact") -> dict:
     """Return the workspace audit event log.
 
     Supports ``wire_format="compact"`` for token-efficient #MUNCH encoding.
     """
     try:
         events = _get_workspace().read_audit()
+        page, meta = paginate(events, limit, cursor)
         r = {"events": [{"ts": e.ts, "type": e.event_type, "subject": e.subject,
-                         "rationale": e.rationale} for e in events],
-             "count": len(events)}
+                         "rationale": e.rationale} for e in page],
+             "count": len(page), **meta}
         from .encoding import encode_response
         payload, _meta = encode_response("query_events", r, requested_format=wire_format)
         return payload
