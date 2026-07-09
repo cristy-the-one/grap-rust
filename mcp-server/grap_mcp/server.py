@@ -1330,6 +1330,12 @@ def _run_gap_detection(scope: str, kind: str, extra_summary: dict = None) -> dic
         pg_version = (activation.pg_version if activation else None) or getattr(_state, "pg_version", None)
         kg_version = (activation.kg_version if activation else None) or getattr(_state, "ontology_version", None)
 
+        try:
+            from grap_mcp import session
+            session.record_query(f"run_procedure:{scope}", 0)
+        except Exception:
+            pass
+
         run_id = f"run-{uuid.uuid4().hex[:8]}"
         ws.start_run(run_id, kind=kind, activation_id=activation_id,
                      pg_version=pg_version, kg_version=kg_version, scope=scope)
