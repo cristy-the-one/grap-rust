@@ -201,6 +201,13 @@ def main():
         assert isinstance(twp_results, list), "Expected a list from sharded twp search"
         print(f"ShardedGraph traversal_weight_property pass-through OK ({len(twp_results)} results)")
 
+        # New: content hash + verify on ShardedGraph
+        h = sg.get_node_content_hash(s1)
+        assert h is not None and len(h) == 64
+        v = sg.verify_node(s1)
+        assert v == "match"
+        print("ShardedGraph get_node_content_hash + verify_node OK")
+
     print("ShardedGraph fusion controls OK")
 
     # 13. wire.encode_tables
