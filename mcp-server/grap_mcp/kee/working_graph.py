@@ -82,6 +82,7 @@ class WorkingGraph:
         self._retracted: Set[int] = set()                  # logically removed concepts
         self._chunk_contrib: Dict[str, dict] = {}          # chunk -> {concepts,chars,edges}
         self.manifest: Dict[str, str] = {}                 # chunk_id -> content hash
+        self.concept_hashes: Dict[int, str] = {}           # node -> hex content_hash from core (provenance + dedup)
 
     # ---- union-find (component tracking for bridge signals) ----
     def _find(self, x: int) -> int:
@@ -121,6 +122,14 @@ class WorkingGraph:
         self.canonical[node] = name
         self.chars.setdefault(node, [])
         self._parent[node] = node
+        # Capture core content hash for integrity, provenance, and future dedup using hardened node hashes.
+        if hasattr(self.kg, "node_content_hash"):
+            try:
+                h = self.kg.node_content_hash(node)
+                if h:
+                    self.concept_hashes[node] = "".join(f"{b:02x}" for b in h)
+            except Exception:
+                pass
         return _Resolution(node, False)
 
     def node_count(self) -> int:
@@ -380,6 +389,7 @@ class WorkingGraph:
             "mapping_hints": mapping_hints,
             "provenance": provenance,
             "relations": relations_out,
+            "concept_hashes": {str(node): h for node, h in self.concept_hashes.items() if node in self.canonical},
         }
 
     # ---- persistence (Phase 2) ----
@@ -409,6 +419,7 @@ class WorkingGraph:
                 srcs = self._rel_sources.get((f, e["type"], t), set())
                 st.edge_sources[(remap[f], remap[t])] = sorted(srcs)
         st.manifest = dict(self.manifest)
+        st.concept_hashes = {remap.get(old, old): h for old, h in self.concept_hashes.items() if old in remap}
         st.rel_vocab = list(dict.fromkeys(e["type"] for e in self.relations))
         st.parked = [{"from": p["from"], "type": p["type"], "to": p["to"],
                       "chunk_id": p.get("source", ""), "reason": p.get("reason", "")}
@@ -430,6 +441,7 @@ class WorkingGraph:
         self.parked = [{"from": p["from"], "type": p["type"], "to": p["to"],
                         "source": p["chunk_id"], "reason": p["reason"]} for p in st.parked]
         self.manifest = dict(st.manifest)
+        self.concept_hashes = dict(st.concept_hashes)
         self._retracted = set()
         self._chunk_contrib = {}
         self._parent = {}
@@ -459,6 +471,13 @@ class WorkingGraph:
             nid = self.kg.add_node(text=self.canonical[cid], label="concept",
                                    embedding=self._embed_one(self.canonical[cid]))
             assert nid == cid, "projection must reproduce dense concept ids"
+            if hasattr(self.kg, "node_content_hash"):
+                try:
+                    h = self.kg.node_content_hash(nid)
+                    if h:
+                        self.concept_hashes[nid] = "".join(f"{b:02x}" for b in h)
+                except Exception:
+                    pass
             for alias in self.aliases_by_node.get(cid, []):
                 self._register_alias(alias, cid)
         for e in self.relations:

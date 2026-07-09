@@ -311,11 +311,42 @@ def extract_ontology(path: str, out_path: str = None, sim: float = 0.86,
             "provenance": onto["provenance"],
             "relations": onto.get("relations", []),
             "validation": validation,
+            "concept_hashes": onto.get("concept_hashes", {}),
             "note": ("LLM proposal — review before loading. To adopt: "
-                     "load_ontology(out_path)."),
+                     "load_ontology(out_path). Use concept_hashes for provenance."),
         }
     except Exception as e:
         logger.exception("extract_ontology failed")
+        return {"status": "error", "message": str(e)}
+
+
+@tiered
+def list_proposed_ontologies() -> dict:
+    """List versioned ontology proposals (from KEE extract) that are candidates for human review/promotion.
+
+    These are stored via publish_ontology with kind=proposed. Use the version_hash
+    with load_ontology to inspect, then promote/activate for production use."""
+    denied = _require("operator")
+    if denied:
+        return denied
+    try:
+        ws = _get_workspace()
+        versions = ws.list_versions("ontology") or []
+        proposed = []
+        for v in versions:
+            try:
+                meta = v.metadata or {}
+                if meta.get("kind") == "proposed":
+                    proposed.append({
+                        "version_hash": v.hash,
+                        "created_at": v.created_at,
+                        "source": meta.get("source"),
+                        "note": "Use load_ontology on the yaml or reconstruct to review.",
+                    })
+            except Exception:
+                continue
+        return {"status": "ok", "proposed": proposed, "count": len(proposed)}
+    except Exception as e:
         return {"status": "error", "message": str(e)}
 
 
@@ -1740,7 +1771,7 @@ def list_capabilities() -> dict:
         "domains": {
             "discovery": ["grap_guide", "suggest_queries"],
             "knowledge": ["load_knowledge_graph", "create_knowledge_graph",
-                          "ingest_documents", "reingest_documents", "extract_ontology", "project_relations",
+                          "ingest_documents", "reingest_documents", "extract_ontology", "list_proposed_ontologies", "project_relations",
                           "open_extraction_graph", "extend_extraction_graph", "export_ontology",
                           "build_legal_graph", "legal_graph_from_relations",
                           "graph_neighbors", "load_ontology",

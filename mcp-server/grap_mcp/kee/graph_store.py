@@ -21,6 +21,7 @@ _MIGRATIONS = [
         CREATE TABLE IF NOT EXISTS characteristics (concept_id INTEGER, text TEXT, PRIMARY KEY(concept_id, text));
         CREATE TABLE IF NOT EXISTS edges (from_id INTEGER, to_id INTEGER, type TEXT, PRIMARY KEY(from_id, to_id));  -- one edge type per (from,to) pair; matches WorkingGraph._edge_types
         CREATE TABLE IF NOT EXISTS chunks (chunk_id TEXT PRIMARY KEY, content_hash TEXT NOT NULL);
+        CREATE TABLE IF NOT EXISTS concept_hashes (concept_id INTEGER PRIMARY KEY, content_hash TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS concept_sources (concept_id INTEGER, chunk_id TEXT, PRIMARY KEY(concept_id, chunk_id));
         CREATE TABLE IF NOT EXISTS char_sources (concept_id INTEGER, text TEXT, chunk_id TEXT, PRIMARY KEY(concept_id, text, chunk_id));
         CREATE TABLE IF NOT EXISTS edge_sources (from_id INTEGER, to_id INTEGER, chunk_id TEXT, PRIMARY KEY(from_id, to_id, chunk_id));
@@ -45,6 +46,7 @@ class GraphState:
     manifest: Dict[str, str] = field(default_factory=dict)
     rel_vocab: List[str] = field(default_factory=list)
     parked: List[dict] = field(default_factory=list)
+    concept_hashes: Dict[int, str] = field(default_factory=dict)  # node -> hex core content_hash
 
 
 class GraphStore:
@@ -67,7 +69,8 @@ class GraphStore:
         c = self.conn
         try:
             for t in ("concepts", "aliases", "characteristics", "edges", "chunks",
-                      "concept_sources", "char_sources", "edge_sources", "parked", "meta"):
+                      "concept_sources", "char_sources", "edge_sources", "parked", "meta",
+                      "concept_hashes"):
                 c.execute(f"DELETE FROM {t}")
             c.executemany("INSERT INTO concepts(concept_id, canonical) VALUES (?,?)",
                           list(state.concepts.items()))
@@ -79,6 +82,8 @@ class GraphStore:
                           [(f, t, ty) for (f, t, ty) in state.edges])
             c.executemany("INSERT INTO chunks(chunk_id, content_hash) VALUES (?,?)",
                           list(state.manifest.items()))
+            c.executemany("INSERT INTO concept_hashes(concept_id, content_hash) VALUES (?,?)",
+                          list(state.concept_hashes.items()))
             c.executemany("INSERT INTO concept_sources(concept_id, chunk_id) VALUES (?,?)",
                           [(cid, ch) for cid, chs in state.concept_sources.items() for ch in chs])
             c.executemany("INSERT INTO char_sources(concept_id, text, chunk_id) VALUES (?,?,?)",
@@ -116,6 +121,8 @@ class GraphStore:
         for r in c.execute("SELECT * FROM edge_sources"):
             s.edge_sources.setdefault((r["from_id"], r["to_id"]), []).append(r["chunk_id"])
         s.manifest = {r["chunk_id"]: r["content_hash"] for r in c.execute("SELECT * FROM chunks")}
+        s.concept_hashes = {r["concept_id"]: r["content_hash"]
+                            for r in c.execute("SELECT * FROM concept_hashes")}
         s.parked = [{"from": r["from_concept"], "type": r["type"], "to": r["to_concept"],
                      "chunk_id": r["chunk_id"], "reason": r["reason"]}
                     for r in c.execute("SELECT * FROM parked")]
