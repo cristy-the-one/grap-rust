@@ -50,11 +50,18 @@ def ingest_paths(kg, root: str, embedder=None) -> Dict[str, Any]:
         for i, chunk in enumerate(chunks):
             label = f"doc:{f.stem}#{i}"
             if embeddings is not None:
-                kg.add_node(text=chunk, label=label, embedding=embeddings[i])
+                nid = kg.add_node(text=chunk, label=label, embedding=embeddings[i])
             else:
-                kg.add_node(text=chunk, label=label)
+                nid = kg.add_node(text=chunk, label=label)
             nodes_added += 1
             if len(labels) < 5:
                 labels.append(label)
+            # Capture core content hash for consistency with KEE/extraction (provenance).
+            if hasattr(kg, "node_content_hash"):
+                try:
+                    h = kg.node_content_hash(nid)
+                    # could store in manifest or side, for now just computed
+                except Exception:
+                    pass
     return {"files": len(files), "nodes_added": nodes_added, "labels": labels,
             "embedded": bool(embedder)}
