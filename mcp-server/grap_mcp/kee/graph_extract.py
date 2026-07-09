@@ -168,6 +168,11 @@ def extend_graph_ontology(workdir: str, docs_path: str, provider, embedder, *,
         _emit({"phase": "done", "added": len(new), "changed": len(changed),
                "removed": len(removed), "concepts": len(wg._live_concepts()),
                "edges": len(wg.relations), "relooks": relooks, "parked": len(wg.parked)})
+        try:
+            from .. import session
+            session.record_query(f"graph_extract:{len(to_extract)}", len(wg._live_concepts()))
+        except Exception:
+            pass
         return {
             "ontology": ontology,
             "added": len(new), "changed": len(changed), "removed": len(removed),
