@@ -404,6 +404,12 @@ class WorkingGraph:
             })
             provenance[oid] = sorted(self.node_sources.get(node, set()))
 
+        try:
+            from .. import session
+            session.record_query(f"to_candidate:{len(self.canonical)}", len(process_outcomes))
+        except Exception:
+            pass
+
         for e in self.relations:
             relations_out.append({
                 "from": self._canonical_label(e["from_id"]),
