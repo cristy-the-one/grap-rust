@@ -14,6 +14,7 @@ import shutil
 import uuid
 import json
 import time
+import functools
 
 from . import procedure_graph as pg_loader
 from .validation import validate_pg
@@ -58,10 +59,20 @@ _ACTIVE_TIER = active_tier()
 def tiered(func):
     """Register `func` as an MCP tool only if its tier (from _TIERS, default
     'standard') is within the active tier. Out-of-tier tools stay defined on the
-    module (callable in tests) but are not advertised to clients."""
+    module (callable in tests) but are not advertised to clients.
+    Also records to telemetry if enabled.
+    """
     tool_tier = _TIERS.get(func.__name__, "standard")
     if tier_includes(tool_tier, _ACTIVE_TIER):
-        return mcp.tool()(func)
+        @functools.wraps(func)
+        def _wrapped(*args, **kwargs):
+            try:
+                from grap_mcp import telemetry as _tel
+                _tel.record(func.__name__)
+            except Exception:
+                pass
+            return func(*args, **kwargs)
+        return mcp.tool()(_wrapped)
     return func
 
 
@@ -155,7 +166,7 @@ def _resolve_ws_root():
     """Return the workspace root path, opening the workspace if needed."""
     if _state.get("ws_root") is None:
         _get_workspace()
-    return _state["ws_root"]
+    return _state.ws_root
 
 
 def _get_role() -> str:
@@ -169,7 +180,7 @@ def _get_role() -> str:
             cfg["role"] = role
             cfg["last_changed"] = int(time.time() * 1000)
             config_store.save_config(root, cfg)
-        _state["role"] = role
+        _state.role = role
     return _state.get("role", "operator")
 
 
@@ -226,8 +237,8 @@ def load_knowledge_graph(path: str) -> dict:
         return denied
     try:
         kg = pygrap.IndexedKnowledgeGraph.with_merge_policy(path, 2)
-        _state["kg"] = kg
-        _state["kg_path"] = path
+        _state.kg = kg
+        _state.kg_path = path
         try:
             _get_workspace().record_event("kg_loaded", path,
                                           details={"node_count": str(kg.node_count())})
@@ -259,9 +270,9 @@ def create_knowledge_graph(path: str) -> dict:
             shutil.rmtree(target)
         kg = pygrap.IndexedKnowledgeGraph.with_merge_policy(path, 2)
         kg.save_to_dir(path)
-        _state["kg"] = kg
-        _state["kg_path"] = path
-        _state["projected_nodes"] = set()
+        _state.kg = kg
+        _state.kg_path = path
+        _state.projected_nodes = set()
         try:
             _get_workspace().record_event("kg_created", path,
                                           details={"node_count": str(kg.node_count())})
@@ -517,9 +528,9 @@ def adopt_proposed_ontology(version_hash: str, rationale: str = None) -> dict:
             version = ws.publish_ontology(
                 raw, metadata={"version": ontology.version, "adopted_from": version_hash, "rationale": rationale}
             )
-            _state["ontology"] = ontology
-            _state["ontology_version"] = version.hash
-            _state["projected_nodes"].update(projection.get("projected_node_ids", []))
+            _state.ontology = ontology
+            _state.ontology_version = version.hash
+            _state.projected_nodes.update(projection.get("projected_node_ids", []))
             ws.record_event(
                 "ontology_adopted", version_hash,
                 details={"new_version": version.hash, "outcomes": str(projection["outcomes_projected"])},
@@ -558,8 +569,8 @@ def open_extraction_graph(path: str) -> dict:
     try:
         from .kee.working_graph import WorkingGraph
         wg = WorkingGraph.open(path, get_embedder())
-        _state["kg"] = wg.kg
-        _state["extraction_workdir"] = path
+        _state.kg = wg.kg
+        _state.extraction_workdir = path
         out = {"status": "ok",
                "concepts": len(wg._live_concepts()),
                "edges": len(wg.relations),
@@ -593,8 +604,8 @@ def extend_extraction_graph(path: str, docs_path: str, model: str = None,
                                     sim=sim, relook_ratio=relook_ratio, max_files=max_files,
                                     chunk_chars=chunk_chars, concurrency=concurrency)
         wg = WorkingGraph.open(path, get_embedder())
-        _state["kg"] = wg.kg
-        _state["extraction_workdir"] = path
+        _state.kg = wg.kg
+        _state.extraction_workdir = path
         wg.close()  # non-owned workdir: releases the sqlite handle only; wg.kg stays valid
         out["status"] = "ok"
         return {k: out[k] for k in ("status", "added", "changed", "removed",
@@ -711,7 +722,7 @@ def build_legal_graph(path: str, max_files: int = 400, with_relations: bool = Fa
         res = create_knowledge_graph(kgp)
         if res.get("status") == "error":
             return res
-        kg = _state["kg"]
+        kg = _state.kg
 
         node_info: dict = {}      # node_id -> {label, kind, title}
         id_to_node: dict = {}     # act id -> node_id
@@ -836,7 +847,7 @@ def legal_graph_from_relations(path: str, top: int = 200) -> dict:
         res = create_knowledge_graph(kgp)
         if res.get("status") == "error":
             return res
-        kg = _state["kg"]
+        kg = _state.kg
 
         node_info: dict = {}
         ent: dict = {}
@@ -1150,9 +1161,9 @@ def load_ontology(path: str) -> dict:
         projection = onto_loader.project_ontology_to_grap(ontology, kg)
         raw = open(path, "r", encoding="utf-8").read()
         version = _get_workspace().publish_ontology(raw, metadata={"version": ontology.version})
-        _state["ontology"] = ontology
-        _state["ontology_version"] = version.hash
-        _state["projected_nodes"].update(projection.get("projected_node_ids", []))
+        _state.ontology = ontology
+        _state.ontology_version = version.hash
+        _state.projected_nodes.update(projection.get("projected_node_ids", []))
         _get_workspace().record_event("ontology_loaded", path,
                                       details={"outcomes": str(projection["outcomes_projected"])})
         return {
@@ -1178,8 +1189,8 @@ def load_procedure_graph(path: str) -> dict:
         return denied
     try:
         pg = pg_loader.load_from_file(path)
-        _state["pg"] = pg
-        _state["current_logic_id"] = pg.name
+        _state.pg = pg
+        _state.current_logic_id = pg.name
         try:
             _get_workspace().record_event("pg_loaded", path, details={"name": pg.name})
         except Exception:
@@ -1190,7 +1201,7 @@ def load_procedure_graph(path: str) -> dict:
         kg = _state.get("kg")
         if kg:
             projection_result = pg_loader.project_to_grap(pg, kg)
-            _state["projected_nodes"].update(projection_result.get("projected_node_ids", []))
+            _state.projected_nodes.update(projection_result.get("projected_node_ids", []))
 
         return {
             "status": "ok",
@@ -1220,7 +1231,7 @@ def run_procedure(scope: str = "all") -> dict:
     activation = None
     logic_id = _state.get("current_logic_id")
     if logic_id and _state.get("ws"):
-        activation = _state["ws"].current_production(logic_id)
+        activation = _state.ws.current_production(logic_id)
 
     pg = _state.get("pg")
     kg = _state.get("kg")
@@ -1299,7 +1310,7 @@ def _run_gap_detection(scope: str, kind: str, extra_summary: dict = None) -> dic
             explanations[exp["target"]] = exp
             version = ws.record_explanation(json.dumps(exp), metadata={"target": exp["target"]})
             hashes.append(version.hash)
-        _state["explanations"] = explanations
+        _state.explanations = explanations
 
         summary = {"scope": scope, "weights": json.dumps(weights)}
         if extra_summary:
@@ -1388,7 +1399,7 @@ def get_status() -> dict:
     logic_id = _state.get("current_logic_id")
     production = None
     if logic_id and _state.get("ws"):
-        prod = _state["ws"].current_production(logic_id)
+        prod = _state.ws.current_production(logic_id)
         production = prod.activation_id if prod else None
 
     return {
@@ -1424,8 +1435,8 @@ def publish_pg(level: str = "draft", rationale: str = None) -> dict:
         raw = open(pg.source_path, "r", encoding="utf-8").read() if pg.source_path else ""
         version = ws.publish_pg(raw, level=level, rationale=rationale,
                                 metadata={"name": pg.name, "version": pg.version})
-        _state["current_logic_id"] = pg.name
-        _state["pg_version"] = version.hash
+        _state.current_logic_id = pg.name
+        _state.pg_version = version.hash
 
         report = validate_for_publish(pg, _state.get("kg"), _state.get("ontology"))
         report["ontology_version"] = _state.get("ontology_version")
@@ -1758,7 +1769,7 @@ def set_role(role: str, rationale: str = None) -> dict:
     cfg["role"] = role
     cfg["last_changed"] = int(time.time() * 1000)
     config_store.save_config(root, cfg)
-    _state["role"] = role  # update in-mem
+    _state.role = role  # update in-mem
     _get_workspace().record_event("role_changed", f"{old_role}->{role}",
                                   details={"from": old_role, "to": role}, rationale=rationale)
     return {"status": "ok", "role": role}
