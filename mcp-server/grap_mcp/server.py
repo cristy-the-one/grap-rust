@@ -8,7 +8,6 @@ This is the starting point for making the narrow-but-vertical ASPICE gap-detecti
 from mcp.server.fastmcp import FastMCP
 import pygrap
 from pathlib import Path
-import hashlib
 import logging
 import os
 import shutil
@@ -26,6 +25,7 @@ from .publish_validation import validate_for_publish
 from .experiments import experiment_summary, quality_metrics
 from . import config as config_store
 from . import auth
+from . import governance
 from . import ingest
 from . import session
 from .pagination import paginate
@@ -50,7 +50,7 @@ _TIERS = {
     "ingest_documents": "core", "graph_neighbors": "core", "get_context_bundle": "core",
     "resolve_entity": "core",
     "run_experiment": "full", "get_quality_metrics": "full", "adopt_experiment": "full",
-    "get_config": "full", "set_weight": "full", "set_retention": "full",
+    "get_config": "full", "set_weight": "full", "set_retention": "full", "set_policy": "full",
     "enforce_retention": "full", "get_audit_log": "full", "reconstruct_run": "full",
     "get_telemetry": "full", "build_legal_graph": "full", "legal_graph_from_relations": "full",
 }
@@ -408,6 +408,40 @@ def extract_ontology(path: str, out_path: str = None, sim: float = 0.86,
                          "provider": provider.name, "embedder": embedder.name})
         except Exception:
             logger.warning("audit record_event failed for ontology_proposed", exc_info=True)
+
+        # Dark-factory path: when the governed adoption policy is enabled, the
+        # policy — not a human — decides. Pass -> auto-adopt (audited as
+        # adopted_by=policy); fail -> audited rejection that surfaces in
+        # list_pending_interventions. Either way the line never blocks.
+        auto_adoption = None
+        policy = governance.merged_policy(config_store.load_config(_resolve_ws_root()))
+        if policy.get("enabled"):
+            import yaml as _yaml
+            ws = _get_workspace()
+            verdict = governance.evaluate_proposal_dict(
+                _yaml.safe_load(yaml_text) or {}, _active_ontology_dict(ws), policy,
+                pg_referenced_ids=_pg_referenced_outcome_ids())
+            failed = [c["name"] for c in verdict["checks"] if not c["ok"]]
+            if verdict["pass"] and _state.kg is not None:
+                auto_rationale = ("adoption_policy: all checks passed ("
+                                  + ", ".join(c["name"] for c in verdict["checks"]) + ")")
+                adopt_res = _adopt_record(ws, _state.kg, version.hash, yaml_text,
+                                          auto_rationale, adopted_by="policy")
+                auto_adoption = {"attempted": True, "pass": True,
+                                 "adopted": adopt_res.get("status") == "ok",
+                                 "new_version_hash": adopt_res.get("new_version_hash")}
+            else:
+                if _state.kg is None:
+                    failed.append("no_kg_loaded")
+                try:
+                    ws.record_event("adoption_policy_rejected", version.hash,
+                                    details={"failed": ",".join(failed) or "unknown"})
+                except Exception:
+                    logger.warning("audit record_event failed for policy_rejected",
+                                   exc_info=True)
+                auto_adoption = {"attempted": True, "pass": False,
+                                 "failed_checks": failed}
+
         return {
             "status": "ok",
             "out_path": out,
@@ -425,10 +459,12 @@ def extract_ontology(path: str, out_path: str = None, sim: float = 0.86,
             "relations": onto.get("relations", []),
             "validation": validation,
             "concept_hashes": onto.get("concept_hashes", {}),
+            "auto_adoption": auto_adoption,
             "note": ("LLM proposal — review before adopting. Inspect with "
                      "get_proposed_ontology(version_hash), then "
                      "adopt_proposed_ontology(version_hash, rationale); adoption "
-                     "verifies concept_hashes (tamper-evidence)."),
+                     "verifies concept_hashes (tamper-evidence). With the adoption "
+                     "policy enabled, auto_adoption reports the policy verdict."),
         }
     except Exception as e:
         logger.exception("extract_ontology failed")
@@ -485,28 +521,108 @@ def get_proposed_ontology(version_hash: str) -> dict:
         return {"status": "error", "message": str(e)}
 
 
-def _verify_concept_hashes(proposal: dict) -> tuple[int, list]:
-    """Check a proposal's concept_hashes against its own outcome names.
+def _load_ontology_from_raw(raw: str):
+    """Materialize a versioned ontology yaml to a temp file for the loader."""
+    import tempfile
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False,
+                                     encoding="utf-8") as tf:
+        tf.write(raw)
+        tmp_path = tf.name
+    try:
+        return onto_loader.load_ontology_from_file(tmp_path)
+    finally:
+        try:
+            os.unlink(tmp_path)
+        except Exception:
+            pass
 
-    KEE working-graph concept nodes carry the outcome's canonical name as
-    their text, and the core's node content hash is sha256(text) — so each
-    recorded hash must equal sha256(outcome name). A mismatch means the yaml
-    was edited between extraction and adoption. Returns (checked, mismatches);
-    proposals without hashes (legacy stateless path) verify trivially (0, [])."""
-    chashes = proposal.get("concept_hashes") or {}
-    outcomes_by_id = {o.get("id"): o for o in proposal.get("process_outcomes", [])
-                      if isinstance(o, dict)}
-    checked, mismatches = 0, []
-    for oid, expected in chashes.items():
-        oc = outcomes_by_id.get(oid)
-        if oc is None:
-            mismatches.append({"outcome": oid, "reason": "hash refers to no outcome in proposal"})
-            continue
-        checked += 1
-        actual = hashlib.sha256(str(oc.get("name", "")).encode("utf-8")).hexdigest()
-        if actual != expected:
-            mismatches.append({"outcome": oid, "expected": expected, "actual": actual})
-    return checked, mismatches
+
+def _pg_referenced_outcome_ids() -> set:
+    """Outcome ids referenced by the loaded PG (kg:...process_outcome.<id>)."""
+    pg = _state.pg
+    ids = set()
+    if not pg or not hasattr(pg, "steps"):
+        return ids
+    for step in pg.steps:
+        for ref in getattr(step, "references", []) or []:
+            marker = "process_outcome."
+            if marker in str(ref):
+                ids.add(str(ref).split(marker, 1)[1])
+    return ids
+
+
+def _active_ontology_dict(ws):
+    """Parsed yaml of the active ontology version, or None if none is active."""
+    vh = getattr(_state, "ontology_version", None)
+    if not vh:
+        return None
+    raw = ws.get_record(vh)
+    if not raw:
+        return None
+    import yaml
+    try:
+        return yaml.safe_load(raw) or {}
+    except Exception:
+        return None
+
+
+def _adopt_record(ws, kg, version_hash: str, raw: str, rationale: str,
+                  adopted_by: str = "human") -> dict:
+    """Shared adoption path for the human tool and policy auto-adoption:
+    verify concept_hashes (refuse on mismatch), project, core-verify the
+    written nodes, publish the adoption version, audit."""
+    import yaml
+    checked, mismatches = governance.verify_concept_hashes(yaml.safe_load(raw) or {})
+    if mismatches:
+        try:
+            ws.record_event("ontology_adoption_rejected", version_hash,
+                            details={"reason": "concept_hashes mismatch",
+                                     "mismatches": str(len(mismatches))})
+        except Exception:
+            logger.warning("audit record_event failed for adoption_rejected", exc_info=True)
+        return {"status": "error",
+                "message": ("concept_hashes verification failed — the proposal "
+                            "content changed since extraction. Re-extract or "
+                            "review the stored version."),
+                "hashes_checked": checked,
+                "mismatches": mismatches}
+    ontology = _load_ontology_from_raw(raw)
+    projection = onto_loader.project_ontology_to_grap(ontology, kg)
+    # Post-projection self-check: the nodes just written must pass the core's
+    # stored-hash-vs-blob verification.
+    projection_verified = True
+    if hasattr(kg, "verify_node"):
+        for nid in projection.get("projected_node_ids", []):
+            try:
+                if kg.verify_node(nid) != "match":
+                    projection_verified = False
+            except Exception:
+                projection_verified = False
+    # Re-publish the adopted version (new hash) with adoption info.
+    version = ws.publish_ontology(
+        raw, metadata={"version": ontology.version, "adopted_from": version_hash,
+                       "rationale": rationale, "adopted_by": adopted_by})
+    _state.set_ontology(ontology, version.hash)
+    _state.projected_nodes.update(projection.get("projected_node_ids", []))
+    ws.record_event(
+        "ontology_adopted", version_hash,
+        details={"new_version": version.hash,
+                 "outcomes": str(projection["outcomes_projected"]),
+                 "concept_hashes_checked": str(checked),
+                 "adopted_by": adopted_by},
+        rationale=rationale
+    )
+    return {
+        "status": "ok",
+        "adopted_from": version_hash,
+        "new_version_hash": version.hash,
+        "outcomes_projected": projection["outcomes_projected"],
+        "characteristics_projected": projection["characteristics_projected"],
+        "concept_hashes_checked": checked,
+        "projection_verified": projection_verified,
+        "adopted_by": adopted_by,
+        "note": "Ontology adopted and active. Review via get_status or run procedures."
+    }
 
 
 @tiered
@@ -533,71 +649,230 @@ def adopt_proposed_ontology(version_hash: str, rationale: str = None) -> dict:
         raw = ws.get_record(version_hash)
         if not raw:
             return {"status": "error", "message": f"Unknown version '{version_hash}'."}
-
-        import yaml
-        checked, mismatches = _verify_concept_hashes(yaml.safe_load(raw) or {})
-        if mismatches:
-            try:
-                ws.record_event("ontology_adoption_rejected", version_hash,
-                                details={"reason": "concept_hashes mismatch",
-                                         "mismatches": str(len(mismatches))})
-            except Exception:
-                logger.warning("audit record_event failed for adoption_rejected", exc_info=True)
-            return {"status": "error",
-                    "message": ("concept_hashes verification failed — the proposal "
-                                "content changed since extraction. Re-extract or "
-                                "review the stored version."),
-                    "hashes_checked": checked,
-                    "mismatches": mismatches}
-
-        # Write to temp to reuse loader (or parse directly); keep simple with temp.
-        import tempfile, os
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False, encoding="utf-8") as tf:
-            tf.write(raw)
-            tmp_path = tf.name
-        try:
-            ontology = onto_loader.load_ontology_from_file(tmp_path)
-            projection = onto_loader.project_ontology_to_grap(ontology, kg)
-            # Post-projection self-check: the nodes just written must pass the
-            # core's stored-hash-vs-blob verification.
-            projection_verified = True
-            if hasattr(kg, "verify_node"):
-                for nid in projection.get("projected_node_ids", []):
-                    try:
-                        if kg.verify_node(nid) != "match":
-                            projection_verified = False
-                    except Exception:
-                        projection_verified = False
-            # Re-publish the adopted version (new hash) with adoption info.
-            version = ws.publish_ontology(
-                raw, metadata={"version": ontology.version, "adopted_from": version_hash, "rationale": rationale}
-            )
-            _state.set_ontology(ontology, version.hash)
-            _state.projected_nodes.update(projection.get("projected_node_ids", []))
-            ws.record_event(
-                "ontology_adopted", version_hash,
-                details={"new_version": version.hash,
-                         "outcomes": str(projection["outcomes_projected"]),
-                         "concept_hashes_checked": str(checked)},
-                rationale=rationale
-            )
-            return {
-                "status": "ok",
-                "adopted_from": version_hash,
-                "new_version_hash": version.hash,
-                "outcomes_projected": projection["outcomes_projected"],
-                "characteristics_projected": projection["characteristics_projected"],
-                "concept_hashes_checked": checked,
-                "projection_verified": projection_verified,
-                "note": "Ontology adopted and active. Review via get_status or run procedures."
-            }
-        finally:
-            try:
-                os.unlink(tmp_path)
-            except Exception:
-                pass
+        return _adopt_record(ws, kg, version_hash, raw, rationale, adopted_by="human")
     except Exception as e:
         logger.exception("adopt_proposed_ontology failed")
+        return {"status": "error", "message": str(e)}
+
+
+@tiered
+def evaluate_proposal(version_hash: str) -> dict:
+    """Run the adoption-policy checks on a proposal without adopting it.
+
+    Deterministic verdict over integrity (concept_hashes), validity, churn
+    vs the active ontology (incl. PG-referenced removals), and provenance
+    floor. The same checks drive auto-adoption when the policy is enabled
+    (set_policy('enabled', True, rationale))."""
+    denied = _require("operator")
+    if denied:
+        return denied
+    try:
+        ws = _get_workspace()
+        raw = ws.get_record(version_hash)
+        if not raw:
+            return {"status": "error", "message": f"Unknown version '{version_hash}'."}
+        import yaml
+        proposal = yaml.safe_load(raw) or {}
+        policy = governance.merged_policy(config_store.load_config(_resolve_ws_root()))
+        verdict = governance.evaluate_proposal_dict(
+            proposal, _active_ontology_dict(ws), policy,
+            pg_referenced_ids=_pg_referenced_outcome_ids())
+        return {"status": "ok", "version_hash": version_hash,
+                "pass": verdict["pass"], "checks": verdict["checks"],
+                "diff": verdict["diff"], "policy": policy}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
+@tiered
+def rollback_ontology(to_version_hash: str, reason: str = None) -> dict:
+    """Re-activate a previously published ontology version (compensating action).
+
+    The dark-factory safety valve: a wrong (auto-)adoption costs one audited
+    revert instead of an incident. Verifies the stored version's
+    concept_hashes, re-projects it into the current KG, and records
+    `ontology_rolled_back` with the reason."""
+    denied = _require("operator")
+    if denied:
+        return denied
+    if not reason or not reason.strip():
+        return {"status": "error", "message": "reason is required for rollback"}
+    kg = _state.kg
+    if not kg:
+        return {"status": "error", "message": "Load a Knowledge Graph first."}
+    try:
+        ws = _get_workspace()
+        raw = ws.get_record(to_version_hash)
+        if not raw:
+            return {"status": "error", "message": f"Unknown version '{to_version_hash}'."}
+        import yaml
+        checked, mismatches = governance.verify_concept_hashes(yaml.safe_load(raw) or {})
+        if mismatches:
+            return {"status": "error",
+                    "message": "stored version fails concept_hashes verification",
+                    "mismatches": mismatches}
+        previous = getattr(_state, "ontology_version", None)
+        ontology = _load_ontology_from_raw(raw)
+        projection = onto_loader.project_ontology_to_grap(ontology, kg)
+        _state.set_ontology(ontology, to_version_hash)
+        _state.projected_nodes.update(projection.get("projected_node_ids", []))
+        ws.record_event("ontology_rolled_back", to_version_hash,
+                        details={"from": previous or "",
+                                 "outcomes": str(projection["outcomes_projected"])},
+                        rationale=reason)
+        return {"status": "ok", "active_version_hash": to_version_hash,
+                "rolled_back_from": previous,
+                "outcomes_projected": projection["outcomes_projected"],
+                "concept_hashes_checked": checked}
+    except Exception as e:
+        logger.exception("rollback_ontology failed")
+        return {"status": "error", "message": str(e)}
+
+
+@tiered
+def diff_ontologies(version_hash: str, against: str = None) -> dict:
+    """What `version_hash` would change relative to `against` (default: the
+    active ontology): outcomes added/removed/changed, characteristic churn."""
+    try:
+        ws = _get_workspace()
+        base_hash = against or getattr(_state, "ontology_version", None)
+        if not base_hash:
+            return {"status": "error",
+                    "message": "'against' omitted and no ontology is active"}
+        raw_t = ws.get_record(version_hash)
+        if not raw_t:
+            return {"status": "error", "message": f"Unknown version '{version_hash}'."}
+        raw_b = ws.get_record(base_hash)
+        if not raw_b:
+            return {"status": "error", "message": f"Unknown version '{base_hash}'."}
+        import yaml
+        diff = governance.diff_ontology_dicts(yaml.safe_load(raw_b) or {},
+                                              yaml.safe_load(raw_t) or {})
+        return {"status": "ok", "base": base_hash, "target": version_hash, **diff}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
+@tiered
+def diff_runs(run_id_a: str, run_id_b: str) -> dict:
+    """Gap-target delta between two runs: new, resolved, persistent.
+
+    Dark-factory triage primitive — automation watches deltas; only new or
+    regressed gaps deserve anyone's attention."""
+    try:
+        ws = _get_workspace()
+
+        def _targets(run_id):
+            r = ws.get_run(run_id)
+            if not r:
+                raise ValueError(f"Run '{run_id}' not found.")
+            out = set()
+            for h in (r.explanation_hashes or []):
+                rec = ws.get_record(h)
+                if rec:
+                    try:
+                        out.add(json.loads(rec).get("target"))
+                    except ValueError:
+                        pass
+            out.discard(None)
+            return out
+
+        a, b = _targets(run_id_a), _targets(run_id_b)
+        return {"status": "ok", "run_a": run_id_a, "run_b": run_id_b,
+                "new_gaps": sorted(b - a), "resolved_gaps": sorted(a - b),
+                "persistent_gaps": sorted(a & b),
+                "counts": {"a": len(a), "b": len(b),
+                           "new": len(b - a), "resolved": len(a - b)}}
+    except ValueError as e:
+        return {"status": "error", "message": str(e)}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
+@tiered
+def set_policy(key: str, value, rationale: str) -> dict:
+    """Set an adoption-policy field (admin + rationale; persisted + audited).
+
+    Keys: enabled (bool), max_outcomes_added, max_outcomes_removed,
+    max_characteristics_removed, min_source_chunks (ints >= 0). Changing the
+    policy is the designed rare human act; the policy then owns the routine
+    adoption verdicts."""
+    denied = _require("admin")
+    if denied:
+        return denied
+    if not rationale:
+        return {"status": "error", "message": "rationale is required"}
+    if key not in governance.DEFAULT_ADOPTION_POLICY:
+        return {"status": "error",
+                "message": f"unknown policy key '{key}' "
+                           f"(valid: {sorted(governance.DEFAULT_ADOPTION_POLICY)})"}
+    try:
+        if key == "enabled":
+            value = bool(value)
+        else:
+            value = int(value)
+            if value < 0:
+                return {"status": "error", "message": "policy budgets must be >= 0"}
+    except (TypeError, ValueError):
+        return {"status": "error", "message": f"invalid value for '{key}'"}
+    root = _resolve_ws_root()
+    cfg = config_store.load_config(root)
+    pol = governance.merged_policy(cfg)
+    old = pol.get(key)
+    pol[key] = value
+    cfg["adoption_policy"] = pol
+    cfg["last_changed"] = int(time.time() * 1000)
+    config_store.save_config(root, cfg)
+    try:
+        _get_workspace().record_event("config_changed", f"adoption_policy.{key}",
+                                      details={"from": str(old), "to": str(value)},
+                                      rationale=rationale)
+    except Exception:
+        logger.warning("audit record_event failed for set_policy", exc_info=True)
+    return {"status": "ok", "adoption_policy": pol}
+
+
+@tiered
+def list_pending_interventions(limit: int = None, cursor: str = None) -> dict:
+    """The exception queue: everything currently awaiting a human, oldest
+    first. Sources: proposals not yet adopted (awaiting review, or rejected by
+    the adoption policy / integrity gate) and parked extraction items in the
+    open KEE workdir. Empty queue = the factory needs nobody."""
+    try:
+        ws = _get_workspace()
+        adopted = {e.subject for e in (ws.query_events("ontology_adopted") or [])}
+        latest = {}  # proposal hash -> (ts, kind); later events refine the kind
+        for e in ws.query_events("ontology_proposed") or []:
+            latest[e.subject] = (e.ts, "proposal_awaiting_review")
+        for e in ws.query_events("adoption_policy_rejected") or []:
+            if e.subject in latest:
+                latest[e.subject] = (e.ts, "policy_rejected")
+        for e in ws.query_events("ontology_adoption_rejected") or []:
+            latest[e.subject] = (e.ts, "integrity_rejected")
+        now_ms = int(time.time() * 1000)
+        items = [{"kind": kind, "subject": subj, "ts": ts,
+                  "age_s": max(0, round((now_ms - ts) / 1000))}
+                 for subj, (ts, kind) in latest.items() if subj not in adopted]
+        wd = getattr(_state, "extraction_workdir", None)
+        if wd:
+            try:
+                import sqlite3
+                db = Path(wd) / "graph_store.db"
+                if db.exists():
+                    conn = sqlite3.connect(str(db))
+                    n = conn.execute("SELECT COUNT(*) FROM parked").fetchone()[0]
+                    conn.close()
+                    if n:
+                        items.append({"kind": "parked_extraction_items",
+                                      "subject": str(wd), "count": n,
+                                      "ts": now_ms, "age_s": 0})
+            except Exception:
+                pass
+        items.sort(key=lambda i: i["ts"])
+        page, meta = paginate(items, limit, cursor)
+        return {"status": "ok", "pending": page, "count": len(page), **meta,
+                "note": "empty queue = the factory needs nobody"}
+    except Exception as e:
         return {"status": "error", "message": str(e)}
 
 
@@ -2036,7 +2311,10 @@ def list_capabilities() -> dict:
         "domains": {
             "discovery": ["grap_guide", "suggest_queries"],
             "knowledge": ["load_knowledge_graph", "create_knowledge_graph",
-                          "ingest_documents", "reingest_documents", "extract_ontology", "list_proposed_ontologies", "get_proposed_ontology", "adopt_proposed_ontology", "project_relations",
+                          "ingest_documents", "reingest_documents", "extract_ontology",
+                          "list_proposed_ontologies", "get_proposed_ontology",
+                          "adopt_proposed_ontology", "evaluate_proposal",
+                          "rollback_ontology", "diff_ontologies", "project_relations",
                           "open_extraction_graph", "extend_extraction_graph", "export_ontology",
                           "build_legal_graph", "legal_graph_from_relations",
                           "graph_neighbors", "load_ontology",
@@ -2047,11 +2325,12 @@ def list_capabilities() -> dict:
                              "activate", "set_production", "get_production", "list_versions"],
             "execution_reasoning": ["run_procedure", "detect_gaps", "get_explanation"],
             "experimentation": ["run_experiment", "get_quality_metrics", "adopt_experiment"],
-            "governance": ["get_config", "set_weight", "set_retention", "enforce_retention"],
+            "governance": ["get_config", "set_weight", "set_retention", "set_policy",
+                           "enforce_retention", "list_pending_interventions"],
             "auth": ["set_role", "get_role"],
             "validation": ["validate_procedure_graph", "diff_procedure_graphs", "get_validation"],
             "audit": ["get_audit_log", "get_status", "get_telemetry", "list_capabilities",
-                      "list_runs", "get_run", "reconstruct_run", "query_events",
+                      "list_runs", "get_run", "diff_runs", "reconstruct_run", "query_events",
                       "get_session_context", "compact_graph"],
         },
         "active_tier": _ACTIVE_TIER,

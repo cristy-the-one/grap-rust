@@ -18,6 +18,23 @@ Every mutating capability emits a Workspace audit event (see `get_audit_log`).
   Verifies the proposal's `concept_hashes` (core sha256 content hashes captured at extraction) and
   **refuses adoption on mismatch** (tamper-evidence); core-verifies the projected nodes after write.
 
+- **evaluate_proposal(version_hash)** → the adoption-policy verdict without adopting:
+  integrity (concept_hashes) / validity / churn vs the active ontology (incl. PG-referenced
+  removals) / provenance floor, plus the structural diff.
+- **rollback_ontology(to_version_hash, reason)** → re-activate a previous ontology version
+  (verified, audited as `ontology_rolled_back`). The compensating action every automated
+  adoption relies on.
+- **diff_ontologies(version_hash, against=None)** → what a version changes relative to
+  `against` (default: the active ontology).
+
+### Dark-factory mode
+When the governed adoption policy is enabled (`set_policy("enabled", True, rationale)`),
+`extract_ontology` runs the policy checks itself: pass → **auto-adopts** (audited with
+`adopted_by: policy`); fail → audited `adoption_policy_rejected` that surfaces in
+**list_pending_interventions()** — the exception queue (proposals awaiting review,
+policy/integrity rejections, parked extraction items). Empty queue = the factory needs
+nobody. See `docs/dark-factory-proposals.md`.
+
 (`mcp-server/demo_kee.py` runs the whole extraction + review flow offline; see `KEE_WORKFLOW.md`
 for the full four-graph improvement loop and local-LLM setup.)
 - **load_ontology(path)** → `{status, version_hash, outcomes_projected, characteristics_projected}`.
@@ -50,7 +67,10 @@ for the full four-graph improvement loop and local-LLM setup.)
   into production through the validation-gated `promote_pg` + `activate` path.
 
 ## Configuration Governance
-- **get_config()** → `{status, weights, retention, last_changed}`.
+- **get_config()** → `{status, weights, retention, role, last_changed}`.
+- **set_policy(key, value, rationale)** (admin) → set an adoption-policy field
+  (`enabled`, `max_outcomes_added`, `max_outcomes_removed`, `max_characteristics_removed`,
+  `min_source_chunks`); audited as `config_changed`.
 - **set_weight(name, value, rationale)** → set a prioritization weight (rationale required; audited).
 - **set_retention(key, days, rationale)** → set a retention-policy value in days (rationale required;
   audited).
@@ -84,6 +104,10 @@ for the full four-graph improvement loop and local-LLM setup.)
 - **list_capabilities()** → this taxonomy.
 - **list_runs(kind=None)** → execution runs (filter by production|experiment).
 - **get_run(run_id)** → a single run record with frozen versions + explanation hashes.
+- **diff_runs(run_id_a, run_id_b)** → gap-target delta between two runs
+  (`new_gaps` / `resolved_gaps` / `persistent_gaps`) — the triage primitive: only new or
+  regressed gaps deserve attention.
+- **list_pending_interventions()** → the exception queue (see Dark-factory mode above).
 - **reconstruct_run(run_id)** → reproduction completeness report (names missing artifacts).
 - **query_events(event_type=None, run_id=None)** → Temporal Graph events (filtered, or for a run).
 

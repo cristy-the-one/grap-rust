@@ -98,6 +98,32 @@ version hashes. Use `reconstruct_run(run_id)` to check a past run is fully
 reproducible (it names any missing artifacts), `query_events` to walk history,
 and `enforce_retention` (admin) to prune by the governed windows.
 
+## Dark-factory mode (Phase 1)
+
+With the governed adoption policy enabled, step 4–5 of the loop needs no human:
+
+```text
+set_policy("enabled", True, rationale)        # admin; THE rare human act
+extract_ontology(docs)                        # policy evaluates the proposal:
+                                              #   integrity + validity + churn budget
+                                              #   + provenance floor
+   pass -> auto-adopted (audited adopted_by=policy)
+   fail -> audited adoption_policy_rejected; the line never blocks
+list_pending_interventions()                  # the ONLY place a human looks:
+                                              # empty queue = the factory needs nobody
+rollback_ontology(version, reason)            # the safety valve: a wrong adoption
+                                              # costs one audited revert
+evaluate_proposal(v) / diff_ontologies(v)     # dry-run the verdict / inspect churn
+diff_runs(run_a, run_b)                       # triage by delta: only new/regressed
+                                              # gaps deserve attention
+```
+
+Budgets (`max_outcomes_added/removed`, `max_characteristics_removed`,
+`min_source_chunks`) are governed config — tune with `set_policy`, every change
+audited. Removing an outcome the active PG references always fails churn,
+regardless of budget. See `docs/dark-factory-proposals.md` for Phases 2–4
+(watcher, canary auto-promotion, n-version extraction).
+
 ## Verified reference runs
 
 ```powershell

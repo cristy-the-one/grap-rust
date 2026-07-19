@@ -107,6 +107,11 @@ def to_yaml(ontology: Dict[str, Any]) -> str:
     }
     if "concept_hashes" in ontology:
         loadable["concept_hashes"] = ontology["concept_hashes"]
+    # Per-outcome source-chunk counts: the adoption policy's provenance-floor
+    # check reads these (full chunk lists stay out of the loadable file).
+    if "provenance" in ontology:
+        loadable["source_chunk_counts"] = {
+            oid: len(chunks) for oid, chunks in ontology["provenance"].items()}
     header = ("# Candidate ontology proposed by the Knowledge Extraction Engine.\n"
               "# Review before promoting — LLM extraction is a proposal, not ground truth.\n"
               "# concept_hashes (if present) are core node content hashes for verification.\n\n")

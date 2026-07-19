@@ -15,6 +15,17 @@ def default_config() -> Dict[str, Any]:
         "weights": {},
         "retention": {"production_days": 365, "experiment_days": 30},
         "role": "operator",
+        # Dark-factory adoption policy (see grap_mcp/governance.py). Disabled
+        # until an admin enables it via set_policy — that flip is the designed
+        # rare human act. Older configs lack this key; readers must merge via
+        # governance.merged_policy().
+        "adoption_policy": {
+            "enabled": False,
+            "max_outcomes_added": 5,
+            "max_outcomes_removed": 0,
+            "max_characteristics_removed": 0,
+            "min_source_chunks": 1,
+        },
         "last_changed": None,
     }
 
