@@ -96,19 +96,17 @@ def main() -> int:
         print("Using offline StubProvider + HashingEmbedder "
               "(pass --real + GRAP_LLM_BASE_URL for a real model)")
 
-    # Wire the demo-controlled provider/embedder into the server module's factories.
-    # This ensures extract_ontology (and other KEE tools) use our stub (with corpus-specific
-    # responses) + hashing embedder instead of defaulting to a network LLM.
-    import grap_mcp.kee.llm as llm_mod
-    import grap_mcp.kee.embeddings as emb_mod
-    llm_mod.get_provider = lambda model=None: provider
-    emb_mod.get_embedder = lambda: embedder
-    os.environ["GRAP_LLM_STUB"] = "1"
-
     banner("1. Extract + reconcile  (3 docs, 2 describe the same concept) - using server path for versioning")
     os.environ["GRAP_WORKSPACE"] = str(workdir / "ws")
     os.environ["GRAP_ROLE"] = "operator"
+    if args.real:
+        os.environ.pop("GRAP_LLM_STUB", None)   # a stale stub flag would defeat --real
     import grap_mcp.server as s
+    # Wire the demo-controlled provider/embedder into the server's single
+    # indirection point (all KEE tools resolve providers via s.get_provider /
+    # s.get_embedder — the same seam the tests monkeypatch).
+    s.get_provider = lambda model=None: provider
+    s.get_embedder = lambda: embedder
     s._state.reset()  # ensure clean portable state
     # Use server extract which versions the proposal with hashes etc.
     ext_res = s.extract_ontology(str(docs), out_path=str(workdir / "candidate-ontology.yaml"), sim=0.82)

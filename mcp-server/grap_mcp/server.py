@@ -8,6 +8,7 @@ This is the starting point for making the narrow-but-vertical ASPICE gap-detecti
 from mcp.server.fastmcp import FastMCP
 import pygrap
 from pathlib import Path
+import hashlib
 import logging
 import os
 import shutil
@@ -386,9 +387,9 @@ def extract_ontology(path: str, out_path: str = None, sim: float = 0.86,
     if denied:
         return denied
     try:
-        from .kee import pipeline, llm, embeddings, validate
-        provider = llm.get_provider(model=model)
-        embedder = embeddings.get_embedder()
+        from .kee import pipeline, validate
+        provider = get_provider(model=model)
+        embedder = get_embedder()
         result = pipeline.extract_ontology(path, provider, embedder, sim=sim,
                                            max_files=max_files)
         onto = result["ontology"]
@@ -424,8 +425,10 @@ def extract_ontology(path: str, out_path: str = None, sim: float = 0.86,
             "relations": onto.get("relations", []),
             "validation": validation,
             "concept_hashes": onto.get("concept_hashes", {}),
-            "note": ("LLM proposal — review before loading. To adopt: "
-                     "load_ontology(out_path). Use concept_hashes for provenance."),
+            "note": ("LLM proposal — review before adopting. Inspect with "
+                     "get_proposed_ontology(version_hash), then "
+                     "adopt_proposed_ontology(version_hash, rationale); adoption "
+                     "verifies concept_hashes (tamper-evidence)."),
         }
     except Exception as e:
         logger.exception("extract_ontology failed")
@@ -482,13 +485,40 @@ def get_proposed_ontology(version_hash: str) -> dict:
         return {"status": "error", "message": str(e)}
 
 
+def _verify_concept_hashes(proposal: dict) -> tuple[int, list]:
+    """Check a proposal's concept_hashes against its own outcome names.
+
+    KEE working-graph concept nodes carry the outcome's canonical name as
+    their text, and the core's node content hash is sha256(text) — so each
+    recorded hash must equal sha256(outcome name). A mismatch means the yaml
+    was edited between extraction and adoption. Returns (checked, mismatches);
+    proposals without hashes (legacy stateless path) verify trivially (0, [])."""
+    chashes = proposal.get("concept_hashes") or {}
+    outcomes_by_id = {o.get("id"): o for o in proposal.get("process_outcomes", [])
+                      if isinstance(o, dict)}
+    checked, mismatches = 0, []
+    for oid, expected in chashes.items():
+        oc = outcomes_by_id.get(oid)
+        if oc is None:
+            mismatches.append({"outcome": oid, "reason": "hash refers to no outcome in proposal"})
+            continue
+        checked += 1
+        actual = hashlib.sha256(str(oc.get("name", "")).encode("utf-8")).hexdigest()
+        if actual != expected:
+            mismatches.append({"outcome": oid, "expected": expected, "actual": actual})
+    return checked, mismatches
+
+
 @tiered
 def adopt_proposed_ontology(version_hash: str, rationale: str = None) -> dict:
     """Adopt a KEE-proposed ontology version (by its content hash) into the active KG.
 
-    Fetches the versioned yaml from the workspace, projects it, and loads it as the
-    active ontology (publishing a new versioned snapshot with adoption metadata).
-    Requires a rationale for full audit trail. This completes the human-review loop.
+    Fetches the versioned yaml from the workspace, verifies its concept_hashes
+    (tamper-evidence: each hash is the core content hash of the concept node
+    captured at extraction; adoption is refused on mismatch), projects it, and
+    loads it as the active ontology (publishing a new versioned snapshot with
+    adoption metadata). Requires a rationale for full audit trail. This
+    completes the human-review loop.
     """
     denied = _require("operator")
     if denied:
@@ -503,6 +533,23 @@ def adopt_proposed_ontology(version_hash: str, rationale: str = None) -> dict:
         raw = ws.get_record(version_hash)
         if not raw:
             return {"status": "error", "message": f"Unknown version '{version_hash}'."}
+
+        import yaml
+        checked, mismatches = _verify_concept_hashes(yaml.safe_load(raw) or {})
+        if mismatches:
+            try:
+                ws.record_event("ontology_adoption_rejected", version_hash,
+                                details={"reason": "concept_hashes mismatch",
+                                         "mismatches": str(len(mismatches))})
+            except Exception:
+                logger.warning("audit record_event failed for adoption_rejected", exc_info=True)
+            return {"status": "error",
+                    "message": ("concept_hashes verification failed — the proposal "
+                                "content changed since extraction. Re-extract or "
+                                "review the stored version."),
+                    "hashes_checked": checked,
+                    "mismatches": mismatches}
+
         # Write to temp to reuse loader (or parse directly); keep simple with temp.
         import tempfile, os
         with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False, encoding="utf-8") as tf:
@@ -511,6 +558,16 @@ def adopt_proposed_ontology(version_hash: str, rationale: str = None) -> dict:
         try:
             ontology = onto_loader.load_ontology_from_file(tmp_path)
             projection = onto_loader.project_ontology_to_grap(ontology, kg)
+            # Post-projection self-check: the nodes just written must pass the
+            # core's stored-hash-vs-blob verification.
+            projection_verified = True
+            if hasattr(kg, "verify_node"):
+                for nid in projection.get("projected_node_ids", []):
+                    try:
+                        if kg.verify_node(nid) != "match":
+                            projection_verified = False
+                    except Exception:
+                        projection_verified = False
             # Re-publish the adopted version (new hash) with adoption info.
             version = ws.publish_ontology(
                 raw, metadata={"version": ontology.version, "adopted_from": version_hash, "rationale": rationale}
@@ -519,7 +576,9 @@ def adopt_proposed_ontology(version_hash: str, rationale: str = None) -> dict:
             _state.projected_nodes.update(projection.get("projected_node_ids", []))
             ws.record_event(
                 "ontology_adopted", version_hash,
-                details={"new_version": version.hash, "outcomes": str(projection["outcomes_projected"])},
+                details={"new_version": version.hash,
+                         "outcomes": str(projection["outcomes_projected"]),
+                         "concept_hashes_checked": str(checked)},
                 rationale=rationale
             )
             return {
@@ -528,6 +587,8 @@ def adopt_proposed_ontology(version_hash: str, rationale: str = None) -> dict:
                 "new_version_hash": version.hash,
                 "outcomes_projected": projection["outcomes_projected"],
                 "characteristics_projected": projection["characteristics_projected"],
+                "concept_hashes_checked": checked,
+                "projection_verified": projection_verified,
                 "note": "Ontology adopted and active. Review via get_status or run procedures."
             }
         finally:
@@ -550,7 +611,11 @@ def open_extraction_graph(path: str) -> dict:
     try:
         from .kee.working_graph import WorkingGraph
         wg = WorkingGraph.open(path, get_embedder())
-        _state.set_kg(wg.kg, path)  # use new method
+        # kg_path stays None: the projection at <workdir>/graph is derived from
+        # the sqlite store — persisting the active KG over it (what a non-None
+        # kg_path invites via ingest/compact save_to_dir) would desync the two.
+        # Durable changes go through extend_extraction_graph.
+        _state.set_kg(wg.kg, None)
         _state.extraction_workdir = path
         out = {"status": "ok",
                "concepts": len(wg._live_concepts()),
@@ -585,7 +650,7 @@ def extend_extraction_graph(path: str, docs_path: str, model: str = None,
                                     sim=sim, relook_ratio=relook_ratio, max_files=max_files,
                                     chunk_chars=chunk_chars, concurrency=concurrency)
         wg = WorkingGraph.open(path, get_embedder())
-        _state.set_kg(wg.kg, path)
+        _state.set_kg(wg.kg, None)  # projection is derived; see open_extraction_graph
         _state.extraction_workdir = path
         wg.close()  # non-owned workdir: releases the sqlite handle only; wg.kg stays valid
         out["status"] = "ok"

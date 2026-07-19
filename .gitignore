@@ -124,3 +124,10 @@ real-data-law-ro/graph/vector_index
 docs/VDA_ASPICE_BlueGoldBook_Sept2017.pdf
 docs/examples/aspice-vda-ontology.yaml
 
+
+# grap runtime artifacts (telemetry pulses, default workspaces, demo output)
+_grap_pulse.json
+grap-workspace/
+mcp-server/grap-workspace/
+out/
+terminals/

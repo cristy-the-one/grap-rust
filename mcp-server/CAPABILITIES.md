@@ -12,11 +12,14 @@ Every mutating capability emits a Workspace audit event (see `get_audit_log`).
   provenance, validation, concept_hashes, ...}`. Knowledge Extraction Engine: LLM proposes ontology fragments from
   documents (graph-augmented context by default), reconciled (now with core content-hash exact dedup support),
   written as a **proposed** candidate and versioned for human review. Emits `ontology_proposed`. See `grap_mcp/kee/`.
-- **list_proposed_ontologies()** → list of proposed versions (with hashes/sources) for review.
-- **get_proposed_ontology(version_hash)** → raw/parsed proposal details (incl. concept_hashes for provenance).
-- **adopt_proposed_ontology(version_hash, rationale)** → adopt after review (audited, rationale required); loads and activates.
+- **list_proposed_ontologies(limit, cursor)** → paginated `{version_hash, ts}` entries (audit-backed) for review.
+- **get_proposed_ontology(version_hash)** → raw + parsed proposal (incl. its concept_hashes).
+- **adopt_proposed_ontology(version_hash, rationale)** → adopt after review (audited, rationale required).
+  Verifies the proposal's `concept_hashes` (core sha256 content hashes captured at extraction) and
+  **refuses adoption on mismatch** (tamper-evidence); core-verifies the projected nodes after write.
 
-(See `mcp-server/demo_kee.py` for a portable stub-based example of the extraction + review flow. For a more complete non-banal demo exercising list/get/adopt with hashes and graph-aug, call the server tools directly in sequence after `extract_ontology` (stub by default for portability).)
+(`mcp-server/demo_kee.py` runs the whole extraction + review flow offline; see `KEE_WORKFLOW.md`
+for the full four-graph improvement loop and local-LLM setup.)
 - **load_ontology(path)** → `{status, version_hash, outcomes_projected, characteristics_projected}`.
   Parse an ASPICE ontology YAML, project it into the KG, and version it. Emits `ontology_loaded`.
 
@@ -56,11 +59,12 @@ Every mutating capability emits a Workspace audit event (see `get_audit_log`).
 
 ## Roles & Access
 - **get_role()** → current role + available roles (`viewer` < `operator` < `admin`).
-- **set_role(role)** → set the current role (POC simulation; no identity backend).
+- **set_role(role, rationale)** → set the current role (admin + rationale required; persisted + audited).
 
 > Mutating capabilities require **operator** (lifecycle/execution) or **admin**
-> (governance + retention). Reads are open to **viewer**. Default role comes from
-> the `GRAP_ROLE` env var (`operator`).
+> (governance + retention). Reads are open to **viewer**. The persisted default is
+> `operator`; `GRAP_ROLE` overrides for the process only (never persisted) — that
+> env var is also the admin bootstrap path (`GRAP_ROLE=admin`).
 
 > Weight changes are audited (`config_changed`). `activate` freezes the governed weights when none are
 > passed and surfaces `frozen_weights` + `weights_last_changed`.
@@ -82,3 +86,8 @@ Every mutating capability emits a Workspace audit event (see `get_audit_log`).
 - **get_run(run_id)** → a single run record with frozen versions + explanation hashes.
 - **reconstruct_run(run_id)** → reproduction completeness report (names missing artifacts).
 - **query_events(event_type=None, run_id=None)** → Temporal Graph events (filtered, or for a run).
+
+> List-returning tools paginate (`limit`, `cursor` → `total`/`next_cursor`). JSON is the
+> default wire format; tools with a compact schema (`graph_neighbors`, `list_runs`,
+> `query_events`, `detect_gaps`, `get_audit_log`) accept `wire_format="compact"` for the
+> token-efficient `#MUNCH` encoding.

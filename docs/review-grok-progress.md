@@ -1,5 +1,15 @@
 # Review: Grok's "battle-plan" work (commits `4a96de8`..`fe0886f`, 2026-07-09 →)
 
+> **Status (2026-07-19): all items resolved.** P0 fixed in `b1509b3` (suite
+> 170F/29E → green), P1/P2 in `bde0b3f` (+ `GRAP_LLM_EXTRA_BODY` for local
+> llama.cpp models), P3 + workflow hardening in the follow-up commit: adoption
+> now really verifies `concept_hashes` (sha256 tamper-evidence, refusal on
+> mismatch, audited) and core-verifies projected nodes; provider indirection
+> unified on `s.get_provider`/`s.get_embedder` (D8); extraction projections no
+> longer set `kg_path` (workdir-clobber risk); runtime artifacts gitignored;
+> `KEE_WORKFLOW.md` documents the four-graph improvement loop with local LLMs.
+> Suite: 211 passing; offline demo and live Bonsai-27B `--real` run both green.
+
 **Scope.** 55 commits, ~1,200 insertions, almost all in `mcp-server/`, plus a small
 Rust addition (`src/shard.rs`, `crates/pygrap/src/sharded_graph.rs`, `tests/content_hash.rs`).
 Reviewed by reading the aggregate diff, cross-checking against the Rust bindings, and
