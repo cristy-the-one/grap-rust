@@ -109,6 +109,6 @@ def to_yaml(ontology: Dict[str, Any]) -> str:
         loadable["concept_hashes"] = ontology["concept_hashes"]
     header = ("# Candidate ontology proposed by the Knowledge Extraction Engine.\n"
               "# Review before promoting — LLM extraction is a proposal, not ground truth.\n"
-              "# concept_hashes (if present) are core node content hashes for provenance.\n\n")
+              "# concept_hashes (if present) are core node content hashes for verification.\n\n")
     return header + yaml.safe_dump(loadable, sort_keys=False, allow_unicode=True,
                                    default_flow_style=False)

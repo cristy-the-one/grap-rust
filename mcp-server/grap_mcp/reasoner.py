@@ -152,30 +152,16 @@ def _lexical_signals(kg, ontology: Ontology, outcome_id: str, characteristic: st
             pass
 
     try:
-        # Prefer the modern hybrid with RRF + optional centrality when available.
-        # This brings in the core RRF + PageRank investment.
-        if hasattr(kg, "search_and_traverse_hybrid"):
-            hits = kg.search_and_traverse_hybrid(
-                query,
-                vector=None,
-                max_seeds=5,
-                property_names=[],
-                min_strength=0.0,
-                max_depth=1,
-                max_results=5,
-                text_weight=weights.get("text_weight", 0.7),
-                vector_weight=0.0,
-                graph_weight=weights.get("graph_weight", 0.3),
-                centrality_weight=weights.get("centrality_weight", 0.15),  # light structural importance boost
-                fusion_mode="rrf",
-                rrf_k=60.0,
-            )
-        else:
-            hits = kg.search_and_traverse(
-                query, max_seeds=5, required_properties=[], min_strength=0.0,
-                max_depth=1, max_results=5,
-                text_weight=weights.get("text_weight", 0.7), graph_weight=weights.get("graph_weight", 0.3),
-            )
+        # Deliberately the classic (deterministic) fusion path. The RRF-hybrid
+        # variant produced per-process tie-break ordering (hash-seed dependent),
+        # which is unacceptable here: gap explanations are persisted, versioned
+        # records and must be reproducible. Revisit only with deterministic
+        # tie-breaking in the core.
+        hits = kg.search_and_traverse(
+            query, max_seeds=5, required_properties=[], min_strength=0.0,
+            max_depth=1, max_results=5,
+            text_weight=weights.get("text_weight", 0.7), graph_weight=weights.get("graph_weight", 0.3),
+        )
     except Exception:
         hits = []
 

@@ -14,7 +14,6 @@ import shutil
 import uuid
 import json
 import time
-import functools
 
 from . import procedure_graph as pg_loader
 from .validation import validate_pg
@@ -59,20 +58,10 @@ _ACTIVE_TIER = active_tier()
 def tiered(func):
     """Register `func` as an MCP tool only if its tier (from _TIERS, default
     'standard') is within the active tier. Out-of-tier tools stay defined on the
-    module (callable in tests) but are not advertised to clients.
-    Also records to telemetry if enabled.
-    """
+    module (callable in tests) but are not advertised to clients."""
     tool_tier = _TIERS.get(func.__name__, "standard")
     if tier_includes(tool_tier, _ACTIVE_TIER):
-        @functools.wraps(func)
-        def _wrapped(*args, **kwargs):
-            try:
-                from grap_mcp import telemetry as _tel
-                _tel.record(func.__name__)
-            except Exception:
-                pass
-            return func(*args, **kwargs)
-        return mcp.tool()(_wrapped)
+        return mcp.tool()(func)
     return func
 
 
@@ -95,6 +84,25 @@ class GrapServerState:
         self.projected_nodes = set()
         self.explanations = {}
         self.extraction_workdir = None
+
+    # Dict-style access kept for tests (monkeypatch.setitem) and any remaining
+    # _state["key"] call sites during the dict -> class transition. These must
+    # be real methods on the class: Python resolves dunders on the type, so
+    # instance-attribute lambdas would not make subscription work.
+    def __getitem__(self, key):
+        return getattr(self, key, None)
+
+    def __setitem__(self, key, value):
+        setattr(self, key, value)
+
+    def __delitem__(self, key):
+        try:
+            delattr(self, key)
+        except AttributeError:
+            pass
+
+    def get(self, key, default=None):
+        return getattr(self, key, default)
 
     def reset(self):
         """Clear volatile session state (keep ws if open)."""
@@ -159,24 +167,18 @@ class GrapServerState:
 # cleaner reloads, less fragile global mutation).
 _state = GrapServerState()
 
-# Support dict protocol for existing test monkeypatches (setitem on "role" etc.)
-# and any remaining _state["key"] accesses during transition.
-_state.__getitem__ = lambda k: getattr(_state, k, None)
-_state.__setitem__ = lambda k, v: setattr(_state, k, v)
-_state.get = lambda k, d=None: getattr(_state, k, d)
-
 
 def _get_workspace():
     """Lazily open the lifecycle workspace (env GRAP_WORKSPACE or ./grap-workspace).
-    On (re)load, reset volatile state and ensure governed role is loaded.
+
+    Must not touch volatile state: tools routinely set the KG/PG first and only
+    then open the workspace to write an audit event, so a reset here would
+    silently discard what the caller just loaded.
     """
     if _state.ws is None:
         root = os.environ.get("GRAP_WORKSPACE", "./grap-workspace")
         _state.ws = pygrap.Workspace.open(root)
         _state.ws_root = root
-        _state.reset()  # clear old kg/pg/ontology etc for clean session
-        # Ensure role is loaded from persisted config (governed)
-        _ = _get_role()
     return _state.ws
 
 
@@ -943,7 +945,7 @@ def legal_graph_from_relations(path: str, top: int = 200) -> dict:
 
 
 @tiered
-def graph_neighbors(node_id: int, types: list = None, wire_format: str = "compact",
+def graph_neighbors(node_id: int, types: list = None, wire_format: str = "json",
                     limit: int = None, cursor: str = None):
     """Return a node's neighbors from the current KG (live), for the given
     relation types (default 'cites'/'mentions'). Powers expand-on-click in the
@@ -1089,7 +1091,7 @@ def get_context_bundle(query: str, max_results: int = 20, token_budget: int = 20
 @tiered
 def get_blast_radius(node_id: int, relations: list = None, max_depth: int = 10,
                      limit: int = None, cursor: str = None,
-                     wire_format: str = "compact") -> dict:
+                     wire_format: str = "json") -> dict:
     """Transitive dependents of a node — what would be impacted if it changes.
 
     Supports ``wire_format="compact"`` for token-efficient #MUNCH encoding.
@@ -1120,7 +1122,7 @@ def get_blast_radius(node_id: int, relations: list = None, max_depth: int = 10,
 
 
 @tiered
-def find_cycles(limit: int = None, cursor: str = None, wire_format: str = "compact") -> dict:
+def find_cycles(limit: int = None, cursor: str = None, wire_format: str = "json") -> dict:
     """Dependency cycles (strongly-connected components) in the current KG.
 
     Supports ``wire_format="compact"`` for token-efficient #MUNCH encoding.
@@ -1144,7 +1146,7 @@ def find_cycles(limit: int = None, cursor: str = None, wire_format: str = "compa
 
 @tiered
 def find_orphans(entry_points: list = None, limit: int = None, cursor: str = None,
-                wire_format: str = "compact") -> dict:
+                wire_format: str = "json") -> dict:
     """Live nodes unreachable from the given entry points (or from KG roots).
 
     Supports ``wire_format="compact"`` for token-efficient #MUNCH encoding.
@@ -1167,7 +1169,7 @@ def find_orphans(entry_points: list = None, limit: int = None, cursor: str = Non
 
 
 @tiered
-def kg_health(wire_format: str = "compact") -> dict:
+def kg_health(wire_format: str = "json") -> dict:
     """Structural health snapshot of the current KG (counts, cycles, orphans, top-central).
 
     Supports ``wire_format="compact"`` (falls back to JSON if no schema).
@@ -1382,7 +1384,7 @@ def _run_gap_detection(scope: str, kind: str, extra_summary: dict = None) -> dic
 
 
 @tiered
-def detect_gaps(scope: str = "all", wire_format: str = "compact") -> dict:
+def detect_gaps(scope: str = "all", wire_format: str = "json") -> dict:
     """Detect ASPICE gaps as a production run (persists run + explanations).
 
     Supports ``wire_format="compact"`` for token-efficient #MUNCH encoding on the gaps table.
@@ -1608,7 +1610,7 @@ def list_versions() -> dict:
 
 
 @tiered
-def get_audit_log(limit: int = None, cursor: str = None, wire_format: str = "compact") -> dict:
+def get_audit_log(limit: int = None, cursor: str = None, wire_format: str = "json") -> dict:
     """Return the workspace audit event log.
 
     Supports ``wire_format="compact"`` for token-efficient #MUNCH encoding.
@@ -1627,7 +1629,7 @@ def get_audit_log(limit: int = None, cursor: str = None, wire_format: str = "com
 
 
 @tiered
-def list_runs(kind: str = None, limit: int = None, cursor: str = None, wire_format: str = "compact") -> dict:
+def list_runs(kind: str = None, limit: int = None, cursor: str = None, wire_format: str = "json") -> dict:
     """List execution runs, optionally filtered by kind (production|experiment).
 
     Supports ``wire_format="compact"`` for token-efficient #MUNCH encoding.
@@ -1676,7 +1678,7 @@ def reconstruct_run(run_id: str) -> dict:
 @tiered
 def query_events(event_type: str = None, run_id: str = None,
                  limit: int = None, cursor: str = None,
-                 wire_format: str = "compact") -> dict:
+                 wire_format: str = "json") -> dict:
     """Query the Temporal Graph: by event_type, or all events for a run_id.
 
     Supports ``wire_format="compact"`` for token-efficient #MUNCH encoding on the events table.
