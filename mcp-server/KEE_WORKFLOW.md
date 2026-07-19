@@ -121,8 +121,37 @@ diff_runs(run_a, run_b)                       # triage by delta: only new/regres
 Budgets (`max_outcomes_added/removed`, `max_characteristics_removed`,
 `min_source_chunks`) are governed config — tune with `set_policy`, every change
 audited. Removing an outcome the active PG references always fails churn,
-regardless of budget. See `docs/dark-factory-proposals.md` for Phases 2–4
-(watcher, canary auto-promotion, n-version extraction).
+regardless of budget.
+
+### Unattended operation (Phase 2)
+
+The whole line runs as one idempotent unit from a declarative config:
+
+```json
+{ "kg_path": "factory-kg",
+  "evidence_dirs": ["corpus/evidence"],
+  "extract": { "docs_path": "corpus/docs", "workdir": "kee-workdir", "concurrency": 4 },
+  "detect_gaps": true,
+  "maintenance": true }
+```
+
+```powershell
+# one shot (for Task Scheduler / cron):
+python mcp-server\run_factory.py --config pipeline.json --once
+# or keep watching: only runs when files actually change (no idle LLM calls)
+python mcp-server\run_factory.py --config pipeline.json --watch --interval 300
+```
+
+`extract.workdir` selects the incremental KEE working graph — only changed
+chunks hit the LLM. Re-runs on an unchanged corpus are no-ops end to end:
+ingest skips via manifest, an identical proposal reports `already_active`,
+and the gap delta is zero. Each gap run records `gap_delta`; regressions,
+failed maintenance, and integrity mismatches appear in
+`list_pending_interventions()` until the next healthy run clears them.
+`get_factory_status()` gives the one-call verdict (`healthy` = needs nobody)
+and writes `<ws_root>/factory_pulse.json` for dashboards or notifiers.
+See `docs/dark-factory-proposals.md` for Phases 3–4 (canary auto-promotion,
+n-version extraction).
 
 ## Verified reference runs
 

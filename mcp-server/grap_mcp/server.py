@@ -51,6 +51,7 @@ _TIERS = {
     "resolve_entity": "core",
     "run_experiment": "full", "get_quality_metrics": "full", "adopt_experiment": "full",
     "get_config": "full", "set_weight": "full", "set_retention": "full", "set_policy": "full",
+    "run_maintenance": "full",
     "enforce_retention": "full", "get_audit_log": "full", "reconstruct_run": "full",
     "get_telemetry": "full", "build_legal_graph": "full", "legal_graph_from_relations": "full",
 }
@@ -368,6 +369,61 @@ def reingest_documents(path: str) -> dict:
         return {"status": "error", "message": str(e)}
 
 
+def _publish_and_gate_proposal(yaml_text: str, source: str, provider_name: str,
+                               embedder_name: str, outcomes_count: int):
+    """Publish a candidate ontology as a *proposed* version, audit it, and —
+    when the governed adoption policy is enabled — let the policy decide:
+    pass -> auto-adopt (audited adopted_by=policy); fail -> audited rejection
+    that surfaces in list_pending_interventions. Either way the line never
+    blocks. Returns (version, auto_adoption).
+
+    Idempotency: if the proposal content is byte-identical to the active
+    ontology, nothing is re-adopted — pipeline re-runs on an unchanged corpus
+    are no-ops."""
+    ws = _get_workspace()
+    version = ws.publish_ontology(
+        yaml_text, metadata={"kind": "proposed", "source": source})
+    try:
+        ws.record_event(
+            "ontology_proposed", version.hash,
+            details={"source": source, "outcomes": str(outcomes_count),
+                     "provider": provider_name, "embedder": embedder_name})
+    except Exception:
+        logger.warning("audit record_event failed for ontology_proposed", exc_info=True)
+
+    auto_adoption = None
+    policy = governance.merged_policy(config_store.load_config(_resolve_ws_root()))
+    if policy.get("enabled"):
+        active_hash = getattr(_state, "ontology_version", None)
+        if active_hash and ws.get_record(active_hash) == yaml_text:
+            return version, {"attempted": False, "reason": "already_active"}
+        import yaml as _yaml
+        verdict = governance.evaluate_proposal_dict(
+            _yaml.safe_load(yaml_text) or {}, _active_ontology_dict(ws), policy,
+            pg_referenced_ids=_pg_referenced_outcome_ids())
+        failed = [c["name"] for c in verdict["checks"] if not c["ok"]]
+        if verdict["pass"] and _state.kg is not None:
+            auto_rationale = ("adoption_policy: all checks passed ("
+                              + ", ".join(c["name"] for c in verdict["checks"]) + ")")
+            adopt_res = _adopt_record(ws, _state.kg, version.hash, yaml_text,
+                                      auto_rationale, adopted_by="policy")
+            auto_adoption = {"attempted": True, "pass": True,
+                             "adopted": adopt_res.get("status") == "ok",
+                             "new_version_hash": adopt_res.get("new_version_hash")}
+        else:
+            if _state.kg is None:
+                failed.append("no_kg_loaded")
+            try:
+                ws.record_event("adoption_policy_rejected", version.hash,
+                                details={"failed": ",".join(failed) or "unknown"})
+            except Exception:
+                logger.warning("audit record_event failed for policy_rejected",
+                               exc_info=True)
+            auto_adoption = {"attempted": True, "pass": False,
+                             "failed_checks": failed}
+    return version, auto_adoption
+
+
 @tiered
 def extract_ontology(path: str, out_path: str = None, sim: float = 0.86,
                      model: str = None, max_files: int = None) -> dict:
@@ -399,48 +455,9 @@ def extract_ontology(path: str, out_path: str = None, sim: float = 0.86,
         out = out_path or str(Path(_resolve_ws_root()) / "candidate-ontology.yaml")
         Path(out).parent.mkdir(parents=True, exist_ok=True)
         Path(out).write_text(yaml_text, encoding="utf-8")
-        version = _get_workspace().publish_ontology(
-            yaml_text, metadata={"kind": "proposed", "source": path})
-        try:
-            _get_workspace().record_event(
-                "ontology_proposed", version.hash,
-                details={"source": path, "outcomes": str(len(onto["process_outcomes"])),
-                         "provider": provider.name, "embedder": embedder.name})
-        except Exception:
-            logger.warning("audit record_event failed for ontology_proposed", exc_info=True)
-
-        # Dark-factory path: when the governed adoption policy is enabled, the
-        # policy — not a human — decides. Pass -> auto-adopt (audited as
-        # adopted_by=policy); fail -> audited rejection that surfaces in
-        # list_pending_interventions. Either way the line never blocks.
-        auto_adoption = None
-        policy = governance.merged_policy(config_store.load_config(_resolve_ws_root()))
-        if policy.get("enabled"):
-            import yaml as _yaml
-            ws = _get_workspace()
-            verdict = governance.evaluate_proposal_dict(
-                _yaml.safe_load(yaml_text) or {}, _active_ontology_dict(ws), policy,
-                pg_referenced_ids=_pg_referenced_outcome_ids())
-            failed = [c["name"] for c in verdict["checks"] if not c["ok"]]
-            if verdict["pass"] and _state.kg is not None:
-                auto_rationale = ("adoption_policy: all checks passed ("
-                                  + ", ".join(c["name"] for c in verdict["checks"]) + ")")
-                adopt_res = _adopt_record(ws, _state.kg, version.hash, yaml_text,
-                                          auto_rationale, adopted_by="policy")
-                auto_adoption = {"attempted": True, "pass": True,
-                                 "adopted": adopt_res.get("status") == "ok",
-                                 "new_version_hash": adopt_res.get("new_version_hash")}
-            else:
-                if _state.kg is None:
-                    failed.append("no_kg_loaded")
-                try:
-                    ws.record_event("adoption_policy_rejected", version.hash,
-                                    details={"failed": ",".join(failed) or "unknown"})
-                except Exception:
-                    logger.warning("audit record_event failed for policy_rejected",
-                                   exc_info=True)
-                auto_adoption = {"attempted": True, "pass": False,
-                                 "failed_checks": failed}
+        version, auto_adoption = _publish_and_gate_proposal(
+            yaml_text, path, provider.name, embedder.name,
+            len(onto["process_outcomes"]))
 
         return {
             "status": "ok",
@@ -832,12 +849,33 @@ def set_policy(key: str, value, rationale: str) -> dict:
     return {"status": "ok", "adoption_policy": pol}
 
 
+def _kv_subject(subject: str) -> dict:
+    """Parse a machine-readable event subject of the form k1=v1;k2=v2.
+
+    The pyo3 binding accepts event `details` on write but does not expose
+    them on read, so factory events carry their state in the subject."""
+    out = {}
+    for part in str(subject or "").split(";"):
+        if "=" in part:
+            k, _, v = part.partition("=")
+            out[k.strip()] = v.strip()
+    return out
+
+
+def _latest_event(ws, event_type: str):
+    """Most recent event of a type (audit order is append-only), or None."""
+    evs = ws.query_events(event_type) or []
+    return evs[-1] if evs else None
+
+
 @tiered
 def list_pending_interventions(limit: int = None, cursor: str = None) -> dict:
     """The exception queue: everything currently awaiting a human, oldest
     first. Sources: proposals not yet adopted (awaiting review, or rejected by
-    the adoption policy / integrity gate) and parked extraction items in the
-    open KEE workdir. Empty queue = the factory needs nobody."""
+    the adoption policy / integrity gate), parked extraction items in the open
+    KEE workdir, and latest-state alarms (failed maintenance, integrity
+    mismatches, gap regressions) that clear on the next healthy run of their
+    producer. Empty queue = the factory needs nobody."""
     try:
         ws = _get_workspace()
         adopted = {e.subject for e in (ws.query_events("ontology_adopted") or [])}
@@ -868,12 +906,263 @@ def list_pending_interventions(limit: int = None, cursor: str = None) -> dict:
                                       "ts": now_ms, "age_s": 0})
             except Exception:
                 pass
+        # Latest-state alarms: pending while the most recent event of the
+        # producer reports trouble; the next healthy run clears them.
+        ev = _latest_event(ws, "maintenance_run")
+        if ev and str(ev.subject).startswith("failed"):
+            items.append({"kind": "maintenance_failed", "subject": ev.subject,
+                          "ts": ev.ts, "age_s": max(0, round((now_ms - ev.ts) / 1000))})
+        ev = _latest_event(ws, "graph_verified")
+        if ev and int(_kv_subject(ev.subject).get("mismatch", 0) or 0) > 0:
+            items.append({"kind": "integrity_alarm", "subject": ev.subject,
+                          "ts": ev.ts, "age_s": max(0, round((now_ms - ev.ts) / 1000))})
+        ev = _latest_event(ws, "gap_delta")
+        if ev and int(_kv_subject(ev.subject).get("new", 0) or 0) > 0:
+            items.append({"kind": "gap_regression", "subject": ev.subject,
+                          "ts": ev.ts, "age_s": max(0, round((now_ms - ev.ts) / 1000))})
         items.sort(key=lambda i: i["ts"])
         page, meta = paginate(items, limit, cursor)
         return {"status": "ok", "pending": page, "count": len(page), **meta,
                 "note": "empty queue = the factory needs nobody"}
     except Exception as e:
         return {"status": "error", "message": str(e)}
+
+
+@tiered
+def verify_graph(sample: int = 200) -> dict:
+    """Core integrity sweep: verify stored content hashes for up to `sample`
+    evenly spaced nodes of the current KG. Records `graph_verified`
+    (checked=N;mismatch=M;unknown=U); a mismatch is an integrity alarm that
+    surfaces in the exception queue until a clean sweep clears it."""
+    denied = _require("operator")
+    if denied:
+        return denied
+    kg = _state.kg
+    if not kg:
+        return {"status": "error", "message": "no Knowledge Graph loaded"}
+    if not hasattr(kg, "verify_node"):
+        return {"status": "error", "message": "core verify_node unavailable on this KG"}
+    try:
+        total = kg.node_count()
+        checked = mismatch = unknown = 0
+        if total:
+            n = max(1, min(int(sample), total))
+            step = max(1, total // n)
+            for nid in range(0, total, step):
+                try:
+                    v = kg.verify_node(nid)
+                except Exception:
+                    v = "unknown"
+                checked += 1
+                if v == "mismatch":
+                    mismatch += 1
+                elif v == "unknown":
+                    unknown += 1
+        subject = f"checked={checked};mismatch={mismatch};unknown={unknown}"
+        try:
+            _get_workspace().record_event("graph_verified", subject)
+        except Exception:
+            logger.warning("audit record_event failed for graph_verified", exc_info=True)
+        return {"status": "ok", "nodes_total": total, "checked": checked,
+                "match": checked - mismatch - unknown,
+                "mismatch": mismatch, "unknown": unknown,
+                "integrity_ok": mismatch == 0}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
+@tiered
+def run_maintenance() -> dict:
+    """The maintenance autopilot: compact the KG, rebuild the entity index,
+    enforce retention, and run an integrity sweep — one idempotent call for a
+    scheduler. Records `maintenance_run` ('ok' or 'failed:<steps>'); a failed
+    latest run stays in the exception queue until the next clean one."""
+    denied = _require("admin")
+    if denied:
+        return denied
+    steps, failed = {}, []
+
+    def _step(name, fn, skip=None):
+        if skip:
+            steps[name] = {"status": "skipped", "note": skip}
+            return
+        try:
+            r = fn()
+            steps[name] = r if isinstance(r, dict) else {"status": "ok"}
+            if isinstance(r, dict) and r.get("status") == "error":
+                failed.append(name)
+        except Exception as e:
+            steps[name] = {"status": "error", "message": str(e)}
+            failed.append(name)
+
+    kg = _state.kg
+    _step("compact_graph", compact_graph, skip=None if kg else "no KG loaded")
+    _step("reindex_entities", reindex_entities,
+          skip=None if (kg and _state.kg_path) else "no persisted KG")
+    _step("enforce_retention", enforce_retention)
+    _step("verify_graph", verify_graph, skip=None if kg else "no KG loaded")
+
+    ok = not failed
+    subject = "ok" if ok else "failed:" + ",".join(failed)
+    try:
+        _get_workspace().record_event("maintenance_run", subject)
+    except Exception:
+        logger.warning("audit record_event failed for maintenance_run", exc_info=True)
+    return {"status": "ok" if ok else "error", "ok": ok,
+            "failed": failed, "steps": steps}
+
+
+@tiered
+def get_factory_status() -> dict:
+    """One call answering: is the factory healthy and does it need anyone?
+
+    Policy state, exception-queue depth, gap trend over recent production
+    runs (with a spike alarm), and latest-state alarms. healthy=true means
+    the factory needs nobody. Also writes <ws_root>/factory_pulse.json for
+    dashboards/notifiers to poll."""
+    try:
+        ws = _get_workspace()
+        policy = governance.merged_policy(config_store.load_config(_resolve_ws_root()))
+        queue = list_pending_interventions()
+        pending = queue.get("count", 0) if isinstance(queue, dict) else 0
+        runs = ws.list_runs("production") or []
+        trend = [{"run_id": r.run_id, "gaps": r.gaps_found} for r in runs[-5:]]
+        alarms = []
+        if (len(trend) >= 2 and trend[-2]["gaps"] > 0
+                and trend[-1]["gaps"] >= trend[-2]["gaps"] * 1.5):
+            alarms.append(f"gap spike: {trend[-2]['gaps']} -> {trend[-1]['gaps']}")
+        for i in (queue.get("pending") or []):
+            if i["kind"] in ("integrity_alarm", "maintenance_failed", "gap_regression"):
+                alarms.append(f"{i['kind']}: {i['subject']}")
+        status = {
+            "status": "ok",
+            "policy_enabled": bool(policy.get("enabled")),
+            "pending_interventions": pending,
+            "gap_trend": trend,
+            "alarms": alarms,
+            "healthy": pending == 0 and not alarms,
+            "note": "healthy=true means the factory needs nobody",
+        }
+        try:
+            (Path(_resolve_ws_root()) / "factory_pulse.json").write_text(
+                json.dumps({**status, "ts": time.time()}), encoding="utf-8")
+        except Exception:
+            pass
+        return status
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
+@tiered
+def run_pipeline(config_path: str = "pipeline.json") -> dict:
+    """Run the whole factory line once from a declarative JSON config —
+    idempotent and scheduler-friendly (run_factory.py wraps this in a watch
+    loop). Config keys:
+
+      kg_path (str, required)   evidence KG dir (loaded, or created if absent)
+      evidence_dirs (list)      incremental ingest sources (manifest-based)
+      extract {docs_path, workdir?, sim?, max_files?, chunk_chars?, concurrency?}
+                                workdir -> incremental KEE working graph (only
+                                changed chunks hit the LLM); else stateless
+      detect_gaps (bool)        gap run + delta vs the previous production run
+                                (gap_delta event feeds the exception queue)
+      maintenance (bool)        run the maintenance autopilot at the end
+
+    A policy rejection never hard-stops the line; it lands in the queue."""
+    denied = _require("operator")
+    if denied:
+        return denied
+    try:
+        cfg = json.loads(Path(config_path).read_text(encoding="utf-8"))
+    except Exception as e:
+        return {"status": "error", "message": f"cannot read config '{config_path}': {e}"}
+    report = {"status": "ok", "steps": {}}
+    try:
+        kgp = cfg.get("kg_path")
+        if not kgp:
+            return {"status": "error", "message": "config needs kg_path"}
+        r = load_knowledge_graph(kgp) if Path(kgp).exists() else create_knowledge_graph(kgp)
+        report["steps"]["kg"] = {"status": r.get("status"), "path": kgp}
+        if r.get("status") != "ok":
+            report["status"] = "error"
+            return report
+
+        ingested = []
+        for d in cfg.get("evidence_dirs") or []:
+            rr = reingest_documents(d)
+            ingested.append({"path": d, "status": rr.get("status"),
+                             "nodes_added": rr.get("nodes_added"),
+                             "nodes_removed": rr.get("nodes_removed"),
+                             "skipped": rr.get("skipped")})
+        report["steps"]["evidence"] = ingested
+
+        ext = cfg.get("extract") or {}
+        if ext.get("docs_path"):
+            if ext.get("workdir"):
+                from .kee.graph_extract import extend_graph_ontology
+                from .kee import pipeline as kee_pipeline
+                out = extend_graph_ontology(
+                    ext["workdir"], ext["docs_path"], get_provider(), get_embedder(),
+                    sim=float(ext.get("sim", 0.86)),
+                    relook_ratio=float(ext.get("relook_ratio", 0.2)),
+                    max_files=ext.get("max_files"),
+                    chunk_chars=int(ext.get("chunk_chars", 800)),
+                    concurrency=int(ext.get("concurrency", 1)))
+                yaml_text = kee_pipeline.to_yaml(out["ontology"])
+                version, auto = _publish_and_gate_proposal(
+                    yaml_text, ext["docs_path"],
+                    getattr(get_provider(), "name", "?"),
+                    getattr(get_embedder(), "name", "?"),
+                    len(out["ontology"].get("process_outcomes", [])))
+                report["steps"]["extract"] = {
+                    "status": "ok", "mode": "incremental",
+                    "added": out["added"], "changed": out["changed"],
+                    "removed": out["removed"], "version_hash": version.hash,
+                    "auto_adoption": auto}
+            else:
+                rr = extract_ontology(ext["docs_path"],
+                                      sim=float(ext.get("sim", 0.86)),
+                                      max_files=ext.get("max_files"))
+                report["steps"]["extract"] = {
+                    "status": rr.get("status"), "mode": "stateless",
+                    "version_hash": rr.get("version_hash"),
+                    "auto_adoption": rr.get("auto_adoption")}
+                if rr.get("status") != "ok":
+                    report["status"] = "error"
+
+        if cfg.get("detect_gaps") and _state.ontology is not None:
+            g = detect_gaps()
+            step = {"status": g.get("status") if isinstance(g, dict) else "ok",
+                    "run_id": g.get("run_id") if isinstance(g, dict) else None,
+                    "gaps_found": g.get("gaps_found") if isinstance(g, dict) else None}
+            ws = _get_workspace()
+            prod = ws.list_runs("production") or []
+            if len(prod) >= 2:
+                d = diff_runs(prod[-2].run_id, prod[-1].run_id)
+                if d.get("status") == "ok":
+                    step["delta"] = d["counts"]
+                    subject = (f"new={d['counts']['new']};"
+                               f"resolved={d['counts']['resolved']};"
+                               f"run={prod[-1].run_id}")
+                    try:
+                        ws.record_event("gap_delta", subject)
+                    except Exception:
+                        logger.warning("audit record_event failed for gap_delta",
+                                       exc_info=True)
+            report["steps"]["gaps"] = step
+
+        if cfg.get("maintenance"):
+            report["steps"]["maintenance"] = run_maintenance()
+
+        try:
+            _get_workspace().record_event(
+                "pipeline_run", "ok" if report["status"] == "ok" else "failed")
+        except Exception:
+            pass
+        return report
+    except Exception as e:
+        logger.exception("run_pipeline failed")
+        return {"status": "error", "message": str(e), "steps": report.get("steps")}
 
 
 @tiered
@@ -2327,6 +2616,8 @@ def list_capabilities() -> dict:
             "experimentation": ["run_experiment", "get_quality_metrics", "adopt_experiment"],
             "governance": ["get_config", "set_weight", "set_retention", "set_policy",
                            "enforce_retention", "list_pending_interventions"],
+            "factory": ["run_pipeline", "get_factory_status", "run_maintenance",
+                        "verify_graph"],
             "auth": ["set_role", "get_role"],
             "validation": ["validate_procedure_graph", "diff_procedure_graphs", "get_validation"],
             "audit": ["get_audit_log", "get_status", "get_telemetry", "list_capabilities",

@@ -32,8 +32,20 @@ When the governed adoption policy is enabled (`set_policy("enabled", True, ratio
 `extract_ontology` runs the policy checks itself: pass → **auto-adopts** (audited with
 `adopted_by: policy`); fail → audited `adoption_policy_rejected` that surfaces in
 **list_pending_interventions()** — the exception queue (proposals awaiting review,
-policy/integrity rejections, parked extraction items). Empty queue = the factory needs
+policy/integrity rejections, parked extraction items, and latest-state alarms: failed
+maintenance, integrity mismatches, gap regressions). Empty queue = the factory needs
 nobody. See `docs/dark-factory-proposals.md`.
+
+- **run_pipeline(config_path)** → the whole line as one idempotent unit
+  (kg → incremental ingest → extract+gate → gap run with `gap_delta` → maintenance),
+  driven by a declarative JSON config; `run_factory.py --watch` wraps it in a
+  change-detecting corpus watcher for schedulers.
+- **get_factory_status()** → policy state, queue depth, gap trend (+ spike alarm),
+  `healthy` verdict; writes `<ws_root>/factory_pulse.json` for dashboards.
+- **run_maintenance()** (admin) → compact + reindex + retention + integrity sweep in one
+  audited call (`maintenance_run` ok/failed).
+- **verify_graph(sample)** → core content-hash sweep over the current KG
+  (`graph_verified checked=N;mismatch=M;unknown=U`).
 
 (`mcp-server/demo_kee.py` runs the whole extraction + review flow offline; see `KEE_WORKFLOW.md`
 for the full four-graph improvement loop and local-LLM setup.)
