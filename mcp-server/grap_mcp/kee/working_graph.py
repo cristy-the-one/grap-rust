@@ -18,6 +18,7 @@ import pygrap
 
 from . import reconcile as rc
 from .graph_store import GraphStore, GraphState
+from .. import session
 from ..entity_index import EntityIndex
 
 
@@ -147,11 +148,7 @@ class WorkingGraph:
                     self._hash_to_node[h] = node
             except Exception:
                 pass
-        try:
-            from .. import session
-            session.record_node_access(node, "resolve_outcome")
-        except Exception:
-            pass
+        session.record_node_access(node, "resolve_outcome")
         return _Resolution(node, False)
 
     def node_count(self) -> int:
@@ -195,11 +192,6 @@ class WorkingGraph:
             if res.ambiguous:
                 sig.conflicts.append({"kind": "ambiguous", "names": [name.strip()]})
         self._relations_pass(frag, source, fragment_nodes, sig)
-        try:
-            from .. import session
-            session.record_node_access(0, "working_graph_upsert")  # placeholder
-        except Exception:
-            pass
         return sig
 
     def _resolve_endpoint(self, name: str, fragment_nodes: Dict[str, int]) -> Optional[int]:
@@ -404,11 +396,7 @@ class WorkingGraph:
             })
             provenance[oid] = sorted(self.node_sources.get(node, set()))
 
-        try:
-            from .. import session
-            session.record_query(f"to_candidate:{len(self.canonical)}", len(process_outcomes))
-        except Exception:
-            pass
+        session.record_query(f"to_candidate:{len(self.canonical)}", len(process_outcomes))
 
         for e in self.relations:
             relations_out.append({

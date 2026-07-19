@@ -11,7 +11,6 @@ grap-core paths most likely to harbour latent bugs.
 
 from __future__ import annotations
 
-import hashlib
 import math
 import re
 import tempfile
@@ -25,11 +24,6 @@ def tokenize(s: str) -> str:
     s = s.lower()
     s = re.sub(r"[^a-z0-9]+", "_", s)
     return s.strip("_")
-
-
-def _content_hash(text: str) -> str:
-    """Core-style content hash for exact dedup."""
-    return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
 def keywords(text: str, cap: int = 12) -> List[str]:
@@ -106,18 +100,8 @@ def reconcile(fragments: Sequence[Dict[str, Any]], embedder, sim: float = 0.86,
             chars_by_name[name].extend(o.get("characteristics", []))
             sources_by_name[name].append(src)
 
-    # Highest-leverage: first pass exact dedup by content hash (core sha256 of name)
-    # before embedding sim. Guarantees identical strings collapse perfectly using
-    # the same hash primitive as the core graph nodes.
-    hash_groups: Dict[str, List[str]] = {}
-    for n in names:
-        h = _content_hash(n)
-        hash_groups.setdefault(h, []).append(n)
-    deduped_names = []
-    for members in hash_groups.values():
-        # keep first seen within hash group (should be same anyway)
-        deduped_names.append(members[0] if members else "")
-    names = [n for n in deduped_names if n]  # refresh for clustering
+    # Exact duplicates collapse before embedding similarity (order-preserving).
+    names = [n for n in dict.fromkeys(names) if n]
 
     clusters = _dedup_strings(names, embedder, sim)
 

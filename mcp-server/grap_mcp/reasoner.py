@@ -31,12 +31,7 @@ except Exception:
 # characteristic (process_definition vs interface_definition). Requiring that
 # the evidence actually contains the characteristic's own tokens is what makes
 # gap detection discriminating.
-DEFAULT_WEIGHTS = {
-    "text_weight": 0.6,
-    "graph_weight": 0.2,
-    "centrality_weight": 0.2,   # boost from PageRank centrality (RRF channel) - more default now
-    "lexical_threshold": 0.6,
-}
+DEFAULT_WEIGHTS = {"text_weight": 0.7, "graph_weight": 0.3, "lexical_threshold": 0.6}
 LEXICAL_THRESHOLD = DEFAULT_WEIGHTS["lexical_threshold"]
 
 # Generic connective words that carry no discriminating meaning; excluded from
@@ -125,11 +120,6 @@ def _structural_signals(kg, outcome_id: str, characteristic: str) -> List[Dict[s
     if hasattr(kg, "has_characteristic"):
         try:
             if kg.has_characteristic(outcome_id, characteristic):
-                if _session:
-                    try:
-                        _session.record_query(f"structural:{outcome_id}:{characteristic}", 1)
-                    except Exception:
-                        pass
                 return [{"kind": "structural", "detail": f"{outcome_id}:{characteristic} present"}]
         except Exception:
             return []
@@ -144,13 +134,6 @@ def _lexical_signals(kg, ontology: Ontology, outcome_id: str, characteristic: st
     # its readable form and the mapping-hint keywords, so both exact and natural
     # text searches have terms to match.
     query = f"{characteristic} {characteristic.replace('_', ' ')} {keywords}".strip()
-    # Record the query for session journal (negative evidence is valuable).
-    if _session:
-        try:
-            _session.record_query(query, 0)  # will be updated after hits
-        except Exception:
-            pass
-
     try:
         # Deliberately the classic (deterministic) fusion path. The RRF-hybrid
         # variant produced per-process tie-break ordering (hash-seed dependent),
@@ -165,47 +148,28 @@ def _lexical_signals(kg, ontology: Ontology, outcome_id: str, characteristic: st
     except Exception:
         hits = []
 
-    # Use session context for same-session boost (high-leverage: recently touched
-    # evidence or nodes from this run get a boost so in-session knowledge wins).
-    recent_boost_nodes = set()
+    # Journal the query (zero hits = negative evidence) and touched nodes.
+    # Observability only — session state must never influence scores here:
+    # gap explanations are persisted, versioned records and have to be
+    # reproducible regardless of what else happened in this process.
     if _session:
-        try:
-            ctx = _session.get_context(max_nodes=30)
-            recent_boost_nodes = {item.get("node") for item in ctx.get("nodes_accessed", []) if item.get("node") is not None}
-            if hits:
-                try:
-                    _session.record_query(query, len(hits))
-                except Exception:
-                    pass
-        except Exception:
-            pass
+        _session.record_query(query, len(hits))
+
     signals = []
     for h in hits:
         text = getattr(h, "text", "") or ""
         node = getattr(h, "node", None)
         if _is_projected(kg, node, text, exclude_nodes):
             continue  # ignore system-projected nodes; only real evidence counts
-
-        base_score = getattr(h, "fused_score", 0.0)
-        # Session boost: nodes touched in this session get a multiplier.
-        # This makes "same-session searchability" real in gap detection.
-        if node in recent_boost_nodes:
-            base_score *= 1.25
-
         if _session and node is not None:
-            try:
-                _session.record_node_access(node, "reasoner_lexical")
-            except Exception:
-                pass
-
+            _session.record_node_access(node, "reasoner_lexical")
         signals.append({
             "kind": "lexical",
             "node": node,
-            "score": base_score,
+            "score": getattr(h, "fused_score", 0.0),
             "coverage": round(_covers(text, characteristic), 3),
             "snippet": text[:160],
             "query": query,
-            "session_boosted": node in recent_boost_nodes,
         })
     return signals
 

@@ -36,6 +36,50 @@ def test_role_in_default_and_roundtrip(tmp_path):
     assert loaded["role"] == "admin"
 
 
+def test_get_role_reads_without_writing_config(tmp_path, monkeypatch):
+    # Reading the role must never persist anything (write-on-read would turn a
+    # one-off env override into permanent governed config).
+    from grap_mcp.server import GrapServerState
+    monkeypatch.delenv("GRAP_ROLE", raising=False)
+    st = GrapServerState()
+    st.ws_root = str(tmp_path)
+    assert st.get_role() == "operator"
+    assert not (tmp_path / "config.json").exists()
+
+
+def test_get_role_env_override_is_process_scoped(tmp_path, monkeypatch):
+    from grap_mcp.server import GrapServerState
+    monkeypatch.setenv("GRAP_ROLE", "admin")
+    st = GrapServerState()
+    st.ws_root = str(tmp_path)
+    assert st.get_role() == "admin"
+    assert not (tmp_path / "config.json").exists()  # env role is never persisted
+
+
+def test_list_proposed_ontologies_pagination_meta(monkeypatch):
+    # Regression: an inner variable used to shadow the pagination meta dict,
+    # spreading a node's metadata into the response instead of total/cursor.
+    import grap_mcp.server as s
+
+    class _Ev:
+        def __init__(self, i):
+            self.subject = f"hash{i}"
+            self.ts = i
+
+    class _WS:
+        def query_events(self, event_type):
+            assert event_type == "ontology_proposed"
+            return [_Ev(i) for i in range(5)]
+
+    monkeypatch.setattr(s, "_get_workspace", lambda: _WS())
+    monkeypatch.setitem(s._state, "role", "operator")
+    out = s.list_proposed_ontologies(limit=2)
+    assert out["status"] == "ok"
+    assert out["count"] == 2 and out["total"] == 5
+    assert out["next_cursor"] == "2"
+    assert out["proposed"][0] == {"version_hash": "hash0", "ts": 0}
+
+
 def test_grap_server_state_reset_and_role():
     # Cross-cut test for P2 robust state (minimal, no full ws)
     from grap_mcp.server import GrapServerState

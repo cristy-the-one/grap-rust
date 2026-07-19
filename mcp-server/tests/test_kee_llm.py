@@ -107,6 +107,34 @@ def test_openai_compat_stream_parses_sse_deltas(monkeypatch):
     # (verified indirectly: deltas were parsed from SSE frames)
 
 
+def test_extra_body_env_merges_into_payload(monkeypatch):
+    # llama.cpp reasoning models (e.g. Bonsai): disable thinking per request.
+    monkeypatch.setenv("GRAP_LLM_EXTRA_BODY",
+                       '{"chat_template_kwargs": {"enable_thinking": false}}')
+    p = llm.OpenAICompatProvider(base_url="http://x/v1", model="m")
+    payload = p._payload("sys", "usr", stream=True)
+    assert payload["chat_template_kwargs"] == {"enable_thinking": False}
+    assert payload["stream"] is True
+
+
+def test_extra_body_absent_and_invalid(monkeypatch):
+    monkeypatch.delenv("GRAP_LLM_EXTRA_BODY", raising=False)
+    p = llm.OpenAICompatProvider(base_url="http://x/v1", model="m")
+    assert "chat_template_kwargs" not in p._payload("s", "u", stream=False)
+
+    monkeypatch.setenv("GRAP_LLM_EXTRA_BODY", "{not json")
+    assert llm._extra_body_from_env() == {}
+    monkeypatch.setenv("GRAP_LLM_EXTRA_BODY", '["a-list-not-a-dict"]')
+    assert llm._extra_body_from_env() == {}
+
+
+def test_explicit_extra_body_wins_over_env(monkeypatch):
+    monkeypatch.setenv("GRAP_LLM_EXTRA_BODY", '{"top_k": 1}')
+    p = llm.OpenAICompatProvider(base_url="http://x/v1", model="m",
+                                 extra_body={"top_k": 20})
+    assert p._payload("s", "u", stream=False)["top_k"] == 20
+
+
 def test_list_models_parses_openai_shape(monkeypatch):
     monkeypatch.setattr(llm.urllib.request, "urlopen",
                         lambda req, timeout=None: _FakeResp(json.dumps(

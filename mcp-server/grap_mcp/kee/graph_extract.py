@@ -14,6 +14,7 @@ from typing import Any, Callable, Dict, Iterator, List, Optional, Sequence, Tupl
 
 from . import extract
 from .. import incremental
+from .. import session
 from .pipeline import read_chunks
 from .working_graph import WorkingGraph
 
@@ -168,11 +169,7 @@ def extend_graph_ontology(workdir: str, docs_path: str, provider, embedder, *,
         _emit({"phase": "done", "added": len(new), "changed": len(changed),
                "removed": len(removed), "concepts": len(wg._live_concepts()),
                "edges": len(wg.relations), "relooks": relooks, "parked": len(wg.parked)})
-        try:
-            from .. import session
-            session.record_query(f"graph_extract:{len(to_extract)}", len(wg._live_concepts()))
-        except Exception:
-            pass
+        session.record_query(f"graph_extract:{len(to_extract)}", len(wg._live_concepts()))
         return {
             "ontology": ontology,
             "added": len(new), "changed": len(changed), "removed": len(removed),

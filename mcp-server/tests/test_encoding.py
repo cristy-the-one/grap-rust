@@ -49,7 +49,40 @@ def test_new_schemas_fallback_without_pygrap():
     p, m = encode_response("query_events", qe, requested_format="compact")
     assert m["format"] in ("json", "compact")
 
-    # detect_gaps
-    dg = {"status": "ok", "gaps_found": 2, "scope": "all", "gaps": [{"outcome_id": "o1", "characteristic": "c1", "score": 0.4}]}
+
+def test_detect_gaps_schema_matches_real_gap_keys():
+    # The gaps table columns must line up with reasoner.detect_gaps output —
+    # a realistic gap dict round-trips its values into the compact payload.
+    dg = {
+        "status": "ok", "run_id": "run-1234", "kind": "production",
+        "scope": "all", "gaps_found": 1,
+        "gaps": [{
+            "outcome_id": "SYS.5.BP3",
+            "outcome_name": "Requirement Verification",
+            "missing_characteristic": "acceptance_criteria_defined",
+            "signals": {"structural": [], "lexical": []},
+            "confidence": 0.87,
+        }],
+    }
     p, m = encode_response("detect_gaps", dg, requested_format="compact")
-    assert m["format"] in ("json", "compact")
+    if m["format"] == "compact":          # pygrap wire available
+        assert isinstance(p, str)
+        assert "SYS.5.BP3" in p
+        assert "acceptance_criteria_defined" in p
+        assert "0.87" in p
+    else:                                  # binding unavailable: JSON passthrough
+        assert p == dg
+
+
+def test_int_list_tools_have_no_schema_and_fall_back_to_json():
+    # blast_radius / orphans return plain int lists, cycles lists of lists —
+    # unrepresentable in the row-of-dicts encoder, so compact requests must
+    # return untouched JSON (a broken encoding would error or emit nulls).
+    for tool, resp in [
+        ("get_blast_radius", {"status": "ok", "center": 1, "impacted": [2, 3, 5]}),
+        ("find_orphans", {"status": "ok", "orphan_count": 2, "orphans": [7, 9]}),
+        ("find_cycles", {"status": "ok", "cycle_count": 1, "cycles": [[1, 2, 3]]}),
+    ]:
+        p, m = encode_response(tool, resp, requested_format="compact")
+        assert p == resp
+        assert m["format"] == "json"

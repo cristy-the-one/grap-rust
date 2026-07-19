@@ -26,6 +26,7 @@ from .experiments import experiment_summary, quality_metrics
 from . import config as config_store
 from . import auth
 from . import ingest
+from . import session
 from .pagination import paginate
 # Module-level provider/embedder factories so lifecycle tools (and tests that
 # monkeypatch s.get_provider / s.get_embedder) share one indirection point.
@@ -118,10 +119,10 @@ class GrapServerState:
         self.extraction_workdir = None
 
     def set_kg(self, kg, path=None):
-        """Set kg and path, clear related caches."""
+        """Set the active KG and its on-disk path (projected_nodes is left to
+        the caller: create_* clears it, open_extraction_graph keeps it)."""
         self.kg = kg
         self.kg_path = path
-        # optionally clear projected if new kg
 
     def set_ontology(self, ontology, version=None):
         self.ontology = ontology
@@ -134,16 +135,18 @@ class GrapServerState:
         self.projected_nodes = set()
 
     def get_role(self) -> str:
+        """Effective role. GRAP_ROLE overrides for this process only (the
+        bootstrap path — e.g. GRAP_ROLE=admin to reach set_role); otherwise
+        the persisted workspace config wins. Reading never writes config —
+        only set_role persists."""
         if self.role is None:
-            root = self.ws_root or os.environ.get("GRAP_WORKSPACE", "./grap-workspace")
-            cfg = config_store.load_config(root)
             env_role = os.environ.get("GRAP_ROLE")
-            role = env_role or cfg.get("role", "operator")
-            if "role" not in cfg or cfg.get("role") != role:
-                cfg["role"] = role
-                cfg["last_changed"] = int(time.time() * 1000)
-                config_store.save_config(root, cfg)
-            self.role = role
+            if env_role in auth.ROLES:
+                self.role = env_role
+            else:
+                root = self.ws_root or os.environ.get("GRAP_WORKSPACE", "./grap-workspace")
+                cfg = config_store.load_config(root)
+                self.role = cfg.get("role", "operator")
         return self.role
 
     def set_role(self, role: str, rationale: str = None):
@@ -389,11 +392,7 @@ def extract_ontology(path: str, out_path: str = None, sim: float = 0.86,
         result = pipeline.extract_ontology(path, provider, embedder, sim=sim,
                                            max_files=max_files)
         onto = result["ontology"]
-        try:
-            from grap_mcp import session
-            session.record_query(f"extract_ontology:{path}", result.get("fragments", 0))
-        except Exception:
-            pass
+        session.record_query(f"extract_ontology:{path}", result.get("fragments", 0))
         validation = validate.validate_ontology(onto)
         yaml_text = pipeline.to_yaml(onto)
         out = out_path or str(Path(_resolve_ws_root()) / "candidate-ontology.yaml")
@@ -435,48 +434,21 @@ def extract_ontology(path: str, out_path: str = None, sim: float = 0.86,
 
 @tiered
 def list_proposed_ontologies(limit: int = None, cursor: str = None) -> dict:
-    """List versioned ontology proposals (from KEE extract) that are candidates for human review/promotion.
+    """List ontology proposals recorded by extract_ontology, newest last.
 
-    Use adopt_proposed_ontology(version_hash, rationale) to adopt after review.
-    These are stored via publish_ontology with kind=proposed."""
+    Audit-backed: each extract_ontology call writes an 'ontology_proposed'
+    event whose subject is the proposal's version hash. Inspect one with
+    get_proposed_ontology(version_hash); promote with
+    adopt_proposed_ontology(version_hash, rationale)."""
     denied = _require("operator")
     if denied:
         return denied
     try:
         ws = _get_workspace()
-        # list_versions in binding is PG-focused; list and inspect via content where possible.
-        # For simplicity fall back to broad audit or note that proposals are returned from extract_ontology.
-        # Better: use workspace to list all ontology versions (extend if binding allows).
-        versions = []
-        try:
-            versions = ws.list_versions() or []  # may be PG only
-        except Exception:
-            pass
-        page, meta = paginate(versions, limit, cursor)
-        proposed = []
-        for v in page:
-            try:
-                # metadata may be on Version in some paths
-                meta = getattr(v, "metadata", {}) or {}
-                if isinstance(meta, dict) and meta.get("kind") == "proposed":
-                    proposed.append({
-                        "version_hash": getattr(v, "hash", str(v)),
-                        "created_at": getattr(v, "created_at", 0),
-                        "source": meta.get("source"),
-                    })
-            except Exception:
-                continue
-        # Also surface recent from audit as fallback for proposed.
-        if not proposed:
-            try:
-                events = ws.query_events("ontology_proposed") or []
-                page_events, meta_events = paginate(events, limit, cursor)
-                for e in page_events:
-                    proposed.append({"version_hash": e.subject, "from_audit": True})
-            except Exception:
-                pass
-        return {"status": "ok", "proposed": proposed, "count": len(proposed), **meta,
-                "note": "Proposals from extract_ontology are versioned; inspect via load or audit."}
+        events = ws.query_events("ontology_proposed") or []
+        entries = [{"version_hash": e.subject, "ts": e.ts} for e in events]
+        page, meta = paginate(entries, limit, cursor)
+        return {"status": "ok", "proposed": page, "count": len(page), **meta}
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
@@ -500,25 +472,11 @@ def get_proposed_ontology(version_hash: str) -> dict:
             parsed = yaml.safe_load(raw) or {}
         except Exception:
             parsed = {}
-        # Try to attach concept hashes if present in metadata or from graph
-        hashes = {}
-        try:
-            # If it was from KEE graph, hashes may be in a side file or we note
-            # For now return raw + parsed; hashes are in the extract response originally
-            pass
-        except Exception:
-            pass
-        try:
-            from grap_mcp import telemetry as _tel
-            _tel.record("get_proposed_ontology")
-        except Exception:
-            pass
         return {
             "status": "ok",
             "version_hash": version_hash,
             "raw": raw,
             "parsed": parsed,
-            "note": "Use concept_hashes from original extract_ontology response or inspect via working graph.",
         }
     except Exception as e:
         return {"status": "error", "message": str(e)}
@@ -553,21 +511,6 @@ def adopt_proposed_ontology(version_hash: str, rationale: str = None) -> dict:
         try:
             ontology = onto_loader.load_ontology_from_file(tmp_path)
             projection = onto_loader.project_ontology_to_grap(ontology, kg)
-            # Verify concept_hashes from proposal against current kg nodes (using core hashes).
-            try:
-                import yaml
-                prop = yaml.safe_load(raw) or {}
-                chashes = prop.get("concept_hashes", {})
-                verified = 0
-                for oid, h in list(chashes.items())[:5]:  # sample
-                    # Note: oids in proposal may not directly map to nodes, but we can note.
-                    if h and hasattr(kg, "get_node_content_hash"):
-                        # simplistic, would need mapping; for now just presence
-                        verified += 1
-                if chashes:
-                    logger.info("adopt: proposal had %d concept_hashes, sampled %d", len(chashes), verified)
-            except Exception:
-                pass
             # Re-publish the adopted version (new hash) with adoption info.
             version = ws.publish_ontology(
                 raw, metadata={"version": ontology.version, "adopted_from": version_hash, "rationale": rationale}
@@ -579,11 +522,6 @@ def adopt_proposed_ontology(version_hash: str, rationale: str = None) -> dict:
                 details={"new_version": version.hash, "outcomes": str(projection["outcomes_projected"])},
                 rationale=rationale
             )
-            try:
-                from grap_mcp import telemetry as _tel
-                _tel.record("adopt_proposed_ontology")
-            except Exception:
-                pass
             return {
                 "status": "ok",
                 "adopted_from": version_hash,
@@ -1001,13 +939,9 @@ def graph_neighbors(node_id: int, types: list = None, wire_format: str = "json",
         paged_ids = {n["id"] for n in page}
         edges_page = [e for e in edges
                       if e["source"] in paged_ids or e["target"] in paged_ids]
-        try:
-            from grap_mcp import session
-            session.record_node_access(node_id, "graph_neighbors")
-            for nid in paged_ids:
-                session.record_node_access(nid, "graph_neighbors")
-        except Exception:
-            pass
+        session.record_node_access(node_id, "graph_neighbors")
+        for nid in paged_ids:
+            session.record_node_access(nid, "graph_neighbors")
         r = {"status": "ok", "center": node_id, "neighbors": page,
              "edges": edges_page, **meta}
         from .encoding import encode_response
@@ -1026,7 +960,6 @@ def get_session_context(sort_by: str = "recency") -> dict:
     if denied:
         return denied
     try:
-        from grap_mcp import session
         ctx = session.get_context(sort_by=sort_by)
         ctx["status"] = "ok"
         return ctx
@@ -1056,7 +989,6 @@ def get_context_bundle(query: str, max_results: int = 20, token_budget: int = 20
     if not kg:
         return {"status": "error", "message": "no Knowledge Graph loaded"}
     try:
-        from grap_mcp import session
         results = kg.search_and_traverse_hybrid(
             query, max_results=max_results, min_strength=min_strength, max_depth=max_depth
         )
@@ -1094,7 +1026,8 @@ def get_blast_radius(node_id: int, relations: list = None, max_depth: int = 10,
                      wire_format: str = "json") -> dict:
     """Transitive dependents of a node — what would be impacted if it changes.
 
-    Supports ``wire_format="compact"`` for token-efficient #MUNCH encoding.
+    ``wire_format`` is accepted for uniformity but the int-list payload has no
+    compact schema, so responses are always JSON.
     """
     denied = _require("operator")
     if denied:
@@ -1106,14 +1039,10 @@ def get_blast_radius(node_id: int, relations: list = None, max_depth: int = 10,
         impacted = kg.blast_radius(node_id, relations, max_depth)
         page, meta = paginate(impacted, limit, cursor)
         r = {"status": "ok", "center": node_id, "impacted": page, **meta}
-        try:
-            from grap_mcp import session
-            session.record_node_access(node_id, "get_blast_radius")
-            for n in page[:5]:  # sample
-                if isinstance(n, dict):
-                    session.record_node_access(n.get("id", 0), "blast_impact")
-        except Exception:
-            pass
+        session.record_node_access(node_id, "get_blast_radius")
+        for n in page[:5]:  # sample (blast_radius returns plain node ids)
+            session.record_node_access(n if isinstance(n, int) else n.get("id", 0),
+                                       "blast_impact")
         from .encoding import encode_response
         payload, _meta = encode_response("get_blast_radius", r, requested_format=wire_format)
         return payload
@@ -1125,7 +1054,8 @@ def get_blast_radius(node_id: int, relations: list = None, max_depth: int = 10,
 def find_cycles(limit: int = None, cursor: str = None, wire_format: str = "json") -> dict:
     """Dependency cycles (strongly-connected components) in the current KG.
 
-    Supports ``wire_format="compact"`` for token-efficient #MUNCH encoding.
+    ``wire_format`` is accepted for uniformity but the list-of-lists payload
+    has no compact schema, so responses are always JSON.
     """
     denied = _require("operator")
     if denied:
@@ -1149,7 +1079,8 @@ def find_orphans(entry_points: list = None, limit: int = None, cursor: str = Non
                 wire_format: str = "json") -> dict:
     """Live nodes unreachable from the given entry points (or from KG roots).
 
-    Supports ``wire_format="compact"`` for token-efficient #MUNCH encoding.
+    ``wire_format`` is accepted for uniformity but the int-list payload has no
+    compact schema, so responses are always JSON.
     """
     denied = _require("operator")
     if denied:
@@ -1209,11 +1140,6 @@ def load_ontology(path: str) -> dict:
         _state.projected_nodes.update(projection.get("projected_node_ids", []))
         _get_workspace().record_event("ontology_loaded", path,
                                       details={"outcomes": str(projection["outcomes_projected"])})
-        try:
-            from grap_mcp import telemetry as _tel
-            _tel.record("load_ontology")
-        except Exception:
-            pass
         return {
             "status": "ok",
             "path": path,
@@ -1339,12 +1265,6 @@ def _run_gap_detection(scope: str, kind: str, extra_summary: dict = None) -> dic
         pg_version = (activation.pg_version if activation else None) or getattr(_state, "pg_version", None)
         kg_version = (activation.kg_version if activation else None) or getattr(_state, "ontology_version", None)
 
-        try:
-            from grap_mcp import session
-            session.record_query(f"run_procedure:{scope}", 0)
-        except Exception:
-            pass
-
         run_id = f"run-{uuid.uuid4().hex[:8]}"
         ws.start_run(run_id, kind=kind, activation_id=activation_id,
                      pg_version=pg_version, kg_version=kg_version, scope=scope)
@@ -1355,11 +1275,7 @@ def _run_gap_detection(scope: str, kind: str, extra_summary: dict = None) -> dic
             weights = config_store.load_config(_resolve_ws_root())["weights"]
         gaps = reasoner.detect_gaps(kg, ontology, pg, weights=weights,
                                     exclude_nodes=getattr(_state, "projected_nodes", set()))
-        try:
-            from grap_mcp import session
-            session.record_query(f"gaps:{scope}", len(gaps))
-        except Exception:
-            pass
+        session.record_query(f"gaps:{scope}", len(gaps))
         explanations = {}
         hashes = []
         for gap in gaps:
@@ -1480,7 +1396,6 @@ def get_status() -> dict:
             "retention": config_store.load_config(_resolve_ws_root()).get("retention", {}),
             "extraction_workdir": getattr(_state, "extraction_workdir", None),
         },
-        "state_class": "GrapServerState (robust refactor in progress)",
         "telemetry": _get_telemetry_snapshot()
     }
 
@@ -1694,11 +1609,7 @@ def query_events(event_type: str = None, run_id: str = None,
                   for e in raw]
         page, meta = paginate(events, limit, cursor)
         r = {"events": page, **meta, "count": len(page)}
-        try:
-            from grap_mcp import session
-            session.record_query(f"events:{event_type or 'all'}", len(page))
-        except Exception:
-            pass
+        session.record_query(f"events:{event_type or 'all'}", len(page))
         from .encoding import encode_response
         payload, _meta = encode_response("query_events", r, requested_format=wire_format)
         return payload
@@ -1810,11 +1721,6 @@ def enforce_retention() -> dict:
         prod_cutoff = max(0, now_ms - int(retention.get("production_days", 365)) * day_ms)
         exp_cutoff = max(0, now_ms - int(retention.get("experiment_days", 30)) * day_ms)
         rep = ws.enforce_retention(prod_cutoff, exp_cutoff)
-        try:
-            from grap_mcp import telemetry as _tel
-            _tel.record("enforce_retention")
-        except Exception:
-            pass
         return {"status": "ok", "runs_deleted": rep.runs_deleted,
                 "explanations_deleted": rep.explanations_deleted, "run_ids": rep.run_ids}
     except Exception as e:
@@ -1831,7 +1737,11 @@ def get_role() -> dict:
 
 @tiered
 def set_role(role: str, rationale: str = None) -> dict:
-    """Set the current role (requires admin + rationale; persisted + audited)."""
+    """Set the current role (requires admin + rationale; persisted + audited).
+
+    Bootstrap: the default persisted role is 'operator', so the first admin
+    must come from the environment — start the server with GRAP_ROLE=admin
+    (process-scoped, never persisted) and then set_role as needed."""
     denied = _require("admin")
     if denied:
         return denied
@@ -2083,7 +1993,10 @@ def list_capabilities() -> dict:
         "tier_of": dict(_TIERS),
         "tier_note": "Tools not in tier_of are 'standard'. Set GRAP_TOOL_TIER=core|standard|full.",
         "auth": "deferred (POC: no authentication/authorization)",
-        "wire_note": "Wire is now DEFAULT='compact' for tools with schemas (massive agent token win). Tools: graph_neighbors, list_runs, query_events, detect_gaps, get_audit_log, get_blast_radius, find_cycles, find_orphans, kg_health etc. Override with wire_format='json' or GRAP_WIRE_FORMAT=json.",
+        "wire_note": ("JSON is the default wire format. Tools with a compact schema "
+                      "(graph_neighbors, list_runs, query_events, detect_gaps, get_audit_log) "
+                      "accept wire_format='compact' (or GRAP_WIRE_FORMAT=compact) for "
+                      "token-efficient #MUNCH encoding; tools without a schema always return JSON."),
     }
 
 

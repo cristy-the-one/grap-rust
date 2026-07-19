@@ -19,7 +19,7 @@ SCHEMAS = {
         "enc_id": "lr1",
         "scalars": ["status", "count"],
         "tables": [
-            ("r", "runs", ["run_id", "kind", "status", "gaps_found", "activation_id"], []),
+            ("r", "runs", ["run_id", "kind", "status", "gaps_found"], [1, 2]),
         ],
     },
     "query_events": {
@@ -29,32 +29,20 @@ SCHEMAS = {
             ("e", "events", ["ts", "type", "subject"], [1, 2]),  # type and subject often repeat
         ],
     },
+    # Columns must match the gap dicts produced by reasoner.detect_gaps.
     "detect_gaps": {
-        "enc_id": "dg1",
-        "scalars": ["status", "gaps_found", "scope"],
+        "enc_id": "dg2",
+        "scalars": ["status", "run_id", "kind", "scope", "gaps_found"],
         "tables": [
-            ("g", "gaps", ["outcome_id", "characteristic", "score"], []),
+            ("g", "gaps",
+             ["outcome_id", "outcome_name", "missing_characteristic", "confidence"],
+             [0, 1]),
         ],
     },
-    "get_blast_radius": {
-        "enc_id": "br1",
-        "scalars": ["status", "center", "total", "returned", "next_cursor"],
-        "tables": [
-            ("i", "impacted", ["id"], []),
-        ],
-    },
-    "find_orphans": {
-        "enc_id": "fo1",
-        "scalars": ["status", "orphan_count", "total", "returned", "next_cursor"],
-        "tables": [
-            ("o", "orphans", ["id"], []),
-        ],
-    },
-    "find_cycles": {
-        "enc_id": "fc1",
-        "scalars": ["status", "cycle_count", "total", "returned", "next_cursor"],
-        "tables": [
-            ("c", "cycles", ["cycle"], []),  # cycles are lists; represent as stringified for wire POC
-        ],
-    },
+    # get_blast_radius / find_orphans / find_cycles have NO schema on purpose:
+    # they return plain int lists (and cycles: lists of lists), which the
+    # row-of-dicts table encoder cannot represent. Without a schema they fall
+    # back to JSON even when compact is requested — correct output beats a
+    # broken encoding. Add schemas only together with encoder support for
+    # scalar-list tables.
 }

@@ -66,6 +66,23 @@ class StubProvider:
             yield piece
 
 
+def _extra_body_from_env() -> dict:
+    """Optional JSON dict merged into every request payload (GRAP_LLM_EXTRA_BODY).
+
+    Lets deployments pass server-specific fields without code changes — e.g.
+    llama.cpp reasoning models (Bonsai, Qwen3):
+    GRAP_LLM_EXTRA_BODY='{"chat_template_kwargs": {"enable_thinking": false}}'
+    turns off thinking for fast batch extraction."""
+    raw = os.environ.get("GRAP_LLM_EXTRA_BODY", "")
+    if not raw:
+        return {}
+    try:
+        obj = json.loads(raw)
+    except ValueError:
+        return {}
+    return obj if isinstance(obj, dict) else {}
+
+
 class OpenAICompatProvider:
     """Talks to any OpenAI-compatible /chat/completions server via urllib."""
 
@@ -73,15 +90,15 @@ class OpenAICompatProvider:
 
     def __init__(self, base_url: Optional[str] = None, model: Optional[str] = None,
                  api_key: Optional[str] = None, timeout: float = 120.0,
-                 temperature: float = 0.0) -> None:
+                 temperature: float = 0.0, extra_body: Optional[dict] = None) -> None:
         self.base_url = (base_url or os.environ.get("GRAP_LLM_BASE_URL", DEFAULT_BASE_URL)).rstrip("/")
         self.model = model or os.environ.get("GRAP_LLM_MODEL", DEFAULT_MODEL)
         self.api_key = api_key or os.environ.get("GRAP_LLM_API_KEY")
         self.timeout = timeout
         self.temperature = temperature
+        self.extra_body = extra_body if extra_body is not None else _extra_body_from_env()
 
-    def complete(self, system: str, user: str) -> str:
-        url = f"{self.base_url}/chat/completions"
+    def _payload(self, system: str, user: str, stream: bool) -> dict:
         payload = {
             "model": self.model,
             "messages": [
@@ -89,8 +106,15 @@ class OpenAICompatProvider:
                 {"role": "user", "content": user},
             ],
             "temperature": self.temperature,   # low for reproducibility
-            "stream": False,
+            "stream": stream,
         }
+        if self.extra_body:
+            payload.update(self.extra_body)
+        return payload
+
+    def complete(self, system: str, user: str) -> str:
+        url = f"{self.base_url}/chat/completions"
+        payload = self._payload(system, user, stream=False)
         headers = {"Content-Type": "application/json"}
         if self.api_key:
             headers["Authorization"] = f"Bearer {self.api_key}"
@@ -115,15 +139,7 @@ class OpenAICompatProvider:
         the honest 'it's working right now' signal for a progress UI.
         """
         url = f"{self.base_url}/chat/completions"
-        payload = {
-            "model": self.model,
-            "messages": [
-                {"role": "system", "content": system},
-                {"role": "user", "content": user},
-            ],
-            "temperature": self.temperature,
-            "stream": True,
-        }
+        payload = self._payload(system, user, stream=True)
         headers = {"Content-Type": "application/json"}
         if self.api_key:
             headers["Authorization"] = f"Bearer {self.api_key}"
