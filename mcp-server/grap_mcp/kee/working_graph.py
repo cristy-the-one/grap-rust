@@ -219,6 +219,12 @@ class WorkingGraph:
             if fn is None or tn is None:
                 self._park(f, ty, t, source, "ungrounded")
                 continue
+            if fn == tn:
+                # Both endpoints resolved to the same concept (the model emitted
+                # "X <rel> X", or two aliases deduped together). A self-loop
+                # carries no relational information and pollutes edge counts.
+                self._park(f, ty, t, source, "self_loop")
+                continue
             key = (fn, tn)
             existing = self._edge_types.get(key)
             if existing is not None and existing != ty:

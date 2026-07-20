@@ -100,6 +100,21 @@ def test_merge_threshold_high_keeps_them_separate(tmp_path):
     assert wg.node_count() == 2
 
 
+def test_self_loop_relation_is_parked_not_added(tmp_path):
+    wg = _wg(tmp_path, merge_threshold=0.95)
+    frag = {
+        "source": "s#0",
+        "outcomes": [{"name": "Verification", "characteristics": []}],
+        # Both endpoints resolve to the same concept -> degenerate self-loop.
+        "relations": [{"from": "Verification", "type": "uses", "to": "Verification"}],
+    }
+    wg.upsert_fragment(frag, "s#0")
+    onto = wg.to_candidate_ontology("v")
+    assert onto["relations"] == []
+    assert len(wg.parked) == 1
+    assert wg.parked[0]["reason"] == "self_loop"
+
+
 def test_conflicting_relation_type_is_parked_and_signaled(tmp_path):
     wg = _wg(tmp_path, merge_threshold=0.95)
     base = {"outcomes": [{"name": "A", "characteristics": []}, {"name": "B", "characteristics": []}]}
