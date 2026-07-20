@@ -70,6 +70,32 @@ insurance houses as separate entities. The extraction is *real* — the
 defects are duplication (finding 5) and characteristic phrasing
 (finding 6), not hallucination.
 
+## Tuning cycles 4–5 (2026-07-20, later)
+
+| Cycle | Change | Result |
+|---|---|---|
+| 4 | prompt: pin output language to source | **Win, committed (`5ff4593`).** Uniformly Romanian concepts, EN/RO twins gone, grounded edges 2→7, gaps 137→128. 13 min, zero timeouts. |
+| 5a | + short-characteristics rule | **Crashed — finding 8:** duplicate parked relations violated the store PK at save time; the whole 18-min extraction was lost (transactional rollback left the store clean). Fixed: `_park` dedupe + `INSERT OR IGNORE`, regression-tested. |
+| 5b | same, rerun on the fix | **Net regression, reverted.** Characteristics did get shorter (170, split), but English concept names returned (`contract_framework` beside `contractul_cadru`), gaps rose to 163, edges fell back to 2. |
+
+Additional findings:
+
+8. **Duplicate parked relations abort the save (code, fixed).** See above —
+   the second-worst failure class observed (work loss, not corruption).
+9. **Instruction budget (prompting lesson).** Bonsai-27B reliably follows
+   one appended rule, not two: the characteristics rule diluted the
+   language pin. Tune one prompt rule at a time and re-measure.
+10. **Diacritic-mangling tokenization (open, likely the next big win).**
+    `tokenize()` truncates at Romanian diacritics (*referinţă* →
+    `referin`), corrupting outcome ids and lexical gap-matching. This is
+    probably a larger contributor to gap noise than characteristic
+    length — a scoring-side fix (diacritic transliteration in
+    `reconcile.tokenize`) beats further prompt surgery.
+
+Best-known configuration after five cycles: **cycle 4** (language pin
+only, `GRAP_LLM_TIMEOUT=300`, `BONSAI_CTX=16384`, bge-m3, chunk_chars
+2000, concurrency 4): 36 RO outcomes, 7 edges, 128 gaps, 13 min/cycle.
+
 ## Recommended next interactive cycles
 
 1. Prompt: pin output language to the source document; re-extract (only

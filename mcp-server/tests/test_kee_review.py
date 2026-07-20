@@ -110,6 +110,30 @@ def test_export_hashes_survive_shorter_alias(tmp_path):
         wg.close()
 
 
+def test_duplicate_parked_relations_dedupe_and_save(tmp_path):
+    # Law-ro pilot cycle 5 regression: a model emitting the same ungroundable
+    # relation twice in one chunk produced duplicate parked rows, the store's
+    # PRIMARY KEY aborted the save, and the whole extraction was lost.
+    from grap_mcp.kee.embeddings import HashingEmbedder
+    from grap_mcp.kee.working_graph import WorkingGraph
+
+    wg = WorkingGraph.open(str(tmp_path / "wd"), HashingEmbedder(dim=64))
+    try:
+        rel = {"from": "Ghost A", "type": "reglementeaza", "to": "Ghost B"}
+        wg.upsert_fragment({"outcomes": [{"name": "Concept Real",
+                                          "characteristics": ["ceva"]}],
+                            "relations": [rel, dict(rel)]}, "doc#0")
+        assert len(wg.parked) == 1                    # deduped at park time
+        wg.save()                                     # and the save survives
+    finally:
+        wg.close()
+    wg2 = WorkingGraph.open(str(tmp_path / "wd"), HashingEmbedder(dim=64))
+    try:
+        assert len(wg2.parked) == 1
+    finally:
+        wg2.close()
+
+
 def test_adopt_refuses_zero_outcome_document(tmp_path, monkeypatch):
     # An empty "ontology" (disputed report, malformed record) would pass hash
     # verification trivially, project nothing, and silently deactivate gap

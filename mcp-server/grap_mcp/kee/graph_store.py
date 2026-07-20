@@ -90,7 +90,9 @@ class GraphStore:
                           [(cid, txt, ch) for (cid, txt), chs in state.char_sources.items() for ch in chs])
             c.executemany("INSERT INTO edge_sources(from_id, to_id, chunk_id) VALUES (?,?,?)",
                           [(f, t, ch) for (f, t), chs in state.edge_sources.items() for ch in chs])
-            c.executemany("INSERT INTO parked(from_concept, type, to_concept, chunk_id, reason) VALUES (?,?,?,?,?)",
+            # OR IGNORE: the working graph dedupes parked entries, but a save
+            # must never lose an entire extraction over a duplicate row.
+            c.executemany("INSERT OR IGNORE INTO parked(from_concept, type, to_concept, chunk_id, reason) VALUES (?,?,?,?,?)",
                           [(p["from"], p["type"], p["to"], p["chunk_id"], p["reason"]) for p in state.parked])
             c.execute("INSERT INTO meta(key, value) VALUES ('rel_vocab', ?)",
                       (json.dumps(state.rel_vocab),))

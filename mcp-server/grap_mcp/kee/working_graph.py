@@ -217,14 +217,12 @@ class WorkingGraph:
             fn = self._resolve_endpoint(f, fragment_nodes)
             tn = self._resolve_endpoint(t, fragment_nodes)
             if fn is None or tn is None:
-                self.parked.append({"from": f, "type": ty, "to": t,
-                                    "source": source, "reason": "ungrounded"})
+                self._park(f, ty, t, source, "ungrounded")
                 continue
             key = (fn, tn)
             existing = self._edge_types.get(key)
             if existing is not None and existing != ty:
-                self.parked.append({"from": f, "type": ty, "to": t,
-                                    "source": source, "reason": "conflict"})
+                self._park(f, ty, t, source, "conflict")
                 sig.conflicts.append({"kind": "relation",
                                       "names": [f, t], "type": ty})
                 continue
@@ -283,6 +281,17 @@ class WorkingGraph:
             if not srcs:
                 self._retract_concept(node)
         self.parked = [p for p in self.parked if p.get("source") != chunk_id]
+
+    def _park(self, f: str, ty: str, t: str, source: str, reason: str) -> None:
+        """Park a relation once per (from, type, to, chunk). The store's
+        primary key rejects duplicates at save time — and a duplicate used to
+        abort the save and lose the whole extraction (law-ro pilot cycle 5:
+        a model emitting the same ungroundable relation twice in one chunk)."""
+        for p in self.parked:
+            if (p["from"], p["type"], p["to"], p.get("source")) == (f, ty, t, source):
+                return
+        self.parked.append({"from": f, "type": ty, "to": t,
+                            "source": source, "reason": reason})
 
     def _remove_edge(self, fn: int, tn: int, ty: str) -> None:
         self._edge_types.pop((fn, tn), None)
