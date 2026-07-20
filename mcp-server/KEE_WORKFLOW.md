@@ -165,7 +165,17 @@ and auto-accepts only their **agreement set** — intersected characteristics,
 conservative provenance counts — while the disagreement residue is published
 as a `disputed` proposal for review (`model_disagreement` alarm, clears when
 the models converge). Humans review the residue, not the ontology.
-See `docs/dark-factory-proposals.md` for Phase 4 (LLM-drafted PG patches).
+
+### The last human act becomes an approval click (Phase 4)
+
+With `set_policy("pg_draft_enabled", True, rationale)`, every kept adoption
+triggers `draft_pg_patch`: the local LLM drafts the PG update covering the
+new ontology, deterministic coverage rules reject drafts that miss required
+outcomes / keep orphaned references / drop valid ones, publish validation
+gates the rest, and the surviving draft lands at level=draft in the queue
+(`pg_draft_pending`) — reviewed with its recorded diff + validation report
+and accepted with one `promote_pg(hash, rationale)`. All four roadmap phases
+of `docs/dark-factory-proposals.md` are now implemented.
 
 ## Verified reference runs
 

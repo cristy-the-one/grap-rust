@@ -29,6 +29,9 @@ DEFAULT_ADOPTION_POLICY: Dict[str, Any] = {
     # budgeted new gaps vs the production baseline.
     "canary_enabled": False,
     "canary_max_new_gaps": 0,
+    # Phase 4: after a kept adoption, LLM-draft a PG patch covering the new
+    # ontology (machine-checked, published at level=draft, human promotes).
+    "pg_draft_enabled": False,
 }
 
 

@@ -478,6 +478,18 @@ def _publish_and_gate_proposal(yaml_text: str, source: str, provider_name: str,
             if auto_adoption["adopted"] and policy.get("canary_enabled"):
                 auto_adoption.update(
                     _run_canary(ws, prev_version, version.hash, policy))
+            # Phase 4: on a kept adoption (canary passed/skipped/off), draft a
+            # PG patch so the human's remaining act is an approval click.
+            if (auto_adoption.get("adopted") and policy.get("pg_draft_enabled")
+                    and auto_adoption.get("canary") in (None, "passed", "skipped")
+                    and _state.pg is not None):
+                d = draft_pg_patch()
+                auto_adoption["pg_draft"] = {
+                    "status": d.get("status"),
+                    "draft_version_hash": d.get("draft_version_hash"),
+                    "uncovered": d.get("uncovered"),
+                    "orphaned": d.get("orphaned"),
+                    "note": d.get("note") or d.get("message")}
         else:
             if _state.kg is None:
                 failed.append("no_kg_loaded")
@@ -553,6 +565,89 @@ def extract_ontology(path: str, out_path: str = None, sim: float = 0.86,
         }
     except Exception as e:
         logger.exception("extract_ontology failed")
+        return {"status": "error", "message": str(e)}
+
+
+@tiered
+def draft_pg_patch(model: str = None) -> dict:
+    """LLM-draft an updated Procedure Graph covering the active ontology.
+
+    Computes the coverage delta (active-ontology outcomes the loaded PG does
+    not reference; PG references to outcomes no longer in the ontology), asks
+    the configured local LLM to draft the updated YAML, then machine-checks
+    it: deterministic coverage rules (must add every uncovered outcome, drop
+    every orphaned one, keep everything still valid) plus publish validation.
+    A passing draft is published at level=draft with its validation report
+    recorded, and waits in the exception queue (kind pg_draft_pending) for a
+    one-click promote_pg. The machine authors and verifies; the human decides."""
+    denied = _require("operator")
+    if denied:
+        return denied
+    pg = _state.pg
+    if not pg or not getattr(pg, "source_path", None):
+        return {"status": "error", "message": "Load a Procedure Graph (from a file) first."}
+    ws = _get_workspace()
+    active = _active_ontology_dict(ws)
+    if not active:
+        return {"status": "error", "message": "No active ontology to cover."}
+    try:
+        from . import pg_patch
+        onto_out = [o for o in active.get("process_outcomes", []) if isinstance(o, dict)]
+        onto_ids = {o.get("id") for o in onto_out}
+        pg_ids = pg_patch.referenced_outcome_ids(pg)
+        uncovered_ids = sorted(onto_ids - pg_ids)
+        orphaned = sorted(pg_ids - onto_ids)
+        if not uncovered_ids and not orphaned:
+            return {"status": "ok", "note": "PG already covers the active ontology",
+                    "uncovered": [], "orphaned": [], "draft_version_hash": None}
+        uncovered = [o for o in onto_out if o.get("id") in set(uncovered_ids)]
+        pg_yaml = open(pg.source_path, "r", encoding="utf-8").read()
+        provider = get_provider(model=model)
+        raw = pg_patch.strip_fences(provider.complete(
+            pg_patch.SYSTEM_PROMPT,
+            pg_patch.build_user_prompt(pg_yaml, uncovered, orphaned)))
+
+        def _fail(reason: str) -> dict:
+            try:
+                ws.record_event("pg_draft_result", f"result=failed;reason={reason[:80]}")
+            except Exception:
+                pass
+            return {"status": "error", "message": f"draft rejected: {reason}",
+                    "uncovered": uncovered_ids, "orphaned": orphaned}
+
+        try:
+            draft = pg_loader.load_from_string(raw)
+        except Exception as e:
+            return _fail(f"unparseable YAML ({e})")
+        violations = pg_patch.coverage_violations(
+            draft, pg_ids, set(uncovered_ids), set(orphaned))
+        if violations:
+            return _fail("; ".join(violations))
+        report = validate_for_publish(draft, _state.kg, _state.ontology)
+        if report["errors"]:
+            return _fail(f"publish validation errors: {report['errors']}")
+
+        version = ws.publish_pg(
+            raw, level="draft",
+            rationale="LLM-drafted PG patch (machine-checked; awaiting human promotion)",
+            metadata={"name": draft.name, "drafted_by": "llm",
+                      "covers": ",".join(uncovered_ids),
+                      "removes": ",".join(orphaned)})
+        report["ontology_version"] = getattr(_state, "ontology_version", None)
+        ws.record_validation(version.hash, json.dumps(report), report["ok"])
+        try:
+            ws.record_event("pg_draft_result",
+                            f"result=ok;version={version.hash};"
+                            f"covers={len(uncovered_ids)};removes={len(orphaned)}")
+        except Exception:
+            logger.warning("audit record_event failed for pg_draft_result", exc_info=True)
+        return {"status": "ok", "draft_version_hash": version.hash,
+                "uncovered": uncovered_ids, "orphaned": orphaned,
+                "validation": report, "diff": diff_pg(pg, draft),
+                "note": ("Draft published (level=draft). Review the diff, then "
+                         "promote_pg(draft_version_hash, rationale) to accept.")}
+    except Exception as e:
+        logger.exception("draft_pg_patch failed")
         return {"status": "error", "message": str(e)}
 
 
@@ -969,7 +1064,7 @@ def set_policy(key: str, value, rationale: str) -> dict:
                 "message": f"unknown policy key '{key}' "
                            f"(valid: {sorted(governance.DEFAULT_ADOPTION_POLICY)})"}
     try:
-        if key in ("enabled", "canary_enabled"):
+        if key in ("enabled", "canary_enabled", "pg_draft_enabled"):
             value = bool(value)
         else:
             value = int(value)
@@ -1076,6 +1171,19 @@ def list_pending_interventions(limit: int = None, cursor: str = None) -> dict:
                 items.append({"kind": "model_disagreement", "subject": ev.subject,
                               "ts": ev.ts,
                               "age_s": max(0, round((now_ms - ev.ts) / 1000))})
+        # LLM-drafted PG patches: pending until a human promotes them
+        promoted_pg = {e.subject for e in (ws.query_events("version_promoted") or [])}
+        for e in ws.query_events("pg_draft_result") or []:
+            kv = _kv_subject(e.subject)
+            if (kv.get("result") == "ok" and kv.get("version")
+                    and kv["version"] not in promoted_pg):
+                items.append({"kind": "pg_draft_pending", "subject": e.subject,
+                              "ts": e.ts,
+                              "age_s": max(0, round((now_ms - e.ts) / 1000))})
+        ev = _latest_event(ws, "pg_draft_result")
+        if ev and _kv_subject(ev.subject).get("result") == "failed":
+            items.append({"kind": "pg_draft_failed", "subject": ev.subject,
+                          "ts": ev.ts, "age_s": max(0, round((now_ms - ev.ts) / 1000))})
         items.sort(key=lambda i: i["ts"])
         page, meta = paginate(items, limit, cursor)
         return {"status": "ok", "pending": page, "count": len(page), **meta,
@@ -1189,7 +1297,7 @@ def get_factory_status() -> dict:
             alarms.append(f"gap spike: {trend[-2]['gaps']} -> {trend[-1]['gaps']}")
         for i in (queue.get("pending") or []):
             if i["kind"] in ("integrity_alarm", "maintenance_failed",
-                             "gap_regression", "canary_failed"):
+                             "gap_regression", "canary_failed", "pg_draft_failed"):
                 alarms.append(f"{i['kind']}: {i['subject']}")
         status = {
             "status": "ok",
@@ -2781,7 +2889,7 @@ def list_capabilities() -> dict:
                           "get_blast_radius", "find_cycles", "find_orphans", "kg_health",
                           "get_context_bundle",
                           "resolve_entity", "register_alias", "aliases_for_node", "reindex_entities"],
-            "pg_lifecycle": ["load_procedure_graph", "publish_pg", "promote_pg",
+            "pg_lifecycle": ["load_procedure_graph", "draft_pg_patch", "publish_pg", "promote_pg",
                              "activate", "set_production", "get_production", "list_versions"],
             "execution_reasoning": ["run_procedure", "detect_gaps", "get_explanation"],
             "experimentation": ["run_experiment", "get_quality_metrics", "adopt_experiment"],

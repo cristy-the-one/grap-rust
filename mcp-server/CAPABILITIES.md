@@ -63,6 +63,12 @@ for the full four-graph improvement loop and local-LLM setup.)
 
 ## Procedure Graph Lifecycle
 - **load_procedure_graph(path)** → `{status, name, version, step_count, projection}`. Emits `pg_loaded`.
+- **draft_pg_patch(model=None)** → LLM-drafts an updated PG covering the active ontology's
+  coverage delta, then machine-checks it (deterministic coverage rules + publish validation)
+  and publishes it at level=draft with the validation report recorded. Waits in the queue
+  (kind `pg_draft_pending`) for a one-click `promote_pg`; rejected drafts raise a
+  self-clearing `pg_draft_failed` alarm. Auto-triggers after kept adoptions when
+  `set_policy("pg_draft_enabled", True, ...)`. The machine authors and verifies; the human decides.
 - **publish_pg(level="draft", rationale=None)** → `{status, version_hash, level}`. Emits `version_published`.
 - **promote_pg(version_hash, rationale)** → `{status, level}`. Emits `version_promoted`.
 - **activate(activation_id, version_hash, weights=None, set_as_production=False, kg_version=None)**

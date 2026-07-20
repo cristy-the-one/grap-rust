@@ -13,8 +13,11 @@ the factory; humans handle a short exception queue"* — intervention that is
 > (`canary_enabled`/`canary_max_new_gaps`, quarantined experiment + automatic
 > rollback, `canary_result` events) and P-5 n-version extraction
 > (`extract_ontology_nversion`, `governance.agreement_merge`, disputed
-> proposals + `model_disagreement` alarm). See `mcp-server/KEE_WORKFLOW.md`.
-> Phase 4 (P-10 LLM-drafted PG patches) remains a proposal.
+> proposals + `model_disagreement` alarm). Phase 4: P-10 `draft_pg_patch`
+> (LLM-drafted, machine-checked PG patches published at level=draft;
+> `pg_draft_pending`/`pg_draft_failed` queue kinds; `pg_draft_enabled`
+> auto-trigger after kept adoptions). **The full roadmap is implemented.**
+> See `mcp-server/KEE_WORKFLOW.md`.
 
 The governing idea is **management by exception**. The current philosophy ("the
 LLM proposes, a human adopts") stays intact — but "a human adopts" is replaced
