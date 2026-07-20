@@ -13,7 +13,7 @@ import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from .ingest import chunk_text, _EXTS
+from .ingest import _ALL_EXTS, chunk_text, read_document
 
 logger = logging.getLogger(__name__)
 
@@ -54,7 +54,7 @@ def _files_under(root: str) -> List[Path]:
     if p.is_file():
         return [p]
     if p.is_dir():
-        return sorted(f for f in p.rglob("*") if f.suffix.lower() in _EXTS)
+        return sorted(f for f in p.rglob("*") if f.suffix.lower() in _ALL_EXTS)
     raise FileNotFoundError(f"ingest path not found: {root}")
 
 
@@ -71,9 +71,8 @@ def ingest_incremental(kg, root: str, embedder=None,
     for f in files_list:
         key = str(f.resolve())
         visited.add(key)
-        try:
-            text = f.read_text(encoding="utf-8")
-        except OSError:
+        text = read_document(f)
+        if text is None:
             continue
         chunks = chunk_text(text)
         new_by_hash: Dict[str, str] = {chunk_hash(c): c for c in chunks}

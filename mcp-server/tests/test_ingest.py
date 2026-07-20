@@ -35,6 +35,48 @@ def test_ingest_paths_reads_md_files(tmp_path):
     assert all(lbl.startswith("doc:") for (_t, lbl) in kg.nodes)
 
 
+def test_ingest_paths_reads_law_json(tmp_path):
+    # Law-ro pilot finding 13: the corpus was .json (titlu + text_complet) and
+    # evidence ingestion silently matched zero files — gap detection then ran
+    # against an empty KG for seven tuning cycles. Evidence ingestion must read
+    # the same JSON text the KEE extraction side reads.
+    import json
+    (tmp_path / "act.json").write_text(json.dumps({
+        "id": "145", "titlu": "Legea asigurarilor sociale",
+        "text_complet": "Contributiile se colecteaza de Ministerul Finantelor.",
+    }), encoding="utf-8")
+    kg = FakeKG()
+    res = ingest_paths(kg, str(tmp_path))
+    assert res["files"] == 1 and res["nodes_added"] >= 1
+    all_text = " ".join(t for (t, _l) in kg.nodes)
+    assert "Ministerul Finantelor" in all_text
+    assert "text_complet" not in all_text        # extracted, not raw JSON
+
+
+def test_ingest_incremental_reads_law_json(tmp_path):
+    import json
+    from grap_mcp.incremental import ingest_incremental
+
+    class RemovableKG(FakeKG):
+        def remove_node(self, nid):
+            pass
+
+    (tmp_path / "docs").mkdir()
+    (tmp_path / "docs" / "act.json").write_text(json.dumps({
+        "id": "72", "titlu": "Ordonanta de urgenta",
+        "text_complet": "Contractul-cadru va fi elaborat pana la 15 februarie 1999.",
+    }), encoding="utf-8")
+    kg = RemovableKG()
+    res = ingest_incremental(kg, str(tmp_path / "docs"),
+                             manifest_path=str(tmp_path / "manifest.json"))
+    assert res["files"] == 1 and res["nodes_added"] >= 1
+    assert any("Contractul-cadru" in t for (t, _l) in kg.nodes)
+    # unchanged corpus re-ingest: manifest skips everything
+    res2 = ingest_incremental(kg, str(tmp_path / "docs"),
+                              manifest_path=str(tmp_path / "manifest.json"))
+    assert res2["nodes_added"] == 0 and res2["skipped"] >= 1
+
+
 import os
 
 

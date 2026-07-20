@@ -1275,6 +1275,13 @@ def list_pending_interventions(limit: int = None, cursor: str = None) -> dict:
         if ev and int(_kv_subject(ev.subject).get("mismatch", 0) or 0) > 0:
             items.append({"kind": "integrity_alarm", "subject": ev.subject,
                           "ts": ev.ts, "age_s": max(0, round((now_ms - ev.ts) / 1000))})
+        ev = _latest_event(ws, "evidence_ingest")
+        if ev:
+            kv = _kv_subject(ev.subject)
+            if int(kv.get("dirs", 0) or 0) > 0 and int(kv.get("files", -1) or 0) == 0:
+                items.append({"kind": "evidence_empty", "subject": ev.subject,
+                              "ts": ev.ts,
+                              "age_s": max(0, round((now_ms - ev.ts) / 1000))})
         ev = _latest_event(ws, "gap_delta")
         if ev and int(_kv_subject(ev.subject).get("new", 0) or 0) > 0:
             items.append({"kind": "gap_regression", "subject": ev.subject,
@@ -1482,10 +1489,25 @@ def run_pipeline(config_path: str = "pipeline.json") -> dict:
         for d in cfg.get("evidence_dirs") or []:
             rr = reingest_documents(d)
             ingested.append({"path": d, "status": rr.get("status"),
+                             "files": rr.get("files"),
                              "nodes_added": rr.get("nodes_added"),
                              "nodes_removed": rr.get("nodes_removed"),
                              "skipped": rr.get("skipped")})
         report["steps"]["evidence"] = ingested
+        if ingested:
+            # Latest-state alarm feed: gap detection against a KG that holds
+            # zero evidence silently reports every characteristic as a gap
+            # (law-ro pilot finding 13 — the corpus was .json, the ingester
+            # only took .md/.txt, and seven tuning cycles scored nothing).
+            # files=0 across all configured dirs must surface in the queue.
+            total_files = sum(int(e.get("files") or 0) for e in ingested)
+            try:
+                _get_workspace().record_event(
+                    "evidence_ingest",
+                    f"files={total_files};dirs={len(ingested)}")
+            except Exception:
+                logger.warning("audit record_event failed for evidence_ingest",
+                               exc_info=True)
 
         ext = cfg.get("extract") or {}
         if ext.get("docs_path"):

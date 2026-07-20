@@ -102,6 +102,33 @@ def test_run_pipeline_end_to_end_and_idempotent(tmp_path, monkeypatch):
     assert (tmp_path / "ws" / "factory_pulse.json").exists()
 
 
+def test_empty_evidence_surfaces_and_clears(tmp_path, monkeypatch):
+    # Law-ro pilot finding 13: evidence_dirs that match zero files must not
+    # pass silently — gap detection against an empty KG reports every
+    # characteristic as a gap while the factory claims HEALTHY.
+    s = _server(tmp_path, monkeypatch)
+    assert s.set_policy("enabled", True, rationale="factory on")["status"] == "ok"
+    _stub_extraction(s, monkeypatch)
+    cfg_path = _pipeline_cfg(tmp_path)
+    evidence = tmp_path / "evidence"
+    (evidence / "req.md").unlink()               # nothing ingestible left
+
+    r1 = s.run_pipeline(cfg_path)
+    assert r1["steps"]["evidence"][0]["files"] == 0
+    q = s.list_pending_interventions()
+    assert any(i["kind"] == "evidence_empty" for i in q["pending"])
+    assert s.get_factory_status()["healthy"] is False
+
+    # evidence appears -> the next run clears the alarm (latest-state semantics)
+    (evidence / "req.md").write_text(
+        "The verification method is specified for each requirement.",
+        encoding="utf-8")
+    r2 = s.run_pipeline(cfg_path)
+    assert r2["steps"]["evidence"][0]["files"] == 1
+    assert not any(i["kind"] == "evidence_empty"
+                   for i in s.list_pending_interventions()["pending"])
+
+
 def test_gap_regression_surfaces_and_clears(tmp_path, monkeypatch):
     s = _server(tmp_path, monkeypatch)
     ws = s._get_workspace()

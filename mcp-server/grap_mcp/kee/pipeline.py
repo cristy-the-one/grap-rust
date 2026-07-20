@@ -13,27 +13,10 @@ import json
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-from ..ingest import _EXTS, chunk_text
+# _text_and_label_from_json lives in ..ingest so evidence ingestion and KEE
+# extraction read the SAME text for the same file (law-ro pilot finding 13).
+from ..ingest import _EXTS, _text_and_label_from_json, chunk_text
 from . import extract, reconcile
-
-
-def _text_and_label_from_json(obj: Any, stem: str) -> Tuple[str, str]:
-    """Extract (text, label) from a parsed JSON document.
-
-    Law-aware (titlu + text_complet, the Romanian-legal-acts schema), with a
-    generic fallback (common text fields, else all string values joined)."""
-    if isinstance(obj, dict):
-        label = (str(obj.get("id")).strip() if obj.get("id") not in (None, "") else stem)
-        title = str(obj.get("titlu") or "").strip()
-        body = str(obj.get("text_complet") or obj.get("text")
-                   or obj.get("content") or obj.get("body") or "").strip()
-        if title or body:
-            return ((title + "\n\n" + body).strip(), label)
-        parts = [v.strip() for v in obj.values() if isinstance(v, str) and v.strip()]
-        return ("\n\n".join(parts), label)
-    if isinstance(obj, list):
-        return ("\n\n".join(_text_and_label_from_json(x, stem)[0] for x in obj), stem)
-    return (str(obj or ""), stem)
 
 
 def read_chunks(root: str, max_files: Optional[int] = None,
