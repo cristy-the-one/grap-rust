@@ -33,6 +33,15 @@ def build_user_prompt(pg_yaml: str, uncovered: List[dict], orphaned: List[str]) 
         for o in uncovered:
             chars = ", ".join(o.get("required_characteristics") or []) or "(none)"
             lines.append(f"- {o.get('id')}: {chars}")
+        # Small local models follow examples far better than prose rules:
+        # without this template they tend to drop the references field.
+        lines.append("")
+        lines.append("Add EXACTLY ONE step per outcome above, in this form "
+                     "(the references line is mandatory):")
+        first = uncovered[0].get("id")
+        lines.append(f"  - id: cover_{first}")
+        lines.append(f"    operation: ensure_{first}")
+        lines.append(f'    references: ["kg:aspice.process_outcome.{first}"]')
     if orphaned:
         lines.append("Outcome ids to remove references to (no longer in the ontology):")
         for oid in orphaned:
