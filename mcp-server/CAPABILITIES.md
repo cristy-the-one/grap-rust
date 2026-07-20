@@ -46,6 +46,15 @@ nobody. See `docs/dark-factory-proposals.md`.
   audited call (`maintenance_run` ok/failed).
 - **verify_graph(sample)** → core content-hash sweep over the current KG
   (`graph_verified checked=N;mismatch=M;unknown=U`).
+- **Canary** (`set_policy("canary_enabled", True, ...)`): every auto-adoption is
+  gap-checked as a quarantined experiment against the last production run; more than
+  `canary_max_new_gaps` new gaps → automatic `rollback_ontology` + `canary_failed`
+  alarm (clears on the next passing canary). Bootstrap adoptions skip the canary.
+- **extract_ontology_nversion(path, models=[a, b])** → run the KEE with two local
+  models sequentially, auto-accept only the **agreement set** (normal policy gate +
+  canary apply), publish the disagreement residue as a `disputed` proposal
+  (queue kind `model_disagreement`, clears when a later run agrees fully). Also
+  available in `run_pipeline` via `extract.models`.
 
 (`mcp-server/demo_kee.py` runs the whole extraction + review flow offline; see `KEE_WORKFLOW.md`
 for the full four-graph improvement loop and local-LLM setup.)

@@ -369,6 +369,70 @@ def reingest_documents(path: str) -> dict:
         return {"status": "error", "message": str(e)}
 
 
+def _canary_check(ws, adopted_hash: str) -> dict:
+    """Gap-detection canary for a just-adopted ontology.
+
+    Baseline = the most recent production run; the canary itself runs as a
+    quarantined experiment (excluded from quality metrics). Returns the
+    new-gap count vs baseline — conservatively huge on any failure — or a
+    bootstrap skip when no baseline exists."""
+    prod = ws.list_runs("production") or []
+    if not prod:
+        return {"skipped": "no production baseline"}
+    baseline = prod[-1].run_id
+    exp = _run_gap_detection("all", "experiment", {"canary_for": adopted_hash})
+    if not isinstance(exp, dict) or exp.get("status") != "ok":
+        return {"baseline_run": baseline, "canary_run": None,
+                "new_gaps": 10 ** 9, "detail": exp}
+    d = diff_runs(baseline, exp["run_id"])
+    return {"baseline_run": baseline, "canary_run": exp["run_id"],
+            "new_gaps": d["counts"]["new"] if d.get("status") == "ok" else 10 ** 9,
+            "detail": d.get("counts")}
+
+
+def _run_canary(ws, prev_version, adopted_hash: str, policy: dict) -> dict:
+    """Run the canary for a just-adopted ontology; over budget -> roll back to
+    prev_version. Records a single `canary_result` event (latest-state alarm
+    source). Returns fields merged into the auto_adoption report — the line
+    never blocks on a canary failure."""
+    c = _canary_check(ws, adopted_hash)
+    if c.get("skipped"):
+        try:
+            ws.record_event("canary_result",
+                            f"result=passed;new=0;to={adopted_hash};note=bootstrap")
+        except Exception:
+            pass
+        return {"canary": "skipped", "canary_note": c["skipped"]}
+    budget = int(policy.get("canary_max_new_gaps", 0))
+    if c["new_gaps"] > budget:
+        # A production baseline normally implies an ontology was active in
+        # this session (prev_version set); a fresh process over an old
+        # workspace can lack a rollback target — flag rather than crash.
+        rollback_status = "no_rollback_target"
+        if prev_version:
+            rb = rollback_ontology(
+                prev_version,
+                reason=f"canary: {c['new_gaps']} new gap(s) over budget {budget}")
+            rollback_status = rb.get("status", "?") if isinstance(rb, dict) else "?"
+        try:
+            ws.record_event("canary_result",
+                            f"result=failed;new={c['new_gaps']};"
+                            f"from={prev_version or ''};to={adopted_hash}")
+        except Exception:
+            pass
+        return {"canary": "failed", "new_gaps": c["new_gaps"],
+                "canary_run": c.get("canary_run"),
+                "rolled_back_to": prev_version,
+                "rollback_status": rollback_status}
+    try:
+        ws.record_event("canary_result",
+                        f"result=passed;new={c['new_gaps']};to={adopted_hash}")
+    except Exception:
+        pass
+    return {"canary": "passed", "new_gaps": c["new_gaps"],
+            "canary_run": c.get("canary_run")}
+
+
 def _publish_and_gate_proposal(yaml_text: str, source: str, provider_name: str,
                                embedder_name: str, outcomes_count: int):
     """Publish a candidate ontology as a *proposed* version, audit it, and —
@@ -403,6 +467,7 @@ def _publish_and_gate_proposal(yaml_text: str, source: str, provider_name: str,
             pg_referenced_ids=_pg_referenced_outcome_ids())
         failed = [c["name"] for c in verdict["checks"] if not c["ok"]]
         if verdict["pass"] and _state.kg is not None:
+            prev_version = getattr(_state, "ontology_version", None)
             auto_rationale = ("adoption_policy: all checks passed ("
                               + ", ".join(c["name"] for c in verdict["checks"]) + ")")
             adopt_res = _adopt_record(ws, _state.kg, version.hash, yaml_text,
@@ -410,6 +475,9 @@ def _publish_and_gate_proposal(yaml_text: str, source: str, provider_name: str,
             auto_adoption = {"attempted": True, "pass": True,
                              "adopted": adopt_res.get("status") == "ok",
                              "new_version_hash": adopt_res.get("new_version_hash")}
+            if auto_adoption["adopted"] and policy.get("canary_enabled"):
+                auto_adoption.update(
+                    _run_canary(ws, prev_version, version.hash, policy))
         else:
             if _state.kg is None:
                 failed.append("no_kg_loaded")
@@ -485,6 +553,83 @@ def extract_ontology(path: str, out_path: str = None, sim: float = 0.86,
         }
     except Exception as e:
         logger.exception("extract_ontology failed")
+        return {"status": "error", "message": str(e)}
+
+
+def _provider_from_spec(spec):
+    """Build an LLM provider from a pipeline model spec: a plain model name
+    (routed through the default provider factory) or a
+    {"base_url", "model", "extra_body"} dict for a specific local server."""
+    if isinstance(spec, dict):
+        from .kee import llm as kee_llm
+        return kee_llm.OpenAICompatProvider(base_url=spec.get("base_url"),
+                                            model=spec.get("model"),
+                                            extra_body=spec.get("extra_body"))
+    return get_provider(model=str(spec))
+
+
+@tiered
+def extract_ontology_nversion(path: str, models: list = None, sim: float = 0.86,
+                              max_files: int = None) -> dict:
+    """N-version extraction: run the KEE with two models **sequentially**,
+    auto-accept only the agreement set (the merged proposal goes through the
+    normal policy gate + canary), and publish the disagreement residue as a
+    `disputed` proposal for human review (exception-queue kind
+    model_disagreement, cleared when a later run agrees fully).
+
+    `models`: exactly two specs — a model name string, or
+    {"base_url", "model", "extra_body"} for a specific local server."""
+    denied = _require("operator")
+    if denied:
+        return denied
+    if not models or len(models) != 2:
+        return {"status": "error", "message": "provide exactly two model specs"}
+    try:
+        from .kee import pipeline as kee_pipeline
+        embedder = get_embedder()
+        ontos = []
+        for spec in models:                     # sequential on purpose: local
+            prov = _provider_from_spec(spec)    # models share one GPU
+            res = kee_pipeline.extract_ontology(path, prov, embedder,
+                                                sim=sim, max_files=max_files)
+            ontos.append(res["ontology"])
+        merged, disagreement = governance.agreement_merge(
+            ontos[0], ontos[1], embedder, sim)
+
+        import yaml as _yaml
+        header = ("# Agreement-set ontology from n-version extraction.\n"
+                  "# Only outcomes both models proposed; disputes are published "
+                  "separately for review.\n\n")
+        yaml_text = header + _yaml.safe_dump(merged, sort_keys=False,
+                                             allow_unicode=True,
+                                             default_flow_style=False)
+        version, auto = _publish_and_gate_proposal(
+            yaml_text, path, "nversion", getattr(embedder, "name", "?"),
+            len(merged.get("process_outcomes", [])))
+
+        ws = _get_workspace()
+        n_outcomes = (len(disagreement["outcomes_only_in_a"])
+                      + len(disagreement["outcomes_only_in_b"]))
+        n_chars = len(disagreement["disputed_characteristics"])
+        disputed_hash = None
+        if n_outcomes or n_chars:
+            disputed_hash = ws.publish_ontology(
+                _yaml.safe_dump(disagreement, sort_keys=False),
+                metadata={"kind": "disputed", "source": path}).hash
+        try:
+            ws.record_event("model_disagreement",
+                            f"outcomes={n_outcomes};disputed_chars={n_chars};"
+                            f"version={disputed_hash or ''}")
+        except Exception:
+            logger.warning("audit record_event failed for model_disagreement",
+                           exc_info=True)
+        return {"status": "ok", "version_hash": version.hash,
+                "auto_adoption": auto,
+                "agreed_outcomes": disagreement["agreed_outcomes"],
+                "disagreement": disagreement,
+                "disputed_version_hash": disputed_hash}
+    except Exception as e:
+        logger.exception("extract_ontology_nversion failed")
         return {"status": "error", "message": str(e)}
 
 
@@ -824,7 +969,7 @@ def set_policy(key: str, value, rationale: str) -> dict:
                 "message": f"unknown policy key '{key}' "
                            f"(valid: {sorted(governance.DEFAULT_ADOPTION_POLICY)})"}
     try:
-        if key == "enabled":
+        if key in ("enabled", "canary_enabled"):
             value = bool(value)
         else:
             value = int(value)
@@ -920,6 +1065,17 @@ def list_pending_interventions(limit: int = None, cursor: str = None) -> dict:
         if ev and int(_kv_subject(ev.subject).get("new", 0) or 0) > 0:
             items.append({"kind": "gap_regression", "subject": ev.subject,
                           "ts": ev.ts, "age_s": max(0, round((now_ms - ev.ts) / 1000))})
+        ev = _latest_event(ws, "canary_result")
+        if ev and _kv_subject(ev.subject).get("result") == "failed":
+            items.append({"kind": "canary_failed", "subject": ev.subject,
+                          "ts": ev.ts, "age_s": max(0, round((now_ms - ev.ts) / 1000))})
+        ev = _latest_event(ws, "model_disagreement")
+        if ev:
+            kv = _kv_subject(ev.subject)
+            if int(kv.get("outcomes", 0) or 0) + int(kv.get("disputed_chars", 0) or 0) > 0:
+                items.append({"kind": "model_disagreement", "subject": ev.subject,
+                              "ts": ev.ts,
+                              "age_s": max(0, round((now_ms - ev.ts) / 1000))})
         items.sort(key=lambda i: i["ts"])
         page, meta = paginate(items, limit, cursor)
         return {"status": "ok", "pending": page, "count": len(page), **meta,
@@ -1032,7 +1188,8 @@ def get_factory_status() -> dict:
                 and trend[-1]["gaps"] >= trend[-2]["gaps"] * 1.5):
             alarms.append(f"gap spike: {trend[-2]['gaps']} -> {trend[-1]['gaps']}")
         for i in (queue.get("pending") or []):
-            if i["kind"] in ("integrity_alarm", "maintenance_failed", "gap_regression"):
+            if i["kind"] in ("integrity_alarm", "maintenance_failed",
+                             "gap_regression", "canary_failed"):
                 alarms.append(f"{i['kind']}: {i['subject']}")
         status = {
             "status": "ok",
@@ -1119,6 +1276,19 @@ def run_pipeline(config_path: str = "pipeline.json") -> dict:
                     "added": out["added"], "changed": out["changed"],
                     "removed": out["removed"], "version_hash": version.hash,
                     "auto_adoption": auto}
+            elif ext.get("models"):
+                rr = extract_ontology_nversion(ext["docs_path"],
+                                               models=ext["models"],
+                                               sim=float(ext.get("sim", 0.86)),
+                                               max_files=ext.get("max_files"))
+                report["steps"]["extract"] = {
+                    "status": rr.get("status"), "mode": "n-version",
+                    "version_hash": rr.get("version_hash"),
+                    "auto_adoption": rr.get("auto_adoption"),
+                    "agreed_outcomes": rr.get("agreed_outcomes"),
+                    "disputed_version_hash": rr.get("disputed_version_hash")}
+                if rr.get("status") != "ok":
+                    report["status"] = "error"
             else:
                 rr = extract_ontology(ext["docs_path"],
                                       sim=float(ext.get("sim", 0.86)),
@@ -2603,6 +2773,7 @@ def list_capabilities() -> dict:
                           "ingest_documents", "reingest_documents", "extract_ontology",
                           "list_proposed_ontologies", "get_proposed_ontology",
                           "adopt_proposed_ontology", "evaluate_proposal",
+                          "extract_ontology_nversion",
                           "rollback_ontology", "diff_ontologies", "project_relations",
                           "open_extraction_graph", "extend_extraction_graph", "export_ontology",
                           "build_legal_graph", "legal_graph_from_relations",

@@ -150,8 +150,22 @@ failed maintenance, and integrity mismatches appear in
 `list_pending_interventions()` until the next healthy run clears them.
 `get_factory_status()` gives the one-call verdict (`healthy` = needs nobody)
 and writes `<ws_root>/factory_pulse.json` for dashboards or notifiers.
-See `docs/dark-factory-proposals.md` for Phases 3–4 (canary auto-promotion,
-n-version extraction).
+
+### Self-correcting adoption (Phase 3)
+
+With `set_policy("canary_enabled", True, rationale)`, every auto-adoption
+must *prove itself*: a quarantined experiment run is diffed against the last
+production baseline, and more than `canary_max_new_gaps` new gaps triggers an
+automatic, audited rollback (`canary_failed` alarm, cleared by the next
+passing canary). A wrong machine decision costs one revert, never an incident.
+
+For extraction trust, `extract.models: [specA, specB]` in the pipeline config
+(or `extract_ontology_nversion` directly) runs two local models sequentially
+and auto-accepts only their **agreement set** — intersected characteristics,
+conservative provenance counts — while the disagreement residue is published
+as a `disputed` proposal for review (`model_disagreement` alarm, clears when
+the models converge). Humans review the residue, not the ontology.
+See `docs/dark-factory-proposals.md` for Phase 4 (LLM-drafted PG patches).
 
 ## Verified reference runs
 

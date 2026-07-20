@@ -4,13 +4,17 @@ Goal: evolve the KEE loop from *"a human reviews everything"* to *"machines run
 the factory; humans handle a short exception queue"* — intervention that is
 **minimal and rare by design**, not by neglect.
 
-> **Status: Phases 1–2 implemented.** Phase 1: P-1 policy gate + auto-adoption,
+> **Status: Phases 1–3 implemented.** Phase 1: P-1 policy gate + auto-adoption,
 > P-2 `rollback_ontology`, `diff_ontologies`, `diff_runs`, P-6
 > `list_pending_interventions` (policy governed via `set_policy`). Phase 2:
 > P-8 `run_pipeline` + `run_factory.py --watch` (P-3 corpus watcher), P-7
 > `run_maintenance` + `verify_graph`, P-9 `get_factory_status` with gap-trend
-> alarms + `factory_pulse.json`. See `mcp-server/KEE_WORKFLOW.md`
-> § Dark-factory mode / Unattended operation. Phases 3–4 remain proposals.
+> alarms + `factory_pulse.json`. Phase 3: P-4 canary auto-promotion
+> (`canary_enabled`/`canary_max_new_gaps`, quarantined experiment + automatic
+> rollback, `canary_result` events) and P-5 n-version extraction
+> (`extract_ontology_nversion`, `governance.agreement_merge`, disputed
+> proposals + `model_disagreement` alarm). See `mcp-server/KEE_WORKFLOW.md`.
+> Phase 4 (P-10 LLM-drafted PG patches) remains a proposal.
 
 The governing idea is **management by exception**. The current philosophy ("the
 LLM proposes, a human adopts") stays intact — but "a human adopts" is replaced
