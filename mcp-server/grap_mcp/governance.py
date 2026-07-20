@@ -32,6 +32,9 @@ DEFAULT_ADOPTION_POLICY: Dict[str, Any] = {
     # Phase 4: after a kept adoption, LLM-draft a PG patch covering the new
     # ontology (machine-checked, published at level=draft, human promotes).
     "pg_draft_enabled": False,
+    # Phase 5: trivial (purely additive) machine-checked drafts self-promote
+    # through the validation-gated promote path; anything else stays queued.
+    "pg_autopromote_enabled": False,
 }
 
 
@@ -163,6 +166,18 @@ def evaluate_proposal_dict(proposal: dict, active: dict | None,
                        "detail": thin or f"all outcomes >= {min_chunks} source chunk(s)"})
 
     return {"pass": all(c["ok"] for c in checks), "checks": checks, "diff": diff}
+
+
+def pg_draft_is_trivial(pg_diff: dict) -> bool:
+    """A PG draft is 'trivial' — safe to auto-promote through the
+    validation-gated promote path — when it is purely additive: at least one
+    step added, nothing removed, nothing changed, and at most a version bump
+    in the metadata. Anything touching existing process logic stays a human
+    decision."""
+    if pg_diff.get("steps_removed") or pg_diff.get("steps_changed"):
+        return False
+    meta = set((pg_diff.get("metadata_changed") or {}).keys())
+    return bool(pg_diff.get("steps_added")) and meta <= {"version"}
 
 
 # ---- n-version extraction (Phase 3, P-5) -----------------------------------

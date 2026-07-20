@@ -641,10 +641,25 @@ def draft_pg_patch(model: str = None) -> dict:
                             f"covers={len(uncovered_ids)};removes={len(orphaned)}")
         except Exception:
             logger.warning("audit record_event failed for pg_draft_result", exc_info=True)
+
+        pdiff = diff_pg(pg, draft)
+        # Phase 5: purely additive drafts may self-promote through the same
+        # validation-gated path a human would use; anything touching existing
+        # process logic stays a human decision in the queue.
+        auto_promoted = False
+        pol = governance.merged_policy(config_store.load_config(_resolve_ws_root()))
+        if pol.get("pg_autopromote_enabled") and governance.pg_draft_is_trivial(pdiff):
+            pr = promote_pg(version.hash,
+                            rationale="auto-promoted: trivial additive draft "
+                                      "(machine-checked coverage + validation)")
+            auto_promoted = isinstance(pr, dict) and pr.get("status") == "ok"
         return {"status": "ok", "draft_version_hash": version.hash,
                 "uncovered": uncovered_ids, "orphaned": orphaned,
-                "validation": report, "diff": diff_pg(pg, draft),
-                "note": ("Draft published (level=draft). Review the diff, then "
+                "validation": report, "diff": pdiff,
+                "auto_promoted": auto_promoted,
+                "note": ("Draft auto-promoted (trivial additive change)."
+                         if auto_promoted else
+                         "Draft published (level=draft). Review the diff, then "
                          "promote_pg(draft_version_hash, rationale) to accept.")}
     except Exception as e:
         logger.exception("draft_pg_patch failed")
@@ -1064,7 +1079,8 @@ def set_policy(key: str, value, rationale: str) -> dict:
                 "message": f"unknown policy key '{key}' "
                            f"(valid: {sorted(governance.DEFAULT_ADOPTION_POLICY)})"}
     try:
-        if key in ("enabled", "canary_enabled", "pg_draft_enabled"):
+        if key in ("enabled", "canary_enabled", "pg_draft_enabled",
+                   "pg_autopromote_enabled"):
             value = bool(value)
         else:
             value = int(value)
@@ -1351,6 +1367,13 @@ def run_pipeline(config_path: str = "pipeline.json") -> dict:
         if r.get("status") != "ok":
             report["status"] = "error"
             return report
+
+        # Optional PG: loaded before extraction so churn checks see its
+        # references and pg_draft auto-triggering has a PG to patch.
+        if cfg.get("pg_path"):
+            rp = load_procedure_graph(cfg["pg_path"])
+            report["steps"]["pg"] = {"status": rp.get("status"),
+                                     "name": rp.get("name")}
 
         ingested = []
         for d in cfg.get("evidence_dirs") or []:

@@ -16,7 +16,11 @@ the factory; humans handle a short exception queue"* — intervention that is
 > proposals + `model_disagreement` alarm). Phase 4: P-10 `draft_pg_patch`
 > (LLM-drafted, machine-checked PG patches published at level=draft;
 > `pg_draft_pending`/`pg_draft_failed` queue kinds; `pg_draft_enabled`
-> auto-trigger after kept adoptions). **The full roadmap is implemented.**
+> auto-trigger after kept adoptions). Phase 5 (beyond the original roadmap):
+> `pg_autopromote_enabled` — trivial purely-additive PG drafts self-promote
+> through the validation gate; `run_pipeline` carries the PG (`pg_path`); the
+> lights-out soak test runs two full cycles with every policy on and ends
+> healthy with an empty queue. **The full roadmap is implemented.**
 > See `mcp-server/KEE_WORKFLOW.md`.
 
 The governing idea is **management by exception**. The current philosophy ("the

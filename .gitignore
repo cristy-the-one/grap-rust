@@ -131,3 +131,5 @@ grap-workspace/
 mcp-server/grap-workspace/
 out/
 terminals/
+/mcps
+/portable-kee-demo

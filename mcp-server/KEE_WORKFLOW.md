@@ -174,8 +174,16 @@ new ontology, deterministic coverage rules reject drafts that miss required
 outcomes / keep orphaned references / drop valid ones, publish validation
 gates the rest, and the surviving draft lands at level=draft in the queue
 (`pg_draft_pending`) — reviewed with its recorded diff + validation report
-and accepted with one `promote_pg(hash, rationale)`. All four roadmap phases
-of `docs/dark-factory-proposals.md` are now implemented.
+and accepted with one `promote_pg(hash, rationale)`.
+
+Phase 5 closes the loop: with `pg_autopromote_enabled`, **purely additive**
+drafts (steps added, nothing removed or changed, at most a version bump)
+self-promote through the same validation gate — modifications to existing
+process logic always stay queued for a human. Give `run_pipeline` a
+`pg_path` and the entire line runs lights-out; the soak test
+(`test_phase5.py::test_lights_out_two_runs_zero_humans`) proves two full
+cycles with every policy on end with a healthy factory and an empty queue.
+All phases of `docs/dark-factory-proposals.md` are implemented.
 
 ## Verified reference runs
 
