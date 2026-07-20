@@ -88,9 +88,15 @@ impl RunStore {
         Ok(Some(serde_json::from_slice(&fs::read(path)?)?))
     }
 
-    /// List all run records.
+    /// List all run records, oldest first.
+    ///
+    /// `read_dir` yields filesystem order — with random-hex run ids that is
+    /// effectively arbitrary, and consumers picking "the latest run" via
+    /// `list()[last]` compared random runs (law-ro pilot finding 14: a
+    /// 122→1 gap improvement was reported as 121 NEW gaps because the delta
+    /// paired the wrong runs). Chronological order is part of the contract.
     pub fn list(&self) -> Result<Vec<RunRecord>, LifecycleError> {
-        let mut out = Vec::new();
+        let mut out: Vec<RunRecord> = Vec::new();
         for entry in fs::read_dir(&self.base)? {
             let path = entry?.path();
             if path.extension().and_then(|e| e.to_str()) != Some("json") {
@@ -98,6 +104,11 @@ impl RunStore {
             }
             out.push(serde_json::from_slice(&fs::read(&path)?)?);
         }
+        out.sort_by(|a, b| {
+            a.started_at
+                .cmp(&b.started_at)
+                .then_with(|| a.run_id.cmp(&b.run_id))
+        });
         Ok(out)
     }
 
@@ -160,5 +171,22 @@ mod tests {
         store.put(&mk("run-2", RunKind::Experiment)).unwrap();
         assert_eq!(store.list().unwrap().len(), 2);
         assert_eq!(store.list_by_kind(RunKind::Experiment).unwrap().len(), 1);
+    }
+
+    #[test]
+    fn list_is_chronological_regardless_of_filename_order() {
+        // Law-ro pilot finding 14: read_dir yields name order, and with
+        // random-hex run ids "the latest run" was a random run — a 122→1 gap
+        // improvement got reported as 121 new gaps.
+        let dir = tempfile::tempdir().unwrap();
+        let store = RunStore::open(dir.path()).unwrap();
+        // Filename (id) order is the REVERSE of chronological order.
+        for (id, ts) in [("run-cc", 100), ("run-bb", 200), ("run-aa", 300)] {
+            let mut r = mk(id, RunKind::Production);
+            r.started_at = ts;
+            store.put(&r).unwrap();
+        }
+        let ids: Vec<String> = store.list().unwrap().into_iter().map(|r| r.run_id).collect();
+        assert_eq!(ids, vec!["run-cc", "run-bb", "run-aa"]);
     }
 }

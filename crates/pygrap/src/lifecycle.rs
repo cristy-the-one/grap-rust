@@ -148,6 +148,10 @@ pub struct RunRecord {
     pub status: String,
     /// Number of gaps found.
     pub gaps_found: u32,
+    /// Start time (unix millis) — the chronological sort key of list_runs.
+    pub started_at: u64,
+    /// Completion time (unix millis), once finished.
+    pub completed_at: Option<u64>,
     /// Frozen PG version hash, if any.
     pub pg_version: Option<String>,
     /// Frozen KG/ontology version hash, if any.
@@ -182,6 +186,8 @@ impl From<lc::RunRecord> for RunRecord {
             kind: kind.to_string(),
             status: status.to_string(),
             gaps_found: r.gaps_found,
+            started_at: r.started_at,
+            completed_at: r.completed_at,
             pg_version: r.pg_version.map(|h| h.to_string()),
             kg_version: r.kg_version.map(|h| h.to_string()),
             explanation_hashes: r
