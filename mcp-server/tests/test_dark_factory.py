@@ -141,6 +141,25 @@ def test_policy_rejection_lands_in_exception_queue(tmp_path, monkeypatch):
     assert s.list_pending_interventions()["count"] == 0
 
 
+def test_superseded_proposals_clear_from_queue(tmp_path, monkeypatch):
+    # A proposal rejected (or awaiting review) before a NEWER proposal was
+    # adopted is dead work, not pending work (law-ro pilot finding).
+    s = _server(tmp_path, monkeypatch, role="admin")
+    assert s.set_policy("enabled", True, rationale="on")["status"] == "ok"
+    assert s.set_policy("min_source_chunks", 99, rationale="force reject")["status"] == "ok"
+    _stub_extraction(s, monkeypatch)
+    res = s.extract_ontology(_docs(tmp_path))
+    assert res["auto_adoption"]["pass"] is False
+    assert s.list_pending_interventions()["count"] == 1      # rejected, pending
+
+    # a different, newer proposal gets adopted -> the old rejection is superseded
+    assert s.set_policy("min_source_chunks", 1, rationale="restore")["status"] == "ok"
+    v2 = _publish(s, _proposal_yaml("req_ver", "Requirement Verification",
+                                    "verification_method"))
+    assert s.adopt_proposed_ontology(v2, rationale="newer candidate")["status"] == "ok"
+    assert s.list_pending_interventions()["count"] == 0
+
+
 def test_proposals_await_review_when_policy_disabled(tmp_path, monkeypatch):
     s = _server(tmp_path, monkeypatch)
     _stub_extraction(s, monkeypatch)

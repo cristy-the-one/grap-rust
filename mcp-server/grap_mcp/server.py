@@ -1241,9 +1241,15 @@ def list_pending_interventions(limit: int = None, cursor: str = None) -> dict:
         for e in ws.query_events("ontology_adoption_rejected") or []:
             latest[e.subject] = (e.ts, "integrity_rejected")
         now_ms = int(time.time() * 1000)
+        # Superseded proposals clear (law-ro pilot finding): any proposal
+        # event older than the latest adoption lost the race to a newer
+        # candidate — it is dead work, not pending work.
+        adopt_events = ws.query_events("ontology_adopted") or []
+        last_adopt_ts = adopt_events[-1].ts if adopt_events else 0
         items = [{"kind": kind, "subject": subj, "ts": ts,
                   "age_s": max(0, round((now_ms - ts) / 1000))}
-                 for subj, (ts, kind) in latest.items() if subj not in adopted]
+                 for subj, (ts, kind) in latest.items()
+                 if subj not in adopted and ts > last_adopt_ts]
         wd = getattr(_state, "extraction_workdir", None)
         if wd:
             try:

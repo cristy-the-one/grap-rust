@@ -128,6 +128,18 @@ def test_extra_body_absent_and_invalid(monkeypatch):
     assert llm._extra_body_from_env() == {}
 
 
+def test_timeout_env_override(monkeypatch):
+    monkeypatch.delenv("GRAP_LLM_TIMEOUT", raising=False)
+    assert llm.OpenAICompatProvider(base_url="http://x/v1", model="m").timeout == 120.0
+    monkeypatch.setenv("GRAP_LLM_TIMEOUT", "300")
+    assert llm.OpenAICompatProvider(base_url="http://x/v1", model="m").timeout == 300.0
+    monkeypatch.setenv("GRAP_LLM_TIMEOUT", "nonsense")
+    assert llm.OpenAICompatProvider(base_url="http://x/v1", model="m").timeout == 120.0
+    # explicit ctor arg wins
+    assert llm.OpenAICompatProvider(base_url="http://x/v1", model="m",
+                                    timeout=17.0).timeout == 17.0
+
+
 def test_explicit_extra_body_wins_over_env(monkeypatch):
     monkeypatch.setenv("GRAP_LLM_EXTRA_BODY", '{"top_k": 1}')
     p = llm.OpenAICompatProvider(base_url="http://x/v1", model="m",

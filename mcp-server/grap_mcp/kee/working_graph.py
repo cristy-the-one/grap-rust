@@ -388,8 +388,14 @@ class WorkingGraph:
                 "description": f"{label} (proposed by extraction; review before promotion).",
                 "required_characteristics": char_tokens,
             })
+            # Hash the name actually being exported: _canonical_label may pick
+            # a (shorter) alias rather than the node's creation text, and the
+            # adoption gate's contract is "these names are exactly what
+            # extraction recorded" — verified as sha256(name). (Found by the
+            # law-ro pilot: multi-alias concepts made stored node hashes stale.)
             if node in self.concept_hashes:
-                outcome_hashes[oid] = self.concept_hashes[node]
+                outcome_hashes[oid] = hashlib.sha256(
+                    label.encode("utf-8")).hexdigest()
             mapping_hints.append({
                 "outcome": oid,
                 "indicators": [{"keywords": rc.keywords(label + " " + " ".join(raw_chars))}],

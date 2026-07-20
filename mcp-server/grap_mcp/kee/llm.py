@@ -89,11 +89,18 @@ class OpenAICompatProvider:
     name = "openai-compat"
 
     def __init__(self, base_url: Optional[str] = None, model: Optional[str] = None,
-                 api_key: Optional[str] = None, timeout: float = 120.0,
+                 api_key: Optional[str] = None, timeout: Optional[float] = None,
                  temperature: float = 0.0, extra_body: Optional[dict] = None) -> None:
         self.base_url = (base_url or os.environ.get("GRAP_LLM_BASE_URL", DEFAULT_BASE_URL)).rstrip("/")
         self.model = model or os.environ.get("GRAP_LLM_MODEL", DEFAULT_MODEL)
         self.api_key = api_key or os.environ.get("GRAP_LLM_API_KEY")
+        if timeout is None:
+            # Long legal/technical chunks on slow local hardware can exceed the
+            # old fixed 120s (law-ro pilot lost 6 chunks to it).
+            try:
+                timeout = float(os.environ.get("GRAP_LLM_TIMEOUT", "120"))
+            except ValueError:
+                timeout = 120.0
         self.timeout = timeout
         self.temperature = temperature
         self.extra_body = extra_body if extra_body is not None else _extra_body_from_env()

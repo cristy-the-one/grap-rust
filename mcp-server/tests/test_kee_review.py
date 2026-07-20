@@ -84,6 +84,32 @@ def test_adopt_rejects_hash_for_unknown_outcome(tmp_path, monkeypatch):
     assert any(m.get("outcome") == "ghost_outcome" for m in out["mismatches"])
 
 
+def test_export_hashes_survive_shorter_alias(tmp_path):
+    # Law-ro pilot regression: _canonical_label prefers the SHORTEST alias, so
+    # a concept that gains a shorter alias exported a name whose sha256 no
+    # longer matched the stored node-creation hash — the integrity gate then
+    # (correctly) refused adoption. Export must hash the exported name.
+    from grap_mcp.governance import verify_concept_hashes
+    from grap_mcp.kee.embeddings import HashingEmbedder
+    from grap_mcp.kee.working_graph import WorkingGraph
+
+    wg = WorkingGraph.open(str(tmp_path / "wd"), HashingEmbedder(dim=64))
+    try:
+        sig = wg.upsert_fragment(
+            {"outcomes": [{"name": "Legea Asigurarilor Sociale de Sanatate",
+                           "characteristics": ["contributii sociale"]}],
+             "relations": []}, "doc#0")
+        assert sig is not None
+        node = next(iter(wg.canonical))
+        wg._register_alias("Legea 145", node)          # shorter alias wins display
+        onto = wg.to_candidate_ontology()
+        assert onto["process_outcomes"][0]["name"] == "Legea 145"
+        checked, mismatches = verify_concept_hashes(onto)
+        assert checked == 1 and mismatches == []
+    finally:
+        wg.close()
+
+
 def test_adopt_refuses_zero_outcome_document(tmp_path, monkeypatch):
     # An empty "ontology" (disputed report, malformed record) would pass hash
     # verification trivially, project nothing, and silently deactivate gap
