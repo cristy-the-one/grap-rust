@@ -92,9 +92,26 @@ Additional findings:
     length — a scoring-side fix (diacritic transliteration in
     `reconcile.tokenize`) beats further prompt surgery.
 
-Best-known configuration after five cycles: **cycle 4** (language pin
-only, `GRAP_LLM_TIMEOUT=300`, `BONSAI_CTX=16384`, bge-m3, chunk_chars
-2000, concurrency 4): 36 RO outcomes, 7 edges, 128 gaps, 13 min/cycle.
+## Tuning cycle 6 (diacritic-aware scoring) — win, committed (`2a5a05f`)
+
+`reconcile.fold` (NFKD, combining marks stripped) applied on both sides
+of every lexical operation: tokenize, keywords, `_content_tokens`,
+`_covers`. Result vs cycle 4: **ids fully readable Romanian**
+(`termenilor_de_referinta`, formerly `referin`), gaps 128 → **122**,
+parked 54 → **47**, edges held at 7, 38 outcomes, 12.4 min.
+
+11. **Numeric tokens are unmatchable (open — cycle 7 target).**
+    `_covers` extracts evidence words with `[a-z]+`, dropping digits,
+    while characteristic tokens keep them (`15`, `1999`, `75`) — so every
+    date/percentage-bearing characteristic is a permanent gap. Same
+    structural class as the diacritics bug; fix is `[a-z0-9]+` on the
+    evidence side + tests. Legal text is date-laden, so this likely
+    outweighs cycle 6's own gap improvement.
+
+Best-known configuration after six cycles: **cycle 6** (language-pinned
+prompt + diacritic-folded scoring, `GRAP_LLM_TIMEOUT=300`,
+`BONSAI_CTX=16384`, bge-m3, chunk_chars 2000, concurrency 4):
+38 RO outcomes, 7 edges, 122 gaps, ~12 min/cycle.
 
 ## Recommended next interactive cycles
 
