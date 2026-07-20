@@ -65,7 +65,8 @@ AUG_SYSTEM = (
     "Ești auditor de conformitate. Trebuie să folosești unealta "
     "run_compliance_audit pentru a obține verdicte fundamentate ÎNAINTE de a "
     "răspunde. Citează probele. O cerință fără probe se raportează ca LIPSĂ — nu "
-    "ghici."
+    "ghici. Răspunde EXCLUSIV în limba română, indiferent de limba în care sunt "
+    "returnate datele din unealtă."
 )
 
 
@@ -86,10 +87,10 @@ def _summarize_report(report: dict) -> dict:
                    if c["satisfied"] and c["evidence_snippet"]), "")
         gapq = [q for c in r["characteristics"] if not c["satisfied"] for q in c["queries"]]
         reqs.append({
-            "requirement": r["name"],
-            "verdict": "SATISFIED" if r["satisfied"] else "GAP",
-            "evidence": ev,
-            "queries_that_found_nothing": gapq if not r["satisfied"] else [],
+            "cerinta": r["name"],
+            "verdict": "ÎNDEPLINITĂ" if r["satisfied"] else "LIPSEȘTE",
+            "proba": ev,
+            "interogari_fara_rezultat": gapq if not r["satisfied"] else [],
         })
     return {"summary": report["summary"], "requirements": reqs}
 
@@ -133,7 +134,8 @@ def main() -> int:
     print(f"model: {MODEL} @ {BASE_URL}")
     print(f"\nQUESTION:\n{QUESTION}")
 
-    audit_ctx = load_audit(str(ROOT / "pilot-law-ro" / "kg"),
+    kg_path = sys.argv[1] if len(sys.argv) > 1 else str(ROOT / "pilot-law-ro" / "kg")
+    audit_ctx = load_audit(kg_path,
                            str(HERE / "requirement-ontology.yaml"),
                            str(HERE / "audit.pg.yaml"))
 
