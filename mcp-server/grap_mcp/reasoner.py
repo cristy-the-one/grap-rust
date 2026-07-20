@@ -41,8 +41,10 @@ _STOPWORDS = {"a", "an", "the", "of", "for", "and", "or", "to", "in", "is",
 
 
 def _content_tokens(characteristic: str) -> List[str]:
-    """Distinguishing tokens of a characteristic id (snake_case -> words)."""
-    return [t for t in characteristic.replace("_", " ").lower().split()
+    """Distinguishing tokens of a characteristic id (snake_case -> words),
+    diacritic-folded so both sides of the coverage match normalize alike."""
+    from .kee.reconcile import fold
+    return [t for t in fold(characteristic).replace("_", " ").split()
             if t not in _STOPWORDS]
 
 
@@ -56,7 +58,8 @@ def _covers(text: str, characteristic: str) -> float:
     tokens = _content_tokens(characteristic)
     if not tokens:
         return 0.0
-    words = re.findall(r"[a-z]+", (text or "").lower())
+    from .kee.reconcile import fold
+    words = re.findall(r"[a-z]+", fold(text))
     present = 0
     for tok in tokens:
         if len(tok) < 4:

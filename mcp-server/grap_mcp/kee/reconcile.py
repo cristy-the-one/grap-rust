@@ -14,22 +14,31 @@ from __future__ import annotations
 import math
 import re
 import tempfile
+import unicodedata
 from typing import Any, Dict, List, Sequence, Tuple
 
 _STOP = {"the", "and", "for", "with", "from", "a", "an", "of", "to", "in",
          "on", "by", "or", "as", "is", "are", "be"}
 
 
+def fold(s: str) -> str:
+    """Lowercase + strip diacritics (NFKD, drop combining marks): Romanian
+    'referinţă' -> 'referinta'. Without this, the [^a-z0-9] tokenizer
+    truncated words at every diacritic (law-ro pilot finding 10), corrupting
+    outcome ids and lexical gap-matching alike."""
+    s = unicodedata.normalize("NFKD", str(s or "").lower())
+    return "".join(ch for ch in s if not unicodedata.combining(ch))
+
+
 def tokenize(s: str) -> str:
-    s = s.lower()
-    s = re.sub(r"[^a-z0-9]+", "_", s)
+    s = re.sub(r"[^a-z0-9]+", "_", fold(s))
     return s.strip("_")
 
 
 def keywords(text: str, cap: int = 12) -> List[str]:
     out: List[str] = []
     seen = set()
-    for w in re.findall(r"[a-z]+", text.lower()):
+    for w in re.findall(r"[a-z]+", fold(text)):
         if len(w) > 3 and w not in _STOP and w not in seen:
             seen.add(w)
             out.append(w)

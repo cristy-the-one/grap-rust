@@ -110,6 +110,29 @@ def test_export_hashes_survive_shorter_alias(tmp_path):
         wg.close()
 
 
+def test_tokenize_folds_diacritics():
+    # Law-ro pilot finding 10: the [^a-z0-9] tokenizer truncated words at
+    # every Romanian diacritic ('referinţă' -> 'referin'), corrupting outcome
+    # ids and lexical matching.
+    from grap_mcp.kee.reconcile import fold, keywords, tokenize
+    assert fold("referinţă") == "referinta"
+    assert tokenize("Termenii de referinţă") == "termenii_de_referinta"
+    assert tokenize("Legea asigurărilor sociale de sănătate") == \
+        "legea_asigurarilor_sociale_de_sanatate"
+    assert tokenize("înţelegere şi hotărâre") == "intelegere_si_hotarare"
+    assert "sanatate" in keywords("asigurările de sănătate")
+
+
+def test_covers_matches_across_diacritics():
+    # Both sides of the coverage match fold: a transliterated characteristic
+    # token must find its diacritic spelling in the evidence, and vice versa.
+    from grap_mcp.reasoner import _covers
+    evidence_ro = "Contribuţiile pentru asigurările sociale de sănătate sunt colectate."
+    assert _covers(evidence_ro, "asigurarilor_de_sanatate") > 0.9
+    assert _covers("plain ascii evidence about sanatate", "sănătate") == 1.0
+    assert _covers(evidence_ro, "quantum_safety_audit") == 0.0
+
+
 def test_duplicate_parked_relations_dedupe_and_save(tmp_path):
     # Law-ro pilot cycle 5 regression: a model emitting the same ungroundable
     # relation twice in one chunk produced duplicate parked rows, the store's
