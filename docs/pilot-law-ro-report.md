@@ -174,11 +174,64 @@ Best-known configuration after eight cycles: cycle 6 prompts + folded
 index + real evidence (38 RO outcomes, 7 edges, **1 gap**, ~4.5 min
 scoring cycle). Self-coverage now measures what it claims to measure.
 
+## Cycle 9 (kill the last gap) — the queue doing its job
+
+A from-scratch re-extract under the language pin did NOT fix the EN
+characteristic: Bonsai re-emitted the same English translation for that
+chunk (13.5 min), and the fresh 37-outcome graph was **rejected by the
+churn gate** (4 outcomes / 37 characteristics removed vs budget 0) —
+correctly, since from-scratch extraction drifts. The right move turned
+out to be the human act the exception queue exists for: the EN
+characteristic was a *translated duplicate* of an existing RO
+characteristic on the same concept (both from doc 16659), so the EN row
+was deleted from the working graph (curation, not extraction). Policy
+was temporarily widened with a rationale (added 200 / removed 10 /
+chars-removed 60 / canary 60) for the re-baseline, and the curated
+all-RO ontology auto-adopted: **canary passed, EN gap resolved**.
+
+15. **Mapping-hint variance flips coverage (open — tuning target).**
+    Adopting the re-extracted graph produced 6 gaps on characteristics
+    whose text was IDENTICAL to previously-passing ones — only the
+    extraction's mapping hints changed, which changed retrieval seeding.
+    Gap stability currently depends on hint quality; retrieval should be
+    made hint-robust (e.g. union of hint-seeded and characteristic-only
+    queries). All 6 resolved on their own once the corpus grew (better
+    seeds available), confirming the diagnosis.
+
+## Cycle 10 (scale to 49 docs) — first honest zero, then the real baseline
+
+39 more acts (stratified by tip_act, 1.5–10 KB each, ~166 KB) took the
+corpus to 49 docs. One lights-out pass (77 min): **139 new chunks
+extracted, zero timeouts**; working graph grew 37→280 concepts,
+136→1016 characteristics, 6→53 grounded edges, 212 parked. Before
+adoption, the old 37-outcome ontology hit **0 gaps** on the enlarged
+evidence — the pilot's first honest zero. The 280-outcome proposal was
+policy-rejected on pure volume (243 added > 200 even widened), reviewed
+(integrity 280/280, provenance clean, **0 EN-looking ids at scale** —
+the language pin held across 39 unseen documents), and adopted manually
+with a rationale. A follow-up cycle picked up one straggler chunk and
+auto-adopted the 281st outcome through the widened gate (canary passed,
+40 new gaps ≤ 60).
+
+Scaled baseline: **281 outcomes, 1016 characteristics, 54 gaps (94.7 %
+self-coverage)**; full scoring cycle ≈ 31 min. Policy restored to strict
+(added 5 / removed 0 / chars-removed 0 / canary 0) after the
+re-baseline. The `gap_regression` alarm for the 54 new-ontology gaps is
+truthful pending triage.
+
+16. **Scoring wall-time is journaling-bound, not search-bound (open).**
+    ~2 s per characteristic with near-zero CPU: the per-query session
+    journal and per-gap explanation records dominate, likely aggravated
+    by the workspace living under a OneDrive-synced path. At 1016
+    characteristics that is ~31 min/cycle. Options: batch the journal
+    writes, or move pilot state off synced storage.
+
 ## Recommended next interactive cycles
 
-1. Fix the one real gap: re-extract with the language pin (the EN
-   characteristic predates it) or patch the outcome — then a clean zero.
-2. Scale: 50 docs, same loop, watch cycle time, gap quality, and queue
-   size. Gap counts are finally trustworthy enough to tune against.
-3. Then de-tune scoring honesty checks: threshold sensitivity (0.6) on a
-   corpus where most characteristics now pass.
+1. Triage the 54 gaps (list is in run-8ea143a2): expect a mix of honest
+   phrasing defects and hint-variance (finding 15).
+2. Hint-robust retrieval (finding 15) — likely the biggest gap-count
+   stabilizer at scale.
+3. Scoring throughput (finding 16) before any further corpus growth.
+4. Then 200+ docs, watcher-driven (run_factory.py), queue-only
+   supervision.
