@@ -104,6 +104,28 @@ impl Tokenizer for DefaultTokenizer {
 }
 
 // ============================================================================
+// Term normalization
+// ============================================================================
+
+/// Canonical form of a term for indexing and matching: lowercase, then NFKD
+/// with all combining marks stripped (diacritic folding).
+///
+/// Both the write path (indexing) and the read path (queries) MUST go through
+/// this function, otherwise diacritic text becomes unretrievable by folded
+/// queries: evidence stored as `sănătate` could never be found by a query for
+/// `sanatate` (law-ro pilot finding 12). Mirrors `reconcile.fold` on the
+/// Python side, which normalizes identically — the two ends of the retrieval
+/// channel have to agree on one canonical form.
+pub fn normalize_term(term: &str) -> String {
+    use unicode_normalization::char::is_combining_mark;
+    use unicode_normalization::UnicodeNormalization;
+    term.to_lowercase()
+        .nfkd()
+        .filter(|c| !is_combining_mark(*c))
+        .collect()
+}
+
+// ============================================================================
 // Term Interning
 // ============================================================================
 
@@ -123,18 +145,18 @@ impl StringInterner {
     }
 
     fn intern(&mut self, s: &str) -> TermId {
-        let lower = s.to_lowercase();
-        if let Some(&id) = self.lookup.get(&lower) {
+        let norm = normalize_term(s);
+        if let Some(&id) = self.lookup.get(&norm) {
             return id;
         }
         let id = TermId(self.strings.len() as u32);
-        self.strings.push(lower.clone());
-        self.lookup.insert(lower, id);
+        self.strings.push(norm.clone());
+        self.lookup.insert(norm, id);
         id
     }
 
     fn get(&self, s: &str) -> Option<TermId> {
-        self.lookup.get(s.to_lowercase().as_str()).copied()
+        self.lookup.get(normalize_term(s).as_str()).copied()
     }
 }
 
@@ -512,8 +534,8 @@ impl InvertedIndex {
 
         let mut term_positions: BTreeMap<String, Vec<u32>> = BTreeMap::new();
         for (word, pos) in &tokens {
-            let lower = word.to_lowercase();
-            term_positions.entry(lower).or_default().push(*pos);
+            let norm = normalize_term(word);
+            term_positions.entry(norm).or_default().push(*pos);
         }
 
         let doc_length = tokens.len() as u32;
@@ -544,7 +566,7 @@ impl InvertedIndex {
         let query_tokens = self.tokenizer.tokenize(query);
         let query_terms: Vec<String> = query_tokens
             .iter()
-            .map(|(w, _)| w.to_lowercase())
+            .map(|(w, _)| normalize_term(w))
             .collect::<HashSet<_>>()
             .into_iter()
             .collect();
@@ -643,7 +665,7 @@ impl InvertedIndex {
         max_results: usize,
     ) -> Vec<TextSearchResult> {
         let tokens = self.tokenizer.tokenize(phrase);
-        let terms: Vec<String> = tokens.iter().map(|(w, _)| w.to_lowercase()).collect();
+        let terms: Vec<String> = tokens.iter().map(|(w, _)| normalize_term(w)).collect();
 
         if terms.len() < 2 {
             // Single token (or empty) — fall back to normal BM25 search.
@@ -2151,6 +2173,40 @@ mod tests {
         idx.index_document(NodeId(0), "alpha"); // now 1 token
         let after = idx.stats().avg_doc_length;
         assert!((after - 1.5).abs() < 1e-9, "expected (1+2)/2 = 1.5, got {after}");
+    }
+
+    #[test]
+    fn normalize_term_folds_diacritics() {
+        assert_eq!(normalize_term("sănătate"), "sanatate");
+        assert_eq!(normalize_term("REFERINŢĂ"), "referinta"); // cedilla form
+        assert_eq!(normalize_term("înțelegere"), "intelegere"); // comma-below form
+        assert_eq!(normalize_term("plain_ascii_42"), "plain_ascii_42");
+    }
+
+    #[test]
+    fn search_folds_diacritics_both_ways() {
+        // Law-ro pilot finding 12: evidence stored with Romanian diacritics
+        // must be retrievable by ASCII-folded queries (characteristic ids are
+        // already folded, so the diacritic form cannot be reconstructed
+        // query-side), and vice versa.
+        let mut idx = InvertedIndex::new();
+        idx.index_document(NodeId(0), "asigurările sociale de sănătate");
+        idx.index_document(NodeId(1), "plain ascii sanatate evidence");
+        idx.index_document(NodeId(2), "unrelated content entirely");
+
+        let folded_query = idx.search("sanatate", 10);
+        let ids: Vec<u32> = folded_query.iter().map(|r| r.node_id.0).collect();
+        assert!(ids.contains(&0), "folded query must hit diacritic evidence");
+        assert!(ids.contains(&1));
+        assert!(!ids.contains(&2));
+
+        let diacritic_query = idx.search("sănătate", 10);
+        let ids: Vec<u32> = diacritic_query.iter().map(|r| r.node_id.0).collect();
+        assert!(ids.contains(&0) && ids.contains(&1));
+
+        // Phrase path folds too.
+        let phrase = idx.phrase_search("asigurarile sociale", 10, 5);
+        assert!(phrase.iter().any(|r| r.node_id == NodeId(0)));
     }
 
     #[test]

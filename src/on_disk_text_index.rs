@@ -132,8 +132,16 @@ impl Default for OnDiskTextIndex {
 
 impl TextIndex for OnDiskTextIndex {
     fn index_document(&mut self, node: NodeId, text: &str) {
+        // The engine stores terms verbatim, so normalization (lowercase +
+        // diacritic folding) MUST happen here on both the write and read
+        // paths — otherwise `sănătate` in a document is unreachable by a
+        // folded query for `sanatate` (law-ro pilot finding 12).
         let tokens = self.tokenizer.tokenize(text);
-        let terms: Vec<&str> = tokens.iter().map(|(t, _)| *t).collect();
+        let normed: Vec<String> = tokens
+            .iter()
+            .map(|(t, _)| crate::index::normalize_term(t))
+            .collect();
+        let terms: Vec<&str> = normed.iter().map(|s| s.as_str()).collect();
         let positions: Vec<Vec<u32>> = tokens.iter().map(|(_, pos)| vec![*pos]).collect();
         let global_id = self.engine.lock().unwrap().add_document(&terms, &positions);
         self.node_to_global.insert(node.0, global_id);
@@ -141,7 +149,11 @@ impl TextIndex for OnDiskTextIndex {
 
     fn search(&self, query: &str, max_results: usize) -> Vec<(NodeId, f64)> {
         let tokens = self.tokenizer.tokenize(query);
-        let terms: Vec<&str> = tokens.iter().map(|(t, _)| *t).collect();
+        let normed: Vec<String> = tokens
+            .iter()
+            .map(|(t, _)| crate::index::normalize_term(t))
+            .collect();
+        let terms: Vec<&str> = normed.iter().map(|s| s.as_str()).collect();
         if terms.is_empty() {
             return vec![];
         }
@@ -164,7 +176,11 @@ impl TextIndex for OnDiskTextIndex {
 
     fn phrase_search(&self, phrase: &str, max_gap: u32, max_results: usize) -> Vec<(NodeId, f64)> {
         let tokens = self.tokenizer.tokenize(phrase);
-        let terms: Vec<&str> = tokens.iter().map(|(t, _)| *t).collect();
+        let normed: Vec<String> = tokens
+            .iter()
+            .map(|(t, _)| crate::index::normalize_term(t))
+            .collect();
+        let terms: Vec<&str> = normed.iter().map(|s| s.as_str()).collect();
         if terms.is_empty() {
             return vec![];
         }
@@ -304,6 +320,30 @@ mod tests {
         assert!(ids.contains(&0), "NodeId(0) should be found");
         assert!(ids.contains(&2), "NodeId(2) should be found");
         assert!(!ids.contains(&1), "NodeId(1) should NOT appear for 'rust'");
+    }
+
+    #[test]
+    fn search_folds_case_and_diacritics() {
+        // The engine stores terms verbatim, so the adapter must normalize on
+        // both paths (law-ro pilot finding 12). Case-folding rides along: the
+        // raw-term passthrough previously made this backend case-sensitive.
+        let mut idx = OnDiskTextIndex::new();
+        idx.index_document(NodeId(0), "asigurările sociale de sănătate");
+        idx.index_document(NodeId(1), "Rust Memory Safety");
+
+        let folded = idx.search("sanatate", 10);
+        assert!(
+            folded.iter().any(|(n, _)| n.0 == 0),
+            "folded query must hit diacritic evidence"
+        );
+        let diacritic = idx.search("sănătate", 10);
+        assert!(diacritic.iter().any(|(n, _)| n.0 == 0));
+
+        let lower = idx.search("rust memory", 10);
+        assert!(lower.iter().any(|(n, _)| n.0 == 1), "case must fold");
+
+        let phrase = idx.phrase_search("asigurarile sociale", 10, 5);
+        assert!(phrase.iter().any(|(n, _)| n.0 == 0));
     }
 
     #[test]
