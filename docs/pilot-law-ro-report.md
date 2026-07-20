@@ -1,4 +1,4 @@
-# Real-Corpus Pilot Report: Romanian Legal Acts (cycle 1–3)
+# Real-Corpus Pilot Report: Romanian Legal Acts
 
 2026-07-20. First confrontation of the dark factory with real data:
 10 documents (7 act types, ~39 KB text) sampled from the 2,094-doc
@@ -127,16 +127,58 @@ Cycle 7 side-proofs on real data: audit-trail rehydration restored the
 active ontology in a fresh process; `already_active` made the re-run a
 zero-LLM no-op; a scoring-only cycle costs ~4 min.
 
-Best-known configuration after seven cycles: unchanged from cycle 6
-(38 RO outcomes, 7 edges, 122 gaps). The gap number should be read as
-retrieval-limited, not extraction-limited, until finding 12 lands.
+## Tuning cycle 8 (retrieval) — gaps 122 → 1
+
+The Rust fix for finding 12 landed first (`normalize_term`: lowercase +
+NFKD + strip combining marks on both paths of BOTH text-index backends;
+the on-disk backend was passing raw case-preserved tokens to the engine,
+so it was case-sensitive too). Wheel rebuilt, `pilot-law-ro/kg` deleted to
+force re-ingest — and the re-run still scored **122, delta 0/0**. That
+null result exposed the biggest finding of the pilot:
+
+13. **The evidence KG held ZERO nodes for all seven prior cycles (code,
+    fixed).** The corpus is `.json`; KEE extraction is law-JSON-aware, but
+    evidence ingestion only matched `.md/.txt`, silently ingested nothing
+    (`files: 0` reported deep in an unprinted step), and the factory said
+    HEALTHY. Every gap run of the pilot scored against an empty index —
+    cycles 6–7 could never have moved the number. Fixed twice over:
+    `_text_and_label_from_json` moved into `ingest.py` so evidence
+    ingestion and extraction read the SAME text for the same file, and
+    `run_pipeline` now records an `evidence_ingest` event that raises an
+    `evidence_empty` queue alarm whenever configured evidence dirs match
+    zero files (latest-state semantics; clears on the next non-empty
+    ingest). A silent zero is exactly what a dark factory must not do.
+
+With evidence actually ingested (folded index + folded scoring):
+**gaps 122 → 1**, in 264 s. The one survivor is honest: an
+English-language characteristic left over from pre-language-pin drift
+(`...:regarding_some_social_protection_measures_for_personnel_in_the_
+defense_production_sector`) — a real ontology defect correctly flagged,
+not a scoring artifact.
+
+The improvement itself then tripped one more latent bug:
+
+14. **`list_runs` returned filesystem order, not chronological (core,
+    fixed).** Run ids are random hex, so "the latest production run" was
+    a random run: the 122→1 improvement was reported as **121 NEW gaps**
+    (delta paired backwards), fired a false `gap_regression` alarm, and —
+    worse — the canary's fallback baseline and the factory-status trend
+    used the same broken assumption. `RunStore::list()` now sorts by
+    `(started_at, run_id)` and pygrap exposes `started_at`/`completed_at`.
+    Regression test: `list_is_chronological_regardless_of_filename_order`.
+
+Verification cycle 8c (post-fix): delta computed against the correct
+predecessor, false alarm cleared, HEALTHY restored.
+
+Best-known configuration after eight cycles: cycle 6 prompts + folded
+index + real evidence (38 RO outcomes, 7 edges, **1 gap**, ~4.5 min
+scoring cycle). Self-coverage now measures what it claims to measure.
 
 ## Recommended next interactive cycles
 
-1. Prompt: pin output language to the source document; re-extract (only
-   changed prompts → full re-extract of the workdir; budget ~25 min).
-2. Consider chunk_chars 3000 (fewer, richer calls) and measure quality.
-3. Calibrate self-coverage: shorter characteristics in the prompt
-   ("3-6 word characteristics"), or a lower lexical threshold for
-   RO text.
-4. Then scale: 50 docs, same loop, watch cycle time and queue size.
+1. Fix the one real gap: re-extract with the language pin (the EN
+   characteristic predates it) or patch the outcome — then a clean zero.
+2. Scale: 50 docs, same loop, watch cycle time, gap quality, and queue
+   size. Gap counts are finally trustworthy enough to tune against.
+3. Then de-tune scoring honesty checks: threshold sensitivity (0.6) on a
+   corpus where most characteristics now pass.
