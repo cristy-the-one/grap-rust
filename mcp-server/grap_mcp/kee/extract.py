@@ -30,7 +30,10 @@ SYSTEM_PROMPT = (
     '{"outcomes":[{"name":"<short name>","characteristics":["<attr>", ...]}],'
     '"relations":[{"from":"<concept>","type":"<verb>","to":"<concept>"}]}\n'
     "Use empty arrays when nothing applies. Do not invent content not supported "
-    "by the text."
+    "by the text.\n"
+    "IMPORTANT: write every name, characteristic, and relation in the SAME "
+    "LANGUAGE as the source text. Never translate — a translated name splits "
+    "one concept into two."
 )
 
 
