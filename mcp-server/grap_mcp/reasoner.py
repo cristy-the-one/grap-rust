@@ -59,7 +59,11 @@ def _covers(text: str, characteristic: str) -> float:
     if not tokens:
         return 0.0
     from .kee.reconcile import fold
-    words = re.findall(r"[a-z]+", fold(text))
+    # [a-z0-9]: characteristic tokens keep digits (dates, quotas, act
+    # numbers), so the evidence side must too — with [a-z]+ every
+    # date/percentage-bearing characteristic was a permanent gap
+    # (law-ro pilot finding 11).
+    words = re.findall(r"[a-z0-9]+", fold(text))
     present = 0
     for tok in tokens:
         if len(tok) < 4:

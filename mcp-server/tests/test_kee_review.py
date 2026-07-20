@@ -133,6 +133,18 @@ def test_covers_matches_across_diacritics():
     assert _covers(evidence_ro, "quantum_safety_audit") == 0.0
 
 
+def test_covers_matches_numeric_tokens():
+    # Law-ro pilot finding 11: evidence words were extracted with [a-z]+,
+    # dropping digits, so date/percentage characteristics could never be
+    # satisfied no matter how literal the evidence.
+    from grap_mcp.reasoner import _covers
+    ev = "Contractul-cadru va fi elaborat până la 15 februarie 1999."
+    assert _covers(ev, "elaborat_pana_la_15_februarie_1999") == 1.0
+    assert _covers("cota de 75% pentru medicamente", "cota_de_75") == 1.0
+    # absent numbers still read as gaps
+    assert _covers(ev, "elaborat_pana_la_30_iunie_2001") < 0.6
+
+
 def test_duplicate_parked_relations_dedupe_and_save(tmp_path):
     # Law-ro pilot cycle 5 regression: a model emitting the same ungroundable
     # relation twice in one chunk produced duplicate parked rows, the store's
