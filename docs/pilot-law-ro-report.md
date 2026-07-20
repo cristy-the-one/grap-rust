@@ -108,10 +108,28 @@ parked 54 → **47**, edges held at 7, 38 outcomes, 12.4 min.
     evidence side + tests. Legal text is date-laden, so this likely
     outweighs cycle 6's own gap improvement.
 
-Best-known configuration after six cycles: **cycle 6** (language-pinned
-prompt + diacritic-folded scoring, `GRAP_LLM_TIMEOUT=300`,
-`BONSAI_CTX=16384`, bge-m3, chunk_chars 2000, concurrency 4):
-38 RO outcomes, 7 edges, 122 gaps, ~12 min/cycle.
+## Tuning cycle 7 (numeric tokens in coverage) — correct fix, null result
+
+`_covers` now matches digits (`413c2f4`, unit-proven) but gaps stayed at
+exactly 122 (delta 0/0) — which localizes the dominant bottleneck:
+
+12. **The retrieval layer is diacritic-blind (open — the next big fix,
+    Rust-side).** Reasoner queries are folded ASCII (`sanatate`) but the
+    core text index stores raw diacritic evidence (`sănătate`), so the
+    lexical channel often never retrieves the right chunk — scoring
+    fixes cannot help on hits that never arrive. Proper fix: an
+    ascii-folding analyzer in the core's fulltext index (Rust +
+    pygrap wheel rebuild). Query-side workarounds are impossible:
+    characteristic ids are already folded, so the diacritic form cannot
+    be reconstructed.
+
+Cycle 7 side-proofs on real data: audit-trail rehydration restored the
+active ontology in a fresh process; `already_active` made the re-run a
+zero-LLM no-op; a scoring-only cycle costs ~4 min.
+
+Best-known configuration after seven cycles: unchanged from cycle 6
+(38 RO outcomes, 7 edges, 122 gaps). The gap number should be read as
+retrieval-limited, not extraction-limited, until finding 12 lands.
 
 ## Recommended next interactive cycles
 
