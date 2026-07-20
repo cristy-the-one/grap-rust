@@ -36,6 +36,13 @@ honest limitation with a proposed remedy.
   governing nothing. Both `_adopt_record` and `rollback_ontology` now refuse
   documents with zero process outcomes (tested, incl. the rollback path).
 
+> **Update (2026-07-20): remedies 1–4 below are implemented** (fresh
+> pre-adoption canary baseline; rename-aware churn budgets and canary
+> counting via `outcomes_renamed` in the diff; active-ontology rehydration
+> from the audit trail on workspace open; opt-in `pg_write_back` policy).
+> Items 5–6 remain design statements/operational advice. Tests in
+> `mcp-server/tests/test_review_fixes.py`; suite at 262.
+
 ## Known limitations, ranked, with remedies
 
 1. **Canary baseline staleness.** The baseline is the *previous* production

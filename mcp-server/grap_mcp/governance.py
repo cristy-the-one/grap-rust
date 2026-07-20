@@ -35,6 +35,9 @@ DEFAULT_ADOPTION_POLICY: Dict[str, Any] = {
     # Phase 5: trivial (purely additive) machine-checked drafts self-promote
     # through the validation-gated promote path; anything else stays queued.
     "pg_autopromote_enabled": False,
+    # Review fix 4: sync auto-promoted drafts back to the PG source file so
+    # the working copy tracks the promoted head (opt-in — writes user files).
+    "pg_write_back": False,
 }
 
 
@@ -93,10 +96,34 @@ def diff_ontology_dicts(base: dict, target: dict) -> Dict[str, Any]:
     # removed outcomes also remove all their characteristics
     for oid in removed:
         chars_removed_total += len(b_out[oid].get("required_characteristics") or [])
+
+    # Rename detection: a removed and an added outcome with the *identical*,
+    # non-empty characteristic set — and unique on both sides — is the same
+    # concept under a new id/name, not churn. Ambiguous fingerprints (several
+    # candidates sharing a set) are conservatively NOT paired.
+    def _fp(o):
+        return tuple(sorted(o.get("required_characteristics") or []))
+
+    removed_by_fp: Dict[tuple, List[str]] = {}
+    for oid in removed:
+        fp = _fp(b_out[oid])
+        if fp:
+            removed_by_fp.setdefault(fp, []).append(oid)
+    added_by_fp: Dict[tuple, List[str]] = {}
+    for oid in added:
+        fp = _fp(t_out[oid])
+        if fp:
+            added_by_fp.setdefault(fp, []).append(oid)
+    renamed = [[olds[0], news[0]]
+               for fp, olds in sorted(removed_by_fp.items())
+               for news in [added_by_fp.get(fp, [])]
+               if len(olds) == 1 and len(news) == 1]
+
     return {
         "outcomes_added": added,
         "outcomes_removed": removed,
         "outcomes_changed": changed,
+        "outcomes_renamed": renamed,
         "characteristics_added": chars_added_total,
         "characteristics_removed": chars_removed_total,
     }
@@ -133,21 +160,37 @@ def evaluate_proposal_dict(proposal: dict, active: dict | None,
                        "detail": "no active ontology (bootstrap adoption)"})
     else:
         diff = diff_ontology_dicts(active, proposal)
+        # Renames (same concept, new id) are not churn: budget the *effective*
+        # adds/removals with rename pairs subtracted. A renamed outcome that
+        # the active PG references still violates — the PG reference would
+        # dangle until a PG patch lands.
+        renamed = diff.get("outcomes_renamed") or []
+        ren_old = {old for old, _ in renamed}
+        ren_new = {new for _, new in renamed}
+        base_out = {o.get("id"): o for o in (active or {}).get("process_outcomes", [])
+                    if isinstance(o, dict)}
+        eff_added = [o for o in diff["outcomes_added"] if o not in ren_new]
+        eff_removed = [o for o in diff["outcomes_removed"] if o not in ren_old]
+        eff_chars_removed = diff["characteristics_removed"] - sum(
+            len(base_out.get(o, {}).get("required_characteristics") or [])
+            for o in ren_old)
         violations = []
-        if len(diff["outcomes_added"]) > int(policy["max_outcomes_added"]):
-            violations.append(f"{len(diff['outcomes_added'])} outcomes added "
+        if len(eff_added) > int(policy["max_outcomes_added"]):
+            violations.append(f"{len(eff_added)} outcomes added "
                               f"(budget {policy['max_outcomes_added']})")
-        if len(diff["outcomes_removed"]) > int(policy["max_outcomes_removed"]):
-            violations.append(f"{len(diff['outcomes_removed'])} outcomes removed "
+        if len(eff_removed) > int(policy["max_outcomes_removed"]):
+            violations.append(f"{len(eff_removed)} outcomes removed "
                               f"(budget {policy['max_outcomes_removed']})")
-        if diff["characteristics_removed"] > int(policy["max_characteristics_removed"]):
-            violations.append(f"{diff['characteristics_removed']} characteristics removed "
+        if eff_chars_removed > int(policy["max_characteristics_removed"]):
+            violations.append(f"{eff_chars_removed} characteristics removed "
                               f"(budget {policy['max_characteristics_removed']})")
         referenced_removed = sorted(set(diff["outcomes_removed"]) & set(pg_referenced_ids))
         if referenced_removed:
             violations.append(f"removes outcomes referenced by the active PG: {referenced_removed}")
-        checks.append({"name": "churn", "ok": not violations,
-                       "detail": violations or "within budget"})
+        detail = violations or "within budget"
+        if not violations and renamed:
+            detail = f"within budget (renames not counted: {renamed})"
+        checks.append({"name": "churn", "ok": not violations, "detail": detail})
 
     min_chunks = int(policy["min_source_chunks"])
     if min_chunks <= 0:

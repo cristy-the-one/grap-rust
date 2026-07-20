@@ -176,15 +176,51 @@ _state = GrapServerState()
 def _get_workspace():
     """Lazily open the lifecycle workspace (env GRAP_WORKSPACE or ./grap-workspace).
 
-    Must not touch volatile state: tools routinely set the KG/PG first and only
-    then open the workspace to write an audit event, so a reset here would
-    silently discard what the caller just loaded.
+    Must not touch volatile state destructively: tools routinely set the KG/PG
+    first and only then open the workspace to write an audit event, so a reset
+    here would silently discard what the caller just loaded. On first open the
+    active ontology is *rehydrated* (additively) from the audit trail so a
+    restarted process knows what is in production — which also restores the
+    canary's rollback target.
     """
     if _state.ws is None:
         root = os.environ.get("GRAP_WORKSPACE", "./grap-workspace")
         _state.ws = pygrap.Workspace.open(root)
         _state.ws_root = root
+        _rehydrate_active_ontology()
     return _state.ws
+
+
+def _rehydrate_active_ontology():
+    """Best-effort restore of the active ontology after a process restart,
+    from the latest ontology_adopted / ontology_rolled_back audit event
+    (adoption re-publishes the same content, so the event subject's record is
+    the active yaml). Projected-node exclusion is NOT rebuilt — evidence
+    filtering falls back to _is_projected's label/text-prefix guards, which is
+    why restarts stay safe even without this."""
+    if _state.ontology is not None:
+        return
+    try:
+        ws = _state.ws
+        candidates = []
+        for event_type in ("ontology_adopted", "ontology_rolled_back"):
+            evs = ws.query_events(event_type) or []
+            if evs:
+                candidates.append(evs[-1])
+        if not candidates:
+            return
+        ev = max(candidates, key=lambda e: e.ts)
+        raw = ws.get_record(ev.subject)
+        if not raw:
+            return
+        import yaml
+        parsed = yaml.safe_load(raw) or {}
+        if not parsed.get("process_outcomes"):
+            return
+        _state.set_ontology(_load_ontology_from_raw(raw), ev.subject)
+        logger.info("rehydrated active ontology %s from audit trail", ev.subject[:12])
+    except Exception:
+        logger.warning("active-ontology rehydration failed", exc_info=True)
 
 
 def _resolve_ws_root():
@@ -369,33 +405,51 @@ def reingest_documents(path: str) -> dict:
         return {"status": "error", "message": str(e)}
 
 
-def _canary_check(ws, adopted_hash: str) -> dict:
+def _canary_check(ws, adopted_hash: str, baseline_run_id: str = None,
+                  rename_pairs=()) -> dict:
     """Gap-detection canary for a just-adopted ontology.
 
-    Baseline = the most recent production run; the canary itself runs as a
-    quarantined experiment (excluded from quality metrics). Returns the
-    new-gap count vs baseline — conservatively huge on any failure — or a
-    bootstrap skip when no baseline exists."""
-    prod = ws.list_runs("production") or []
-    if not prod:
-        return {"skipped": "no production baseline"}
-    baseline = prod[-1].run_id
+    Baseline preference: a fresh pre-adoption run from this cycle
+    (`baseline_run_id`, review fix 1 — avoids blaming the candidate for
+    evidence changes since the last cycle), else the most recent production
+    run, else a bootstrap skip. The canary itself runs as a quarantined
+    experiment. Gap targets that merely moved to a renamed outcome id
+    (review fix 2) are not counted as new. Returns the new-gap count —
+    conservatively huge on any failure."""
+    baseline = baseline_run_id
+    if not baseline:
+        prod = ws.list_runs("production") or []
+        if not prod:
+            return {"skipped": "no production baseline"}
+        baseline = prod[-1].run_id
     exp = _run_gap_detection("all", "experiment", {"canary_for": adopted_hash})
     if not isinstance(exp, dict) or exp.get("status") != "ok":
         return {"baseline_run": baseline, "canary_run": None,
                 "new_gaps": 10 ** 9, "detail": exp}
     d = diff_runs(baseline, exp["run_id"])
+    if d.get("status") != "ok":
+        return {"baseline_run": baseline, "canary_run": exp["run_id"],
+                "new_gaps": 10 ** 9, "detail": d}
+    renames = {new: old for old, new in (rename_pairs or [])}
+    resolved = set(d["resolved_gaps"])
+
+    def _renamed_carryover(target: str) -> bool:
+        oid, _, char = str(target).partition(":")
+        old = renames.get(oid)
+        return old is not None and f"{old}:{char}" in resolved
+
+    new_gaps = [t for t in d["new_gaps"] if not _renamed_carryover(t)]
     return {"baseline_run": baseline, "canary_run": exp["run_id"],
-            "new_gaps": d["counts"]["new"] if d.get("status") == "ok" else 10 ** 9,
-            "detail": d.get("counts")}
+            "new_gaps": len(new_gaps), "detail": d.get("counts")}
 
 
-def _run_canary(ws, prev_version, adopted_hash: str, policy: dict) -> dict:
+def _run_canary(ws, prev_version, adopted_hash: str, policy: dict,
+                baseline_run_id: str = None, rename_pairs=()) -> dict:
     """Run the canary for a just-adopted ontology; over budget -> roll back to
     prev_version. Records a single `canary_result` event (latest-state alarm
     source). Returns fields merged into the auto_adoption report — the line
     never blocks on a canary failure."""
-    c = _canary_check(ws, adopted_hash)
+    c = _canary_check(ws, adopted_hash, baseline_run_id, rename_pairs)
     if c.get("skipped"):
         try:
             ws.record_event("canary_result",
@@ -422,6 +476,7 @@ def _run_canary(ws, prev_version, adopted_hash: str, policy: dict) -> dict:
             pass
         return {"canary": "failed", "new_gaps": c["new_gaps"],
                 "canary_run": c.get("canary_run"),
+                "baseline_run": c.get("baseline_run"),
                 "rolled_back_to": prev_version,
                 "rollback_status": rollback_status}
     try:
@@ -430,7 +485,8 @@ def _run_canary(ws, prev_version, adopted_hash: str, policy: dict) -> dict:
     except Exception:
         pass
     return {"canary": "passed", "new_gaps": c["new_gaps"],
-            "canary_run": c.get("canary_run")}
+            "canary_run": c.get("canary_run"),
+            "baseline_run": c.get("baseline_run")}
 
 
 def _publish_and_gate_proposal(yaml_text: str, source: str, provider_name: str,
@@ -468,6 +524,16 @@ def _publish_and_gate_proposal(yaml_text: str, source: str, provider_name: str,
         failed = [c["name"] for c in verdict["checks"] if not c["ok"]]
         if verdict["pass"] and _state.kg is not None:
             prev_version = getattr(_state, "ontology_version", None)
+            # Fresh pre-adoption baseline (review fix 1): measured against the
+            # *previous* ontology on the current evidence, so the canary diff
+            # attributes gap changes to the candidate, not to evidence churn
+            # since the last cycle.
+            baseline_run_id = None
+            if policy.get("canary_enabled") and prev_version and _state.ontology is not None:
+                base = _run_gap_detection("all", "experiment",
+                                          {"canary_baseline_for": version.hash})
+                if isinstance(base, dict) and base.get("status") == "ok":
+                    baseline_run_id = base["run_id"]
             auto_rationale = ("adoption_policy: all checks passed ("
                               + ", ".join(c["name"] for c in verdict["checks"]) + ")")
             adopt_res = _adopt_record(ws, _state.kg, version.hash, yaml_text,
@@ -476,8 +542,10 @@ def _publish_and_gate_proposal(yaml_text: str, source: str, provider_name: str,
                              "adopted": adopt_res.get("status") == "ok",
                              "new_version_hash": adopt_res.get("new_version_hash")}
             if auto_adoption["adopted"] and policy.get("canary_enabled"):
+                rename_pairs = (verdict.get("diff") or {}).get("outcomes_renamed") or []
                 auto_adoption.update(
-                    _run_canary(ws, prev_version, version.hash, policy))
+                    _run_canary(ws, prev_version, version.hash, policy,
+                                baseline_run_id, rename_pairs))
             # Phase 4: on a kept adoption (canary passed/skipped/off), draft a
             # PG patch so the human's remaining act is an approval click.
             if (auto_adoption.get("adopted") and policy.get("pg_draft_enabled")
@@ -647,16 +715,29 @@ def draft_pg_patch(model: str = None) -> dict:
         # validation-gated path a human would use; anything touching existing
         # process logic stays a human decision in the queue.
         auto_promoted = False
+        written_back = False
         pol = governance.merged_policy(config_store.load_config(_resolve_ws_root()))
         if pol.get("pg_autopromote_enabled") and governance.pg_draft_is_trivial(pdiff):
             pr = promote_pg(version.hash,
                             rationale="auto-promoted: trivial additive draft "
                                       "(machine-checked coverage + validation)")
             auto_promoted = isinstance(pr, dict) and pr.get("status") == "ok"
+        # Review fix 4 (opt-in): keep the PG source file tracking the promoted
+        # head so later cycles draft from the current PG, not a stale file.
+        if auto_promoted and pol.get("pg_write_back"):
+            try:
+                Path(pg.source_path).write_text(raw, encoding="utf-8")
+                draft.source_path = pg.source_path
+                _state.pg = draft
+                _state.current_logic_id = draft.name
+                written_back = True
+            except Exception:
+                logger.warning("pg_write_back failed", exc_info=True)
         return {"status": "ok", "draft_version_hash": version.hash,
                 "uncovered": uncovered_ids, "orphaned": orphaned,
                 "validation": report, "diff": pdiff,
                 "auto_promoted": auto_promoted,
+                "written_back": written_back,
                 "note": ("Draft auto-promoted (trivial additive change)."
                          if auto_promoted else
                          "Draft published (level=draft). Review the diff, then "
@@ -1096,7 +1177,7 @@ def set_policy(key: str, value, rationale: str) -> dict:
                            f"(valid: {sorted(governance.DEFAULT_ADOPTION_POLICY)})"}
     try:
         if key in ("enabled", "canary_enabled", "pg_draft_enabled",
-                   "pg_autopromote_enabled"):
+                   "pg_autopromote_enabled", "pg_write_back"):
             value = bool(value)
         else:
             value = int(value)
