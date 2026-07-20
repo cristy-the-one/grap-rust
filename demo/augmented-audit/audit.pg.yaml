@@ -1,0 +1,70 @@
+name: Romanian Normative-Act Compliance Audit
+description: Audits the legal corpus against an authored requirement checklist.
+version: 0.1.0
+steps:
+- id: select-corpus
+  operation: Select the corpus in scope for the compliance audit
+  outputs:
+    corpus: list
+  references:
+  - kg:aspice.scope.current
+- id: audit-indicare_emitentul
+  operation: 'Verify requirement: Indicarea emitentului'
+  inputs:
+    corpus: select-corpus.outputs.corpus
+  outputs:
+    verdict: object
+  references:
+  - kg:aspice.process_outcome.indicare_emitentul
+  notes: Actul normativ indică clar autoritatea care l-a emis.
+- id: audit-publicat_monitorul_oficial
+  operation: 'Verify requirement: Publicat în Monitorul Oficial'
+  inputs:
+    corpus: select-corpus.outputs.corpus
+  outputs:
+    verdict: object
+  references:
+  - kg:aspice.process_outcome.publicat_monitorul_oficial
+  notes: Actul normativ este publicat în Monitorul Oficial.
+- id: audit-referintra_modificare_completare
+  operation: 'Verify requirement: Referință la modificarea și completarea actului'
+  inputs:
+    corpus: select-corpus.outputs.corpus
+  outputs:
+    verdict: object
+  references:
+  - kg:aspice.process_outcome.referintra_modificare_completare
+  notes: Un act care modifică sau completează un alt act trebuie să facă referință
+    explicită la modificarea și completarea actului.
+- id: audit-evaluare_impact_protec_ie_datelor_personale
+  operation: 'Verify requirement: Evaluare impact protectie datelor personale'
+  inputs:
+    corpus: select-corpus.outputs.corpus
+  outputs:
+    verdict: object
+  references:
+  - kg:aspice.process_outcome.evaluare_impact_protec_ie_datelor_personale
+  notes: Actul normativ include o evaluare a impactului asupra protecției datelor
+    cu caracter personal.
+- id: audit-consulta_publica
+  operation: 'Verify requirement: Consultare publică'
+  inputs:
+    corpus: select-corpus.outputs.corpus
+  outputs:
+    verdict: object
+  references:
+  - kg:aspice.process_outcome.consulta_publica
+  notes: Actul normativ trebuie să prevadă o perioadă de consulta publică înainte
+    de adoptare.
+- id: emit-report
+  operation: Emit per-requirement satisfied/gap report with provenance
+  inputs:
+    v_indicare_emitentul: audit-indicare_emitentul.outputs.verdict
+    v_publicat_monitorul_oficial: audit-publicat_monitorul_oficial.outputs.verdict
+    v_referintra_modificare_completare: audit-referintra_modificare_completare.outputs.verdict
+    v_evaluare_impact_protec_ie_datelor_personale: audit-evaluare_impact_protec_ie_datelor_personale.outputs.verdict
+    v_consulta_publica: audit-consulta_publica.outputs.verdict
+  outputs:
+    report: object
+  references:
+  - kg:aspice.report.template.v1

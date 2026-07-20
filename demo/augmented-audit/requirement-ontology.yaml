@@ -1,0 +1,74 @@
+version: req-0.1
+process_outcomes:
+- id: indicare_emitentul
+  name: Indicarea emitentului
+  description: Actul normativ indică clar autoritatea care l-a emis.
+  required_characteristics:
+  - emitent
+- id: publicat_monitorul_oficial
+  name: Publicat în Monitorul Oficial
+  description: Actul normativ este publicat în Monitorul Oficial.
+  required_characteristics:
+  - monitorul_oficial
+- id: referintra_modificare_completare
+  name: Referință la modificarea și completarea actului
+  description: Un act care modifică sau completează un alt act trebuie să facă referință
+    explicită la modificarea și completarea actului.
+  required_characteristics:
+  - modificare_completare
+- id: evaluare_impact_protec_ie_datelor_personale
+  name: Evaluare impact protectie datelor personale
+  description: Actul normativ include o evaluare a impactului asupra protecției datelor
+    cu caracter personal.
+  required_characteristics:
+  - evaluare_impact_protectie_datelor
+- id: consulta_publica
+  name: Consultare publică / transparență decizională
+  description: Actul normativ trebuie să prevadă transparență decizională (consultare
+    publică înainte de adoptare, cf. Legii 52/2003).
+  required_characteristics:
+  - transparenta_decizionala
+mapping_hints:
+- outcome: indicare_emitentul
+  indicators:
+  - keywords:
+    - emitentul
+    - autoritate
+    - emite
+    - act
+    - normativ
+- outcome: publicat_monitorul_oficial
+  indicators:
+  - keywords:
+    - publicat
+    - monitorul
+    - oficial
+    - publicare
+    - act_normativ
+- outcome: referintra_modificare_completare
+  indicators:
+  - keywords:
+    - modificare
+    - completare
+    - referintra
+    - act
+    - modificarea
+    - completarea
+- outcome: evaluare_impact_protec_ie_datelor_personale
+  indicators:
+  - keywords:
+    - evaluare
+    - impact
+    - protectie
+    - datelor
+    - personale
+    - normativ
+    - include
+- outcome: consulta_publica
+  indicators:
+  - keywords:
+    - transparenta
+    - decizionala
+    - consultare
+    - dezbatere
+    - adoptare
