@@ -844,7 +844,18 @@ def _adopt_record(ws, kg, version_hash: str, raw: str, rationale: str,
     verify concept_hashes (refuse on mismatch), project, core-verify the
     written nodes, publish the adoption version, audit."""
     import yaml
-    checked, mismatches = governance.verify_concept_hashes(yaml.safe_load(raw) or {})
+    parsed = yaml.safe_load(raw) or {}
+    if not parsed.get("process_outcomes"):
+        # An empty "ontology" (a disputed report, a malformed record) would
+        # pass hash verification trivially, project nothing, and silently
+        # deactivate gap detection — the factory would look perfect while
+        # governing nothing. Refuse.
+        return {"status": "error",
+                "message": ("refusing to adopt a document with zero process "
+                            "outcomes — it is not a loadable ontology "
+                            "(disputed reports and malformed records look "
+                            "like this).")}
+    checked, mismatches = governance.verify_concept_hashes(parsed)
     if mismatches:
         try:
             ws.record_event("ontology_adoption_rejected", version_hash,
@@ -978,7 +989,12 @@ def rollback_ontology(to_version_hash: str, reason: str = None) -> dict:
         if not raw:
             return {"status": "error", "message": f"Unknown version '{to_version_hash}'."}
         import yaml
-        checked, mismatches = governance.verify_concept_hashes(yaml.safe_load(raw) or {})
+        parsed = yaml.safe_load(raw) or {}
+        if not parsed.get("process_outcomes"):
+            return {"status": "error",
+                    "message": ("refusing to roll back to a document with zero "
+                                "process outcomes — not a loadable ontology.")}
+        checked, mismatches = governance.verify_concept_hashes(parsed)
         if mismatches:
             return {"status": "error",
                     "message": "stored version fails concept_hashes verification",

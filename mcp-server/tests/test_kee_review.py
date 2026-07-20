@@ -84,6 +84,18 @@ def test_adopt_rejects_hash_for_unknown_outcome(tmp_path, monkeypatch):
     assert any(m.get("outcome") == "ghost_outcome" for m in out["mismatches"])
 
 
+def test_adopt_refuses_zero_outcome_document(tmp_path, monkeypatch):
+    # An empty "ontology" (disputed report, malformed record) would pass hash
+    # verification trivially, project nothing, and silently deactivate gap
+    # detection. Both adoption and rollback must refuse it.
+    s = _server(tmp_path, monkeypatch)
+    vh = _publish(s, "agreed_outcomes: 0\noutcomes_only_in_a: [qb]\n")
+    out = s.adopt_proposed_ontology(vh, rationale="oops, adopting the report")
+    assert out["status"] == "error" and "zero process outcomes" in out["message"]
+    rb = s.rollback_ontology(vh, reason="oops, rolling back to the report")
+    assert rb["status"] == "error" and "zero process outcomes" in rb["message"]
+
+
 def test_adopt_without_hashes_still_works(tmp_path, monkeypatch):
     # Legacy stateless extraction has no concept_hashes: nothing to verify.
     s = _server(tmp_path, monkeypatch)
