@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 import os
+import time
 import re
 import urllib.error
 import urllib.request
@@ -104,6 +105,18 @@ class OpenAICompatProvider:
         self.timeout = timeout
         self.temperature = temperature
         self.extra_body = extra_body if extra_body is not None else _extra_body_from_env()
+        # Retry transient failures (timeouts, HTTP 5xx) with exponential backoff.
+        # Without this, a momentary GPU/slot contention on a shared local server
+        # permanently drops the chunk (law-ro 200-doc run lost ~155 chunks this
+        # way). Client errors (4xx) are NOT retried — they won't fix themselves.
+        try:
+            self.retries = int(os.environ.get("GRAP_LLM_RETRIES", "4"))
+        except ValueError:
+            self.retries = 4
+        try:
+            self.retry_backoff = float(os.environ.get("GRAP_LLM_RETRY_BACKOFF", "2.0"))
+        except ValueError:
+            self.retry_backoff = 2.0
 
     def _payload(self, system: str, user: str, stream: bool) -> dict:
         payload = {
@@ -121,23 +134,36 @@ class OpenAICompatProvider:
 
     def complete(self, system: str, user: str) -> str:
         url = f"{self.base_url}/chat/completions"
-        payload = self._payload(system, user, stream=False)
+        data = json.dumps(self._payload(system, user, stream=False)).encode("utf-8")
         headers = {"Content-Type": "application/json"}
         if self.api_key:
             headers["Authorization"] = f"Bearer {self.api_key}"
-        req = urllib.request.Request(url, data=json.dumps(payload).encode("utf-8"),
-                                     headers=headers, method="POST")
-        try:
-            with urllib.request.urlopen(req, timeout=self.timeout) as resp:
-                body = json.loads(resp.read().decode("utf-8"))
-        except (urllib.error.URLError, OSError) as exc:
-            raise RuntimeError(
-                f"LLM request to {url} failed: {exc}. Is the server (e.g. Ollama) "
-                f"running and is model '{self.model}' available?") from exc
-        try:
-            return body["choices"][0]["message"]["content"]
-        except (KeyError, IndexError, TypeError) as exc:
-            raise RuntimeError(f"unexpected LLM response shape: {body!r}") from exc
+
+        last_exc: Optional[Exception] = None
+        for attempt in range(self.retries + 1):
+            req = urllib.request.Request(url, data=data, headers=headers, method="POST")
+            try:
+                with urllib.request.urlopen(req, timeout=self.timeout) as resp:
+                    body = json.loads(resp.read().decode("utf-8"))
+                return body["choices"][0]["message"]["content"]
+            except urllib.error.HTTPError as exc:
+                last_exc = exc
+                if exc.code < 500:          # client error: retrying won't help
+                    raise RuntimeError(
+                        f"LLM request to {url} failed: {exc}. Is the server "
+                        f"running and is model '{self.model}' available?") from exc
+                # 5xx is transient (e.g. GPU/slot contention) -> fall through to retry
+            except (urllib.error.URLError, OSError) as exc:   # timeout, conn reset
+                last_exc = exc
+            except (KeyError, IndexError, TypeError) as exc:
+                raise RuntimeError(f"unexpected LLM response shape: {body!r}") from exc
+            if attempt < self.retries:
+                time.sleep(self.retry_backoff * (2 ** attempt))
+
+        raise RuntimeError(
+            f"LLM request to {url} failed after {self.retries + 1} attempts: "
+            f"{last_exc}. Is the server (e.g. Ollama) running and is model "
+            f"'{self.model}' available?") from last_exc
 
     def stream(self, system: str, user: str) -> Iterator[str]:
         """Yield content deltas as the model generates them (stream:true).

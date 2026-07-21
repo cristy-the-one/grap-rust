@@ -71,6 +71,75 @@ def test_openai_compat_bad_shape_raises(monkeypatch):
         assert "unexpected LLM response" in str(e)
 
 
+def test_retries_transient_500_then_succeeds(monkeypatch):
+    monkeypatch.setattr(llm.time, "sleep", lambda *_: None)
+    calls = {"n": 0}
+
+    def fake_urlopen(req, timeout=None):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise llm.urllib.error.HTTPError(req.full_url, 500, "boom", {}, None)
+        return _FakeResp(json.dumps({"choices": [{"message": {"content": "ok"}}]}).encode())
+
+    monkeypatch.setattr(llm.urllib.request, "urlopen", fake_urlopen)
+    p = llm.OpenAICompatProvider(base_url="http://x/v1", model="m")
+    assert p.complete("s", "u") == "ok"
+    assert calls["n"] == 2      # retried once, then succeeded
+
+
+def test_retries_timeout_then_succeeds(monkeypatch):
+    monkeypatch.setattr(llm.time, "sleep", lambda *_: None)
+    calls = {"n": 0}
+
+    def fake_urlopen(req, timeout=None):
+        calls["n"] += 1
+        if calls["n"] < 3:
+            raise llm.urllib.error.URLError("timed out")
+        return _FakeResp(json.dumps({"choices": [{"message": {"content": "done"}}]}).encode())
+
+    monkeypatch.setattr(llm.urllib.request, "urlopen", fake_urlopen)
+    p = llm.OpenAICompatProvider(base_url="http://x/v1", model="m")
+    assert p.complete("s", "u") == "done"
+    assert calls["n"] == 3
+
+
+def test_client_error_4xx_not_retried(monkeypatch):
+    monkeypatch.setattr(llm.time, "sleep", lambda *_: None)
+    calls = {"n": 0}
+
+    def fake_urlopen(req, timeout=None):
+        calls["n"] += 1
+        raise llm.urllib.error.HTTPError(req.full_url, 400, "bad request", {}, None)
+
+    monkeypatch.setattr(llm.urllib.request, "urlopen", fake_urlopen)
+    p = llm.OpenAICompatProvider(base_url="http://x/v1", model="m")
+    try:
+        p.complete("s", "u")
+        assert False, "expected RuntimeError"
+    except RuntimeError:
+        pass
+    assert calls["n"] == 1      # 4xx is permanent — no retry
+
+
+def test_exhausts_retries_then_raises(monkeypatch):
+    monkeypatch.setenv("GRAP_LLM_RETRIES", "2")
+    monkeypatch.setattr(llm.time, "sleep", lambda *_: None)
+    calls = {"n": 0}
+
+    def fake_urlopen(req, timeout=None):
+        calls["n"] += 1
+        raise llm.urllib.error.HTTPError(req.full_url, 503, "unavailable", {}, None)
+
+    monkeypatch.setattr(llm.urllib.request, "urlopen", fake_urlopen)
+    p = llm.OpenAICompatProvider(base_url="http://x/v1", model="m")
+    try:
+        p.complete("s", "u")
+        assert False, "expected RuntimeError"
+    except RuntimeError as e:
+        assert "after 3 attempts" in str(e)
+    assert calls["n"] == 3       # retries=2 -> 1 + 2 = 3 attempts
+
+
 def test_get_provider_stub_via_env(monkeypatch):
     monkeypatch.setenv("GRAP_LLM_STUB", "1")
     assert isinstance(llm.get_provider(), llm.StubProvider)
