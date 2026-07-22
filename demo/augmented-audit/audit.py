@@ -102,6 +102,12 @@ def format_report(report: Dict[str, Any]) -> str:
 
 if __name__ == "__main__":
     import os
+    # Romanian evidence contains characters (ţ, ş, ă) the Windows console's
+    # cp1252 codepage cannot encode — force UTF-8 so the report always prints.
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
     os.environ.setdefault("GRAP_EMBED_BACKEND", "ollama")
     os.environ.setdefault("GRAP_EMBED_MODEL", "bge-m3")
     os.environ.setdefault("GRAP_EMBED_BASE_URL", "http://localhost:11434/v1")

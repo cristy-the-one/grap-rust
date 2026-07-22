@@ -31,8 +31,11 @@ os.environ.setdefault("GRAP_EMBED_BASE_URL", "http://localhost:11434/v1")
 from llm_client import chat, MODEL, BASE_URL      # noqa: E402
 from audit import load_audit, run_audit           # noqa: E402
 
+_DOCS = ROOT / "pilot-law-ro" / "docs"
+_NDOCS = len(list(_DOCS.glob("*.json"))) if _DOCS.exists() else 0
+
 QUESTION = (
-    "Am un corpus de 49 de acte normative românești (1998-1999). Verifică dacă "
+    f"Am un corpus de {_NDOCS} de acte normative românești (1998-1999). Verifică dacă "
     "acestea respectă următoarele cerințe de conformitate: (1) indicarea "
     "emitentului, (2) publicarea în Monitorul Oficial, (3) referința la "
     "modificarea și completarea altor acte, (4) evaluarea impactului asupra "
@@ -131,6 +134,12 @@ def _rule(title: str) -> str:
 
 
 def main() -> int:
+    # The whole demo answers in Romanian; the Windows console's cp1252 codepage
+    # cannot encode ţ/ş/ă, so force UTF-8 before printing anything.
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
     print(f"model: {MODEL} @ {BASE_URL}")
     print(f"\nQUESTION:\n{QUESTION}")
 
