@@ -111,3 +111,50 @@ def test_ingest_without_embedder_is_unchanged(tmp_path):
     res = ingest.ingest_paths(kg, str(tmp_path))
     assert res["embedded"] is False
     assert res["nodes_added"] == 2
+
+
+def test_embedder_retries_transient_then_succeeds(monkeypatch):
+    """A blip against the embedding endpoint must not kill a whole run."""
+    import grap_mcp.kee.embeddings as em
+    monkeypatch.setattr(em.time, "sleep", lambda *_: None)
+    calls = {"n": 0}
+
+    class _R(io.BytesIO):
+        def __enter__(self): return self
+        def __exit__(self, *a): self.close(); return False
+
+    def fake_urlopen(req, timeout=None):
+        calls["n"] += 1
+        if calls["n"] < 3:
+            raise em.urllib.error.URLError("connection refused")
+        return _R(json.dumps({"data": [{"index": 0, "embedding": [1.0, 0.0]}]}).encode())
+
+    monkeypatch.setattr(em.urllib.request, "urlopen", fake_urlopen)
+    e = em.OpenAICompatEmbedder(base_url="http://x/v1", model="m")
+    out = e.embed(["hello"])
+    assert len(out) == 1 and calls["n"] == 3
+
+
+def test_embedder_gives_up_with_clear_error(monkeypatch):
+    import grap_mcp.kee.embeddings as em
+    monkeypatch.setenv("GRAP_EMBED_RETRIES", "1")
+    monkeypatch.setattr(em.time, "sleep", lambda *_: None)
+
+    def fake_urlopen(req, timeout=None):
+        raise em.urllib.error.URLError("refused")
+
+    monkeypatch.setattr(em.urllib.request, "urlopen", fake_urlopen)
+    e = em.OpenAICompatEmbedder(base_url="http://x/v1", model="m")
+    try:
+        e.embed(["hello"])
+        assert False, "expected RuntimeError"
+    except RuntimeError as err:
+        assert "after 2 attempts" in str(err)
+
+
+def test_default_embed_url_is_ipv4_literal():
+    """'localhost' resolves to ::1 first on Windows and Ollama is IPv4-only,
+    which hung a run in SYN_SENT for 24 minutes."""
+    import grap_mcp.kee.embeddings as em
+    assert "127.0.0.1" in em._DEFAULT_EMBED_BASE_URL
+    assert "localhost" not in em._DEFAULT_EMBED_BASE_URL

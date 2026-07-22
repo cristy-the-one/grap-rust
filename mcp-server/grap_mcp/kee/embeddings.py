@@ -17,6 +17,7 @@ import logging
 import math
 import os
 import re
+import time
 import urllib.error
 import urllib.request
 from typing import List, Optional, Protocol, Sequence, runtime_checkable
@@ -25,7 +26,11 @@ logger = logging.getLogger("grap-mcp.kee")
 
 # Default OpenAI-compatible endpoint (Ollama). Reused for the HTTP embedder so
 # embeddings can be fully local via Ollama (e.g. nomic-embed-text).
-_DEFAULT_EMBED_BASE_URL = "http://localhost:11434/v1"
+# 127.0.0.1, NOT "localhost": on Windows dual-stack, "localhost" resolves to
+# ::1 first, and Ollama listens on IPv4 only. urllib then blocks in SYN_SENT
+# instead of falling back to IPv4 — a law-ro pipeline run hung there for 24
+# minutes without the socket timeout ever firing.
+_DEFAULT_EMBED_BASE_URL = "http://127.0.0.1:11434/v1"
 _DEFAULT_OLLAMA_EMBED_MODEL = "nomic-embed-text"
 
 _TOKEN_RE = re.compile(r"[a-z0-9]+")
@@ -120,8 +125,37 @@ class OpenAICompatEmbedder:
         self.api_key = api_key or os.environ.get("GRAP_LLM_API_KEY")
         self.timeout = timeout
         self.dim = 0
+        # Same transient-failure hardening the LLM provider has. The embedder is
+        # on the critical path of ingest, resolution and projection, so a blip
+        # here stalls or kills a whole run.
+        try:
+            self.retries = int(os.environ.get("GRAP_EMBED_RETRIES", "3"))
+        except ValueError:
+            self.retries = 3
+        try:
+            self.retry_backoff = float(os.environ.get("GRAP_EMBED_RETRY_BACKOFF", "2.0"))
+        except ValueError:
+            self.retry_backoff = 2.0
 
     def embed(self, texts: Sequence[str]) -> List[List[float]]:
+        last_exc: Optional[Exception] = None
+        for attempt in range(self.retries + 1):
+            try:
+                return self._embed_once(texts)
+            except urllib.error.HTTPError as exc:
+                if exc.code < 500:              # client error: retry won't help
+                    raise
+                last_exc = exc
+            except (urllib.error.URLError, OSError, TimeoutError) as exc:
+                last_exc = exc
+            if attempt < self.retries:
+                time.sleep(self.retry_backoff * (2 ** attempt))
+        raise RuntimeError(
+            f"embedding request to {self.base_url}/embeddings failed after "
+            f"{self.retries + 1} attempts: {last_exc}. Is the server running and "
+            f"is model '{self.model}' pulled?")
+
+    def _embed_once(self, texts: Sequence[str]) -> List[List[float]]:
         if not texts:
             return []
         payload = {"model": self.model, "input": list(texts)}
@@ -131,13 +165,10 @@ class OpenAICompatEmbedder:
         req = urllib.request.Request(f"{self.base_url}/embeddings",
                                      data=json.dumps(payload).encode("utf-8"),
                                      headers=headers, method="POST")
-        try:
-            with urllib.request.urlopen(req, timeout=self.timeout) as resp:
-                body = json.loads(resp.read().decode("utf-8"))
-        except (urllib.error.URLError, OSError) as exc:
-            raise RuntimeError(
-                f"embedding request to {self.base_url}/embeddings failed: {exc}. "
-                f"Is the server running and is model '{self.model}' pulled?") from exc
+        # Network errors deliberately propagate raw so `embed()` can classify and
+        # retry them; it raises the friendly RuntimeError once attempts run out.
+        with urllib.request.urlopen(req, timeout=self.timeout) as resp:
+            body = json.loads(resp.read().decode("utf-8"))
         try:
             rows = sorted(body["data"], key=lambda d: d.get("index", 0))
             vectors = [[float(x) for x in row["embedding"]] for row in rows]
