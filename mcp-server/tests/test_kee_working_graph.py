@@ -312,3 +312,28 @@ def test_promote_keeps_provenance_and_is_idempotent(tmp_path):
     again = wg.promote_parked_endpoints(min_refs=2)
     assert again["promoted"] == 0
     assert len(wg.relations) == rels and len(wg.canonical) == concepts
+
+
+def test_promote_works_on_graph_reopened_from_disk(tmp_path):
+    """The real path: parked relations are promoted on a graph loaded from disk,
+    where per-run bookkeeping like _chunk_contrib is empty."""
+    wd = str(tmp_path / "wd")
+    emb = HashingEmbedder()
+    wg = WorkingGraph(emb, workdir=wd, merge_threshold=0.99)
+    for i in range(2):
+        wg.upsert_fragment({
+            "source": f"s{i}",
+            "outcomes": [{"name": f"Actul {i}", "characteristics": []}],
+            "relations": [{"from": f"Actul {i}", "type": "emit", "to": "GUVERNUL"}],
+        }, f"s{i}")
+    wg.save()
+    wg.close()
+
+    reopened = WorkingGraph.open(wd, emb, merge_threshold=0.99)
+    assert reopened._chunk_contrib == {}, "precondition: bookkeeping is not persisted"
+    assert sum(1 for p in reopened.parked if p["reason"] == "ungrounded") == 2
+
+    res = reopened.promote_parked_endpoints(min_refs=2)
+    assert res["promoted"] == 1
+    assert res["relations_recovered"] == 2
+    assert res["still_parked"] == 0

@@ -257,6 +257,11 @@ class WorkingGraph:
         before_rels = len(self.relations)
         sig = Signals()
         for source, items in by_source.items():
+            # On a graph reopened from disk `_chunk_contrib` is empty (it is
+            # per-run bookkeeping, not persisted), and _relations_pass indexes
+            # into it directly.
+            self._chunk_contrib.setdefault(
+                source, {"concepts": set(), "chars": set(), "edges": set()})
             frag = {"relations": [{"from": p.get("from"), "type": p.get("type"),
                                    "to": p.get("to")} for p in items]}
             self._relations_pass(frag, source, {}, sig)
