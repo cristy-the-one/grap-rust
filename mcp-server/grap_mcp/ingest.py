@@ -67,11 +67,21 @@ def chunk_text(text: str, max_chars: int = 800) -> List[str]:
     return chunks
 
 
-def ingest_paths(kg, root: str, embedder=None) -> Dict[str, Any]:
+EMBED_BATCH = 128     # texts per /embeddings request; bounds payload size
+
+
+def ingest_paths(kg, root: str, embedder=None, batch_size: int = EMBED_BATCH) -> Dict[str, Any]:
     """Chunk + add_node every .md/.txt/.json under `root` (file or dir). Returns counts.
 
     If `embedder` is supplied (a kee.embeddings.Embedder), each chunk is embedded
     and stored on its node, enabling vector / hybrid search and semantic dedup.
+
+    Embedding batches span FILES, not just the chunks of one file. A local
+    /embeddings round-trip costs ~2.2s regardless of how few texts it carries,
+    so embedding per file made a 200-document corpus pay ~200 round-trips for
+    ~2 chunks each (~7 min of pure overhead). Batching across files in bounded
+    groups collapses that to a handful of requests while keeping the payload
+    (and peak memory) capped.
     """
     p = Path(root)
     if p.is_file():
@@ -81,18 +91,23 @@ def ingest_paths(kg, root: str, embedder=None) -> Dict[str, Any]:
     else:
         raise FileNotFoundError(f"ingest path not found: {root}")
 
-    nodes_added = 0
-    labels: List[str] = []
+    pending: List[tuple] = []           # (label, chunk) in stable file order
     for f in files:
         text = read_document(f)
         if text is None:
             continue
-        chunks = chunk_text(text)
-        embeddings = embedder.embed(chunks) if (embedder and chunks) else None
-        for i, chunk in enumerate(chunks):
-            label = f"doc:{f.stem}#{i}"
+        for i, chunk in enumerate(chunk_text(text)):
+            pending.append((f"doc:{f.stem}#{i}", chunk))
+
+    nodes_added = 0
+    labels: List[str] = []
+    step = max(1, int(batch_size))
+    for start in range(0, len(pending), step):
+        group = pending[start:start + step]
+        embeddings = embedder.embed([c for _, c in group]) if embedder else None
+        for j, (label, chunk) in enumerate(group):
             if embeddings is not None:
-                kg.add_node(text=chunk, label=label, embedding=embeddings[i])
+                kg.add_node(text=chunk, label=label, embedding=embeddings[j])
             else:
                 kg.add_node(text=chunk, label=label)
             nodes_added += 1

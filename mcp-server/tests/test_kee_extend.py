@@ -191,3 +191,47 @@ def test_server_extend_accepts_concurrency(tmp_path, monkeypatch):
     ext = s.extend_extraction_graph(str(tmp_path / "g"), str(docs), sim=0.9,
                                     concurrency=2)
     assert ext["status"] == "ok" and ext["added"] == 3
+
+
+def test_checkpoint_persists_progress_mid_run(tmp_path):
+    """A checkpoint must persist the manifest, so an interrupted run resumes
+    instead of re-extracting everything from scratch."""
+    wd = str(tmp_path / "g")
+    docs = tmp_path / "docs"; docs.mkdir()
+    for i in range(6):
+        (docs / f"d{i}.txt").write_text(f"alpha topic {i}", encoding="utf-8")
+
+    seen = []
+
+    class Boom(RuntimeError):
+        pass
+
+    def handler(system, user):
+        seen.append(user)
+        # die after enough chunks that a checkpoint (every 2) has landed
+        if len(seen) == 5:
+            raise Boom("simulated crash mid-run")
+        return _frag([{"name": f"C{len(seen)}", "characteristics": []}])
+
+    try:
+        extend_graph_ontology(wd, str(docs), StubProvider(handler=handler),
+                              HashingEmbedder(), sim=0.9, checkpoint_every=2)
+    except Boom:
+        pass
+
+    # Re-open the durable graph: work before the crash survived.
+    from grap_mcp.kee.working_graph import WorkingGraph
+    wg = WorkingGraph.open(wd, HashingEmbedder(), merge_threshold=0.9)
+    assert len(wg.manifest) >= 2, (
+        f"checkpoint should have persisted completed chunks, got {len(wg.manifest)}")
+    assert len(wg._live_concepts()) >= 2
+
+
+def test_checkpoint_disabled_keeps_single_final_save(tmp_path):
+    """checkpoint_every=0 preserves the old all-or-nothing behaviour."""
+    wd = str(tmp_path / "g")
+    docs = tmp_path / "docs"; docs.mkdir()
+    (docs / "a.txt").write_text("alpha topic", encoding="utf-8")
+    out = extend_graph_ontology(wd, str(docs), StubProvider(handler=_handler),
+                                HashingEmbedder(), sim=0.9, checkpoint_every=0)
+    assert out["added"] == 1

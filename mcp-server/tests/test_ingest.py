@@ -111,3 +111,53 @@ def test_ingest_feeds_reasoner(tmp_path, monkeypatch):
 
     assert empty >= 1
     assert after < empty  # ingested evidence covers characteristics -> fewer gaps
+
+
+class CountingEmbKG:
+    """KG that accepts embeddings, paired with an embed-call counter."""
+
+    def __init__(self):
+        self.nodes = []
+
+    def add_node(self, text, label=None, embedding=None):
+        self.nodes.append((text, label, embedding))
+        return len(self.nodes)
+
+
+class CountingEmbedder:
+    def __init__(self):
+        self.calls = 0
+        self.texts = 0
+
+    def embed(self, texts):
+        texts = list(texts)
+        self.calls += 1
+        self.texts += len(texts)
+        return [[float(len(t))] for t in texts]
+
+
+def test_embedding_batches_span_files(tmp_path):
+    """A local /embeddings round-trip costs ~2.2s regardless of size, so many
+    small files must not mean one request per file."""
+    for i in range(10):
+        (tmp_path / f"doc{i}.md").write_text(f"Chunk for doc {i}.", encoding="utf-8")
+    kg, emb = CountingEmbKG(), CountingEmbedder()
+    res = ingest_paths(kg, str(tmp_path), embedder=emb)
+
+    assert res["nodes_added"] == 10
+    assert emb.texts == 10
+    # 10 files, 1 chunk each -> must be ONE batched request, not ten.
+    assert emb.calls == 1, f"expected 1 cross-file batch, got {emb.calls}"
+
+
+def test_embedding_batch_size_is_bounded(tmp_path):
+    """Batches stay capped so payload/peak memory do not grow with the corpus."""
+    for i in range(10):
+        (tmp_path / f"doc{i}.md").write_text(f"Chunk for doc {i}.", encoding="utf-8")
+    kg, emb = CountingEmbKG(), CountingEmbedder()
+    ingest_paths(kg, str(tmp_path), embedder=emb, batch_size=3)
+
+    assert emb.texts == 10
+    assert emb.calls == 4          # ceil(10/3)
+    # embeddings still land on the right nodes, in order
+    assert [n[2][0] for n in kg.nodes] == [float(len(n[0])) for n in kg.nodes]

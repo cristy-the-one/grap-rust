@@ -21,6 +21,8 @@ from .graph_store import GraphStore, GraphState
 from .. import session
 from ..entity_index import EntityIndex
 
+EMBED_BATCH = 128     # texts per /embeddings request; bounds payload + peak memory
+
 
 @dataclass
 class Context:
@@ -130,12 +132,14 @@ class WorkingGraph:
                 todo.append(name)
         if not todo:
             return
-        try:
-            vecs = self.embedder.embed(todo)
-        except Exception:
-            return
-        for name, vec in zip(todo, vecs):
-            self._vec_cache[name] = vec
+        for start in range(0, len(todo), EMBED_BATCH):
+            group = todo[start:start + EMBED_BATCH]
+            try:
+                vecs = self.embedder.embed(group)
+            except Exception:
+                return
+            for name, vec in zip(group, vecs):
+                self._vec_cache[name] = vec
 
     def _content_hash(self, text: str) -> str:
         """Compute content hash using same algo as core (for dedup/provenance)."""
@@ -556,6 +560,11 @@ class WorkingGraph:
         shutil.rmtree(graph_dir, ignore_errors=True)
         self.idx.clear()
         self.kg = pygrap.IndexedKnowledgeGraph.with_merge_policy(graph_dir, 2)
+        # Every concept below needs its vector. Embedding them one at a time cost
+        # ~2.2s each (≈1h for 1671 concepts), which is what made save() — and
+        # therefore any checkpoint — prohibitively expensive. Batch them first;
+        # names resolved earlier this run are already cached and cost nothing.
+        self._prefetch_vectors([self.canonical[cid] for cid in sorted(self.canonical)])
         for cid in sorted(self.canonical):
             nid = self.kg.add_node(text=self.canonical[cid], label="concept",
                                    embedding=self._embed_one(self.canonical[cid]))

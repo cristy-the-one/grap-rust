@@ -107,7 +107,8 @@ def extend_graph_ontology(workdir: str, docs_path: str, provider, embedder, *,
                           relook_ratio: float = 0.2, context_cap: int = 8,
                           max_files: Optional[int] = None, chunk_chars: int = 800,
                           progress: Optional[Callable[[dict], None]] = None,
-                          concurrency: int = 1) -> Dict[str, Any]:
+                          concurrency: int = 1,
+                          checkpoint_every: int = 25) -> Dict[str, Any]:
     """Open the durable graph at `workdir`, sync it to `docs_path`, save, return stats.
 
     new chunk -> extract; changed chunk (hash differs) -> retract old + re-extract;
@@ -149,6 +150,7 @@ def extend_graph_ontology(workdir: str, docs_path: str, provider, embedder, *,
         _emit({"phase": "diff", "new": len(new), "changed": len(changed),
                "removed": len(removed)})
         n = len(to_extract)
+        since_ckpt = 0
         for window, frags in _extract_windows(
                 wg, to_extract, provider, concurrency,
                 on_chunk=lambda i, source: _emit(
@@ -158,11 +160,23 @@ def extend_graph_ontology(workdir: str, docs_path: str, provider, embedder, *,
                     continue                 # provider error/empty: do NOT record hash -> retried next run
                 sig = wg.upsert_fragment(frag, source)
                 wg.manifest[source] = hashes[source]
+                since_ckpt += 1
                 if sig.warrants_relook() and relooks < budget:
                     relooks += 1
                     frag2 = _extract_with_context(provider, source, text, wg.focused_context(sig))
                     if frag2 is not None:
                         wg.upsert_fragment(frag2, source)
+            # Durability checkpoint. Without this the whole run lives in memory
+            # until the final save: a 200-doc run held ~18h of extraction in RAM
+            # and any interruption lost all of it. save() persists the graph AND
+            # the manifest, and the manifest is what lets the next run skip the
+            # chunks already done — so a checkpoint bounds loss to the work since
+            # the last one and makes an interrupted run genuinely resumable.
+            if checkpoint_every > 0 and since_ckpt >= checkpoint_every:
+                wg.save()
+                _emit({"phase": "checkpoint", "chunks_since": since_ckpt,
+                       "concepts": len(wg._live_concepts())})
+                since_ckpt = 0
 
         ontology = wg.to_candidate_ontology(version)
         wg.save()
