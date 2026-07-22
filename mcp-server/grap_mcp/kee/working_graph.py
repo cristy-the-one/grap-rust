@@ -190,6 +190,83 @@ class WorkingGraph:
         session.record_node_access(node, "resolve_outcome")
         return _Resolution(node, False)
 
+    def _would_resolve(self, name: str) -> bool:
+        """Cheap, non-creating resolution check (alias + content hash only).
+
+        Deliberately skips the vector path: this is used to *count* how often an
+        unresolved endpoint recurs, and an approximate count is enough — the
+        promotion itself goes through `_resolve_outcome`, which does the full
+        alias/hash/vector resolution and only creates when all of them miss.
+        """
+        if not isinstance(name, str) or not name.strip():
+            return False
+        name = name.strip()
+        if [h for h in self.idx.resolve(name) if h not in self._retracted]:
+            return True
+        return self._content_hash(name) in self._hash_to_node
+
+    def promote_parked_endpoints(self, min_refs: int = 2) -> Dict[str, int]:
+        """Promote recurring ungrounded relation endpoints into concepts, then
+        re-attempt the relations that were parked because of them.
+
+        Relations are parked as `ungrounded` when an endpoint never appeared in
+        the model's `outcomes` list, so no concept exists to attach them to. In
+        the law-ro corpus that discarded the most valuable edges in the graph —
+        `<act> --emit--> GUVERNUL`, `--publicat în--> MONITORUL OFICIAL`,
+        `--modificarea și--> <other act>` — 1904 parked against 357 kept.
+
+        `min_refs` is the governance gate that replaces the outcomes list: a
+        genuine entity is referenced by many chunks, while a hallucinated or
+        malformed endpoint typically appears once. Raising it is stricter.
+        Anything still ungrounded afterwards stays parked, so nothing is lost.
+        """
+        ungrounded = [p for p in self.parked if p.get("reason") == "ungrounded"]
+        if not ungrounded:
+            return {"candidates": 0, "promoted": 0, "relations_recovered": 0,
+                    "still_parked": 0}
+
+        counts: Dict[str, int] = {}
+        for p in ungrounded:
+            for name in (p.get("from"), p.get("to")):
+                if isinstance(name, str) and name.strip() and not self._would_resolve(name):
+                    counts[name.strip()] = counts.get(name.strip(), 0) + 1
+        promote = sorted(n for n, c in counts.items() if c >= min_refs)
+
+        self._prefetch_vectors(promote)          # one batched embed, not one per name
+        before_nodes = len(self.canonical)
+        sources_for: Dict[str, Set[str]] = {}
+        for p in ungrounded:
+            for name in (p.get("from"), p.get("to")):
+                if isinstance(name, str) and name.strip() in counts:
+                    sources_for.setdefault(name.strip(), set()).add(p.get("source"))
+        for name in promote:
+            res = self._resolve_outcome(name)
+            # keep provenance: the chunks that referenced this endpoint
+            for src in sources_for.get(name, ()):
+                if src:
+                    self.node_sources.setdefault(res.node_id, set()).add(src)
+        promoted = len(self.canonical) - before_nodes
+
+        # Re-attempt the parked relations through the normal path, so the
+        # self-loop guard, conflict detection and provenance all still apply.
+        # Drop them first; whatever still fails simply gets re-parked.
+        self.parked = [p for p in self.parked if p.get("reason") != "ungrounded"]
+        by_source: Dict[str, List[dict]] = {}
+        for p in ungrounded:
+            by_source.setdefault(p.get("source"), []).append(p)
+        before_rels = len(self.relations)
+        sig = Signals()
+        for source, items in by_source.items():
+            frag = {"relations": [{"from": p.get("from"), "type": p.get("type"),
+                                   "to": p.get("to")} for p in items]}
+            self._relations_pass(frag, source, {}, sig)
+        recovered = len(self.relations) - before_rels
+
+        return {"candidates": len(counts), "promoted": promoted,
+                "relations_recovered": recovered,
+                "still_parked": sum(1 for p in self.parked
+                                    if p.get("reason") == "ungrounded")}
+
     def node_count(self) -> int:
         return self.kg.node_count()
 

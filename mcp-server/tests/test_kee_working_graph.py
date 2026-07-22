@@ -252,3 +252,63 @@ def test_retract_drops_only_the_chunks_characteristic(tmp_path):
     po = onto["process_outcomes"][0]
     assert "schedule" in po["required_characteristics"]
     assert "coverage" not in po["required_characteristics"]
+
+
+def test_promote_parked_endpoints_recovers_relations(tmp_path):
+    """Endpoints that recur across chunks become concepts, and the relations
+    parked because of them are recovered."""
+    wg = _wg(tmp_path, merge_threshold=0.99)
+    # "GUVERNUL" is never an outcome, but three acts point at it.
+    for i in range(3):
+        wg.upsert_fragment({
+            "source": f"s{i}",
+            "outcomes": [{"name": f"Actul {i}", "characteristics": []}],
+            "relations": [{"from": f"Actul {i}", "type": "emit", "to": "GUVERNUL"}],
+        }, f"s{i}")
+
+    assert len(wg.relations) == 0, "relations should start out parked"
+    assert sum(1 for p in wg.parked if p["reason"] == "ungrounded") == 3
+
+    res = wg.promote_parked_endpoints(min_refs=2)
+
+    assert res["promoted"] == 1                 # GUVERNUL became a concept
+    assert res["relations_recovered"] == 3      # all three edges recovered
+    assert res["still_parked"] == 0
+    assert len(wg.relations) == 3
+    assert any(c == "GUVERNUL" for c in wg.canonical.values())
+
+
+def test_promote_respects_min_refs_gate(tmp_path):
+    """A one-off endpoint stays parked: frequency is the governance gate."""
+    wg = _wg(tmp_path, merge_threshold=0.99)
+    wg.upsert_fragment({
+        "source": "s0",
+        "outcomes": [{"name": "Actul 0", "characteristics": []}],
+        "relations": [{"from": "Actul 0", "type": "emit", "to": "Typo Entity Xyzzy"}],
+    }, "s0")
+
+    res = wg.promote_parked_endpoints(min_refs=2)
+    assert res["promoted"] == 0
+    assert res["relations_recovered"] == 0
+    assert res["still_parked"] == 1             # nothing lost — still queued
+    assert not any(c == "Typo Entity Xyzzy" for c in wg.canonical.values())
+
+
+def test_promote_keeps_provenance_and_is_idempotent(tmp_path):
+    wg = _wg(tmp_path, merge_threshold=0.99)
+    for i in range(2):
+        wg.upsert_fragment({
+            "source": f"s{i}",
+            "outcomes": [{"name": f"Actul {i}", "characteristics": []}],
+            "relations": [{"from": f"Actul {i}", "type": "publicat", "to": "MONITORUL OFICIAL"}],
+        }, f"s{i}")
+
+    wg.promote_parked_endpoints(min_refs=2)
+    node = next(n for n, c in wg.canonical.items() if c == "MONITORUL OFICIAL")
+    assert wg.node_sources.get(node) == {"s0", "s1"}, "promoted concept keeps its sources"
+
+    # running it again must not duplicate concepts or edges
+    rels, concepts = len(wg.relations), len(wg.canonical)
+    again = wg.promote_parked_endpoints(min_refs=2)
+    assert again["promoted"] == 0
+    assert len(wg.relations) == rels and len(wg.canonical) == concepts
