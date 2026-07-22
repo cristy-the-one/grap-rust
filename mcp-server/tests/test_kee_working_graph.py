@@ -100,6 +100,52 @@ def test_merge_threshold_high_keeps_them_separate(tmp_path):
     assert wg.node_count() == 2
 
 
+class CountingEmb:
+    """Embedder that records how many HTTP-shaped calls it received."""
+    name = "counting"
+    dim = 2
+
+    def __init__(self):
+        self.calls = 0
+        self.texts = 0
+
+    def embed(self, texts):
+        texts = list(texts)
+        self.calls += 1
+        self.texts += len(texts)
+        # deterministic, distinct-ish vectors
+        return [[float(len(t) % 7), float(sum(map(ord, t)) % 11)] for t in texts]
+
+
+def test_fragment_embeds_in_one_batched_call(tmp_path):
+    """Resolution must not make one embed round-trip per name: a fragment with
+    several distinct names is embedded in a single batched call."""
+    emb = CountingEmb()
+    wg = WorkingGraph(emb, workdir=str(tmp_path), merge_threshold=0.99)
+    frag = {
+        "source": "s#0",
+        "outcomes": [{"name": "Alpha One", "characteristics": []},
+                     {"name": "Beta Two", "characteristics": []},
+                     {"name": "Gamma Three", "characteristics": []}],
+        "relations": [{"from": "Alpha One", "type": "uses", "to": "Delta Four"}],
+    }
+    wg.upsert_fragment(frag, "s#0")
+    # 4 distinct names, but they must not cost 4 separate round-trips.
+    assert emb.calls == 1, f"expected a single batched embed call, got {emb.calls}"
+    assert emb.texts == 4
+
+
+def test_repeated_names_reuse_cached_vectors(tmp_path):
+    """A name already embedded in an earlier fragment is not re-embedded."""
+    emb = CountingEmb()
+    wg = WorkingGraph(emb, workdir=str(tmp_path), merge_threshold=0.99)
+    base = {"outcomes": [{"name": "Alpha One", "characteristics": []}], "relations": []}
+    wg.upsert_fragment({"source": "s1", **base}, "s1")
+    after_first = emb.texts
+    wg.upsert_fragment({"source": "s2", **base}, "s2")
+    assert emb.texts == after_first, "same name should not be embedded twice"
+
+
 def test_self_loop_relation_is_parked_not_added(tmp_path):
     wg = _wg(tmp_path, merge_threshold=0.95)
     frag = {
