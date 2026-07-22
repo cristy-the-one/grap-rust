@@ -222,3 +222,22 @@ def test_list_models_parses_openai_shape(monkeypatch):
                             {"data": [{"id": "llama3.1:8b"}, {"id": "qwen3:8b"},
                                       {"nope": 1}]}).encode("utf-8")))
     assert llm.list_models(base_url="http://x/v1") == ["llama3.1:8b", "qwen3:8b"]
+
+
+def test_max_tokens_default_and_env_override(monkeypatch):
+    monkeypatch.delenv("GRAP_LLM_MAX_TOKENS", raising=False)
+    p = llm.OpenAICompatProvider(base_url="http://x/v1", model="m")
+    assert p.max_tokens == 2048
+    assert p._payload("s", "u", stream=False)["max_tokens"] == 2048
+
+    monkeypatch.setenv("GRAP_LLM_MAX_TOKENS", "512")
+    assert llm.OpenAICompatProvider(base_url="http://x/v1", model="m").max_tokens == 512
+
+    monkeypatch.setenv("GRAP_LLM_MAX_TOKENS", "nonsense")
+    assert llm.OpenAICompatProvider(base_url="http://x/v1", model="m").max_tokens == 2048
+
+
+def test_max_tokens_zero_disables_the_cap(monkeypatch):
+    monkeypatch.setenv("GRAP_LLM_MAX_TOKENS", "0")
+    p = llm.OpenAICompatProvider(base_url="http://x/v1", model="m")
+    assert "max_tokens" not in p._payload("s", "u", stream=False)

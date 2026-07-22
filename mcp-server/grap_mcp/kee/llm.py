@@ -105,6 +105,19 @@ class OpenAICompatProvider:
         self.timeout = timeout
         self.temperature = temperature
         self.extra_body = extra_body if extra_body is not None else _extra_body_from_env()
+        # Safety cap on generation length. Extraction emitted no max_tokens at
+        # all, so a degenerating model could decode until it hit the context
+        # limit: across 717 real law-ro generations the median was 524 tokens
+        # but the tail reached 3768 — runaway repetition that is garbage anyway.
+        # 2048 bounds that (truncates ~2% of chunks) without cutting legitimate
+        # output (p95 = 1612). Lower it to trade extraction completeness for
+        # speed: savings track truncation ~1:1, since decode time is in the bulk
+        # of generations, not the tail. 0 disables the cap.
+        try:
+            self.max_tokens = int(os.environ.get("GRAP_LLM_MAX_TOKENS", "2048"))
+        except ValueError:
+            self.max_tokens = 2048
+
         # Retry transient failures (timeouts, HTTP 5xx) with exponential backoff.
         # Without this, a momentary GPU/slot contention on a shared local server
         # permanently drops the chunk (law-ro 200-doc run lost ~155 chunks this
@@ -128,6 +141,8 @@ class OpenAICompatProvider:
             "temperature": self.temperature,   # low for reproducibility
             "stream": stream,
         }
+        if self.max_tokens:
+            payload["max_tokens"] = self.max_tokens
         if self.extra_body:
             payload.update(self.extra_body)
         return payload

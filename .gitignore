@@ -134,3 +134,6 @@ terminals/
 /mcps
 /portable-kee-demo
 /pilot-law-ro
+
+# llama-server logs from scripts/serve-bonsai.ps1
+.logs/
