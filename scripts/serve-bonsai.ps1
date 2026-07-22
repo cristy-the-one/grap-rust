@@ -54,7 +54,17 @@ param(
     [int]$Slots = 4,
     [string]$Alias = "ternary-bonsai-27b",
     [int]$ReadyTimeoutSec = 600,
-    [switch]$Foreground
+    [switch]$Foreground,
+    # KEE also needs an embedding model. Ollama unloads it after keep_alive
+    # (default 5 min) of inactivity; during extraction the embedder is only
+    # touched every few minutes, so it sits ~2 minutes from eviction. A reload
+    # is cheap on its own, but if it happens while Bonsai's KV cache is at peak
+    # Ollama may decide it no longer fits and silently place it on CPU, making
+    # every embedding call an order of magnitude slower. Pinning it costs
+    # ~664 MiB and removes that failure mode. Set -PinEmbedder:$false to skip.
+    [string]$EmbedModel = "bge-m3",
+    [string]$OllamaUrl = "http://127.0.0.1:11434",
+    [bool]$PinEmbedder = $true
 )
 
 $ErrorActionPreference = "Stop"
@@ -128,6 +138,22 @@ while ((Get-Date) -lt $deadline) {
         Write-Host "  `$env:GRAP_LLM_TIMEOUT   = '300'   # ~240s/chunk observed"
         Write-Host "  `$env:GRAP_LLM_RETRIES   = '2'     # bounds a stuck chunk"
         Write-Host "  `$env:GRAP_LLM_MAX_TOKENS= '2048'  # caps runaway repetition"
+
+        if ($PinEmbedder) {
+            # keep_alive=-1 pins the model for the life of the Ollama process,
+            # and needs no service restart (OLLAMA_KEEP_ALIVE is only read at
+            # startup). Set OLLAMA_KEEP_ALIVE=-1 in the service environment if
+            # you want it to survive an Ollama restart too.
+            try {
+                $body = @{ model = $EmbedModel; input = "pin"; keep_alive = -1 } | ConvertTo-Json
+                Invoke-RestMethod "$OllamaUrl/api/embed" -Method Post -Body $body `
+                    -ContentType "application/json" -TimeoutSec 120 | Out-Null
+                Write-Host ""
+                Write-Host "[serve-bonsai] pinned '$EmbedModel' in VRAM (keep_alive=-1)" -ForegroundColor Green
+            } catch {
+                Write-Warning "could not pin '$EmbedModel' on $OllamaUrl : $($_.Exception.Message)"
+            }
+        }
         exit 0
     } catch { Start-Sleep -Seconds 4 }
 }
