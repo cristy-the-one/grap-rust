@@ -1,0 +1,374 @@
+# The Dark Factory Bring-Up: Lessons in the Seams
+
+> **Status:** living document. Started 2026-07-23, during the law-ro pilot
+> scale-up (49 → 200 → 300 → 400 docs) and the incremental-adoption loop.
+> **How to add:** append to the relevant theme, keep the narrative voice, and
+> prefer "here is the incident → here is the transferable principle → here is
+> the name the wider field already gave it." Date new entries. Correct old ones
+> in place and note the correction — this document is itself append-mostly, not
+> append-only.
+
+---
+
+## Why this document exists
+
+A "dark factory" is a plant that runs lights-out: no humans on the floor, only
+an exception queue someone glances at. The KEE dark factory tries to do that for
+knowledge — ingest documents, extract an ontology, adopt it under policy, detect
+gaps — with a local LLM and a Rust graph core, unattended.
+
+Bringing it up was not mostly an AI problem. The model behaved; the Rust core
+was fast and correct, as promised. Almost every real difficulty lived in the
+**seams**: I/O, configuration, process lifecycle, control loops, and — again
+and again — in *confident explanations that turned out to be wrong*. This
+document is the memory of that, organized so the lessons transfer rather than
+just accumulate.
+
+## The one-line thesis
+
+> **A knowledge factory is a distributed pipeline, and it fails like one.**
+> Retries, timeouts, idempotency, checkpointing, canaries, backpressure,
+> observability, the fallacies of distributed computing — the whole classical
+> catalogue showed up, unbidden, in a project nominally about LLMs and graphs.
+> The scarce skill was not ML. It was systems thinking and the discipline to
+> *measure before believing*.
+
+---
+
+## I. Measure, don't infer — the misdiagnosis thread
+
+This is the spine of the whole story, so it comes first. Over the bring-up, at
+least four "known facts" were confidently asserted and later demolished by a
+single measurement.
+
+- **"Scoring is journaling-bound; move state off synced storage."** This was
+  recorded as *finding 16*: ~2s per characteristic, near-zero CPU, therefore
+  disk/sync latency. We even moved the repo off OneDrive partly on its strength.
+  The real cause, found by profiling, was **single-text embedding round-trips**
+  to Ollama (~2.2s of pure per-request overhead). The Rust search was <1ms; a
+  full 1,671-outcome scoring pass was ~6 seconds. Storage was never involved.
+- **"The run is stalled — kill it."** A long run showed a quiet log and an idle
+  GPU on a spot check, so it looked hung. It was not: extraction *successes log
+  nothing*, and the GPU is idle *between* chunks. Killing it discarded ~6 hours
+  of in-memory work.
+- **"The model silently fell back to the Intel iGPU."** `nvidia-smi
+  --query-gpu=memory.used` reported `0 MiB`, which looks exactly like an iGPU
+  fallback. The full `nvidia-smi` process table showed the model resident on the
+  RTX the entire time. The *instrument* was unreliable for Vulkan-under-WDDM, not
+  the system.
+- **"Adoption has an anomaly — it says adopted but the ontology didn't grow."**
+  Not an anomaly: the audit trail showed each batch adopted and then the
+  **canary auto-rolled it back**. The control was working; our reading of it was
+  incomplete.
+
+**The principle.** An unfalsified hypothesis, stated with confidence, becomes
+institutional knowledge and then steers real decisions (a whole repo move).
+Plausibility is not evidence. Every one of these was resolved in minutes by one
+targeted measurement — a profiler, a delta over a window, the *other* column in
+the tool, the event log.
+
+**The parallels the field already named.**
+- *Premature optimization* (Knuth) — but the sharper edge here is
+  **premature diagnosis**: optimizing, or re-architecting, against a guessed
+  bottleneck. `finding 16` cost a storage migration that changed nothing.
+- The **scientific method / hypothesis-driven debugging**: a bug is a
+  falsifiable claim; if you can't state the experiment that would disprove your
+  theory, you don't have a theory, you have a hunch.
+- **Confirmation bias & the unreliable gauge**: a scary metric (`0 MiB`) plus a
+  prior fear (iGPU fallback) manufactured a false conclusion. *Who watches the
+  watchmen* — instrument your instruments.
+
+**What it changes going forward.** Progress is judged over a *window* (a delta,
+a rate), never a snapshot. Silence is not evidence of failure when success is
+silent — so we now watch `entities.db` mtime and completed-task counts, not
+vibes. And any "well-known" performance fact in this project is suspect until it
+has a number attached to it and a date.
+
+---
+
+## II. The process is not the state — durability
+
+For most of the bring-up, extraction was **all-or-nothing**: the working graph
+(and the manifest that makes a re-run resumable) was written only by a single
+`save()` at the very end. A 200-doc run therefore held ~18 hours of work in RAM,
+and any interruption — a kill, a hang, a client restart — vaporized it. We
+learned this the hard way twice before fixing it, and then the fix immediately
+paid for itself when an unrelated hang forced a kill and the checkpoint survived.
+
+**The principle.** Long-running stateful work must make progress *durable*
+incrementally, and must be able to *resume* rather than restart. The unit of
+value is the committed state, not the running process; treat the process as
+disposable.
+
+**The enabler was itself a lesson.** Checkpointing was "impossible" at first
+because `save()` re-embedded every concept one at a time (~62 minutes at 1,671
+concepts). Batching that embed made `save()` cost **3.7s** — a ~1000x change
+that turned a checkpoint from prohibitive to ~0.25% overhead. *A durability
+feature was gated on a performance bug three layers away.* You cannot design the
+reliability story independently of the cost story.
+
+**The parallels.**
+- **Crash-only software** (Candea & Fox): if the only way to stop is to crash,
+  then crashing must be safe and recovery must be the normal path. We made the
+  kill a non-event.
+- **Write-ahead logging / checkpointing**: the manifest is a WAL — record what's
+  durably done so replay skips it. It was *already there*; it just wasn't
+  flushed until the end. The fix was to `save()` at window boundaries, not to
+  invent a mechanism.
+- **Idempotent, resumable jobs / reconciliation loops** (the Kubernetes-style
+  "converge toward desired state"): the resumed loop asks "what's still missing
+  to reach 400 docs?" rather than "run these 100 docs," so a restart is safe.
+- **The actor model's "let it crash"**: supervised restart is only a virtue if
+  state is externalized. Ours wasn't, until it was.
+
+---
+
+## III. The failure economics of retries and timeouts
+
+We added retry-with-backoff to the LLM client to stop transient 5xx/timeouts
+from dropping chunks. It was correct — and it made a later run *worse*, because
+of a second change made in isolation: a `max_tokens=2048` cap. At ~5.8 tok/s a
+capped generation needs ~353s, but the client timeout was 300s. So every long
+generation **timed out mid-stream**, and the retry logic dutifully re-issued it
+three times — three guaranteed 300s failures, ~15 minutes burned per chunk, and
+the chunk lost anyway.
+
+**The principle.** A retry only helps if the underlying operation *can* succeed
+on retry. Retrying a structurally-doomed operation is not resilience; it's
+amplification. And **timeouts are not independent knobs** — a timeout is a
+budget, and it must dominate the worst-case work it bounds (`timeout >
+max_tokens / throughput`, with margin).
+
+**The parallels.**
+- **Retry storms / retry amplification** and the **thundering herd**: retries
+  multiply load precisely when the system is least able to absorb it. The fix in
+  the wider field is bounded retries + backoff + a **circuit breaker** that
+  stops retrying a call that keeps failing the same way. We bounded attempts;
+  the deeper fix was removing the doom (raise the timeout so the work fits).
+- **Coupling & invariants / "action at a distance"**: adding `max_tokens` (a
+  local, reasonable change) silently violated a global invariant (the timeout
+  budget). The parameters *looked* independent and were not. The remedy is to
+  reason about parameter *interactions*, and ideally to encode the invariant
+  (assert `timeout > max_tokens/throughput`) so the coupling can't be forgotten.
+- **Little's Law, obliquely**: doomed-but-retried requests occupy slots for
+  their full timeout, collapsing effective concurrency. Wasted occupancy is
+  wasted throughput.
+
+**Forward note.** Config that has arithmetic relationships (`timeout`,
+`max_tokens`, throughput; `-c` context ÷ `-np` slots; `keep_alive` vs the
+inter-request gap) should carry that arithmetic *in the code or the launch
+script*, with a comment stating the inequality. Several launch flags in
+`scripts/serve-bonsai.ps1` now do exactly this.
+
+---
+
+## IV. Chatty vs chunky — the cost lives at the interface
+
+The single most impactful performance fix was embarrassingly classic. Every
+caller in the codebase embedded texts in **batches** — except one, on the
+hottest path (concept resolution during extraction), which sent **one text per
+HTTP request**. Against a local server the per-request overhead dwarfs the work:
+50 single calls took 111s (2,222ms each); the same 50 batched took 2.67s (53ms
+each). A **42x** difference, all fixed cost, all avoidable.
+
+**The principle.** When an operation has a large fixed per-call cost (a network
+round-trip, a syscall, a transaction), the interface's *granularity* dominates
+its economics. Batch across the natural unit of work, not below it.
+
+**The parallels.**
+- This is the **N+1 query problem** verbatim — the ORM antipattern where a loop
+  issues one query per item instead of one query for the set. It showed up here
+  as N+1 *embeddings*. The same fix (fetch/compute in a batch) applied.
+- **Chatty vs chunky interfaces** (Fowler's *first law of distributed objects*:
+  "don't distribute your objects"): each fine-grained call across a boundary
+  pays the boundary's tax.
+- **Latency vs throughput**, and **amortization**: batching trades a little
+  latency-per-item for a large throughput win because the fixed cost is spread.
+  Ingest had the same bug at file granularity (batched *within* a file, not
+  *across* files) — ~200 round-trips for a 200-doc corpus, fixed by batching in
+  bounded groups that also cap peak memory.
+
+**Forward note.** The tell was *consistency*: one call site diverged from the
+established pattern of every other. In a codebase, the outlier is where the bug
+hides. A lint/review habit of "why does this one place do it differently?" would
+have caught all three batching sites for free.
+
+---
+
+## V. The environment is part of the system
+
+A cluster of incidents share a root: we treated the *environment* — filesystem,
+network, GPU, process lifetime — as a neutral backdrop, and it was an active
+participant with surprising semantics.
+
+- **OneDrive forked the state.** The pilot workspace, under a sync-conflict-prone
+  synced folder, quietly split into 17 conflict copies (`ws(1)`, `kg(1)`, …)
+  while the *unsuffixed* names became empty husks. A stateful, write-heavy
+  workload on eventually-consistent sync storage produced **split-brain**.
+- **The venv wasn't relocatable.** Moving the repo broke the console-script
+  shims (hard-coded interpreter paths), so tools silently executed against the
+  *old* location. Edits here, execution there.
+- **`localhost` hung the pipeline for 24 minutes.** On Windows dual-stack,
+  `localhost` resolves to IPv6 `::1` first; Ollama listens on IPv4 only. `curl`
+  fell back; Python's `urllib` blocked in `SYN_SENT`, and — the compounding
+  failure — the embedder had *none* of the timeout/retry hardening the LLM
+  client had. Asymmetric robustness: the weakest link was the one nobody
+  hardened.
+- **The GPU picked the wrong device, and the model got evicted.** llama.cpp
+  binds Vulkan device 0 (the iGPU) by default; Ollama unloads a model after
+  `keep_alive` idle, and under memory pressure a reload can land on CPU.
+  Implicit resource binding and implicit lifecycle, both invisible until they
+  bit.
+
+**The principle.** The environment is not configuration you set once; it is a
+set of *contracts* — consistency model, name resolution, device binding,
+resource lifetime — and each contract has fine print. "It works on my machine"
+is usually a statement about which fine print you happened to satisfy.
+
+**The parallels.**
+- **The fallacies of distributed computing** (Deutsch/Gosling): "the network is
+  reliable," "latency is zero," "there is one administrator," "the network is
+  homogeneous." The `::1`-vs-`127.0.0.1` hang is the network-is-reliable and
+  topology fallacies in miniature. `localhost` is not simple.
+- **CAP / split-brain**: OneDrive chose availability and gave us divergence. You
+  cannot put the single source of truth on a substrate that will happily make
+  two of it.
+- **Hermetic builds / 12-factor / config-as-code**: relocatable-by-design,
+  no absolute paths baked into artifacts, environment declared explicitly. The
+  venv and the server config both moved toward this (a self-verifying launch
+  script that auto-detects the discrete GPU and pins the embedder).
+- **Explicit over implicit / principle of least astonishment**: every default
+  that bit us (device 0, `keep_alive`, `localhost`) was a *reasonable* default
+  in a *different* context. Make the environment's choices explicit and
+  self-checking rather than inherited.
+- **Defense in depth, applied evenly**: hardening the LLM client but not the
+  embedder is a fence with a gate left open. Robustness has to be uniform across
+  the critical path.
+
+---
+
+## VI. Governance is a control system
+
+The dark factory's whole reason to exist is *governed* autonomy: policy-gated
+adoption, a canary that watches for regressions and rolls back, an exception
+queue. Bringing that up taught us that a governance layer is a **feedback
+controller**, and it succeeds or fails on the same terms.
+
+- **The canary rolled back every growth batch.** Adopting new legal outcomes
+  *inherently* adds ~850 self-coverage gaps (a fresh outcome's characteristics
+  don't yet have threshold-matching evidence). A canary budget of 40 "new gaps"
+  therefore auto-rolled-back *every* batch that grew the ontology. The control
+  was doing precisely what it was told; what it was told measured the wrong
+  thing. It conflated **expected growth** (new outcomes needing evidence) with
+  **regression** (existing coverage breaking).
+- **The reject pile was the treasure.** 1,904 relations were parked as
+  "ungrounded" because their endpoints (`GUVERNUL`, `MONITORUL OFICIAL`) were
+  never emitted as outcomes — and those were the *most valuable* edges in the
+  graph (issuer, publication, amendment links). Promoting endpoints that recur
+  across chunks (frequency as the gate) recovered 573 edges (401 → 974).
+
+**The principle.** A control loop optimizes exactly the proxy you give it, so
+the proxy had better mean what you think. And the *rejects* of a governed system
+are data, not garbage — the queue is a dataset.
+
+**The parallels.**
+- **Goodhart's Law / "you get what you measure"**: "minimize new gaps" is a
+  proxy for "don't regress," but during growth the proxy and the goal diverge.
+  A canary needs to distinguish *new-outcome gaps* (fine) from *existing-outcome
+  regressions* (not), or it will fight the mission. This is choosing the right
+  **SLI**.
+- **Control theory**: a controller tuned to the wrong setpoint doesn't fail
+  loudly; it oscillates or clamps. Ours clamped growth to zero and looked, at a
+  glance, like an "adoption anomaly."
+- **Canary / progressive delivery / blue-green** — but note the direct
+  isomorphism: **the dark factory *is* a CI/CD pipeline for knowledge.** Extract
+  = build; propose = artifact; churn gate = policy check; canary = canary deploy
+  with auto-rollback; adopt = promote to production; the exception queue = the
+  failed-pipeline dashboard; `adopt_proposed_ontology(..., rationale=…)` = a
+  **break-glass manual approval** with an audit record. Everything DevOps knows
+  about safe deployment applies, including that a too-strict gate is a
+  reliability problem of its own (it blocks good changes).
+- **The dead-letter queue as a source, not a sink**: the "ungrounded" pile is a
+  DLQ, and mining it (schema-on-read over the rejects) recovered the graph's
+  best structure.
+
+---
+
+## VII. The audit trail is the debugger
+
+The canary mystery — "adopted but didn't grow" — was solved *entirely* from the
+append-only event log: `ontology_adopted` events proving adoption compounded
+(2969 → 3002 → 3016), then `canary_result: failed; new=850` and
+`ontology_rolled_back` events proving why active kept reverting. No live
+debugging, no reproduction; the system had already recorded the truth.
+
+**The principle.** A system that records *why* it did what it did can be
+understood after the fact without re-running it — which, for slow, expensive,
+partly-non-deterministic pipelines, is the difference between diagnosable and
+not.
+
+**The parallels.**
+- **Event sourcing**: state is a fold over an immutable event log; the log is
+  authoritative and lets you reconstruct any past state (and the *reasons*).
+- **Observability vs monitoring**: monitoring tells you *that* something is
+  wrong; observability lets you ask *why* without shipping new code. The audit
+  trail plus per-run explanations is the "why" layer.
+- **Forensic / postmortem debugging**: the best incident reviews read the record
+  rather than re-enact the crime. Design the record so that's possible.
+
+---
+
+## Meta-observations
+
+- **The core was never the problem.** The Rust graph engine was fast and correct
+  throughout; a full scoring pass is seconds. Every multi-hour cost was LLM
+  decode, and every *outage* was in the seams — config, I/O, lifecycle, control.
+  This is the usual shape of production trouble: not the algorithm, the
+  plumbing. Budget attention accordingly (*Amdahl's Law* points at the LLM;
+  *incident statistics* point at the glue).
+- **Most fixes were subtractions or reconciliations, not inventions.** Batch the
+  one call site that wasn't batched. Flush the WAL that already existed. Make the
+  timeout respect the token budget. Use the IPv4 literal. Recover the rejects.
+  The leverage was in *consistency* and *coherence*, not new machinery.
+- **Confidence is a hazard when unmeasured.** The recurring failure mode was not
+  ignorance; it was a *fluent, plausible wrong answer* (from human and model
+  alike). The antidote was cheap, specific measurement — and the humility to run
+  it before acting.
+- **Instrument the happy path, because success is silent.** Nearly every "is it
+  stuck?" scare came from a system that logs failures loudly and successes not
+  at all. Progress needs a positive heartbeat, not just an error stream.
+
+---
+
+## Open questions / to revisit
+
+- **A growth-aware canary.** Separate "new gaps from new outcomes" (expected)
+  from "new gaps on previously-covered outcomes" (real regression), so the canary
+  can gate regressions without blocking growth. Today we widen the budget as a
+  blunt instrument.
+- **Self-coverage calibration.** Self-coverage gaps scale with ontology size
+  because characteristic-vs-evidence matching is token-coverage over a threshold.
+  Is there a normalized coverage metric that doesn't inflate with growth?
+- **Backpressure, not just retries.** We bound retries and timeouts, but the
+  system has no explicit backpressure when the LLM is saturated. Should the
+  factory throttle ingest to match extraction throughput?
+- **The environment contract as a preflight.** Many Section-V incidents would
+  have been caught by a startup preflight: assert IPv4 reachability, assert the
+  discrete GPU is bound, assert relocatable paths, assert `timeout >
+  max_tokens/throughput`. Worth formalizing.
+- **Idempotency of adoption vs the working graph.** The working graph compounds
+  monotonically while the active ontology can roll back; the divergence between
+  them under repeated batches deserves a clean mental model.
+
+---
+
+## Revision log
+
+- **2026-07-23** — Document created during the 300→400 incremental-adoption loop.
+  Captures the 49→200→300 scale-up, the checkpointing/batching/timeout/IPv4
+  fixes, the endpoint-promotion recovery, and the canary-calibration discovery.
+  Relevant commits: `b0d10b1` (self-loop parking), `c8518f3` (batch resolution
+  embeddings), `5af022e` (checkpointing + ingest batching), `d81b376` (max_tokens
+  cap + server config in-repo), `49ca25e`/`c10db8a` (endpoint promotion),
+  `c6ebe0e` (embedder IPv4 + retry), `d969315` (pin embedder), `ceb5211` (LLM
+  retry).
