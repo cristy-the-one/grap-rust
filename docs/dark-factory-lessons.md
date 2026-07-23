@@ -318,6 +318,57 @@ not.
 
 ---
 
+## Field data — the incremental-adoption study (2026-07-23/24)
+
+Sections I–VII are the qualitative lessons. This is the first quantitative one:
+what actually happens to a knowledge ontology when you grow it in small,
+individually-governed increments. We ran the factory over docs 300→400 in
+**10-document batches**, letting it auto-adopt each batch under a widened churn
+budget with the canary live — i.e. the CI/CD pipeline of Section VI, exercised
+as a controlled experiment.
+
+**Both v1 failures were the earlier themes made concrete.** The run first surfaced
+the timeout×`max_tokens` coupling (Theme III — every capped generation timed
+out) and a canary that rolled back *every* growth batch (Theme VI — a budget of
+40 "new gaps" against ~850 that adoption inherently produces). Fixed to timeout
+420 and canary 2500, the study ran clean.
+
+**The saturation curve is a plateau, not a knee.** Across six clean 10-doc
+batches (docs 350→400):
+
+| batch | docs | new outcomes | new edges | canary new-gaps | active ontology |
+|------:|-----:|-------------:|----------:|----------------:|----------------:|
+| 4 | 350 | 16 | 14 | 819 | 3061 → 3077 |
+| 5 | 360 | 16 | 15 | 830 | 3077 → 3093 |
+| 6 | 370 | 15 | 10 | 840 | 3093 → 3108 |
+| 7 | 380 | 18 | 15 | 850 | 3108 → 3126 |
+| 8 | 390 | 17 | 11 | 867 | 3126 → 3143 |
+| 9 | 400 | 17 |  6 | 869 | 3143 → 3160 |
+
+Mean marginal growth is **~16.5 outcomes per 10 documents, essentially flat**.
+The early graph added ~90 concepts per 10 docs; by 350 docs the same volume of
+Romanian legal text adds a fifth as many. But the striking part is that it does
+*not keep falling* over batches 4–9 — the dedup knee happened earlier, and we
+are watching the mature plateau, where new documents mostly **enrich existing
+outcomes** (characteristics, edges, evidence) rather than mint new ones. The
+ontology is filling in, not sprawling.
+
+**Growth compounds; gaps and canary-pressure drift up slowly.** The active
+ontology grew monotonically (2969 → 3160), every batch passed the canary, and
+"new gaps" crept 819 → 869 while outcomes-per-batch stayed flat — later
+increments are marginally less covered by prior evidence, but never near the
+2500 ceiling. Self-coverage gaps rose 1275 → 1389: new outcomes add gaps faster
+than fresh evidence resolves old ones, but the two are within sight of balancing.
+
+**The transferable reading.** This is the empirical signature of a healthy
+incremental system: bounded, predictable per-increment change; monotonic
+compounding under a governance gate that neither blocks nor rubber-stamps; and a
+cost metric (gaps) that grows sub-linearly with the corpus. It is what a
+*continuously deployed* codebase looks like when it's going well — small PRs,
+green canaries, slowly-growing but not exploding tech-debt. A **5-document**
+follow-up (docs 400→600) is running to resolve whether the plateau is truly flat
+or gently sloping at double the resolution.
+
 ## Meta-observations
 
 - **The core was never the problem.** The Rust graph engine was fast and correct
@@ -364,6 +415,12 @@ not.
 
 ## Revision log
 
+- **2026-07-24** — Added *Field data — the incremental-adoption study*: the
+  10-doc batch run (docs 300→400) completed, 9 batches, active ontology
+  compounding 2969→3160, marginal growth flat at ~16.5 outcomes/10 docs (the
+  saturation plateau). Both v1 config bugs (timeout, canary=40) recorded under
+  Themes III and VI. Launched the finer 5-doc phase (docs 400→600) to resolve
+  the plateau at double resolution.
 - **2026-07-23** — Document created during the 300→400 incremental-adoption loop.
   Captures the 49→200→300 scale-up, the checkpointing/batching/timeout/IPv4
   fixes, the endpoint-promotion recovery, and the canary-calibration discovery.
