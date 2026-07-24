@@ -369,6 +369,21 @@ green canaries, slowly-growing but not exploding tech-debt. A **5-document**
 follow-up (docs 400→600) is running to resolve whether the plateau is truly flat
 or gently sloping at double the resolution.
 
+**A scaling wall the coarse phase had hidden.** Partway through the 5-doc run,
+HTTP 400s from the model climbed to a ~20% chunk-loss rate on the largest-graph
+batches. The obvious guess was document size; the measurement said otherwise —
+chunks were capped at ~500 tokens, but *prompts* had grown to 5k–17k. The
+extraction context injected into every prompt was **unbounded**: the full
+relation vocabulary (418 verbs by 400 docs) and each context entity's *entire*
+characteristic list (one concept had 139). So the prompt grew with the ontology
+and eventually overran the model's context window — the factory getting slower
+and lossier the bigger it got. Bounded to a fixed size (a few characteristics
+per entity, the top-N verbs, a hard ceiling), an extraction prompt is now the
+same size at 3,000 outcomes as at 30. The lesson generalizes past this bug: **a
+per-item cost that scales with total accumulated state is a wall you hit later,
+not never** — and the finer-grained experiment is what made us hit it while we
+were still watching.
+
 ## Meta-observations
 
 - **The core was never the problem.** The Rust graph engine was fast and correct
@@ -388,6 +403,17 @@ or gently sloping at double the resolution.
 - **Instrument the happy path, because success is silent.** Nearly every "is it
   stuck?" scare came from a system that logs failures loudly and successes not
   at all. Progress needs a positive heartbeat, not just an error stream.
+- **The progress came from the interruptions, not the patience.** This is the
+  through-line, stated plainly: every leap — the 42× embedding batch, checkpointing,
+  the canary calibration, the bounded context — landed because we *stopped to
+  measure against a stated expectation* and let the result confirm or overturn
+  it. A hypothesis you commit to and then check is worth far more than one you
+  wait to have settled for you. The wrong guesses (finding 16, the iGPU alarm,
+  the "flat" plateau, "it's the doc size") were only wrong for as long as it took
+  to run the check — and running the check is what produced the next direction.
+  Waiting for the end result would have delivered a slower, lossier factory and
+  none of the understanding. The tight measure → hypothesize → check → correct
+  loop *was* the method; the deliverables were its residue.
 
 ---
 
@@ -415,6 +441,12 @@ or gently sloping at double the resolution.
 
 ## Revision log
 
+- **2026-07-24 (later)** — 5-doc phase (docs 400→600) surfaced a scaling wall:
+  the extraction context was unbounded and prompts overflowed the model window
+  at ~3,200 outcomes (~20% chunk loss on large-graph batches). Fixed by bounding
+  the context (`a25dfc1`), loop restarted. Added the scaling-wall note to Field
+  data and a meta-observation on why the tight measure→check loop, not patience,
+  produced the progress (the collaborator's framing).
 - **2026-07-24** — Added *Field data — the incremental-adoption study*: the
   10-doc batch run (docs 300→400) completed, 9 batches, active ontology
   compounding 2969→3160, marginal growth flat at ~16.5 outcomes/10 docs (the
