@@ -419,10 +419,21 @@ were still watching.
 
 ## Open questions / to revisit
 
-- **A growth-aware canary.** Separate "new gaps from new outcomes" (expected)
-  from "new gaps on previously-covered outcomes" (real regression), so the canary
-  can gate regressions without blocking growth. Today we widen the budget as a
-  blunt instrument.
+- **A growth-aware canary — now known to be a defect, not a nicety.** A review
+  across 27 governed batches measured the canary's discriminative power and it
+  has none: `new_gaps` sat at **mean 848, sd 17 (CV 2.0%)** while the batches
+  behind it ranged from 0 to 45 outcomes added; halving the batch size (10→5
+  docs) moved it **0.6%**; correlation with outcomes added was **−0.30**. The
+  cause is in `_canary_check`: it diffs gap *target strings*
+  (`outcome_id:characteristic`), and outcome ids are content-derived, so every
+  adoption reshuffles identities across thousands of outcomes and the count is
+  dominated by identity churn rather than lost coverage. The consequence is that
+  **no threshold discriminates** — 40 rejects every batch, 2500 accepts every
+  batch — so the factory's principal safety control is currently decorative. The
+  fix is to compare coverage only over the outcomes present in *both* runs
+  (the intersection), isolating genuine regression from expected growth and from
+  identity churn. This is a **prerequisite for "pitch black"**: autonomy without
+  a working canary is not lights-out, it is unsupervised.
 - **Self-coverage calibration.** Self-coverage gaps scale with ontology size
   because characteristic-vs-evidence matching is token-coverage over a threshold.
   Is there a normalized coverage metric that doesn't inflate with growth?
