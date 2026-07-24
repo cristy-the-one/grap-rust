@@ -183,6 +183,19 @@ mud, we have learned — cheaply, early — that this corpus lacks a clean schem
 we stop. Either outcome is progress; waiting for a finished pipeline to find out
 is the anti-pattern the lessons warn against.
 
+## Why this is the step from "dark" to "pitch black"
+
+A *dark* factory runs lights-out but still has a wall: the extraction context
+grows with the corpus, so at some scale a human must intervene (raise the window,
+bound the context — as we just did by force). A **stable, abstract schema as
+context removes the wall entirely.** The distilled TBox is small and changes
+slowly, so extraction prompts stop growing with the corpus — the factory can run
+*unbounded*, indefinitely, with no human ever resizing anything. That is the
+step from *dark* (autonomous until it hits a scaling limit) to **pitch black**
+(autonomous without one). It is the strongest reason distillation is a factory
+capability and not just a reporting convenience — provided the extrinsic test
+below confirms the schema is genuinely good extraction context.
+
 ## Becoming part of the factory
 
 The end state is a governed **distillation stage**: it runs after adoption,
