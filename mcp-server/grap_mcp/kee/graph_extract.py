@@ -108,7 +108,8 @@ def extend_graph_ontology(workdir: str, docs_path: str, provider, embedder, *,
                           max_files: Optional[int] = None, chunk_chars: int = 800,
                           progress: Optional[Callable[[dict], None]] = None,
                           concurrency: int = 1,
-                          checkpoint_every: int = 25) -> Dict[str, Any]:
+                          checkpoint_every: int = 25,
+                          promote_min_refs: int = 2) -> Dict[str, Any]:
     """Open the durable graph at `workdir`, sync it to `docs_path`, save, return stats.
 
     new chunk -> extract; changed chunk (hash differs) -> retract old + re-extract;
@@ -178,6 +179,22 @@ def extend_graph_ontology(workdir: str, docs_path: str, provider, embedder, *,
                        "concepts": len(wg._live_concepts())})
                 since_ckpt = 0
 
+        # Recover relations parked as `ungrounded` whose endpoints recur across
+        # chunks (e.g. GUVERNUL, MONITORUL OFICIAL never appear as outcomes, so
+        # the acts' issuer/publication edges are all parked). Runs before the
+        # candidate ontology is built so the recovered edges are proposed with
+        # it. Frequency (`min_refs`) is the gate; anything still ungrounded stays
+        # parked, so this only ever adds grounded structure.
+        promo = {}
+        if promote_min_refs > 0:
+            try:
+                promo = wg.promote_parked_endpoints(min_refs=promote_min_refs)
+                if promo.get("relations_recovered"):
+                    _emit({"phase": "promote", **promo})
+            except Exception:
+                logger.exception("endpoint promotion failed; continuing")
+                promo = {}
+
         ontology = wg.to_candidate_ontology(version)
         wg.save()
         _emit({"phase": "done", "added": len(new), "changed": len(changed),
@@ -189,6 +206,8 @@ def extend_graph_ontology(workdir: str, docs_path: str, provider, embedder, *,
             "added": len(new), "changed": len(changed), "removed": len(removed),
             "concepts": len(wg._live_concepts()), "edges": len(wg.relations),
             "relooks": relooks, "parked": len(wg.parked),
+            "promoted": promo.get("promoted", 0),
+            "relations_recovered": promo.get("relations_recovered", 0),
         }
     finally:
         wg.close()

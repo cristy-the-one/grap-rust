@@ -405,8 +405,27 @@ def reingest_documents(path: str) -> dict:
         return {"status": "error", "message": str(e)}
 
 
+def _baseline_outcome_ids(ws, prev_version: str):
+    """Outcome ids of the ontology that was active BEFORE this adoption.
+
+    Returns None when unavailable, which makes the canary fall back to its old
+    (undiscriminating) behaviour rather than silently pass everything."""
+    if not prev_version:
+        return None
+    try:
+        raw = ws.get_record(prev_version)
+        if not raw:
+            return None
+        import yaml
+        parsed = yaml.safe_load(raw) or {}
+        ids = {o.get("id") for o in parsed.get("process_outcomes", []) if o.get("id")}
+        return ids or None
+    except Exception:
+        return None
+
+
 def _canary_check(ws, adopted_hash: str, baseline_run_id: str = None,
-                  rename_pairs=()) -> dict:
+                  rename_pairs=(), prev_version: str = None) -> dict:
     """Gap-detection canary for a just-adopted ontology.
 
     Baseline preference: a fresh pre-adoption run from this cycle
@@ -439,8 +458,28 @@ def _canary_check(ws, adopted_hash: str, baseline_run_id: str = None,
         return old is not None and f"{old}:{char}" in resolved
 
     new_gaps = [t for t in d["new_gaps"] if not _renamed_carryover(t)]
+
+    # Only an outcome that EXISTED BEFORE can regress. A gap on a newly added
+    # outcome is expected growth — the new outcome's characteristics simply have
+    # no threshold-matching evidence yet — and counting it made the canary
+    # measure ontology churn instead of lost coverage: over 27 governed batches
+    # the raw count sat at mean 848 / sd 17 (CV 2%) while the batches behind it
+    # added anywhere from 0 to 45 outcomes, i.e. no threshold could discriminate
+    # (40 rejected every batch, 2500 accepted every batch). Partitioning against
+    # the previous ontology's outcome ids isolates the real signal.
+    prev_ids = _baseline_outcome_ids(ws, prev_version)
+    if prev_ids is None:
+        regressions, growth = new_gaps, []
+    else:
+        regressions = [t for t in new_gaps if str(t).partition(":")[0] in prev_ids]
+        growth = [t for t in new_gaps if str(t).partition(":")[0] not in prev_ids]
+
     return {"baseline_run": baseline, "canary_run": exp["run_id"],
-            "new_gaps": len(new_gaps), "detail": d.get("counts")}
+            "new_gaps": len(regressions),          # what the budget gates on
+            "regressions": len(regressions),
+            "growth_gaps": len(growth),            # expected, reported for observability
+            "raw_new_gaps": len(new_gaps),
+            "detail": d.get("counts")}
 
 
 def _run_canary(ws, prev_version, adopted_hash: str, policy: dict,
@@ -449,7 +488,8 @@ def _run_canary(ws, prev_version, adopted_hash: str, policy: dict,
     prev_version. Records a single `canary_result` event (latest-state alarm
     source). Returns fields merged into the auto_adoption report — the line
     never blocks on a canary failure."""
-    c = _canary_check(ws, adopted_hash, baseline_run_id, rename_pairs)
+    c = _canary_check(ws, adopted_hash, baseline_run_id, rename_pairs,
+                      prev_version=prev_version)
     if c.get("skipped"):
         try:
             ws.record_event("canary_result",
@@ -481,10 +521,13 @@ def _run_canary(ws, prev_version, adopted_hash: str, policy: dict,
                 "rollback_status": rollback_status}
     try:
         ws.record_event("canary_result",
-                        f"result=passed;new={c['new_gaps']};to={adopted_hash}")
+                        f"result=passed;new={c['new_gaps']};"
+                        f"growth={c.get('growth_gaps', 0)};to={adopted_hash}")
     except Exception:
         pass
     return {"canary": "passed", "new_gaps": c["new_gaps"],
+            "growth_gaps": c.get("growth_gaps"),
+            "raw_new_gaps": c.get("raw_new_gaps"),
             "canary_run": c.get("canary_run"),
             "baseline_run": c.get("baseline_run")}
 

@@ -216,3 +216,68 @@ def test_set_policy_write_back_bool_cast(tmp_path, monkeypatch):
     assert s.create_knowledge_graph(str(tmp_path / "kg"))["status"] == "ok"
     out = s.set_policy("pg_write_back", 1, rationale="cast")
     assert out["adoption_policy"]["pg_write_back"] is True
+
+
+# --- canary discriminative power (2026-07-24 review) -------------------------
+# The canary counted every new gap target, including gaps on outcomes that did
+# not exist before. Because outcome ids are content-derived, growth swamped
+# regression and no budget could discriminate. These pin the partition.
+
+class _FakeWS:
+    """Minimal workspace: get_record returns a stored ontology yaml."""
+    def __init__(self, records):
+        self._records = records
+
+    def get_record(self, h):
+        return self._records.get(h)
+
+
+def test_canary_ignores_gaps_on_newly_added_outcomes(monkeypatch):
+    import grap_mcp.server as s
+    prev_yaml = _onto([("existing_a", "A", ["c1"]), ("existing_b", "B", ["c2"])])
+    ws = _FakeWS({"prevhash": prev_yaml})
+
+    # diff says: 3 gaps on brand-new outcomes (growth) + 1 on a pre-existing one
+    monkeypatch.setattr(s, "diff_runs", lambda a, b: {
+        "status": "ok",
+        "new_gaps": ["brand_new_1:x", "brand_new_2:y", "brand_new_3:z",
+                     "existing_a:c1"],
+        "resolved_gaps": [], "counts": {}})
+    monkeypatch.setattr(s, "_run_gap_detection",
+                        lambda *a, **k: {"status": "ok", "run_id": "run-canary"})
+
+    c = s._canary_check(ws, "newhash", baseline_run_id="run-base",
+                        prev_version="prevhash")
+    assert c["raw_new_gaps"] == 4          # what the old canary would have gated on
+    assert c["growth_gaps"] == 3           # expected: new outcomes lack evidence
+    assert c["new_gaps"] == 1              # the only real regression
+    assert c["regressions"] == 1
+
+
+def test_canary_still_catches_a_real_regression(monkeypatch):
+    """A batch that adds nothing but breaks existing coverage must be caught."""
+    import grap_mcp.server as s
+    prev_yaml = _onto([("existing_a", "A", ["c1"]), ("existing_b", "B", ["c2"])])
+    ws = _FakeWS({"prevhash": prev_yaml})
+    monkeypatch.setattr(s, "diff_runs", lambda a, b: {
+        "status": "ok",
+        "new_gaps": ["existing_a:c1", "existing_b:c2"],
+        "resolved_gaps": [], "counts": {}})
+    monkeypatch.setattr(s, "_run_gap_detection",
+                        lambda *a, **k: {"status": "ok", "run_id": "run-canary"})
+
+    c = s._canary_check(ws, "newhash", baseline_run_id="run-base",
+                        prev_version="prevhash")
+    assert c["new_gaps"] == 2 and c["growth_gaps"] == 0
+
+
+def test_canary_falls_back_when_baseline_ontology_unavailable(monkeypatch):
+    """No prev ontology -> conservative old behaviour, not a silent pass."""
+    import grap_mcp.server as s
+    ws = _FakeWS({})
+    monkeypatch.setattr(s, "diff_runs", lambda a, b: {
+        "status": "ok", "new_gaps": ["x:1", "y:2"], "resolved_gaps": [], "counts": {}})
+    monkeypatch.setattr(s, "_run_gap_detection",
+                        lambda *a, **k: {"status": "ok", "run_id": "run-canary"})
+    c = s._canary_check(ws, "newhash", baseline_run_id="run-base", prev_version=None)
+    assert c["new_gaps"] == 2      # gates on everything rather than nothing
