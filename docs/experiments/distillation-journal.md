@@ -67,15 +67,62 @@ learnable schema.
 4. Emit: compression ratio, edge coverage, mean purity, the top-10 triples for
    human judgment, and the two synonym-unification checks.
 
-**Result.** _(to be filled)_
+**Result** (run 2026-07-24, `pilot-law-ro/distill_iter1.py`, snapshot
+`_backup-20260724-2109`, 3,321 concepts / 1,792 edges / 419 verbs; params
+verb_sim 0.72, top_hubs 250; artifacts in `pilot-law-ro/distillation/iter-1/`,
+5.3 s total):
 
-**Verdict.** _(to be filled)_
+| pre-registered check | threshold | measured | |
+|---|---|---|---|
+| clusters covering 80% of edges | ≤ 25 | **24** | PASS |
+| `GUVERNUL`/`Guvern`/`Guvernul României` → one class | yes | **yes** (AuthoritativeBody) | PASS |
+| `fac parte integrantă din`/`face parte…`/`is part of` → one relation | yes | **yes** (one cluster) | PASS |
+| top-10 abstract triples sensible | ≥ 7/10 | **~7–8/10** | PASS (borderline) |
+| mean purity, top-10 relations | ≥ 0.80 | **0.41** | **FAIL** |
+| typed edge coverage (both endpoints classed) | — | 56.5% | — |
 
-**Next.** If CONFIRMED → build Stage 1+2 properly and proceed to schema lifting
-(Stage 3) with support/purity gates. If REFUTED → record *why* (no clean
-predicate structure? classes too muddy?) and decide whether a different signal
-(structural role over embeddings, or a narrower relation subset) is worth one
-more iteration before abandoning.
+419 verbs → 211 clusters overall, but the head is what matters: 24 clusters carry
+80% of all edges. The verb clusters are clean and cross-lingual —
+`emite`/`EMITENT`/`emit`; `hotărăşte`/`decide`/`DECIDE`/`hotărăște`;
+`fac parte integrantă din` absorbing the English `is part of`.
+
+The single highest-support abstract triple is exactly the target of this whole
+theme:
+
+```
+AuthoritativeBody --emite--> NormativeAct    [support 221, purity 0.82]
+Official --contrasemnează--> NormativeAct    [support  71]
+StructuralPart --fac parte integrantă din--> NormativeAct  [support 22]
+NormativeAct --modificarea şi completarea--> NormativeAct   [support 18]
+```
+
+**Verdict: CONFIRMED, with the purity metric refuted.** The hypothesis — this
+corpus has a learnable grammar — holds: none of the pre-registered refutation
+criteria fired (24 ≪ 40 clusters, ~7–8/10 ≫ 4/10 coherent, both synonym sets
+unified). But purity failed badly, and the *diagnosis of why* is the real result:
+
+1. **The metric penalizes honest polysemy.** `se referă la` ("references") has
+   purity 0.21 because it legitimately connects many type pairs — that is
+   correct behaviour for a generic relation, not a defect. Averaging purity over
+   the top-10 relations therefore measures "how many generic relations are in the
+   head", not typing quality.
+2. **Direction inconsistency in the raw graph.** `NormativeAct --emite-->
+   AuthoritativeBody` (support 41) appears alongside the correct
+   `AuthoritativeBody --emite--> NormativeAct` (221) — the `EMITENT:` header
+   pattern was extracted in both directions. A genuine raw-data finding that
+   distillation surfaced.
+3. **Class induction is the bottleneck, not relation clustering.** 72/250 hubs
+   (29%) are `Unclassified` under hand-written morphology rules (`Statul de
+   reşedinţă`, `egalitatea în drepturi`, and the misspelled `Articulul 9`).
+   Coverage of 56.5% is capped by typing, not by verbs.
+
+**Next (iteration 2).** Fix the measurement and the weakest stage:
+(a) redefine purity per *(relation, direction)* and report generic vs specific
+relations separately instead of averaging — a relation's *entropy over type
+pairs* is the honest statistic; (b) normalize edge direction for
+header-derived patterns; (c) replace hand rules with real class induction
+(embedding + structural role + the promoted hub endpoints as seeds) and re-measure
+coverage. Pre-register before running.
 
 ---
 

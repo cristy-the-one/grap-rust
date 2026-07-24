@@ -218,8 +218,36 @@ is the grammar we read it through.
   3× that is genuinely distinct) vs noise. The purity/support gate must not erase
   the informative long tail.
 - **Circularity of the self-improving loop.** If the distilled schema guides
-  extraction, does extraction then merely confirm the schema? The held-out task
-  and provenance grounding are the guard, but this needs watching.
+  extraction, does extraction then merely confirm the schema? Early mistakes
+  would ossify and become invisible, because the evidence that would contradict
+  them stops being extracted — and it would *look* like improving consistency.
+  The held-out task and provenance grounding are the guard, plus:
+
+  **Anti-ossification by surprisal (the "drop boring, admit surprising" rule).**
+  A schema component should have to keep paying for itself. The principled
+  formulation is **Minimum Description Length**: a class or relation earns its
+  place only if stating it costs fewer bits than the redundancy it removes from
+  the instance graph. That gives a *measurable* definition of the intuition —
+  "boring" = a component whose removal barely changes the description length
+  (it predicts nothing new), "surprising" = an instance pattern with high
+  information gain that the current schema fails to explain. Periodically evict
+  the former and admit the latter.
+
+  This is also, structurally, **dropout**: randomly (or by low-MDL-value)
+  suppressing schema components during re-distillation prevents the schema from
+  co-adapting to its own past output, exactly as dropout stops units from
+  co-adapting during training. And it is the escape-from-local-optimum move that
+  **simulated annealing** makes by injecting temperature. The three framings agree
+  on the mechanic: keep a component only while it earns its keep, and keep a
+  channel open for the unexplained.
+
+  Concretely: (i) compute per-component MDL contribution each distillation and
+  drop those below a floor; (ii) maintain a **residual set** of high-support
+  instance patterns *not* explained by the current schema, and force each
+  re-distillation to attempt them — this is the "let in surprising items" channel
+  and doubles as the ossification alarm (a residual set that stops growing while
+  the corpus grows means extraction has started echoing the schema); (iii) keep a
+  periodic from-scratch re-distillation, ignoring the previous schema, and diff.
 - **Evaluation ground truth.** We have no gold TBox for Romanian law. Extrinsic
   task performance (abstract compliance, corpus QA) is the honest yardstick;
   intrinsic metrics only triangulate.
