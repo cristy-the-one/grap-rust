@@ -22,6 +22,7 @@ from .. import session
 from ..entity_index import EntityIndex
 
 EMBED_BATCH = 128     # texts per /embeddings request; bounds payload + peak memory
+REL_VOCAB_CAP = 40    # most-frequent relation types injected into extraction context
 
 
 @dataclass
@@ -467,7 +468,17 @@ class WorkingGraph:
                 relations.append((self._canonical_label(e["from_id"]), e["type"],
                                   self._canonical_label(e["to_id"])))
         return Context(entities=entities, characteristics=characteristics,
-                       relations=relations, relation_vocab=list(self.rel_vocab))
+                       relations=relations,
+                       relation_vocab=self._top_relation_types(REL_VOCAB_CAP))
+
+    def _top_relation_types(self, cap: int) -> List[str]:
+        """The `cap` most-frequent relation types, for the context's reuse hint.
+        The full vocabulary grows unbounded with the graph (418 types at 400
+        docs) and would bloat every extraction prompt; the common types are the
+        ones worth reusing anyway."""
+        from collections import Counter
+        counts = Counter(e["type"] for e in self.relations)
+        return [t for t, _ in counts.most_common(cap)]
 
     def context_for(self, text: str) -> Context:
         if not self.canonical:

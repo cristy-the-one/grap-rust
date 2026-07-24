@@ -87,3 +87,43 @@ def test_build_user_prompt_with_context_includes_known_block():
     empty = Context(entities=[], characteristics={}, relations=[], relation_vocab=[])
     from grap_mcp.kee.extract import build_user_prompt
     assert build_user_prompt_with_context("X", empty) == build_user_prompt("X")
+
+
+def test_context_prompt_is_bounded_regardless_of_graph_size():
+    """A concept can accumulate 100+ characteristics and the vocab hundreds of
+    verbs; the extraction prompt must NOT grow with the ontology, or it will
+    overflow the model context window at scale (law-ro 400s at ~3200 outcomes)."""
+    from grap_mcp.kee.working_graph import Context
+    from grap_mcp.kee import extract as ex
+
+    huge = Context(
+        entities=[f"Concept {i}" for i in range(16)],
+        # each entity carries 139 long characteristics (the real worst case)
+        characteristics={f"Concept {i}": [f"characteristic phrase number {j} of many"
+                                          for j in range(139)] for i in range(16)},
+        relations=[(f"Concept {i}", "rel", f"Concept {i+1}") for i in range(15)],
+        relation_vocab=[f"relation_verb_{k}" for k in range(418)],
+    )
+    prompt = ex.build_user_prompt_with_context("the chunk text here", huge)
+
+    # bounded: block ceiling + the chunk tail, comfortably under a 16k-token slot
+    assert len(prompt) <= ex.MAX_CONTEXT_CHARS + 400
+    # only a few characteristics per entity survive, not all 139
+    assert prompt.count("characteristic phrase number") <= 16 * ex.MAX_CHARS_PER_ENTITY
+    # dedup guidance preserved: entity names and the chunk still present
+    assert "Concept 0" in prompt
+    assert "the chunk text here" in prompt
+
+
+def test_relation_vocab_is_capped_by_frequency():
+    """_top_relation_types returns the most-common verbs, capped."""
+    from grap_mcp.kee.working_graph import WorkingGraph, REL_VOCAB_CAP
+    from grap_mcp.kee.embeddings import HashingEmbedder
+    import tempfile
+    wg = WorkingGraph(HashingEmbedder(), workdir=tempfile.mkdtemp(), merge_threshold=0.99)
+    # 100 distinct verbs; "common" appears most
+    wg.relations = ([{"from_id": 0, "to_id": 1, "type": "common"}] * 10 +
+                    [{"from_id": 0, "to_id": 1, "type": f"v{i}"} for i in range(100)])
+    top = wg._top_relation_types(REL_VOCAB_CAP)
+    assert len(top) == REL_VOCAB_CAP
+    assert top[0] == "common"

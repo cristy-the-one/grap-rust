@@ -47,19 +47,31 @@ CONTEXT_INSTRUCTION = (
     "instead of inventing new names. Only assert relations grounded in THIS text."
 )
 
+# The context block exists to help the model reuse canonical names for dedup —
+# it needs the entity NAMES and a few characteristics, not a concept's full
+# history. Without these caps the block grows with the ontology (a concept can
+# accumulate 100+ characteristics; the relation vocabulary hundreds of verbs),
+# so extraction prompts inflate past the model's context window as the graph
+# scales — a hidden wall that makes the factory slower and lossier the bigger it
+# gets. These bounds keep an extraction prompt the same size at 3,000 outcomes
+# as at 30.
+MAX_CHARS_PER_ENTITY = 6         # characteristics shown per known entity
+MAX_CONTEXT_CHARS = 24000        # hard ceiling on the whole KNOWN-graph block (~6k tokens)
+
 
 def build_user_prompt_with_context(text: str, context) -> str:
     """Plain user prompt, optionally prefixed with a compact KNOWN-graph block.
 
     `context` is a kee.working_graph.Context. When it carries no entities the
     prompt is identical to `build_user_prompt(text)` (no empty block, so early
-    chunks behave exactly like the stateless path)."""
+    chunks behave exactly like the stateless path). The block is bounded (see the
+    MAX_* constants) so prompt size does not grow with the ontology."""
     if not getattr(context, "entities", None):
         return build_user_prompt(text)
 
     lines = [CONTEXT_INSTRUCTION, "", "KNOWN ENTITIES:"]
     for name in context.entities:
-        chars = context.characteristics.get(name) or []
+        chars = (context.characteristics.get(name) or [])[:MAX_CHARS_PER_ENTITY]
         if chars:
             lines.append(f"- {name} (characteristics: {', '.join(chars)})")
         else:
@@ -73,9 +85,11 @@ def build_user_prompt_with_context(text: str, context) -> str:
         lines.append("")
         lines.append("RELATION VOCABULARY (reuse where apt): "
                      + ", ".join(context.relation_vocab))
-    lines.append("")
-    lines.append(build_user_prompt(text))
-    return "\n".join(lines)
+
+    block = "\n".join(lines)
+    if len(block) > MAX_CONTEXT_CHARS:      # robust ceiling, independent of graph size
+        block = block[:MAX_CONTEXT_CHARS].rstrip() + "\n… (context truncated)"
+    return f"{block}\n\n{build_user_prompt(text)}"
 
 
 def _strip_fences(s: str) -> str:
