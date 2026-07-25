@@ -160,6 +160,49 @@ inter-request gap) should carry that arithmetic *in the code or the launch
 script*, with a comment stating the inequality. Several launch flags in
 `scripts/serve-bonsai.ps1` now do exactly this.
 
+### The same lesson, a second time: the retry that outlived the run (2026-07-25)
+
+The 750-doc run finished 5/5 autonomous and its log carried one warning in every
+batch: `no JSON parsed for 20300#2`. The same chunk. Checking every run log ever
+produced, it had failed in **all of them** — 14×, 14×, 11×, 7×, 5×, 5×. So had a
+stable set of about eighteen others, most of which eventually parsed.
+
+The cause is a single line of deliberate design: a chunk that fails extraction
+does not get its content hash recorded, *so the next run tries it again*. That is
+exactly right for a transient failure and unbounded for a deterministic one.
+There was no attempt counter, so "retry next run" meant "retry every batch, for
+as long as the corpus exists" — the retry outlived the run that created it. Cost:
+one wasted generation per batch, permanently, growing with nothing.
+
+This is a **poison message** on a work queue, and the standard answer is the one
+we had already written down in this very theme and not applied here: bound the
+attempts, then **dead-letter** it. Three deterministic failures now quarantine
+the chunk; the document is untouched and the entry is reported, so it is a
+decision to stop paying, not a silent drop.
+
+Two details matter more than the fix:
+
+- **Which failures may quarantine.** Transport errors are exempt. If they
+  counted, a server outage — the one failure mode guaranteed to hit *every*
+  chunk at once — would dead-letter the entire corpus in three batches. A
+  circuit breaker that trips on the network is a system that amputates itself
+  during a brownout. There is a test pinning this.
+- **The failure was contaminating its own instrument.** Three unrelated events
+  (transport error, unparseable reply, valid-JSON-but-empty) all returned `None`
+  and were all counted as "parse failures". That is why `parse_failure_rate` read
+  exactly **0.091 in all five batches**: 2 of 22, being the same stuck chunk plus
+  one legitimately empty one, every time. A number that never moves is not a
+  measurement of the documents; it is a constant wearing a metric's name. Theme
+  VIII again, from the other end — and the giveaway was the *stability*, the same
+  tell as the 830 ± 12 canary floor.
+
+**And a third defect the fix's own test exposed:** the working graph reloaded its
+state only `if st.concepts` — so a run in which *every* chunk failed dropped its
+manifest and re-did all of that work next time. The manifest is the record of
+what was **attempted**, not of what succeeded. Conditioning recovery on the
+presence of output means the runs that most need to remember what they tried are
+precisely the ones that forget.
+
 ---
 
 ## IV. Chatty vs chunky — the cost lives at the interface
@@ -638,6 +681,14 @@ not a later refinement.
 
 ## Revision log
 
+- **2026-07-25 (latest)** — 750-doc run completed 5/5 autonomous (active 3,998 →
+  4,097). Its log exposed a chunk that had failed extraction in *every run ever
+  made* and been re-sent on every batch: added *The retry that outlived the run*
+  to Theme III (poison message → dead-letter queue; transport errors exempt so an
+  outage cannot dead-letter the corpus; three failure causes were being counted
+  as one, which is why `parse_failure_rate` read a constant 0.091). Added the
+  structural-saving lesson to Theme VIII and the companion design note
+  `docs/table-preserving-reduction.md`. Commits `ef412bc`, `292516a`.
 - **2026-07-25 (later)** — Consolidated the distillation arc: added *Theme VIII —
   the instrument is the experiment* (three instrument failures in five iterations:
   a metric that punished the truth, four quantity metrics unanimously fooled by a
