@@ -464,6 +464,16 @@ instrument failures, each of a different kind:
   "schema violations ≤ 10%". The baseline was **50%** — the threshold was
   unachievable by construction, and it nearly made me diagnose a real defect
   (type overloading) by the wrong name.
+- **A saving computed from structure, mistaken for a saving.** Three separate
+  times a benefit was calculated from the *shape* of the data and would have been
+  shipped on that number alone. Collapsing layout whitespace "saves 452 chunks
+  (~7.5 h)" — measured, it cost **44% of extracted characteristics**, because runs
+  of spaces are what delimit table cells. A corpus audit reported "exclude 142
+  flagged files, save 71 h" — inspected, every flag was legitimate formatting and
+  acting on it would have deleted **4,280 chunks of real legislation**. A distilled
+  schema as extraction context cut the prompt to 0.13× and *raised* yield 2.33× —
+  read, the model was echoing the schema and fabricating relations. Every estimate
+  was arithmetically correct. Every one was about the wrong quantity.
 
 **The principles.**
 
@@ -479,6 +489,15 @@ instrument failures, each of a different kind:
 > 10/10 chunks. Constant output is the signature of a template-filler, and it is
 > invisible to any per-chunk average. Iteration 4b pre-registered the coefficient
 > of variation as a template detector, and it worked.
+
+> **A saving computed from structure is not a saving until output quality is
+> measured on the same data.** Token counts, file counts and chunk counts are
+> proxies for cost, never for value. The proxy is cheap and feels like evidence,
+> which is exactly what makes it dangerous: it arrives already quantified, in
+> units that look like the units you care about. Before acting on any efficiency
+> estimate, run the expensive thing on a sample and compare *output*, not size —
+> and set the acceptance threshold against a measured baseline before looking at
+> the result.
 
 **The parallels.** *Goodhart's Law* again, but pointed inward — at our own
 instruments rather than at the system's controls (Theme VI). *Construct validity*
