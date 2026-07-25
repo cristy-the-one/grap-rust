@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import logging
 import math
+from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Callable, Dict, Iterator, List, Optional, Sequence, Tuple
 
@@ -16,6 +17,7 @@ from . import extract
 from .. import incremental
 from .. import session
 from .pipeline import read_chunks
+from .extract_quality import QualityMonitor
 from .working_graph import WorkingGraph
 
 logger = logging.getLogger("grap-mcp.kee")
@@ -153,13 +155,16 @@ def extend_graph_ontology(workdir: str, docs_path: str, provider, embedder, *,
                "removed": len(removed)})
         n = len(to_extract)
         since_ckpt = 0
+        qm = QualityMonitor(class_vocab=extract.CLASS_VOCAB)
         for window, frags in _extract_windows(
                 wg, to_extract, provider, concurrency,
                 on_chunk=lambda i, source: _emit(
                     {"phase": "chunk", "i": i + 1, "n": n, "source": source})):
             for (source, text), frag in zip(window, frags):
                 if frag is None:
+                    qm.record_failure()
                     continue                 # provider error/empty: do NOT record hash -> retried next run
+                qm.record(frag)
                 sig = wg.upsert_fragment(frag, source)
                 wg.manifest[source] = hashes[source]
                 since_ckpt += 1
@@ -176,8 +181,10 @@ def extend_graph_ontology(workdir: str, docs_path: str, provider, embedder, *,
             # the last one and makes an interrupted run genuinely resumable.
             if checkpoint_every > 0 and since_ckpt >= checkpoint_every:
                 wg.save()
+                qm.write(Path(workdir) / "extract_quality.json")
                 _emit({"phase": "checkpoint", "chunks_since": since_ckpt,
-                       "concepts": len(wg._live_concepts())})
+                       "concepts": len(wg._live_concepts()),
+                       "quality": qm.report()})
                 since_ckpt = 0
 
         # Recover relations parked as `ungrounded` whose endpoints recur across
@@ -197,6 +204,11 @@ def extend_graph_ontology(workdir: str, docs_path: str, provider, embedder, *,
                 logger.exception("endpoint promotion failed; continuing")
                 promo = {}
 
+        quality = qm.report()
+        qm.write(Path(workdir) / "extract_quality.json")
+        for a in quality.get("alarms", []):
+            logger.warning("extraction quality alarm: %s", a)
+
         ontology = wg.to_candidate_ontology(version)
         wg.save()
         _emit({"phase": "done", "added": len(new), "changed": len(changed),
@@ -210,6 +222,8 @@ def extend_graph_ontology(workdir: str, docs_path: str, provider, embedder, *,
             "relooks": relooks, "parked": len(wg.parked),
             "promoted": promo.get("promoted", 0),
             "relations_recovered": promo.get("relations_recovered", 0),
+            "quality": quality,
+            "context_mode": extract.CONTEXT_MODE,
         }
     finally:
         wg.close()

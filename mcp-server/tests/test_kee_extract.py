@@ -70,8 +70,14 @@ def test_extract_fragments_skips_empty_outcomes_and_relations():
 
 
 def test_build_user_prompt_with_context_includes_known_block():
+    """Pins the legacy "full" mode, which lists characteristics, known relations
+    and a relation vocabulary. The default is now "names" (see
+    test_names_mode_lists_instances_but_no_patterns) because listing patterns
+    caused the model to instantiate them; "full" is kept for comparison."""
     from grap_mcp.kee.working_graph import Context
-    from grap_mcp.kee.extract import build_user_prompt_with_context
+    from functools import partial
+    from grap_mcp.kee.extract import build_user_prompt_with_context as _b
+    build_user_prompt_with_context = partial(_b, mode="full")
 
     ctx = Context(
         entities=["Test Plan", "Verification"],
@@ -87,6 +93,8 @@ def test_build_user_prompt_with_context_includes_known_block():
     empty = Context(entities=[], characteristics={}, relations=[], relation_vocab=[])
     from grap_mcp.kee.extract import build_user_prompt
     assert build_user_prompt_with_context("X", empty) == build_user_prompt("X")
+    # and the same holds in the default "names" mode with nothing to say
+    assert _b("X", empty) == build_user_prompt("X")
 
 
 def test_context_prompt_is_bounded_regardless_of_graph_size():
@@ -127,3 +135,56 @@ def test_relation_vocab_is_capped_by_frequency():
     top = wg._top_relation_types(REL_VOCAB_CAP)
     assert len(top) == REL_VOCAB_CAP
     assert top[0] == "common"
+
+
+# --- context mode "names" (measured-best format, distillation iter 4b arm C) ---
+
+def test_names_mode_lists_instances_but_no_patterns(monkeypatch):
+    """The asymmetry: instances are safe to list (reuse = dedup), patterns are not
+    (reuse = assert). 'names' mode must carry NO relations and NO relation vocab."""
+    from grap_mcp.kee.working_graph import Context
+    from grap_mcp.kee import extract as ex
+
+    ctx = Context(entities=["ORDONANŢA nr. 33", "GUVERNUL"],
+                  characteristics={"ORDONANŢA nr. 33": ["a", "b", "c"]},
+                  relations=[("GUVERNUL", "emite", "ORDONANŢA nr. 33")],
+                  relation_vocab=["emite", "contrasemnează", "adoptată de"])
+    p = ex.build_user_prompt_with_context("chunk text", ctx, mode="names")
+
+    assert "ORDONANŢA nr. 33" in p and "GUVERNUL" in p     # instances present
+    assert "chunk text" in p
+    assert "RELATION VOCABULARY" not in p                   # no pattern list
+    assert "KNOWN RELATIONS" not in p
+    assert "contrasemnează" not in p                        # vocab not leaked
+    assert "characteristics:" not in p                      # no characteristic dump
+    assert "ONLY if THIS text states it" in p               # assert-only instruction
+    # and it is much smaller than full mode
+    assert len(p) < len(ex.build_user_prompt_with_context("chunk text", ctx, mode="full"))
+
+
+def test_names_mode_caps_the_name_list():
+    from grap_mcp.kee.working_graph import Context
+    from grap_mcp.kee import extract as ex
+    ctx = Context(entities=[f"Concept {i}" for i in range(200)],
+                  characteristics={}, relations=[], relation_vocab=[])
+    block = ex.build_names_context(ctx, class_vocab=["Foo"])
+    assert block.count("- Concept ") == ex.MAX_NAMES
+    assert "Foo" in block
+
+
+def test_class_vocab_is_configuration_not_hardcoded(monkeypatch):
+    """Class names are DOMAIN content; the generic extractor must not carry them."""
+    import importlib
+    from grap_mcp.kee.working_graph import Context
+    monkeypatch.setenv("GRAP_KEE_CLASS_VOCAB", "Alpha, Beta")
+    import grap_mcp.kee.extract as ex
+    ex = importlib.reload(ex)
+    try:
+        ctx = Context(entities=["X"], characteristics={}, relations=[], relation_vocab=[])
+        assert "Alpha, Beta" in ex.build_names_context(ctx)
+        monkeypatch.delenv("GRAP_KEE_CLASS_VOCAB")
+        ex2 = importlib.reload(ex)
+        assert ex2.CLASS_VOCAB == []
+    finally:
+        monkeypatch.delenv("GRAP_KEE_CLASS_VOCAB", raising=False)
+        importlib.reload(ex)

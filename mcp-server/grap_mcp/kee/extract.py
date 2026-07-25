@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 logger = logging.getLogger("grap-mcp.kee")
@@ -57,15 +58,70 @@ CONTEXT_INSTRUCTION = (
 # as at 30.
 MAX_CHARS_PER_ENTITY = 6         # characteristics shown per known entity
 MAX_CONTEXT_CHARS = 24000        # hard ceiling on the whole KNOWN-graph block (~6k tokens)
+MAX_NAMES = 24                   # known concept names shown in "names" mode
+
+# Context mode. "names" is the measured-best format (law-ro distillation iteration
+# 4b, arm C): class vocabulary + known concept NAMES only, no characteristics, no
+# known relations, no relation vocabulary. It measured 0.28x the prompt size of
+# "full" at 0.91x yield, with MORE relation-type diversity (37 vs 34) and zero
+# schema violations.
+#
+# The reason is an asymmetry in what may go into an LLM's context:
+#   listing INSTANCES is safe and useful  -> "reuse what you see" IS deduplication
+#   listing PATTERNS  is unsafe           -> "reuse what you see" becomes "assert this"
+# Given typed axioms as context the model fabricated instances of every one of
+# them; given a closed list of permitted relation TYPES it overloaded them until
+# relation objects became verb clauses and distinct types collapsed 34 -> 14.
+# "full" mode still lists KNOWN RELATIONS and a RELATION VOCABULARY, i.e. patterns,
+# and is kept only for comparison.
+CONTEXT_MODE = os.environ.get("GRAP_KEE_CONTEXT_MODE", "names").strip().lower()
+
+# Class vocabulary is DOMAIN content, so it is injected by configuration rather
+# than hard-coded here (comma-separated). Empty -> the class line is omitted.
+CLASS_VOCAB = [c.strip() for c in
+               os.environ.get("GRAP_KEE_CLASS_VOCAB", "").split(",") if c.strip()]
+
+NAMES_INSTRUCTION = (
+    "Assert a relation ONLY if THIS text states it. Name concepts as the text "
+    "names them (the actual act, body or person), never with a kind-name."
+)
 
 
-def build_user_prompt_with_context(text: str, context) -> str:
-    """Plain user prompt, optionally prefixed with a compact KNOWN-graph block.
+def build_names_context(context, class_vocab=None, max_names: int = MAX_NAMES) -> str:
+    """The 'names' context block: class vocabulary + known concept names only.
 
-    `context` is a kee.working_graph.Context. When it carries no entities the
-    prompt is identical to `build_user_prompt(text)` (no empty block, so early
-    chunks behave exactly like the stateless path). The block is bounded (see the
-    MAX_* constants) so prompt size does not grow with the ontology."""
+    Deliberately contains no relations, no relation vocabulary and no
+    characteristics — nothing the model can mistake for a fact to instantiate."""
+    names = [n for n in (getattr(context, "entities", None) or [])][:max_names]
+    vocab = class_vocab if class_vocab is not None else CLASS_VOCAB
+    if not names and not vocab:
+        return ""
+    lines = []
+    if vocab:
+        lines.append("VOCABULARY for this corpus. Prefer these names for kinds of "
+                     "thing when they apply: " + ", ".join(vocab) + ".")
+    if names:
+        lines.append("KNOWN CONCEPT NAMES (reuse the exact name if the same concept "
+                     "appears here; this list is for naming consistency only and "
+                     "asserts nothing):")
+        lines.extend(f"- {n}" for n in names)
+    lines.append(NAMES_INSTRUCTION)
+    block = "\n".join(lines)
+    if len(block) > MAX_CONTEXT_CHARS:
+        block = block[:MAX_CONTEXT_CHARS].rstrip() + "\n… (context truncated)"
+    return block
+
+
+def build_user_prompt_with_context(text: str, context, mode: str = None) -> str:
+    """Plain user prompt, optionally prefixed with a bounded context block.
+
+    `context` is a kee.working_graph.Context. With no entities the prompt is
+    identical to `build_user_prompt(text)`, so early chunks behave exactly like the
+    stateless path. `mode` defaults to CONTEXT_MODE ("names"; see above)."""
+    if (mode or CONTEXT_MODE) == "names":
+        block = build_names_context(context)
+        return f"{block}\n\n{build_user_prompt(text)}" if block else build_user_prompt(text)
+
     if not getattr(context, "entities", None):
         return build_user_prompt(text)
 
