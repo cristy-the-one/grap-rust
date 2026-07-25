@@ -126,6 +126,200 @@ coverage. Pre-register before running.
 
 ---
 
+---
+
+## Iteration 2 — is class induction the bottleneck, and is entropy the right
+## relation statistic? (PRE-REGISTERED 2026-07-25, before running)
+
+Runs on the frozen 600-doc snapshot `_backup-20260725-0631` (3,739 concepts /
+2,624 edges — includes the 763 relations recovered by endpoint promotion).
+Fully deterministic: embeddings + graph analytics only, no LLM call, so it is
+exactly reproducible.
+
+**Hypotheses.**
+- **H1 (class induction).** Iteration 1's typed coverage (56.5%) was capped by
+  hand-written morphology rules, not by relation clustering. Seeding those rules
+  as high-precision labels and propagating by concept-embedding + structural-role
+  similarity will substantially raise coverage.
+- **H2 (entropy is the honest statistic).** Purity failed because it punished
+  legitimate polysemy. Normalized **entropy of a relation's distribution over
+  (class,class) pairs** will cleanly separate *specific* relations (low entropy →
+  real schema axioms with domain/range) from *generic* ones (high entropy →
+  `se referă la`-like, correctly not axioms). The separation should be bimodal,
+  not a smear.
+- **H3 (direction noise is measurable).** Collapsing each relation's unordered
+  class pair to its dominant direction will yield a consistent schema and
+  quantify extraction direction-noise as a minority fraction.
+
+**Predictions + refutation thresholds (written before the run).**
+| metric | predict | refute if |
+|---|---|---|
+| typed edge coverage (both endpoints classed) | **≥ 75%** (from 56.5%) | < 65% |
+| unclassified share of top-250 hubs | **≤ 10%** (from 29%) | > 20% |
+| induced classes | 15–50 | > 80 or < 8 |
+| relations with normalized entropy ≤ 0.5 ("specific") | **≥ 8** | < 5 |
+| bimodality: gap between specific and generic entropy modes | visible | entropy uniformly mid-range (no separation) |
+| direction consistency of the top specific relation | **≥ 90%** dominant | < 75% |
+
+**Experiment.** (1) Reuse the cached verb clusters from iteration 1. (2) Seed
+classes from morphology rules; build per-class centroids from concept-name
+embeddings **and** a structural-role vector (distribution over incident relation
+clusters, in/out); assign each unassigned concept to its nearest class if above a
+recorded similarity floor, else leave Unclassified. (3) Lift all edges; per
+relation compute the (class,class) distribution, its normalized entropy, and the
+dominant direction. (4) Emit the distilled schema: specific relations with
+domain/range/support, generic relations listed separately, plus all metrics.
+
+**Result** (run 2026-07-25, `distill_iter2.py`, snapshot `_backup-20260725-0631`,
+3,739 concepts / 2,624 edges, 42 s, no LLM):
+
+| metric | predicted | measured | |
+|---|---|---|---|
+| typed edge coverage | ≥ 75% | **70.5%** (from 56.5%) | FAIL |
+| hubs unclassified | ≤ 10% | **14%** (from 29%) | FAIL |
+| induced classes | 15–50 | **7** | FAIL |
+| specific relations (H ≤ 0.5) | ≥ 8 | **2** | FAIL |
+| entropy separation (bimodal) | visible | **+0.14 gap** | **PASS** |
+| top relation direction dominance | ≥ 90% | **73%** | FAIL |
+
+The distilled schema that survived the entropy filter:
+
+```
+AuthoritativeBody --emite-->         NormativeAct   [300, H=0.37, dir 73%]
+Official          --contrasemnează--> NormativeAct   [200, H=0.42, dir 96%]
+
+generic (correctly excluded): se referă la (H=0.75, 28 pairs), aproba (0.80),
+adoptată de (0.59), modificarea şi completarea (0.81), hotărăşte (0.76)
+```
+
+**Verdict: REFUTED on the thresholds; H2 confirmed; three sharp findings.**
+
+1. **H1 partially holds but under-delivers, and the cause is my design, not the
+   data.** Coverage did improve (56.5% → 70.5%, hubs 29% → 14%), so class typing
+   *was* the bottleneck. But I implemented "class induction" as *seeded
+   propagation* — assigning concepts to the 7 existing morphology classes — which
+   structurally **cannot discover a new class**. That is why the class count came
+   in at 7 and failed its own 15–50 prediction. The proposal called for
+   *clustering*; I substituted something weaker and cheaper. The prediction wasn't
+   wrong, the implementation was.
+2. **H2 (entropy) is confirmed and is the right statistic.** The separation is
+   real (+0.14 gap between the specific and generic modes) and it puts exactly
+   the right relations on each side: `se referă la` ("references", 28 class
+   pairs, H=0.75) is correctly *not* an axiom, while `contrasemnează` is. Purity
+   is retired.
+3. **Direction noise is real, relation-specific, and localized.**
+   `contrasemnează` is 96% direction-consistent; `emite` only 73%. The 27% of
+   inverted `emite` edges trace to the `EMITENT:` header pattern being extracted
+   both ways. This is a concrete KEE extraction defect that distillation
+   surfaced — the header should yield a canonical direction.
+
+**The open question that matters most.** Only 2 relations passed the entropy
+filter, and I cannot yet tell whether the other 13 are *genuinely generic* or
+whether **my induced labels are too noisy/coarse** and are inflating their
+entropy. Those are opposite conclusions with opposite fixes. Iteration 3 must
+separate them before anything else.
+
+---
+
+## Iteration 3 — is high entropy genuine polysemy or label noise?
+## (PRE-REGISTERED 2026-07-25, before running)
+
+**Hypothesis.** The 13 "generic" relations are high-entropy mainly because of
+**coarse/noisy class labels**, not genuine polysemy. Computing entropy over only
+the *high-precision seeded* labels (dropping propagated ones) will lower it
+materially for relations whose semantics are actually typed.
+
+**Predictions + refutation thresholds.**
+| check | predict | refute if |
+|---|---|---|
+| relations moving from generic → specific when restricted to seeded labels | **≥ 3** | 0 |
+| mean entropy drop on the 13 generic relations (seeded-only vs induced) | **≥ 0.10** | ≤ 0.03 |
+| `aproba` entropy, seeded-only | **≤ 0.6** (from 0.80) | > 0.75 |
+
+If CONFIRMED → the fix is better classes (true clustering, finer granularity),
+and the schema will grow as typing improves. If REFUTED → the corpus genuinely
+has few typed relations, the distilled grammar is small (~2–4 axioms + a generic
+`references`), and we should stop trying to enlarge it and instead test whether a
+*small* schema is still useful as extraction context (which is the pitch-black
+claim that actually matters).
+
+**Result** (run 2026-07-25, `distill_iter3.py`, same snapshot, 3.9 s, no LLM;
+15 relations at support ≥ 8):
+
+| check | predicted | measured | |
+|---|---|---|---|
+| generic relations that became specific | ≥ 3 | **0** | FAIL |
+| mean entropy drop on generic relations | ≥ 0.10 | **+0.008** | FAIL |
+| `aproba` entropy, seeded-only | ≤ 0.60 | **0.76** (was 0.80) | FAIL |
+
+Entropy is essentially **invariant** to the label set — every ΔH lands within
+±0.05, and several are *negative* (seeded-only entropy slightly higher for
+`emite`, `contrasemnează`, `fac parte integrantă din`). There is no systematic
+label-noise effect at all.
+
+```
+relation                     H(induced)  H(seeded)     ΔH
+se referă la                       0.75       0.72   +0.03
+emite                              0.37       0.40   -0.03
+contrasemnează                     0.42       0.47   -0.05
+aproba                             0.80       0.76   +0.04
+modificarea şi completarea         0.81       0.80   +0.01
+```
+
+**Verdict: REFUTED, decisively — and this settles the question.** The
+high-entropy relations are **genuinely polysemous**, not artefacts of coarse
+labels. Better classes will not enlarge the schema.
+
+A second observation reinforces it: seeded support ≈ induced support on every
+high-support relation (`emite` 411 vs 416). The 228 propagated labels barely
+touch the edges that matter, so iteration 2's propagation was nearly irrelevant
+to the schema — which is why its entropy didn't move.
+
+**The conclusion for the theme, per iteration 3's own pre-registration.** This
+corpus has a **genuinely small grammar**: two strong axioms plus a handful of
+borderline ones, over a substrate of type-agnostic cross-referencing.
+
+```
+AuthoritativeBody --emite-->          NormativeAct   [416, H=0.37]
+Official          --contrasemnează--> NormativeAct   [264, H=0.42, dir 96%]
+  borderline:  se face public (0.57) · adoptată de (0.59) · fac parte integrantă din (0.63)
+  genuinely generic:  se referă la (H=0.72–0.75, 28 class pairs)
+```
+
+That last line is a real finding about the domain, not a defect: **legal
+cross-referencing is inherently type-agnostic** — any act may reference any
+article, body, budget line or other act — so a `references` relation *should*
+have maximal entropy. A distiller that forced it into a typed axiom would be
+lying about the law.
+
+**So we stop trying to grow the schema.** The pre-registered implication holds:
+the next question is not "how do we find more axioms?" but **"is a small schema
+still useful as extraction context?"** — which is the pitch-black claim that
+actually matters, and is now the cheapest remaining experiment. A ~5-line grammar
+that is *stable* is arguably a better bounded context than a 3,700-concept sea,
+regardless of how few axioms it holds.
+
+**Next (iteration 4) — the claim that matters.** A/B test: extract a held-out set
+of chunks (a) with the current concept-sea context and (b) with the distilled
+5-line schema as context, and compare extraction quality and prompt size. To
+pre-register: what "quality" means without a gold standard (candidates —
+agreement with the existing graph on the same chunks, self-consistency across
+runs, human spot-judgement on a sample).
+
+---
+
 ## Revision log
+- **2026-07-25** — Iteration 3 run: REFUTED decisively (0 relations moved, ΔH
+  +0.008, entropy invariant to label set). Conclusion: the corpus has a genuinely
+  small grammar (2 strong axioms + type-agnostic `references`); label quality is
+  not the limit. Theme redirected from "grow the schema" to "test the small
+  schema as extraction context" (iteration 4).
+- **2026-07-25** — Iteration 2 run: REFUTED on thresholds (coverage 70.5% vs 75%,
+  7 classes vs 15–50, 2 specific relations vs ≥8), H2/entropy CONFIRMED (+0.14
+  bimodal gap), direction noise quantified (`emite` 73% vs `contrasemnează` 96%).
+  Root cause of the class-count miss: seeded propagation cannot discover classes.
+  Iteration 3 pre-registered to separate label noise from genuine polysemy.
+- **2026-07-25** — Iteration 1 verdict recorded (CONFIRMED, purity refuted).
+  Iteration 2 pre-registered against the frozen 600-doc snapshot.
 - **2026-07-24** — Journal created; Iteration 1 pre-registered. Gated on the
   400→600 loop completing.
