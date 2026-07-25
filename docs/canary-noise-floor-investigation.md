@@ -1,6 +1,9 @@
 # The canary noise floor — open investigation
 
-> **Status:** OPEN. Tracked 2026-07-25 after the 650→700 autonomous run.
+> **Status:** OPEN, but narrowed. E0 executed 2026-07-26 (see below): the canary
+> *baseline* run is the outlier, not the candidate; three hypotheses refuted; a
+> concrete code-level mechanism identified with a one-line test to confirm it.
+> Tracked 2026-07-25 after the 650→700 autonomous run.
 > **Impact:** the canary cannot currently act as a fine-grained regression gate.
 > Mitigated (not fixed) by calibrating `canary_max_new_gaps` to the measured
 > floor, so it functions as a gross-failure detector. See
@@ -95,7 +98,88 @@ that did not exist at the baseline run).
 This also sharpens the decisive experiment below: the phenomenon reproduces
 without the canary, so the experiment can be run purely with production gap runs.
 
-## The decisive experiment (next step)
+## E0 executed (2026-07-26) — the baseline run is the outlier
+
+Run offline against the verified snapshot `_backup-20260726-0226`, resolving each
+run's `explanation_hashes` through the content-addressed object store. No GPU, no
+mutation, nothing touched in the live pilot. **The persisted explanations carry
+the retrieval query, the retrieved node ids, their scores and their per-hit
+coverage** — enough to answer most of this without re-running anything.
+
+Take two runs with the **same ontology hash, same scope, same weights**, 32
+minutes apart:
+
+| run | kind | when | gaps |
+|---|---|---|---|
+| run-d945d462 | Production | 01:16 | **1,579** |
+| run-00173908 | canary baseline | 01:48 | **824** |
+
+Diffed by target: 731 shared, **848 flagged only by production**, 93 only by the
+baseline. So the canary's "~830 new gaps attributed to the candidate" is not
+adoption adding gaps at all. **The candidate run (1,615) is consistent with the
+previous production run (1,579). It is the *baseline* that is anomalously low**,
+and the canary subtracts it from a normal number and reports the difference as
+regression. We have been reading a broken reference, not a damaged subject.
+
+### Three hypotheses refuted, offline
+
+| hypothesis | test | verdict |
+|---|---|---|
+| Node-id instability across projection (candidate B) | 737 nodes retrieved by both runs, compared id → snippet text | **falsified** — 0 mismatches |
+| The baseline sees the projected ontology as its own evidence (self-coverage) | inspected the 471 nodes only the baseline retrieved | **falsified** — all ordinary document chunks (legal text), no ontology text |
+| Production applies a leave-one-out exclusion of an outcome's own source chunks | self-match score of dropped vs kept hits | **falsified** — dropped hits are *less* self-matching (0.28 vs 0.44) |
+
+### What is actually different
+
+- **Retrieval depth.** Production returns 2–3 hits where the baseline returns 5;
+  906 baseline hits are absent from production's results. Production is
+  *excluding more nodes*.
+- **Scores move, slightly.** Of 2,433 common (target, node) score pairs, 67.8%
+  are bit-identical and 32.2% move — median ratio 1.0018, full range 0.947–1.044.
+  So the index is not static between the runs, but the perturbation is ±5%.
+- **Coverage is not piled against the threshold.** Max coverage per gap target:
+  652 of 1,579 sit at 0.00–0.05 (true misses) and only ~85 lie within 0.10 of the
+  0.6 cut. Threshold adjacency can explain a minority of flips, **not** ~830 —
+  worth stating because it was my first hypothesis and the data does not support
+  it.
+
+### The mechanism this points to (not yet proven)
+
+Both call sites pass `exclude_nodes=getattr(_state, "projected_nodes", set())`
+(`server.py:2380`, `server.py:2425`). That attribute is assigned a fresh `set()`
+**only** when a KG is created or a workspace opened (`:87`, `:119`, `:137`,
+`:338`). Every adoption, rollback and ontology load instead does
+`.update(...)` (`:1021`, `:1138`, `:2288`, `:2326`) — the set only ever grows.
+
+Within a single batch the ordering is fixed: the canary baseline runs **before**
+`_adopt_record` updates the set, and the production run **after**. The two runs
+therefore *provably* score with different exclusion sets, one of them larger by
+a whole projection. A larger exclusion set removes candidate evidence from
+retrieval → shallower hit lists → lower coverage → more gaps. That is precisely
+the asymmetry measured above, in the right direction and roughly the right size,
+and it explains what the refuted hypotheses could not: the dropped nodes are
+ordinary document chunks with no semantic relationship to the target, because
+they are being excluded **by id, not by meaning**.
+
+It also explains two things previously filed as coincidence: two consecutive
+pre-adoption runs are identical (919, 919 — no adoption between them, so no
+update), and the floor creeps upward as the ontology grows (818→863 over the 750
+run, 822→868 over the 800 run).
+
+### The one-line test that settles it
+
+Record `len(exclude_nodes)` in each run's summary alongside `scope` and
+`weights`. If the canary baseline and the production run of the same batch report
+different sizes, this is confirmed and the fix is to make `projected_nodes`
+describe the *current* projection (replace, not union) — and, separately, to
+decide whether gap scoring should exclude projected nodes from the **index**
+rather than from the **results**, since excluding them from results still lets
+them shift BM25 statistics.
+
+This supersedes the "decisive experiment" below as the cheapest next step: it
+needs no snapshot, no re-projection, and no factory downtime.
+
+## The decisive experiment (superseded, kept for reference)
 
 Isolate projection from ontology change:
 
