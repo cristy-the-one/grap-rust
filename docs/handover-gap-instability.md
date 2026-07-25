@@ -201,12 +201,20 @@ once the index changes shape under S2.
    chunk with reason `unparseable` (visible in the queue, like parked
    relations). Identify the current offenders and check whether they are the
    repetition-degeneration documents.
-4. **Layout-run normalization (decision pending measurement):** collapsing dot
-   leaders/box-drawing/column padding saves ~452 chunks (~7.5 h) over the
-   remaining corpus, but it changes chunk ids (full re-extract if applied to
-   processed docs) and *may harm table extraction*. Test extraction quality on
-   ~5 table-heavy chunks first (18425, 18903, 50956 are the biggest wins);
-   apply to **new documents only** if it passes.
+4. **Layout-run normalization — TESTED AND REJECTED (2026-07-25).** Do not
+   implement. A/B extraction on the five biggest-saving (most table-heavy)
+   chunks, same prompt/model/parser, raw vs cleaned:
+   **outcomes 0.65x, characteristics 0.56x, relations 0.78x** — cleaning loses
+   44% of characteristics. Mechanism: collapsing runs of spaces destroys the
+   column alignment that DELIMITS TABLE CELLS, so adjacent cells fuse and the
+   model stops seeing them as distinct data points (`17126.json` 1999->490 chars,
+   24->8 characteristics; `18903.json` 1896->162 chars, 1->0 outcomes). The
+   padding is load-bearing, not noise. Artifacts:
+   `pilot-law-ro/distillation/cleaning-test/`, driver `test_cleaning.py`.
+   *Untested refinement, if the ~7.5h is ever worth chasing:* drop box-drawing
+   and dot leaders only (pure noise) while converting space runs to an EXPLICIT
+   delimiter (e.g. ` | `) so cell boundaries survive rather than vanish. Would
+   need its own A/B before adoption.
 5. **Arm the rate-budget in default policy:** `max_outcomes_added_per_chunk=3.0`
    proved itself; it currently lives only in the loop driver's per-run policy.
    Decide whether it belongs in `DEFAULT_ADOPTION_POLICY` (with `enabled` still
