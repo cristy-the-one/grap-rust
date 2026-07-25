@@ -1326,9 +1326,20 @@ def list_pending_interventions(limit: int = None, cursor: str = None) -> dict:
                               "ts": ev.ts,
                               "age_s": max(0, round((now_ms - ev.ts) / 1000))})
         ev = _latest_event(ws, "gap_delta")
-        if ev and int(_kv_subject(ev.subject).get("new", 0) or 0) > 0:
-            items.append({"kind": "gap_regression", "subject": ev.subject,
-                          "ts": ev.ts, "age_s": max(0, round((now_ms - ev.ts) / 1000))})
+        if ev:
+            kv = _kv_subject(ev.subject)
+            new = int(kv.get("new", 0) or 0)
+            resolved = int(kv.get("resolved", 0) or 0)
+            # Fire on a NET regression, not on any new gap at all. Counting gross
+            # additions made "new=3; resolved=6" — a net improvement of three —
+            # queue as a regression, the same gross-vs-net flaw the canary had
+            # (it counted gaps on newly added outcomes as regressions until
+            # `_baseline_outcome_ids` partitioned them). A cycle that resolves at
+            # least as many gaps as it introduces is not a regression.
+            if new > resolved:
+                items.append({"kind": "gap_regression", "subject": ev.subject,
+                              "ts": ev.ts,
+                              "age_s": max(0, round((now_ms - ev.ts) / 1000))})
         ev = _latest_event(ws, "canary_result")
         if ev and _kv_subject(ev.subject).get("result") == "failed":
             items.append({"kind": "canary_failed", "subject": ev.subject,

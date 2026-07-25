@@ -368,3 +368,46 @@ def test_rate_budget_disabled_by_default_preserves_behaviour():
     res = evaluate_proposal_dict(target, base, pol)
     churn = next(c for c in res["checks"] if c["name"] == "churn")
     assert churn["ok"]                     # no rate check applied
+
+
+# --- gap_regression must fire on a NET regression, not any new gap ------------
+
+class _EvWS:
+    """Workspace stub exposing only what list_pending_interventions reads."""
+    def __init__(self, subject):
+        self._subject = subject
+
+    def query_events(self, kind, **kw):
+        if kind != "gap_delta":
+            return []
+        class E:
+            pass
+        e = E(); e.subject = self._subject; e.ts = 1
+        return [e]
+
+    def list_runs(self, *a, **k):
+        return []
+
+    def read_audit(self, *a, **k):
+        return []
+
+
+def _gap_alarm_fires(subject, monkeypatch):
+    import grap_mcp.server as s
+    monkeypatch.setattr(s, "_get_workspace", lambda: _EvWS(subject))
+    monkeypatch.setattr(s, "_open_kee_workdir_parked", lambda *a, **k: [], raising=False)
+    q = s.list_pending_interventions()
+    return any(i.get("kind") == "gap_regression" for i in q.get("pending", []))
+
+
+def test_net_improvement_is_not_a_gap_regression(monkeypatch):
+    """new=3, resolved=6 is a net gain of three and must NOT queue."""
+    assert not _gap_alarm_fires("new=3;resolved=6;run=run-x", monkeypatch)
+
+
+def test_net_regression_still_fires(monkeypatch):
+    assert _gap_alarm_fires("new=9;resolved=2;run=run-x", monkeypatch)
+
+
+def test_equal_new_and_resolved_is_not_a_regression(monkeypatch):
+    assert not _gap_alarm_fires("new=4;resolved=4;run=run-x", monkeypatch)
