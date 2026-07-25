@@ -203,6 +203,23 @@ what was **attempted**, not of what succeeded. Conditioning recovery on the
 presence of output means the runs that most need to remember what they tried are
 precisely the ones that forget.
 
+**Measured on the next run (800 docs, five batches).** The lumped rate that had
+been pinned at 0.091 went **0.136 → 0.087 → 0.091 → 0.000 → 0.050**. Batch 4 is
+the first batch in the project's history with *no* failed chunk — and under the
+old code that fact was unobservable, because the constant was hiding it. The
+dead-letter queue quarantined exactly two chunks, both at batch 3 (three attempts
+each), and left a third alone at one attempt, still eligible. The metric now
+tracks the documents instead of tracking one stuck chunk.
+
+The confirmation worth keeping is the second quarantine, `18897#8`, reason
+`empty`. It had been failing on every batch for as long as `20300#2` had — and it
+had **never printed a warning**, because only the unparseable branch logged. It
+was visible solely as the gap between "one warning in the log" and
+"parse_failures: 2" in the telemetry. The stuck chunk we could see cost the same
+as the stuck chunk we could not; the only reason the invisible one got fixed is
+that the visible one led us to the code path they shared. **A defect with no log
+line is not a smaller defect — it is the same defect with the evidence removed.**
+
 ---
 
 ## IV. Chatty vs chunky — the cost lives at the interface
@@ -681,6 +698,12 @@ not a later refinement.
 
 ## Revision log
 
+- **2026-07-26** — 800-doc run completed 5/5 autonomous (active 4,097 → 4,222),
+  the second consecutive fully unattended round and the first carrying the
+  dead-letter queue. Measured confirmation added to Theme III: the parse-failure
+  rate, constant at 0.091 for five batches, now moves (0.136 → 0.087 → 0.091 →
+  0.000 → 0.050); two chunks quarantined, one of which had been failing invisibly
+  because only the unparseable branch logged.
 - **2026-07-25 (latest)** — 750-doc run completed 5/5 autonomous (active 3,998 →
   4,097). Its log exposed a chunk that had failed extraction in *every run ever
   made* and been re-sent on every batch: added *The retry that outlived the run*
