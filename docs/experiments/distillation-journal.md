@@ -585,7 +585,147 @@ on the simpler foundation we already built.
 
 ---
 
-## Iteration 5 — systematic axiom discovery (SCOPED 2026-07-25)
+## Iteration 5 — systematic axiom discovery (PRE-REGISTERED 2026-07-25)
+
+**Discovery-first, no cherry-picking.** Enumerate *every* candidate axiom over the
+lifted graph, score them all, and only then look. Two families:
+
+- **Inverse pairs.** Two signals, both computed for all ordered relation pairs:
+  *(i) instance-level* — count `(x,y)` with `R1(x,y)` **and** `R2(y,x)` present;
+  confidence = overlap / min(|R1|,|R2|). Strong evidence. *(ii) type-level* —
+  `R1: A→B` and `R2: B→A` over the same class pair with overlapping endpoint
+  populations. Weaker, but the only signal available if each document states a
+  fact one way only.
+- **Subsumption `R1 ⊑ R2`.** For all ordered pairs: of the `(x,y)` with `R1`, what
+  fraction also have `R2`? (AMIE-style confidence, with support.)
+
+**The procedure is on trial, not the axioms.** The `emite` / `adoptată de` inverse
+pair — spotted by eye in 3b — is **held back as a validation case**. It must be
+*rediscovered*. If the procedure misses it, the procedure is wrong.
+
+**Predictions + refutation thresholds.**
+| check | predict | refute if |
+|---|---|---|
+| `emite`/`adoptată de` in top-5 inverse candidates | **yes** | absent → procedure invalid |
+| high-confidence axioms (conf ≥ 0.5, support ≥ 8) | **3–15** | 0, or > 50 (noise, no ranking power) |
+| plausibility of top-10 by inspection | **≥ 60%** | < 40% |
+
+**Result** (run 2026-07-25, 33 candidate relations, 1,056 ordered pairs, 2.5 s):
+
+| check | predicted | measured | |
+|---|---|---|---|
+| held-back pair in top-5 inverse candidates | yes | **ABSENT** | FAIL |
+| high-confidence axioms (conf ≥ 0.5, sup ≥ 8) | 3–15 | **0** | FAIL |
+
+Total output: **1 inverse candidate** (`Publicat în ~inv~ va elaborat`, score 0.25,
+spurious) and **0 subsumption candidates**.
+
+**Verdict: the PROCEDURE is refuted, exactly as pre-registered.** It missed the
+validation case, so it is wrong — and the diagnosis is more interesting than the
+failure.
+
+**Why it failed — the corpus is "one fact per document per relation".**
+```
+instance-level overlap(emite, reversed adoptată de) = 0   of 423 × 98 edges
+emite        dominant type signature: (AuthoritativeBody, NormativeAct)  296
+adoptată de  dominant type signature: (NormativeAct, AuthoritativeBody)   46   ← exact reverse
+```
+The type signatures **do** reverse cleanly. But both of my scoring families rested
+on **instance-pair co-occurrence** — inverse needed `R1(x,y)` ∧ `R2(y,x)`;
+subsumption needed the same `(x,y)` under both relations — and a legal document
+states a fact *one way only*. `EMITENT: X` and `adoptată de X` never appear for the
+same act, so co-occurrence is **structurally zero**, which also explains the zero
+subsumption candidates.
+
+Worse, I gated even the *type-level* signal behind an "overlapping endpoint
+populations" requirement (as pre-registered). Inverse relations cannot satisfy it
+by construction: they are attested in *disjoint* documents, so their endpoint
+populations barely intersect. The one requirement I added to make the weak signal
+credible is precisely the one that made it unusable.
+
+**The transferable lesson.** **AMIE-style rule mining assumes a dense graph** where
+the same entity pair participates in many relations. A per-document extraction
+graph is sparse in exactly that dimension — each pair typically carries one
+relation from one sentence. So axiom discovery over this kind of graph must be
+**type-level** (over class signatures), not **instance-level** (over entity-pair
+co-occurrence). Choosing the standard algorithm without checking that its core
+assumption holds cost this iteration.
+
+**Cost of the diagnosis, acknowledged:** the held-back pair has now been *spent* —
+having used it to debug, its rediscovery in 5b is weaker evidence. 5b must
+therefore also be judged on whether its *other* candidates are plausible.
+
+---
+
+## Iteration 5b — type-level axiom discovery (PRE-REGISTERED 2026-07-25)
+
+**Correction.** Drop the endpoint-population requirement and the reliance on
+instance-pair co-occurrence. Score type-level inverse purely on: dominant type
+signatures being exact reverses, **weighted by the support of both relations** and
+by how concentrated each signature is (its share of that relation's typed edges).
+Keep the instance-level signal as a *bonus*, not a gate. Add domain/range axioms
+(a relation's dominant signature with its concentration as confidence), which is
+type-level by nature and was missing entirely.
+
+**Predictions + refutation thresholds.**
+| check | predict | refute if |
+|---|---|---|
+| held-back pair in top-3 inverse candidates | yes (weak evidence now) | absent → mechanism still wrong |
+| domain/range axioms at concentration ≥ 0.6, support ≥ 8 | **3–12** | 0, or > 40 |
+| plausibility of top-8 across both families | ≥ 60% | < 40% |
+| spurious `Publicat în ~inv~ va elabora`-type pairs in top-3 | 0 | ≥ 2 |
+
+**Result** (run 2026-07-25, 33 relations, deterministic, no LLM):
+
+| check | predicted | measured | |
+|---|---|---|---|
+| held-back pair rank | ≤ 3 | **#1** (score 0.59) | PASS |
+| domain/range axioms (conc ≥ 0.6, sup ≥ 8) | 3–12 | **4** | PASS |
+| plausibility of top-8 | ≥ 60% | **6/6 = 100%** | PASS |
+| spurious pairs in top-3 | 0 | **0** | PASS |
+
+```
+INVERSE
+  [0.59] emite        ~inv~ adoptată de   (Auth,Norm)<->(Norm,Auth)  conc .72/.52
+  [0.46] adoptată de  ~inv~ hotărăşte     (Norm,Auth)<->(Auth,Norm)  conc .52/.54
+
+DOMAIN / RANGE
+  [411  conc .72]  AuthoritativeBody --emite-->          NormativeAct
+  [246  conc .76]  Official          --contrasemnează--> NormativeAct
+  [ 36  conc .67]  NormativeAct      --se face public--> OfficialGazette
+  [ 10  conc .60]  AuthoritativeBody --se asigura de-->  AuthoritativeBody
+```
+
+**Verdict: CONFIRMED.** The corrected type-level procedure recovers the held-back
+pair at **rank 1**, the spurious candidate from iteration 5 is gone, and every one
+of the top six is semantically defensible — including the second inverse
+(`Act --adoptată de--> Body` vs `Body --hotărăşte--> Act`: "adopted by" / "rules",
+genuinely inverse) which was *not* on my radar.
+
+**The independent rediscovery worth noting.** `NormativeAct --se face public-->
+OfficialGazette` is the `publishedIn` axiom hand-written as an *illustration* in
+the original proposal. Nobody encoded it; the systematic procedure found it from
+36 instances at concentration 0.67. Two of the proposal's three illustrative
+axioms (`issues`, `publishedIn`) were recovered from data. The third (`amends`)
+was not — `modificarea şi completarea` has entropy 0.80 and fails the
+concentration floor, i.e. in this corpus amendment genuinely relates many kinds of
+thing, consistent with iteration 3.
+
+**The distilled grammar, final form.** With the inverse assertions folded in, the
+corpus reduces to three axioms plus their inverses — a grammar small enough to
+read in one breath and every line traceable to hundreds of instances:
+
+```
+AuthoritativeBody issues NormativeAct        (inverse: adoptedBy; surface forms
+                                              emite / adoptată de / hotărăşte)
+Official          countersigns NormativeAct
+NormativeAct      publishedIn OfficialGazette
++ an untyped `references` relation spanning 28 class pairs (correctly untyped)
+```
+
+---
+
+## Iteration 5 — original scoping note (2026-07-25)
 
 Per direction: **discovery first, systematic, no cherry-picking.** Enumerate all
 candidate axioms over the lifted schema — inverse pairs (`R1(A,B)` vs `R2(B,A)`
