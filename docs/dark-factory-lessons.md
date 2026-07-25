@@ -438,6 +438,112 @@ eleven passes. *Instrumentation is code and can be wrong in the direction that
 flatters you*; a metric that cannot report "not measured" will invent a
 measurement.
 
+## VIII. The instrument is the experiment
+
+Theme I says *measure, don't infer*. The distillation arc taught the next lesson,
+which is harder: **measuring is not enough — the instrument has to be right, and
+you will usually not notice that it isn't.** Five iterations produced three
+instrument failures, each of a different kind:
+
+- **A metric that punished the truth.** Iteration 1 scored relation quality by
+  *purity* — the fraction of a relation's instances in its dominant type pair. It
+  failed at 0.41. But `se referă la` ("references") *legitimately* links any kind
+  of thing to any other, so low purity was the correct reading of a genuinely
+  polysemous relation. The metric was penalising the data for being honest.
+  Replacing it with **normalized entropy over type pairs** separated specific from
+  generic relations cleanly (a +0.14 bimodal gap) and put the right relations on
+  each side.
+- **Metrics that were unanimously fooled.** Iteration 4 pre-registered four
+  checks — prompt tokens, yield, canonical-direction rate, parse failures. All
+  four **passed**, and the experiment was a disaster: the model was echoing the
+  schema, emitting each axiom ~7 times regardless of content, copying the ASCII
+  arrow notation into the relation-*type* field, and fabricating a false relation
+  to fill the third slot. Every metric was a *quantity* metric; the failure was
+  *qualitative*. Yield went **up** (2.33×) because fabrication is productive.
+- **A threshold set without a baseline.** Iteration 4b pre-registered
+  "schema violations ≤ 10%". The baseline was **50%** — the threshold was
+  unachievable by construction, and it nearly made me diagnose a real defect
+  (type overloading) by the wrong name.
+
+**The principles.**
+
+> **Pre-registration protects against moving the goalposts. It does not protect
+> against measuring the wrong thing.** Both are needed and they are different
+> disciplines.
+
+> **Measure the baseline before setting an absolute threshold.** A number with no
+> control is not a target, it is a guess wearing a target's clothes.
+
+> **Pair every quantity metric with a shape metric.** What exposed iteration 4 was
+> not any of its four checks but a *variance*: arm B emitted exactly 3 relations on
+> 10/10 chunks. Constant output is the signature of a template-filler, and it is
+> invisible to any per-chunk average. Iteration 4b pre-registered the coefficient
+> of variation as a template detector, and it worked.
+
+**The parallels.** *Goodhart's Law* again, but pointed inward — at our own
+instruments rather than at the system's controls (Theme VI). *Construct validity*
+from measurement theory: does the metric measure the thing you named, or merely
+something correlated with it under normal conditions? And **Campbell's Law**: the
+more a quantitative indicator is used for decisions, the more it distorts what it
+was meant to track. Also *garbage in, gospel out* — a dashboard laundering a
+number into a belief.
+
+## Field data — round 3: the distillation arc (2026-07-25)
+
+Five iterations, each pre-registered, run in a single day at seconds-to-minutes of
+compute apiece. Three refuted, two confirmed — **and the refutations did the
+steering.**
+
+| # | question | verdict |
+|---|---|---|
+| 1 | does the corpus have a learnable grammar? | CONFIRMED (purity refuted) |
+| 2 | is class typing the bottleneck; is entropy the right statistic? | REFUTED on thresholds; entropy confirmed |
+| 3 | is high entropy label noise or real polysemy? | REFUTED decisively → polysemy |
+| 3b | does inverse canonicalization clean the schema? | CONFIRMED 4/4 |
+| 4 | is a small schema good extraction context? | REFUTED on quality (all 4 metrics passed) |
+| 4b | is it good as a *constraint* rather than a template? | CONFIRMED 6/6 for the hybrid |
+
+**What was found.** The abstraction is real: `AuthoritativeBody --emite-->
+NormativeAct`, 416 instances, entropy 0.05, 100% direction-consistent — a clean
+typed axiom deduced from data and traceable to source documents. But the grammar
+is **genuinely small** (2–3 axioms over a substrate of untyped cross-referencing),
+and iteration 3 established that decisively rather than by assumption: entropy is
+invariant to label quality, so better classes cannot grow it. That smallness is a
+finding about Romanian legal text — legal cross-referencing *is* type-agnostic, and
+a distiller that forced `se referă la` into a typed axiom would be lying about the
+law.
+
+**The novel finding — an asymmetry in what you may put in an LLM's context.**
+
+> Listing **instances** is safe and useful: "reuse what you see" *is* deduplication.
+> Listing **patterns** is unsafe: "reuse what you see" becomes *assert this
+> pattern*. A **class vocabulary** is the safe middle — it aids naming without
+> asserting anything.
+
+Both failure modes were observed. Given three axioms as context, the model
+**fabricated** instances of all of them (iteration 4). Given a closed list of
+permitted relation *types* — a weaker form of the same mistake — it **overloaded**
+them, forcing every "body does something" statement onto the nearest type until
+relation objects became verb clauses (`Ministerul --emite--> "organizează şi
+asigura…"`) and distinct relation types collapsed 34 → 14 (arm B2). Only the
+hybrid — class names plus a bounded list of instance *names*, no relation types —
+beat the baseline on diversity (37 types vs 34) while cutting the prompt 3.6×.
+
+**And the answer turned out to be already built.** The winning context is a fixed
+class list plus a bounded instance sample — which is precisely what `context_cap`
+and the caps from `a25dfc1` already provide. **The unbounded-context problem was
+solved when we bounded the context;** distillation's contribution to "pitch black"
+is a small stable class vocabulary, not a replacement for instances. Iteration 4
+spent its effort on a second mechanism that was never needed — a reminder to check
+whether the thing you are about to build is already there in another form.
+
+**The ossification risk is immediate, not eventual.** The proposal worried that a
+schema-guided extractor would *slowly* come to confirm its own schema. It does it
+on the first chunk. Anti-ossification machinery (MDL-style eviction of components
+that stop paying for themselves; a residual set of unexplained patterns that
+doubles as the alarm) is therefore a **prerequisite** for any self-improving loop,
+not a later refinement.
+
 ## Meta-observations
 
 - **The core was never the problem.** The Rust graph engine was fast and correct
@@ -457,6 +563,13 @@ measurement.
 - **Instrument the happy path, because success is silent.** Nearly every "is it
   stuck?" scare came from a system that logs failures loudly and successes not
   at all. Progress needs a positive heartbeat, not just an error stream.
+- **Refutation was more productive than confirmation.** Across the distillation
+  arc, three of five iterations were refutations — and they are what redirected the
+  work: iteration 3 killed the "better classes will grow the schema" plan, and
+  iteration 4 stopped us shipping a schema-as-context feature that actively
+  degrades extraction. The two confirmations polished; the refutations steered. A
+  research loop that only produces confirmations is not learning, it is agreeing
+  with itself.
 - **The progress came from the interruptions, not the patience.** This is the
   through-line, stated plainly: every leap — the 42× embedding batch, checkpointing,
   the canary calibration, the bounded context — landed because we *stopped to
@@ -506,6 +619,14 @@ measurement.
 
 ## Revision log
 
+- **2026-07-25 (later)** — Consolidated the distillation arc: added *Theme VIII —
+  the instrument is the experiment* (three instrument failures in five iterations:
+  a metric that punished the truth, four quantity metrics unanimously fooled by a
+  qualitative collapse, and a threshold set without a baseline) and *Field data —
+  round 3* (five pre-registered iterations; the instances-vs-patterns asymmetry;
+  the finding that bounded context had already solved the problem iteration 4 was
+  chasing). New meta-observation on refutation being the productive outcome.
+  Commits `e1ba19c`, `d0b32ed`-range through iteration 4b.
 - **2026-07-25** — Round 2 complete (600 docs, 38 batches; graph 3,739 concepts /
   2,624 edges). Added *Round 2: what it actually taught us*: the saturation
   measurement is confounded by our own mid-flight fixes (measure XOR improve);
