@@ -26,9 +26,9 @@ DOCS = PILOT / "docs"
 POOL = ROOT / "real-data-law-ro"
 # Phase 2 (2026-07-24): finer 5-doc batches, continue 400 -> 600. Separate
 # metrics file so the 10-doc study (loop-metrics-10doc.json) stays intact.
-METRICS = PILOT / "loop-metrics-700.json"
+METRICS = PILOT / "loop-metrics-800.json"
 
-TOTAL_DOCS = 700
+TOTAL_DOCS = 800
 PER_BATCH = 10
 
 os.environ["GRAP_WORKSPACE"] = str(PILOT / "ws")
