@@ -481,6 +481,110 @@ exactly the signature that gave this away).
 
 ---
 
+## Iteration 4b — schema as *constraint*, not template
+## (PRE-REGISTERED 2026-07-25, before running)
+
+Iteration 4's collapse may be my prompt's fault rather than the idea's: it said
+"use these class names and relation directions when the same kinds of thing appear
+here" — an invitation to instantiate — and drew the axioms in ASCII arrows the
+model then copied into the type field. 4b separates *bad prompt* from *bad idea*.
+
+**The asymmetry that motivates arm C.** The concept-sea context lists
+**instances**, so "reuse what you see" *is* the desired behaviour (dedup). A
+schema lists **patterns**, so "reuse what you see" becomes *assert this pattern*
+(fabrication). They are not symmetric substitutes: dedup needs instance names. If
+that holds, the right context is class vocabulary **plus a bounded sample of
+instance names** — and pitch black was already achieved by bounding the context in
+`a25dfc1`, making a second mechanism unnecessary.
+
+**Arms** (same chunks, system prompt, parser, model):
+- **A** concept-sea (unchanged baseline).
+- **B2** schema as a **closed vocabulary**: class names, permitted relation types
+  as a plain list (no arrows, no domain/range template), and an explicit
+  *"assert a relation ONLY if this text states it; omit types that do not apply."*
+- **C** hybrid: class vocabulary **+ bounded list of instance names only** (no
+  characteristics, no relations, no axioms) — nothing to instantiate.
+
+**Chunks.** 10 **mid-document** chunks (index ≥ 1) from never-ingested docs, so
+headers no longer dominate and structural uniformity is not baked in.
+
+**Predictions + refutation thresholds.** Quantity checks are now *two-sided* —
+iteration 4 taught that a yield far *above* baseline signals fabrication, not
+quality.
+| check | predict | refute if |
+|---|---|---|
+| prompt tokens vs A | B2 & C ≤ 0.5× | ≥ A |
+| yield vs A (two-sided) | **0.75×–1.5×** | outside 0.6×–2.0× |
+| **CV of per-chunk relation count** (template detector) | **≥ 0.25** | ≤ 0.10 (constant output = template) |
+| class-name-used-as-instance-name | **0%** | > 0% |
+| notation leakage in relation types (`-->`) | **0** | > 0 |
+| schema-violating relations (type used with wrong endpoint classes) | **≤ 10%** | > 25% |
+
+**Result** (run 2026-07-25, 10 mid-document held-out chunks × 3 arms):
+
+| | A concept-sea | B2 closed vocab | C hybrid |
+|---|---|---|---|
+| prompt tokens | 3,355 | **663 (0.20×)** | **929 (0.28×)** |
+| yield | 9.9 | 9.3 (0.94×) | 9.0 (0.91×) |
+| relation-count CV | 0.42 | 0.49 | **0.82** |
+| distinct relation types | 34 | **14** | **37** |
+| class-name-as-instance | 0 | 0 | 0 |
+| notation leakage | 0 | 0 | 0 |
+| schema violations | 2/4 (50%) | 7/13 (54%) | **0/2 (0%)** |
+| parse failures | 0 | 0 | **2** |
+
+**Arm C: 6/6 pre-registered checks PASS. Arm B2: 5/6, failing on violations.**
+
+**First, a correction to my own metric.** I pre-registered "schema violations ≤ 10%"
+*without measuring the baseline* — and the baseline is **50%**. The threshold was
+unachievable by construction. Inspecting arm A's violations shows they are the
+already-known inverse-label conflation (`ORDONANŢA --emite--> GUVERNUL`), i.e. the
+iteration-3b phenomenon, not new errors. **Third instrument error in five
+iterations: measure the baseline before setting an absolute threshold.**
+
+**But B2 is genuinely harmful, for a reason the metric only hinted at.** Its
+violations are not classifier gaps — they are *type overloading*:
+
+```
+Ministerul Transporturilor    --emite--> "aproba şi comunică părţii solicitante"
+Ministerul Apărării Naţionale --emite--> "organizează şi asigura, în con…"
+Ministerul Apărării Naţionale --emite--> "transmite Agenţiei Naţionale d…"
+```
+
+The object is a **verb clause, not an entity**. Given a *closed list* of permitted
+relation types, the model forced every "body does something" statement onto the
+nearest permitted type instead of omitting it — despite the explicit "omit types
+this text does not support". The collapse in distinct relation types (34 → **14**)
+is the same effect measured from the other side: a closed vocabulary destroys the
+natural diversity of legal relation language.
+
+**Arm C — class vocabulary + bounded instance names, with no relation types
+listed — is the design that works.** It has the *highest* relation-type diversity
+(37, above baseline), the highest content-responsiveness (CV 0.82), zero
+violations, and a 3.6× smaller prompt. Its two parse failures are repetition
+degeneration (`"alt venit bugetar"` ×N until the 2048-token cap) — the known
+Bonsai failure mode, though 2/10 vs A's 0/10 is a real cost worth watching.
+
+**Verdict: the asymmetry hypothesis is CONFIRMED.**
+- Listing **instances** is safe and necessary — reuse of an instance name *is*
+  dedup, the behaviour we want.
+- Listing **patterns** (axioms, or even a closed type vocabulary) is unsafe —
+  "reuse what you see" becomes "assert/force this pattern", producing fabrication
+  (iteration 4) or type overloading (B2).
+- A **class vocabulary** is a safe middle: it aids naming without asserting
+  anything.
+
+**What this means for pitch black.** Arm C's context is a fixed class list plus a
+*bounded* sample of instance names — bounded by construction, independent of
+corpus size. But that is precisely what `context_cap` plus the caps from
+`a25dfc1` already do. **So the unbounded-context problem was already solved by
+bounding the context; distillation's contribution to pitch black is the small
+stable class vocabulary, not a replacement for instances.** Iteration 4 was
+chasing a second mechanism that was never needed. The pitch-black claim stands —
+on the simpler foundation we already built.
+
+---
+
 ## Iteration 5 — systematic axiom discovery (SCOPED 2026-07-25)
 
 Per direction: **discovery first, systematic, no cherry-picking.** Enumerate all
