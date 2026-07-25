@@ -1570,11 +1570,20 @@ def run_pipeline(config_path: str = "pipeline.json") -> dict:
                     getattr(get_provider(), "name", "?"),
                     getattr(get_embedder(), "name", "?"),
                     len(out["ontology"].get("process_outcomes", [])))
+                # Forward the extractor's own telemetry rather than a fixed key
+                # list: quality indicators and promotion counts were being
+                # silently dropped here, so a run's extraction *shape* never
+                # reached the caller even though the extractor computed it.
                 report["steps"]["extract"] = {
                     "status": "ok", "mode": "incremental",
                     "added": out["added"], "changed": out["changed"],
                     "removed": out["removed"], "version_hash": version.hash,
-                    "auto_adoption": auto}
+                    "auto_adoption": auto,
+                    "quality": out.get("quality"),
+                    "context_mode": out.get("context_mode"),
+                    "promoted": out.get("promoted"),
+                    "relations_recovered": out.get("relations_recovered"),
+                    "parked": out.get("parked")}
             elif ext.get("models"):
                 rr = extract_ontology_nversion(ext["docs_path"],
                                                models=ext["models"],

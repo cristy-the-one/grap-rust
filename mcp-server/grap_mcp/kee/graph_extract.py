@@ -7,8 +7,10 @@ spend a bounded re-look only when the graph flags a conflict/correlation.
 
 from __future__ import annotations
 
+import json
 import logging
 import math
+import time
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Callable, Dict, Iterator, List, Optional, Sequence, Tuple
@@ -205,7 +207,18 @@ def extend_graph_ontology(workdir: str, docs_path: str, provider, embedder, *,
                 promo = {}
 
         quality = qm.report()
+        # Current run, plus an append-only history: the per-run file is
+        # overwritten each run, so batch-by-batch telemetry was lost when the
+        # pipeline report dropped it (server.py built the extract step from a
+        # fixed key list). Keep both.
         qm.write(Path(workdir) / "extract_quality.json")
+        try:
+            hist = Path(workdir) / "extract_quality_history.jsonl"
+            with hist.open("a", encoding="utf-8") as fh:
+                fh.write(json.dumps({"ts": time.time(), **quality},
+                                    ensure_ascii=False) + "\n")
+        except Exception:
+            pass
         for a in quality.get("alarms", []):
             logger.warning("extraction quality alarm: %s", a)
 

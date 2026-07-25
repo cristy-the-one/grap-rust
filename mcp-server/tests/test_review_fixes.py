@@ -281,3 +281,90 @@ def test_canary_falls_back_when_baseline_ontology_unavailable(monkeypatch):
                         lambda *a, **k: {"status": "ok", "run_id": "run-canary"})
     c = s._canary_check(ws, "newhash", baseline_run_id="run-base", prev_version=None)
     assert c["new_gaps"] == 2      # gates on everything rather than nothing
+
+
+# --- scale-free churn: additions per supporting chunk (2026-07-25) ------------
+# The absolute budget compounds: a rejected proposal never becomes the baseline,
+# so the next diff includes the rejected delta and the gate stays shut forever.
+# The rate budget asks a scale-free question instead — is this proposal anomalous
+# relative to the evidence justifying it?
+
+def _onto_prov(entries, chunks_per_outcome):
+    """Ontology yaml-as-dict with provenance, for rate checks."""
+    outs, prov = [], {}
+    for i, (oid, name, chars) in enumerate(entries):
+        outs.append({"id": oid, "name": name, "description": name,
+                     "required_characteristics": list(chars)})
+        prov[oid] = [f"chunk{i}#{k}" for k in range(chunks_per_outcome)]
+    return {"version": "v", "process_outcomes": outs, "mapping_hints": [],
+            "concept_hashes": {oid: _sha(name) for oid, name, _ in entries},
+            "source_chunk_counts": {oid: chunks_per_outcome for oid, _, _ in entries},
+            "provenance": prov}
+
+
+def test_rate_budget_flags_an_anomalous_proposal():
+    """Many outcomes from little evidence = anomalous, regardless of totals."""
+    base = _onto_prov([("a", "A", ["c"])], 1)
+    # 12 new outcomes all from ONE shared chunk -> 12/chunk
+    outs = [("a", "A", ["c"])] + [(f"n{i}", f"N{i}", ["c"]) for i in range(12)]
+    target = _onto_prov(outs, 1)
+    for oid in target["provenance"]:
+        target["provenance"][oid] = ["same_chunk#0"]
+    pol = {**DEFAULT_ADOPTION_POLICY, "max_outcomes_added": 100,
+           "max_outcomes_added_per_chunk": 3.0}
+    res = evaluate_proposal_dict(target, base, pol)
+    churn = next(c for c in res["checks"] if c["name"] == "churn")
+    assert not churn["ok"]
+    assert any("anomalous" in str(v) for v in churn["detail"])
+
+
+def test_rate_budget_passes_proportionate_growth():
+    """Same number of additions, but each backed by its own chunk -> 1/chunk."""
+    base = _onto_prov([("a", "A", ["c"])], 1)
+    outs = [("a", "A", ["c"])] + [(f"n{i}", f"N{i}", ["c"]) for i in range(12)]
+    target = _onto_prov(outs, 1)          # distinct chunk per outcome
+    pol = {**DEFAULT_ADOPTION_POLICY, "max_outcomes_added": 100,
+           "max_outcomes_added_per_chunk": 3.0}
+    res = evaluate_proposal_dict(target, base, pol)
+    churn = next(c for c in res["checks"] if c["name"] == "churn")
+    assert churn["ok"], churn["detail"]
+
+
+def test_rate_is_scale_free_so_a_backlog_does_not_cascade():
+    """Three batches' worth of accumulated additions still passes the rate check,
+    because supporting evidence grew with them — this is the cascade fix."""
+    base = _onto_prov([("a", "A", ["c"])], 1)
+    pol = {**DEFAULT_ADOPTION_POLICY, "max_outcomes_added": 100,
+           "max_outcomes_added_per_chunk": 3.0}
+    for n in (12, 24, 36):                # backlog growing across rejected batches
+        outs = [("a", "A", ["c"])] + [(f"n{i}", f"N{i}", ["c"]) for i in range(n)]
+        res = evaluate_proposal_dict(_onto_prov(outs, 1), base, pol)
+        churn = next(c for c in res["checks"] if c["name"] == "churn")
+        assert churn["ok"], f"n={n}: {churn['detail']}"
+
+
+def test_blast_radius_stop_says_it_will_not_self_clear():
+    """When growth is proportionate but over the absolute budget, the message must
+    distinguish it from an anomaly and state the required action."""
+    base = _onto_prov([("a", "A", ["c"])], 1)
+    outs = [("a", "A", ["c"])] + [(f"n{i}", f"N{i}", ["c"]) for i in range(12)]
+    pol = {**DEFAULT_ADOPTION_POLICY, "max_outcomes_added": 5,
+           "max_outcomes_added_per_chunk": 3.0}
+    res = evaluate_proposal_dict(_onto_prov(outs, 1), base, pol)
+    churn = next(c for c in res["checks"] if c["name"] == "churn")
+    assert not churn["ok"]
+    joined = " ".join(str(v) for v in churn["detail"])
+    assert "blast-radius" in joined and "NOT clear on its own" in joined
+    assert "anomalous" not in joined       # proportionate: not an anomaly
+
+
+def test_rate_budget_disabled_by_default_preserves_behaviour():
+    base = _onto_prov([("a", "A", ["c"])], 1)
+    outs = [("a", "A", ["c"])] + [(f"n{i}", f"N{i}", ["c"]) for i in range(12)]
+    target = _onto_prov(outs, 1)
+    for oid in target["provenance"]:
+        target["provenance"][oid] = ["same_chunk#0"]
+    pol = {**DEFAULT_ADOPTION_POLICY, "max_outcomes_added": 100}   # rate = 0.0
+    res = evaluate_proposal_dict(target, base, pol)
+    churn = next(c for c in res["checks"] if c["name"] == "churn")
+    assert churn["ok"]                     # no rate check applied

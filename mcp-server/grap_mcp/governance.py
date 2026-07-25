@@ -24,6 +24,18 @@ DEFAULT_ADOPTION_POLICY: Dict[str, Any] = {
     "max_outcomes_removed": 0,
     "max_characteristics_removed": 0,
     "min_source_chunks": 1,
+    # Scale-free anomaly budget: outcomes added per NEW supporting chunk. The
+    # absolute budgets above answer "is this change too big to adopt without a
+    # human?" — a blast-radius question, and one that inherently compounds: a
+    # rejected proposal never becomes the baseline, so the next proposal's diff
+    # includes the rejected delta and the gate stays shut (observed: 11
+    # consecutive rejections at 600 docs, 3 more at 650). This budget answers a
+    # different question — "is this proposal anomalous *relative to the evidence
+    # that justifies it*?" — which is scale-free and therefore cascade-proof:
+    # when batches accumulate, additions and supporting chunks grow together and
+    # the rate is unchanged. 0 disables it (default, so existing configs are
+    # unaffected).
+    "max_outcomes_added_per_chunk": 0.0,
     # Canary (Phase 3): after auto-adoption, run gap detection as a
     # quarantined experiment and roll back if it introduces more than the
     # budgeted new gaps vs the production baseline.
@@ -129,6 +141,40 @@ def diff_ontology_dicts(base: dict, target: dict) -> Dict[str, Any]:
     }
 
 
+def _supporting_chunks(proposal: dict, outcome_ids: Iterable[str]) -> int:
+    """How much evidence backs `outcome_ids` in `proposal`.
+
+    Prefers `provenance` (outcome id -> [chunk ids]) and counts DISTINCT chunks,
+    since several outcomes usually come from the same chunk and double-counting
+    would understate the rate. Falls back to summing `source_chunk_counts`, then
+    to 0 (which disables the rate check rather than guessing)."""
+    ids = list(outcome_ids)
+    if not ids:
+        return 0
+    prov = proposal.get("provenance")
+    if isinstance(prov, dict):
+        chunks = set()
+        for oid in ids:
+            v = prov.get(oid)
+            if isinstance(v, (list, tuple, set)):
+                chunks.update(str(x) for x in v)
+            elif v:
+                chunks.add(str(v))
+        if chunks:
+            return len(chunks)
+    counts = proposal.get("source_chunk_counts")
+    if isinstance(counts, dict):
+        total = 0
+        for oid in ids:
+            try:
+                total += int(counts.get(oid, 0) or 0)
+            except (TypeError, ValueError):
+                pass
+        if total:
+            return total
+    return 0
+
+
 def evaluate_proposal_dict(proposal: dict, active: dict | None,
                            policy: Dict[str, Any],
                            pg_referenced_ids: Iterable[str] = ()) -> Dict[str, Any]:
@@ -175,9 +221,31 @@ def evaluate_proposal_dict(proposal: dict, active: dict | None,
             len(base_out.get(o, {}).get("required_characteristics") or [])
             for o in ren_old)
         violations = []
+        # --- scale-free anomaly check: additions per supporting chunk ---------
+        # Reported separately from the absolute budgets so an *anomalous* proposal
+        # (many outcomes from little evidence) is distinguishable from a merely
+        # *large* one (proportionate growth that needs a human to re-baseline).
+        rate_budget = float(policy.get("max_outcomes_added_per_chunk") or 0.0)
+        added_chunks = _supporting_chunks(proposal, eff_added)
+        rate = (len(eff_added) / added_chunks) if added_chunks else None
+        if rate_budget > 0 and rate is not None and rate > rate_budget:
+            violations.append(
+                f"anomalous: {len(eff_added)} outcomes added from only "
+                f"{added_chunks} supporting chunk(s) = {rate:.1f}/chunk "
+                f"(budget {rate_budget}/chunk)")
+
         if len(eff_added) > int(policy["max_outcomes_added"]):
+            extra = ""
+            if rate_budget > 0 and rate is not None and rate <= rate_budget:
+                # Proportionate to its evidence — this is a blast-radius stop, not
+                # a quality failure. Say so, and say what clears it, because the
+                # condition does not clear itself.
+                extra = (f"; proportionate to evidence ({rate:.1f}/chunk, within "
+                         f"{rate_budget}/chunk) — this is a blast-radius stop, not "
+                         f"an anomaly. It will NOT clear on its own: adopt to "
+                         f"re-baseline, or raise the budget with rationale")
             violations.append(f"{len(eff_added)} outcomes added "
-                              f"(budget {policy['max_outcomes_added']})")
+                              f"(budget {policy['max_outcomes_added']}){extra}")
         if len(eff_removed) > int(policy["max_outcomes_removed"]):
             violations.append(f"{len(eff_removed)} outcomes removed "
                               f"(budget {policy['max_outcomes_removed']})")
