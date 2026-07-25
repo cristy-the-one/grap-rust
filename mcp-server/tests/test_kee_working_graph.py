@@ -337,3 +337,26 @@ def test_promote_works_on_graph_reopened_from_disk(tmp_path):
     assert res["promoted"] == 1
     assert res["relations_recovered"] == 2
     assert res["still_parked"] == 0
+
+
+def test_promotion_is_amortized_by_max_promote(tmp_path):
+    """A bulk promotion blows the adoption churn budget and, because a rejected
+    proposal never becomes active, the gate then stays tripped forever. Capping
+    per run keeps each increment inside the budget; the rest stay parked."""
+    wg = _wg(tmp_path, merge_threshold=0.99)
+    # 10 distinct endpoints, each referenced twice -> all eligible
+    for i in range(10):
+        for j in range(2):
+            wg.upsert_fragment({
+                "source": f"s{i}-{j}",
+                "outcomes": [{"name": f"Actul {i}-{j}", "characteristics": []}],
+                "relations": [{"from": f"Actul {i}-{j}", "type": "emit", "to": f"ORGAN {i}"}],
+            }, f"s{i}-{j}")
+
+    res = wg.promote_parked_endpoints(min_refs=2, max_promote=3)
+    assert res["promoted"] == 3, res
+    assert res["still_parked"] > 0, "un-promoted endpoints must remain parked, not vanish"
+
+    # a later run picks up more, so nothing is lost permanently
+    res2 = wg.promote_parked_endpoints(min_refs=2, max_promote=3)
+    assert res2["promoted"] == 3

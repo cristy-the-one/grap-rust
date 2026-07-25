@@ -66,10 +66,17 @@ def active_size():
     return len(onto.get("process_outcomes", [])) if onto else 0
 
 
-def latest_canary(ws):
+def latest_canary(ws, since_ts=None):
+    """Latest canary event, but ONLY if it is newer than `since_ts`.
+
+    A rejected proposal never runs a canary, so without this guard the metrics
+    reported the previous batch's canary as if it were this batch's — which made
+    11 consecutive churn rejections look like 11 passing canaries."""
     evs = ws.query_events("canary_result") or []
     if not evs:
         return {}
+    if since_ts is not None and evs[-1].ts <= since_ts:
+        return {"result": None, "new": None, "growth": None, "stale": True}
     kv = s._kv_subject(evs[-1].subject)
     return {"ts": evs[-1].ts, "result": kv.get("result"),
             "new": int(kv.get("new", 0) or 0),
@@ -123,6 +130,8 @@ def main():
             docs_total = len(list(DOCS.glob("*.json")))
 
             t0 = time.time()
+            canary_ts0 = (ws.query_events("canary_result") or [None])[-1]
+            canary_ts0 = getattr(canary_ts0, "ts", None)
             rep = s.run_pipeline(cfg)
             dt = time.time() - t0
 
@@ -130,7 +139,7 @@ def main():
             ext = rep.get("steps", {}).get("extract", {})
             adopt = ext.get("auto_adoption") or {}
             gaps = rep.get("steps", {}).get("gaps", {})
-            can = latest_canary(ws)
+            can = latest_canary(ws, since_ts=canary_ts0)
             row = {
                 "batch": bi, "docs_total": docs_total, "wall_s": round(dt),
                 "extract_added": ext.get("added"),

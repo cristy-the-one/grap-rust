@@ -109,7 +109,8 @@ def extend_graph_ontology(workdir: str, docs_path: str, provider, embedder, *,
                           progress: Optional[Callable[[dict], None]] = None,
                           concurrency: int = 1,
                           checkpoint_every: int = 25,
-                          promote_min_refs: int = 2) -> Dict[str, Any]:
+                          promote_min_refs: int = 2,
+                          promote_max_per_run: int = 25) -> Dict[str, Any]:
     """Open the durable graph at `workdir`, sync it to `docs_path`, save, return stats.
 
     new chunk -> extract; changed chunk (hash differs) -> retract old + re-extract;
@@ -188,7 +189,8 @@ def extend_graph_ontology(workdir: str, docs_path: str, provider, embedder, *,
         promo = {}
         if promote_min_refs > 0:
             try:
-                promo = wg.promote_parked_endpoints(min_refs=promote_min_refs)
+                promo = wg.promote_parked_endpoints(min_refs=promote_min_refs,
+                                                    max_promote=promote_max_per_run)
                 if promo.get("relations_recovered"):
                     _emit({"phase": "promote", **promo})
             except Exception:

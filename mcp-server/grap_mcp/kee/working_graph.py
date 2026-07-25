@@ -206,7 +206,8 @@ class WorkingGraph:
             return True
         return self._content_hash(name) in self._hash_to_node
 
-    def promote_parked_endpoints(self, min_refs: int = 2) -> Dict[str, int]:
+    def promote_parked_endpoints(self, min_refs: int = 2,
+                                 max_promote: int = 0) -> Dict[str, int]:
         """Promote recurring ungrounded relation endpoints into concepts, then
         re-attempt the relations that were parked because of them.
 
@@ -231,7 +232,18 @@ class WorkingGraph:
             for name in (p.get("from"), p.get("to")):
                 if isinstance(name, str) and name.strip() and not self._would_resolve(name):
                     counts[name.strip()] = counts.get(name.strip(), 0) + 1
-        promote = sorted(n for n, c in counts.items() if c >= min_refs)
+        promote = sorted((n for n, c in counts.items() if c >= min_refs),
+                         key=lambda n: (-counts[n], n))
+        if max_promote > 0:
+            # Amortize: a single bulk promotion adds hundreds of outcomes at once,
+            # which blows through the adoption churn budget. Because a rejected
+            # proposal never becomes active, the next batch's diff is just as
+            # large and the gate stays tripped forever — one structural
+            # improvement permanently locking out autonomous adoption (observed
+            # at 600 docs: ~570 promoted, then 11 consecutive churn rejections).
+            # Promoting the most-referenced N per run keeps every increment
+            # inside the budget; the rest are still parked and promoted next run.
+            promote = promote[:max_promote]
 
         self._prefetch_vectors(promote)          # one batched embed, not one per name
         before_nodes = len(self.canonical)
