@@ -308,7 +308,78 @@ runs, human spot-judgement on a sample).
 
 ---
 
+## Iteration 3b — inverse-relation canonicalization
+## (PRE-REGISTERED 2026-07-25, before running)
+
+**A correction to iteration 2's finding.** Iteration 2 reported `emite` at 73%
+direction dominance and I called it a KEE extraction defect. Inspecting the edges
+shows that was wrong. The 111 "inverted" edges are
+`Act --emite--> GUVERNUL/PARLAMENT`, derived from the document header
+`HOTĂRÂRE nr. 99 …` / `EMITENT: GUVERNUL` — they encode **`hasIssuer`**,
+correctly directed, but carry the label `emite` because the header word is
+`EMITENT`. The other 295 encode **`issues`**. Both are faithful to the source;
+the relation *label* conflates a relation and its inverse.
+
+Extraction is therefore not at fault, and "fixing" it would push
+Romanian-specific morphology into a generic component. **Collapsing inverse
+framings is distillation's job** — the same job it already does for
+`is part of` / `face parte integrantă din`.
+
+**Hypothesis.** Canonicalizing each relation's inverse directions (for a relation
+R and unordered class pair {A,B}, fold `(B,R,A)` into the higher-support
+`(A,R,B)`) will raise direction dominance to 1.0 and *lower* entropy, because two
+distinct class pairs collapse into one.
+
+**Predictions + refutation thresholds.**
+| check | predict | refute if |
+|---|---|---|
+| `emite` direction dominance | **1.00** (from 0.73) | < 1.00 |
+| `emite` normalized entropy | **≤ 0.30** (from 0.37) | ≥ 0.37 (no drop) |
+| specific relations (H ≤ 0.5) | **≥ 3** (from 2) | still 2 |
+| typed edge coverage | unchanged (~70.5%) | changes (would mean edges lost) |
+
+**Result** (run 2026-07-25, same frozen snapshot, deterministic, no LLM):
+
+| check | predicted | measured | |
+|---|---|---|---|
+| `emite` direction dominance | 1.00 | **1.00** (from 0.73) | PASS |
+| `emite` normalized entropy | ≤ 0.30 | **0.05** (from 0.37) | PASS |
+| specific relations (H ≤ 0.5) | ≥ 3 | **3** (from 2) | PASS |
+| typed edge coverage | unchanged | **1,849 edges, unchanged** | PASS |
+
+**Verdict: CONFIRMED on all four.** The distilled schema after canonicalization:
+
+```
+AuthoritativeBody --emite-->           NormativeAct        [416, H=0.05, dir 100%]
+Official          --contrasemnează-->  NormativeAct        [264, H=0.40, dir 100%]
+NormativeAct      --adoptată de-->     AuthoritativeBody   [ 89, H=0.41, dir 100%]
+```
+
+`emite` at **H = 0.05** is essentially a pure typed axiom — 416 instances,
+one class pair, one direction. Compare the same relation two iterations ago:
+purity 0.82 and a contradictory reverse triple at support 41. The signal was
+always there; two successive measurement fixes (entropy instead of purity, then
+inverse canonicalization) were needed to see it.
+
+**An observation that points at the next step.** `NormativeAct --adoptată de-->
+AuthoritativeBody` is the semantic **inverse of** `AuthoritativeBody --emite-->
+NormativeAct` — but under a *different label*, so intra-label canonicalization
+cannot merge them. Detecting that two distinct relations are inverses of each
+other over the same class pair is **inverse-relation discovery**, i.e. Stage 5
+axiom induction from the proposal. It would reduce these three axioms to two plus
+an `inverseOf` assertion — a genuinely smaller and more truthful grammar.
+
+---
+
 ## Revision log
+- **2026-07-25** — Iteration 3b run: CONFIRMED on all four checks. `emite`
+  H 0.37→0.05, dominance 73%→100%, specific relations 2→3, coverage unchanged.
+  Noted that `emite` and `adoptată de` are cross-label inverses, motivating
+  Stage-5 inverse-relation discovery.
+- **2026-07-25** — Iteration 3b pre-registered, correcting iteration 2's
+  misattribution: the `emite` direction split is inverse-relation label
+  conflation (`issues` vs `hasIssuer`), faithful to the source text, and belongs
+  to distillation to canonicalize — not an extraction defect.
 - **2026-07-25** — Iteration 3 run: REFUTED decisively (0 relations moved, ΔH
   +0.008, entropy invariant to label set). Conclusion: the corpus has a genuinely
   small grammar (2 strong axioms + type-agnostic `references`); label quality is
