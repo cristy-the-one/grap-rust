@@ -117,16 +117,21 @@ def main():
     # a cascade. Removals sized from the 650-doc run (14 outcomes / 48 chars over
     # 5 batches).
     #
-    # canary_max_new_gaps is deliberately GENEROUS: the corrected canary (which
-    # gates on REGRESSIONS only, not growth) has never run on real data, so its
-    # baseline is unknown. Per lessons Theme VIII — never set an absolute
-    # threshold without measuring its baseline — this run MEASURES the regression
-    # count rather than relying on it. Tighten next run from the recorded numbers.
+    # canary_max_new_gaps CALIBRATED TO ITS MEASURED FLOOR (2026-07-25). The
+    # 650->700 run measured it: 830 +/- 12 "regressions" per batch (816/820/838/
+    # 844), remarkably stable across batches with very different content, and with
+    # growth=0 every time. That floor is NOT semantic regression — see
+    # docs/canary-noise-floor-investigation.md. Three hypotheses were falsified
+    # (growth mislabelled as regression; mapping-hint variance; scoring
+    # nondeterminism — gap detection is bit-identical on fixed inputs). Until the
+    # root cause is found the canary can only be a GROSS-FAILURE detector, so the
+    # budget sits above the measured floor with margin. This is a threshold with a
+    # baseline behind it (lessons Theme VIII), not a guess.
     policy = {"enabled": True, "canary_enabled": True,
               "max_outcomes_added": 400, "max_outcomes_removed": 25,
               "max_characteristics_removed": 80,
               "max_outcomes_added_per_chunk": 3.0,
-              "canary_max_new_gaps": 200}
+              "canary_max_new_gaps": 1200}
     for k, v in policy.items():
         r = s.set_policy(k, v, rationale="10x10 loop v2 (timeout+canary calibrated)")
         assert r["status"] == "ok", r
