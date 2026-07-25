@@ -384,6 +384,60 @@ per-item cost that scales with total accumulated state is a wall you hit later,
 not never** — and the finer-grained experiment is what made us hit it while we
 were still watching.
 
+### Round 2 (docs 400→600, 5-doc batches): what it actually taught us
+
+The finer round completed — 38 batches, 600 documents, working graph at **3,739
+concepts / 12,172 characteristics / 2,624 edges**. Its intended purpose was to
+resolve the plateau at double resolution. It failed at that and succeeded at
+something more useful.
+
+**The measurement is confounded, and honesty requires saying so.** Outcomes per
+chunk by regime: 0.344 (10-doc) → 0.154 (5-doc, before the context fix) → 0.239
+(after it) → 0.548 (after promotion was wired in). That is not a saturation
+curve; it is a record of our own changes. The dip is chunk loss from the context
+wall; the jump is endpoint promotion adding concepts that never came from
+extraction. Three regime changes inside one measurement. The robust claim
+survives — marginal growth fell sharply from the early corpus (~90 outcomes per
+10 docs) to the mature one (~5–16 per batch), so dedup is real and large — but
+*whether the mature plateau is flat or sloping*, the entire reason for going to
+5-doc resolution, is not answerable from this data.
+
+> **You cannot run a controlled measurement and an improvement effort on the same
+> run.** Every fix we shipped mid-flight was correct and worth shipping, and each
+> one invalidated the baseline. Next time: freeze the code, then measure. This is
+> the experimental-design counterpart to *measure, don't infer* — it is not enough
+> to measure, the measurement has to be **controlled**, and a live improvement
+> effort is an uncontrolled variable.
+
+**The reject cascade happened exactly as predicted — from a *good* change.**
+Wiring endpoint promotion in made its first run promote ~570 accumulated
+endpoints at once, blowing the `max_outcomes_added: 150` budget. Because a
+churn-rejected proposal never becomes active, the next batch's diff stayed just
+as large: **11 consecutive rejections**, the active ontology frozen at 3,342
+while the working graph kept growing. When we finally adopted, the queue
+collapsed **12 → 1** — eleven accumulated rejections resolved by one decision,
+confirming the mechanism precisely.
+
+The lesson is sharper than "tune the budget": **a one-time structural improvement
+can permanently lock out autonomous adoption.** A gate that reasons about the
+*size* of a change cannot tell a bulk improvement from a bulk regression, and
+rejection is self-perpetuating when the baseline never moves. The fix is to
+**amortize** — promote at most N endpoints per run, so every increment stays
+inside the budget. Same principle as small, always-green PRs; the cure for a
+change too big to review is to stop making changes that big.
+
+Promotion itself was the round's biggest win: **edges 1,843 → 2,624, parked 3,430
+→ 2,901** — 763 grounded relations recovered (issuer, publication, amendment
+structure that had been silently discarded).
+
+**And the metrics were lying.** Those eleven rejected batches recorded
+`canary=passed, new=898`, because the reporter read the latest `canary_result`
+event unconditionally — but a rejected proposal never runs a canary, so it was
+re-reading a stale verdict from before the restart. Eleven rejections looked like
+eleven passes. *Instrumentation is code and can be wrong in the direction that
+flatters you*; a metric that cannot report "not measured" will invent a
+measurement.
+
 ## Meta-observations
 
 - **The core was never the problem.** The Rust graph engine was fast and correct
@@ -452,6 +506,14 @@ were still watching.
 
 ## Revision log
 
+- **2026-07-25** — Round 2 complete (600 docs, 38 batches; graph 3,739 concepts /
+  2,624 edges). Added *Round 2: what it actually taught us*: the saturation
+  measurement is confounded by our own mid-flight fixes (measure XOR improve);
+  the predicted reject cascade fired from a good change (11 rejections, queue
+  collapsed 12→1 on adoption); endpoint promotion recovered 763 relations; and
+  the metrics reported stale canary verdicts as passes. Fixes committed in
+  `746e6e8` (amortized promotion, honest canary reporting). Active ontology
+  re-baselined 3,342 → 3,637.
 - **2026-07-24 (later)** — 5-doc phase (docs 400→600) surfaced a scaling wall:
   the extraction context was unbounded and prompts overflowed the model window
   at ~3,200 outcomes (~20% chunk loss on large-graph batches). Fixed by bounding
