@@ -217,10 +217,22 @@ is the grammar we read it through.
 - **Support thresholds vs long tail.** Rare-but-real relations (a relation seen
   3× that is genuinely distinct) vs noise. The purity/support gate must not erase
   the informative long tail.
-- **Circularity of the self-improving loop.** If the distilled schema guides
-  extraction, does extraction then merely confirm the schema? Early mistakes
-  would ossify and become invisible, because the evidence that would contradict
-  them stops being extracted — and it would *look* like improving consistency.
+- **Circularity of the self-improving loop — DEMONSTRATED 2026-07-25, not
+  hypothetical.** Iteration 4 fed the distilled schema to the extractor as
+  context. It did not ossify slowly; it collapsed on the first chunk. The model
+  instantiated every listed axiom a near-equal number of times regardless of
+  document content, copied the notation verbatim into the relation-type field,
+  duplicated inverse pairs because both were listed, fabricated a false relation
+  to fill the third slot, and in one case used the class names as instance names
+  (which would collapse every act into one node). All four pre-registered
+  quantitative checks PASSED while this happened. Conclusion: the schema must be
+  presented as a **constraint/vocabulary**, never as a template of facts to
+  instantiate, and the anti-ossification machinery below is a prerequisite for the
+  self-improving loop rather than a later refinement.
+  If the distilled schema guides extraction, does extraction then merely confirm
+  the schema? Early mistakes would ossify and become invisible, because the
+  evidence that would contradict them stops being extracted — and it would *look*
+  like improving consistency.
   The held-out task and provenance grounding are the guard, plus:
 
   **Anti-ossification by surprisal (the "drop boring, admit surprising" rule).**

@@ -371,7 +371,132 @@ an `inverseOf` assertion — a genuinely smaller and more truthful grammar.
 
 ---
 
+## Iteration 4 — is a small schema good extraction context?
+## (PRE-REGISTERED 2026-07-25, before running) — THE PITCH-BLACK CLAIM
+
+The claim that matters: a *stable, small* schema as extraction context makes
+prompt size independent of corpus size, so the factory can run unbounded. Tested
+as **non-inferiority**, not superiority (per the agreed basis): context must stop
+growing **and** quality must not collapse.
+
+**Arms.** Same chunks, same system prompt, same parser, same model/settings.
+- **A (concept-sea)** — today's context: `wg.context_for(text)` over the
+  3,739-concept graph, bounded by the caps from `a25dfc1`.
+- **B (distilled schema)** — the iteration-3b schema: 7 class names + 3 typed
+  axioms + the generic-relation note. Fixed size, independent of the graph.
+
+**Chunks.** 10 chunks from documents **never ingested** (the pool holds ~1,490
+unused acts), so neither arm has memorised them.
+
+**Hypotheses.**
+- **H1 (bounded).** B's prompt is materially smaller and, unlike A, cannot grow
+  with the corpus.
+- **H2 (non-inferior yield).** B extracts a comparable amount — it must not
+  collapse.
+- **H3 (canonicalising, the interesting one).** B should *reduce inverse-label
+  conflation at the source*: told `AuthoritativeBody --emite--> NormativeAct`, the
+  model should stop emitting the `hasIssuer` framing that cost us iteration 3b.
+  If so, schema-as-context improves raw-graph consistency, not just prompt size.
+
+**Predictions + refutation thresholds.**
+| check | predict | refute if |
+|---|---|---|
+| prompt tokens, B vs A | **B ≤ ⅓ of A** | B ≥ A |
+| outcomes+relations per chunk, B vs A | **≥ 75% of A** (non-inferior) | < 60% of A |
+| `emite`-family edges in canonical direction, B | **≥ 90%** (baseline 73%) | ≤ 73% (no gain) |
+| parse failures, B | ≤ A + 1 | markedly worse |
+
+Human spot-check (10 chunks, side-by-side) is the only correctness signal and is
+recorded separately as a judgement, not a threshold.
+
+**Result** (run 2026-07-25, 10 held-out chunks × 2 arms, artifacts in
+`distillation/iter-4/`):
+
+| pre-registered check | predicted | measured | |
+|---|---|---|---|
+| prompt tokens B vs A | ≤ 0.33× | **0.13×** (250 vs 1,941) | PASS |
+| yield B vs A | ≥ 0.75× | **2.33×** | PASS |
+| B `emite` canonical rate | ≥ 90% | **100%** | PASS |
+| B parse failures | ≤ 1 | **0** | PASS |
+
+**All four checks passed. The experiment is still REFUTED, on quality — and the
+metrics are what failed.**
+
+Inspecting the outputs (the step the numbers did not require):
+
+```
+arm B relation types:  emite ×7,  adoptată de ×7,  contrasemnează ×7
+                       + literal type strings "--emite-->", "--adoptată de-->", …
+GUVERNUL --emite--> ORDONANŢA           and
+ORDONANŢA --adoptată de--> GUVERNUL     ← one fact, both directions, because both were listed
+MONITORUL OFICIAL --contrasemnează--> ORDONANŢA   ← false; a gazette countersigns nothing
+16% of arm-B outcome names were CLASS names ("NormativeAct", "AuthoritativeBody")
+arm B emitted exactly 3 relations on 10/10 chunks
+```
+
+Arm B **echoed the schema instead of reading the document**: it instantiated every
+listed axiom a near-equal number of times regardless of content, copied the ASCII
+arrow notation into the *type* field, duplicated inverse pairs because both were
+listed, fabricated `contrasemnează` to fill the third slot, and in one chunk used
+the class names *as* the instance names — which would collapse every act in the
+corpus into a single node. Arm A, by contrast, produced correct sparse triples
+(`PARLAMENTUL --emite--> LEGE`).
+
+So B's "2.33× yield" was duplication plus fabrication, and its "100% canonical
+rate" was copying, not comprehension.
+
+**Verdict: REFUTED. Schema-as-context, presented this way, is actively harmful.**
+
+**Two lessons, both larger than this experiment.**
+1. **The ossification risk is real and immediate, not eventual.** The proposal
+   worried that a schema-guided extractor would slowly come to confirm its own
+   schema. It does not do it slowly; given the schema as context it does it on the
+   first chunk, crudely, by fabricating instances of every axiom. The
+   anti-ossification machinery (MDL eviction, residual set) is therefore not a
+   refinement to add later — without it, the self-improving loop degenerates
+   immediately.
+2. **Every metric I pre-registered was a quantity metric, and all four were
+   unanimously fooled by a qualitative collapse.** Tokens, yield, canonical rate,
+   parse rate: all passed, all meaningless. The only element of the design that
+   could catch this was the human spot-check — and it was caught by *looking at
+   the artifacts*, not by reading the dashboard. Pre-registration protects against
+   moving the goalposts; it does **not** protect against measuring the wrong thing.
+
+**Two flaws in my own design, owned.**
+- I used only the **first chunk** of each document, so every sample was a
+  structurally identical header. That amplified the uniformity and means
+  mid-document extraction was never tested.
+- The arm-B prompt said "Use these class names and relation directions when the
+  same kinds of thing appear here" — an *invitation to instantiate*. The schema
+  was framed as a template to fill rather than a vocabulary to constrain.
+
+**Next (iteration 4b).** The claim is not dead, but the *presentation* is. Retest
+with the schema as a **constraint, not a template**: supply the class names for
+naming consistency, state the permitted relation types as a closed vocabulary,
+and instruct explicitly that a relation may be asserted *only if this text states
+it*; drop the arrow notation. Sample mid-document chunks, not just headers. Add a
+qualitative check to the pre-registration this time — e.g. relation-type entropy
+per chunk (a template-filler produces near-zero variance across chunks, which is
+exactly the signature that gave this away).
+
+---
+
+## Iteration 5 — systematic axiom discovery (SCOPED 2026-07-25)
+
+Per direction: **discovery first, systematic, no cherry-picking.** Enumerate all
+candidate axioms over the lifted schema — inverse pairs (`R1(A,B)` vs `R2(B,A)`
+with high instance overlap), subsumption (`R1 ⊑ R2`), and functional/domain
+constraints — score every candidate by support and confidence, and only then look
+at which ones are meaningful. The `emite` / `adoptată de` inverse pair noticed in
+3b must be *rediscovered* by the procedure, not assumed; if the procedure misses
+it, the procedure is wrong. To be pre-registered in full after iteration 4.
+
+---
+
 ## Revision log
+- **2026-07-25** — Iteration 4 pre-registered (the pitch-black claim, tested as
+  non-inferiority); iteration 5 scoped as systematic discovery-first axiom
+  induction, with the 3b inverse pair as a held-back validation case.
 - **2026-07-25** — Iteration 3b run: CONFIRMED on all four checks. `emite`
   H 0.37→0.05, dominance 73%→100%, specific relations 2→3, coverage unchanged.
   Noted that `emite` and `adoptată de` are cross-label inverses, motivating
