@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import hashlib
 import tempfile
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, List, Optional, Set, Tuple
@@ -87,6 +88,7 @@ class WorkingGraph:
         self._retracted: Set[int] = set()                  # logically removed concepts
         self._chunk_contrib: Dict[str, dict] = {}          # chunk -> {concepts,chars,edges}
         self.manifest: Dict[str, str] = {}                 # chunk_id -> content hash
+        self.chunk_failures: Dict[str, dict] = {}          # chunk_id -> dead-letter record
         self.concept_hashes: Dict[int, str] = {}           # node -> hex content_hash from core (provenance + dedup)
         self._hash_to_node: Dict[str, int] = {}            # content hash -> node for exact dedup
         self._vec_cache: Dict[str, List[float]] = {}       # name -> embedding (see _prefetch_vectors)
@@ -397,6 +399,43 @@ class WorkingGraph:
             if bridge:
                 sig.correlations.append({"kind": "bridge", "names": [f, t]})
 
+    # ---- dead-letter queue for chunks that never extract ------------------
+    #
+    # A failed chunk's hash is deliberately not recorded, so the next run tries
+    # it again. That is correct for a transient failure (server down, timeout)
+    # and unbounded for a deterministic one: the same chunk is re-sent to the
+    # LLM on every batch, forever, and every run pays for it. Bound the retry —
+    # but only for failures the model owns. A provider/transport error is never
+    # counted here, because an outage would otherwise quarantine the corpus.
+
+    def record_chunk_failure(self, chunk_id: str, content_hash: str, reason: str,
+                             max_attempts: int = 3) -> bool:
+        """Count a deterministic failure. Returns True once it is quarantined.
+
+        A record is reset when the chunk's content changes, so editing a
+        poisonous document gives it a fresh set of attempts.
+        """
+        rec = self.chunk_failures.get(chunk_id)
+        if rec is None or rec.get("content_hash") != content_hash:
+            rec = {"content_hash": content_hash, "attempts": 0,
+                   "reason": reason, "quarantined": False}
+        rec["attempts"] = int(rec.get("attempts", 0)) + 1
+        rec["reason"] = reason
+        rec["last_ts"] = time.time()
+        rec["quarantined"] = rec["attempts"] >= max(1, int(max_attempts))
+        self.chunk_failures[chunk_id] = rec
+        return bool(rec["quarantined"])
+
+    def clear_chunk_failure(self, chunk_id: str) -> None:
+        """A chunk that finally extracted is no longer a dead letter."""
+        self.chunk_failures.pop(chunk_id, None)
+
+    def quarantined_chunks(self) -> List[dict]:
+        """The dead letters, for the exception queue. Nothing here is lost data —
+        the source document is untouched; only the extraction attempt stopped."""
+        return [{"chunk_id": cid, **rec} for cid, rec in sorted(self.chunk_failures.items())
+                if rec.get("quarantined")]
+
     def retract_chunk(self, chunk_id: str) -> None:
         """Logically remove everything `chunk_id` contributed. pygrap is NOT
         mutated here (append-only during a run); retracted concepts are excluded
@@ -616,6 +655,7 @@ class WorkingGraph:
                 srcs = self._rel_sources.get((f, e["type"], t), set())
                 st.edge_sources[(remap[f], remap[t])] = sorted(srcs)
         st.manifest = dict(self.manifest)
+        st.chunk_failures = {k: dict(v) for k, v in self.chunk_failures.items()}
         st.concept_hashes = {remap.get(old, old): h for old, h in self.concept_hashes.items() if old in remap}
         st.rel_vocab = list(dict.fromkeys(e["type"] for e in self.relations))
         st.parked = [{"from": p["from"], "type": p["type"], "to": p["to"],
@@ -638,6 +678,7 @@ class WorkingGraph:
         self.parked = [{"from": p["from"], "type": p["type"], "to": p["to"],
                         "source": p["chunk_id"], "reason": p["reason"]} for p in st.parked]
         self.manifest = dict(st.manifest)
+        self.chunk_failures = {k: dict(v) for k, v in st.chunk_failures.items()}
         self.concept_hashes = dict(st.concept_hashes)
         self._hash_to_node = {h: nid for nid, h in self.concept_hashes.items()}
         self._retracted = set()
@@ -704,6 +745,12 @@ class WorkingGraph:
         store_path = Path(workdir) / "graph_store.db"
         with GraphStore(str(store_path)) as store:
             st = store.load()
-        if st.concepts:
+        # Not just `st.concepts`: a run in which every chunk failed extraction
+        # still has state worth reloading — the manifest of chunks already tried
+        # and the dead-letter counts. Gating on concepts alone silently discarded
+        # both, so such a run re-did all of its work (and re-paid for it) next
+        # time. The manifest is the record of what was attempted, not only of
+        # what succeeded.
+        if st.concepts or st.manifest or st.chunk_failures:
             wg._load_state(st)
         return wg

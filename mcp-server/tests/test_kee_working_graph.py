@@ -360,3 +360,52 @@ def test_promotion_is_amortized_by_max_promote(tmp_path):
     # a later run picks up more, so nothing is lost permanently
     res2 = wg.promote_parked_endpoints(min_refs=2, max_promote=3)
     assert res2["promoted"] == 3
+
+
+# ---- dead-letter queue -----------------------------------------------------
+#
+# `20300#2` failed extraction in every run for weeks: a failed chunk's hash is
+# not recorded, so it was re-sent to the LLM on every batch forever. These pin
+# the bound — and the exemption that keeps an outage from quarantining the corpus.
+
+def test_deterministic_failure_is_quarantined_after_max_attempts(tmp_path):
+    wg = _wg(tmp_path)
+    assert wg.record_chunk_failure("20300#2", "h1", "unparsed", max_attempts=3) is False
+    assert wg.record_chunk_failure("20300#2", "h1", "unparsed", max_attempts=3) is False
+    assert wg.record_chunk_failure("20300#2", "h1", "unparsed", max_attempts=3) is True
+    q = wg.quarantined_chunks()
+    assert [r["chunk_id"] for r in q] == ["20300#2"]
+    assert q[0]["attempts"] == 3 and q[0]["reason"] == "unparsed"
+
+
+def test_edited_chunk_gets_a_fresh_set_of_attempts(tmp_path):
+    wg = _wg(tmp_path)
+    for _ in range(3):
+        wg.record_chunk_failure("c#0", "old", "unparsed", max_attempts=3)
+    assert wg.quarantined_chunks()
+    # same chunk id, new content -> the verdict was about the old text
+    assert wg.record_chunk_failure("c#0", "new", "unparsed", max_attempts=3) is False
+    assert wg.quarantined_chunks() == []
+
+
+def test_success_clears_the_dead_letter(tmp_path):
+    wg = _wg(tmp_path)
+    wg.record_chunk_failure("c#0", "h", "empty", max_attempts=3)
+    wg.clear_chunk_failure("c#0")
+    assert wg.chunk_failures == {}
+
+
+def test_quarantine_survives_save_and_reopen(tmp_path):
+    wg = _wg(tmp_path)
+    wg.upsert_fragment({"source": "a#0", "outcomes": [{"name": "Thing", "characteristics": []}],
+                        "relations": []}, "a#0")
+    for _ in range(3):
+        wg.record_chunk_failure("bad#1", "h", "unparsed", max_attempts=3)
+    wg.save()
+    wg.close()
+    wg2 = WorkingGraph.open(str(tmp_path), HashingEmbedder())
+    try:
+        assert [r["chunk_id"] for r in wg2.quarantined_chunks()] == ["bad#1"]
+        assert wg2.chunk_failures["bad#1"]["attempts"] == 3
+    finally:
+        wg2.close()

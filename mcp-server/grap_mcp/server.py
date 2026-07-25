@@ -1607,7 +1607,8 @@ def run_pipeline(config_path: str = "pipeline.json") -> dict:
                     "context_mode": out.get("context_mode"),
                     "promoted": out.get("promoted"),
                     "relations_recovered": out.get("relations_recovered"),
-                    "parked": out.get("parked")}
+                    "parked": out.get("parked"),
+                    "quarantined": out.get("quarantined")}
             elif ext.get("models"):
                 rr = extract_ontology_nversion(ext["docs_path"],
                                                models=ext["models"],

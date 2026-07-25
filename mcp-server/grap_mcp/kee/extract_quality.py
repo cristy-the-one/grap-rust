@@ -26,7 +26,13 @@ class QualityMonitor:
     def __init__(self, class_vocab=None):
         self.class_vocab = {c.strip().lower() for c in (class_vocab or []) if c.strip()}
         self.chunks = 0
-        self.parse_failures = 0
+        # Three different events, previously added together under one name.
+        # "parse failure" should mean the model returned something unparseable —
+        # not that the server was down, and not that a chunk honestly had
+        # nothing in it to extract.
+        self.parse_failures = 0       # reply arrived, no JSON in it
+        self.empty_extractions = 0    # valid JSON, no outcomes and no relations
+        self.provider_errors = 0      # transport/server failure, model not at fault
         self.rel_counts: list[int] = []
         self.outcome_counts: list[int] = []
         self.rel_types: Counter = Counter()
@@ -35,9 +41,16 @@ class QualityMonitor:
         self.empty_typed = 0          # relation with a blank type
 
     # ---- accumulation -----------------------------------------------------
-    def record_failure(self) -> None:
+    def record_failure(self, reason: Optional[str] = None) -> None:
+        """Count a chunk that produced no fragment. `reason` is one of
+        "unparsed" | "empty" | "provider"; None keeps the old lumped behaviour."""
         self.chunks += 1
-        self.parse_failures += 1
+        if reason == "empty":
+            self.empty_extractions += 1
+        elif reason == "provider":
+            self.provider_errors += 1
+        else:
+            self.parse_failures += 1
 
     def record(self, frag: Dict[str, Any]) -> None:
         self.chunks += 1
@@ -76,6 +89,13 @@ class QualityMonitor:
             "chunks": self.chunks,
             "parse_failures": self.parse_failures,
             "parse_failure_rate": round(self.parse_failures / n, 3),
+            "empty_extractions": self.empty_extractions,
+            "provider_errors": self.provider_errors,
+            # The old `parse_failure_rate` was this: every chunk that yielded no
+            # fragment, whatever the cause. Kept under an honest name so the
+            # history series in extract_quality_history.jsonl stays comparable.
+            "no_fragment_rate": round(
+                (self.parse_failures + self.empty_extractions + self.provider_errors) / n, 3),
             "outcomes_per_chunk": round(sum(self.outcome_counts) / max(1, len(self.outcome_counts)), 2),
             "relations_per_chunk": round(sum(self.rel_counts) / max(1, len(self.rel_counts)), 2),
             # shape metrics — the ones a mean cannot see
@@ -105,8 +125,14 @@ class QualityMonitor:
         if self.notation_leak:
             out.append(f"notation_leak: {self.notation_leak} relation type(s) carry "
                        "prompt notation")
-        if self.chunks >= 10 and self.parse_failures / self.chunks > 0.15:
-            out.append(f"parse_failures: {self.parse_failures}/{self.chunks} "
+        # Alarm on the lumped rate, which is what the 0.15 threshold was
+        # calibrated against — but name the split so the operator can see
+        # whether it is the model, the server, or genuinely empty text.
+        no_frag = self.parse_failures + self.empty_extractions + self.provider_errors
+        if self.chunks >= 10 and no_frag / self.chunks > 0.15:
+            out.append(f"no_fragment: {no_frag}/{self.chunks} chunks yielded nothing "
+                       f"(unparsed {self.parse_failures}, empty {self.empty_extractions}, "
+                       f"provider {self.provider_errors}) "
                        "(> 15%; baseline 0-20%)")
         return out
 

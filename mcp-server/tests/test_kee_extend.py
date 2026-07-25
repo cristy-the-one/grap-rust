@@ -235,3 +235,51 @@ def test_checkpoint_disabled_keeps_single_final_save(tmp_path):
     out = extend_graph_ontology(wd, str(docs), StubProvider(handler=_handler),
                                 HashingEmbedder(), sim=0.9, checkpoint_every=0)
     assert out["added"] == 1
+
+
+# ---- the poison chunk ------------------------------------------------------
+#
+# A chunk that fails deliberately keeps its hash out of the manifest so the next
+# run retries it. Unbounded, that is one wasted generation per batch forever:
+# `20300#2` was still being re-sent 750 documents into the law-ro pilot.
+
+def _always_unparseable(system, user):
+    return "I cannot produce JSON for this."
+
+
+def test_poison_chunk_stops_being_retried(tmp_path):
+    wd = str(tmp_path / "g")
+    docs = tmp_path / "docs"; docs.mkdir()
+    (docs / "bad.txt").write_text("unextractable text", encoding="utf-8")
+
+    calls = []
+    for _ in range(4):                       # four consecutive runs
+        p = StubProvider(handler=_always_unparseable)
+        out = extend_graph_ontology(wd, str(docs), p, HashingEmbedder(),
+                                    sim=0.9, max_extract_attempts=3)
+        calls.append(len(p.calls))
+    # tried on runs 1-3, quarantined at the third, never sent again
+    assert calls == [1, 1, 1, 0], calls
+    assert [q["chunk_id"] for q in out["quarantined"]] == []      # already quarantined
+    assert out["quality"]["quarantined_total"] == 1
+
+
+def test_provider_outage_never_quarantines(tmp_path):
+    """An outage must not dead-letter the corpus: transport errors are exempt."""
+    wd = str(tmp_path / "g")
+    docs = tmp_path / "docs"; docs.mkdir()
+    (docs / "a.txt").write_text("alpha topic", encoding="utf-8")
+
+    def _down(system, user):
+        raise RuntimeError("connection refused")
+
+    for _ in range(5):
+        out = extend_graph_ontology(wd, str(docs), StubProvider(handler=_down),
+                                    HashingEmbedder(), sim=0.9, max_extract_attempts=3)
+        assert out["quality"]["quarantined_total"] == 0
+
+    # the server comes back: the chunk is still pending and extracts normally
+    p = StubProvider(handler=_handler)
+    out = extend_graph_ontology(wd, str(docs), p, HashingEmbedder(), sim=0.9)
+    assert len(p.calls) == 1
+    assert any(o["name"] == "Alpha" for o in out["ontology"]["process_outcomes"])

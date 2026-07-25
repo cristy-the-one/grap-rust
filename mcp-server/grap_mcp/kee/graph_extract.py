@@ -25,28 +25,47 @@ from .working_graph import WorkingGraph
 logger = logging.getLogger("grap-mcp.kee")
 
 
-def _extract_with_context(provider, source: str, text: str, context) -> Optional[dict]:
-    """One augmented LLM call -> normalized fragment (or None if unparseable)."""
+def _extract_with_context(provider, source: str, text: str, context
+                          ) -> Tuple[Optional[dict], Optional[str]]:
+    """One augmented LLM call -> (fragment, failure reason).
+
+    Returns exactly one of `(frag, None)` or `(None, reason)`. The three ways to
+    get nothing back used to be indistinguishable — all of them returned None
+    and all of them were counted as "parse failures". They are not the same
+    event and they do not deserve the same response:
+
+      "provider" — transport/server error. Transient; always worth retrying, and
+                   never grounds for quarantine (an outage would otherwise
+                   dead-letter the whole corpus in a few batches).
+      "unparsed" — a reply came back and no JSON could be found in it. The model
+                   owns this, and it reproduces on the same input.
+      "empty"    — valid JSON, nothing extractable in it. Also reproducible, and
+                   often simply true (a table of contents has no outcomes).
+                   Counting it as a parse failure overstated the failure rate.
+    """
     user = extract.build_user_prompt_with_context(text, context)
     try:
         raw = provider.complete(extract.SYSTEM_PROMPT, user)
     except Exception as exc:  # noqa: BLE001 - provider/network errors are non-fatal
         logger.warning("graph_extract: provider failed on %s: %s", source, exc)
-        return None
+        return None, "provider"
     obj = extract.extract_json(raw)
     if obj is None:
         logger.warning("graph_extract: no JSON parsed for %s", source)
-        return None
+        return None, "unparsed"
     frag = extract.normalize_fragment(obj, source)
     if not (frag["outcomes"] or frag["relations"]):
-        return None
-    return frag
+        return None, "empty"
+    return frag, None
 
 
 def _extract_windows(wg, chunks: List[Tuple[str, str]], provider, concurrency: int,
                      on_chunk: Optional[Callable[[int, str], None]] = None,
-                     ) -> Iterator[Tuple[List[Tuple[str, str]], List[Optional[dict]]]]:
-    """Yield (window, fragments) over `chunks` in windows of `concurrency`.
+                     ) -> Iterator[Tuple[List[Tuple[str, str]],
+                                         List[Tuple[Optional[dict], Optional[str]]]]]:
+    """Yield (window, results) over `chunks` in windows of `concurrency`.
+
+    Each result is the `(fragment, reason)` pair from `_extract_with_context`.
 
     Each window snapshots its contexts from the current graph, runs the LLM
     calls concurrently, and returns fragments in chunk order so the caller can
@@ -84,15 +103,15 @@ def graph_extract_ontology(chunks: Sequence[Tuple[str, str]], provider, embedder
 
     with WorkingGraph(embedder, merge_threshold=sim, context_cap=context_cap,
                       workdir=workdir) as wg:
-        for window, frags in _extract_windows(wg, list(chunks), provider, concurrency):
-            for (source, text), frag in zip(window, frags):
+        for window, results in _extract_windows(wg, list(chunks), provider, concurrency):
+            for (source, text), (frag, _reason) in zip(window, results):
                 if frag is None:
                     continue
                 sig = wg.upsert_fragment(frag, source)
                 if sig.warrants_relook() and relooks < budget:
                     relooks += 1
                     fctx = wg.focused_context(sig)
-                    frag2 = _extract_with_context(provider, source, text, fctx)
+                    frag2, _ = _extract_with_context(provider, source, text, fctx)
                     if frag2 is not None:
                         wg.upsert_fragment(frag2, source)
 
@@ -114,7 +133,8 @@ def extend_graph_ontology(workdir: str, docs_path: str, provider, embedder, *,
                           concurrency: int = 1,
                           checkpoint_every: int = 25,
                           promote_min_refs: int = 2,
-                          promote_max_per_run: int = 25) -> Dict[str, Any]:
+                          promote_max_per_run: int = 25,
+                          max_extract_attempts: int = 3) -> Dict[str, Any]:
     """Open the durable graph at `workdir`, sync it to `docs_path`, save, return stats.
 
     new chunk -> extract; changed chunk (hash differs) -> retract old + re-extract;
@@ -129,6 +149,10 @@ def extend_graph_ontology(workdir: str, docs_path: str, provider, embedder, *,
     snapshotted before dispatch and results are upserted in chunk order, so
     chunks within a window don't see each other's results. Default 1 keeps the
     fully sequential semantics.
+
+    `max_extract_attempts` bounds how many times a chunk the model cannot
+    extract is re-sent across runs before it is quarantined. Transport errors
+    are exempt and retry forever, so an outage cannot dead-letter the corpus.
     """
     wg = WorkingGraph.open(workdir, embedder, merge_threshold=sim, context_cap=context_cap)
     try:
@@ -157,22 +181,36 @@ def extend_graph_ontology(workdir: str, docs_path: str, provider, embedder, *,
                "removed": len(removed)})
         n = len(to_extract)
         since_ckpt = 0
+        quarantined: List[dict] = []
         qm = QualityMonitor(class_vocab=extract.CLASS_VOCAB)
-        for window, frags in _extract_windows(
+        for window, results in _extract_windows(
                 wg, to_extract, provider, concurrency,
                 on_chunk=lambda i, source: _emit(
                     {"phase": "chunk", "i": i + 1, "n": n, "source": source})):
-            for (source, text), frag in zip(window, frags):
+            for (source, text), (frag, reason) in zip(window, results):
                 if frag is None:
-                    qm.record_failure()
-                    continue                 # provider error/empty: do NOT record hash -> retried next run
+                    qm.record_failure(reason)
+                    # Not recording the hash is what makes the retry happen next
+                    # run. Keep that for transport errors; bound it for failures
+                    # the model reproduces, or the chunk is re-sent every batch
+                    # for as long as the corpus lives.
+                    if reason != "provider":
+                        if wg.record_chunk_failure(source, hashes[source], reason or "unknown",
+                                                   max_attempts=max_extract_attempts):
+                            wg.manifest[source] = hashes[source]   # stop retrying
+                            quarantined.append({"chunk_id": source, "reason": reason})
+                            logger.warning(
+                                "graph_extract: quarantined %s after %d attempts (%s)",
+                                source, max_extract_attempts, reason)
+                    continue
                 qm.record(frag)
+                wg.clear_chunk_failure(source)   # it extracted; it is not a dead letter
                 sig = wg.upsert_fragment(frag, source)
                 wg.manifest[source] = hashes[source]
                 since_ckpt += 1
                 if sig.warrants_relook() and relooks < budget:
                     relooks += 1
-                    frag2 = _extract_with_context(provider, source, text, wg.focused_context(sig))
+                    frag2, _ = _extract_with_context(provider, source, text, wg.focused_context(sig))
                     if frag2 is not None:
                         wg.upsert_fragment(frag2, source)
             # Durability checkpoint. Without this the whole run lives in memory
@@ -207,6 +245,13 @@ def extend_graph_ontology(workdir: str, docs_path: str, provider, embedder, *,
                 promo = {}
 
         quality = qm.report()
+        # Dead letters are part of the run's quality picture: they are the work
+        # the factory decided to stop paying for, and nobody sees them unless
+        # they are reported. `total` is cumulative across runs, not just this one.
+        quality["quarantined_now"] = len(quarantined)
+        quality["quarantined_total"] = len(wg.quarantined_chunks())
+        if quarantined:
+            _emit({"phase": "quarantine", "chunks": quarantined})
         # Current run, plus an append-only history: the per-run file is
         # overwritten each run, so batch-by-batch telemetry was lost when the
         # pipeline report dropped it (server.py built the extract step from a
@@ -237,6 +282,7 @@ def extend_graph_ontology(workdir: str, docs_path: str, provider, embedder, *,
             "relations_recovered": promo.get("relations_recovered", 0),
             "quality": quality,
             "context_mode": extract.CONTEXT_MODE,
+            "quarantined": quarantined,
         }
     finally:
         wg.close()

@@ -29,6 +29,24 @@ _MIGRATIONS = [
         CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT);
         """
     ),
+    # A chunk that fails extraction deliberately does NOT get its hash recorded,
+    # so the next run retries it. That is right for transient failures and wrong
+    # forever after for deterministic ones: `20300#2` failed in every run for
+    # weeks, one wasted generation per batch, and it held parse_failure_rate at a
+    # constant 9.1% that had nothing to do with the documents being ingested.
+    # This table is the dead-letter queue that bounds the retry.
+    lambda c: c.executescript(
+        """
+        CREATE TABLE IF NOT EXISTS chunk_failures (
+            chunk_id TEXT PRIMARY KEY,
+            content_hash TEXT NOT NULL,
+            attempts INTEGER NOT NULL,
+            reason TEXT,
+            quarantined INTEGER NOT NULL DEFAULT 0,
+            last_ts REAL
+        );
+        """
+    ),
 ]
 
 SCHEMA_VERSION = len(_MIGRATIONS)
@@ -47,6 +65,8 @@ class GraphState:
     rel_vocab: List[str] = field(default_factory=list)
     parked: List[dict] = field(default_factory=list)
     concept_hashes: Dict[int, str] = field(default_factory=dict)  # node -> hex core content_hash
+    # chunk_id -> {content_hash, attempts, reason, quarantined, last_ts}
+    chunk_failures: Dict[str, dict] = field(default_factory=dict)
 
 
 class GraphStore:
@@ -70,7 +90,7 @@ class GraphStore:
         try:
             for t in ("concepts", "aliases", "characteristics", "edges", "chunks",
                       "concept_sources", "char_sources", "edge_sources", "parked", "meta",
-                      "concept_hashes"):
+                      "concept_hashes", "chunk_failures"):
                 c.execute(f"DELETE FROM {t}")
             c.executemany("INSERT INTO concepts(concept_id, canonical) VALUES (?,?)",
                           list(state.concepts.items()))
@@ -94,6 +114,12 @@ class GraphStore:
             # must never lose an entire extraction over a duplicate row.
             c.executemany("INSERT OR IGNORE INTO parked(from_concept, type, to_concept, chunk_id, reason) VALUES (?,?,?,?,?)",
                           [(p["from"], p["type"], p["to"], p["chunk_id"], p["reason"]) for p in state.parked])
+            c.executemany(
+                "INSERT INTO chunk_failures(chunk_id, content_hash, attempts, reason, "
+                "quarantined, last_ts) VALUES (?,?,?,?,?,?)",
+                [(cid, f.get("content_hash", ""), int(f.get("attempts", 0)),
+                  f.get("reason"), 1 if f.get("quarantined") else 0, f.get("last_ts"))
+                 for cid, f in state.chunk_failures.items()])
             c.execute("INSERT INTO meta(key, value) VALUES ('rel_vocab', ?)",
                       (json.dumps(state.rel_vocab),))
             c.commit()
@@ -128,6 +154,11 @@ class GraphStore:
         s.parked = [{"from": r["from_concept"], "type": r["type"], "to": r["to_concept"],
                      "chunk_id": r["chunk_id"], "reason": r["reason"]}
                     for r in c.execute("SELECT * FROM parked")]
+        s.chunk_failures = {
+            r["chunk_id"]: {"content_hash": r["content_hash"], "attempts": r["attempts"],
+                            "reason": r["reason"], "quarantined": bool(r["quarantined"]),
+                            "last_ts": r["last_ts"]}
+            for r in c.execute("SELECT * FROM chunk_failures")}
         row = c.execute("SELECT value FROM meta WHERE key='rel_vocab'").fetchone()
         s.rel_vocab = json.loads(row["value"]) if row else []
         return s

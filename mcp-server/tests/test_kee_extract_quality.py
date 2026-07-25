@@ -48,7 +48,32 @@ def test_parse_failures_tracked_and_alarmed():
     r = qm.report()
     assert r["chunks"] == 12 and r["parse_failures"] == 4
     assert r["parse_failure_rate"] == round(4 / 12, 3)
-    assert any("parse_failures" in a for a in r["alarms"])
+    # the alarm covers every way a chunk can yield nothing, not just bad JSON
+    assert any("no_fragment" in a for a in r["alarms"])
+
+
+def test_failure_causes_are_not_lumped_together():
+    """A server outage and an empty table-of-contents page are not parse failures.
+
+    Lumping them held the reported rate at a constant 9.1% across five batches of
+    the 750-doc run — a number about one poisoned chunk, not about the documents.
+    """
+    qm = QualityMonitor()
+    for _ in range(7):
+        qm.record(_frag(["A"], [("x", "t", "y")]))
+    qm.record_failure("unparsed")
+    qm.record_failure("empty")
+    qm.record_failure("provider")
+    r = qm.report()
+    assert r["chunks"] == 10
+    assert r["parse_failures"] == 1
+    assert r["empty_extractions"] == 1
+    assert r["provider_errors"] == 1
+    assert r["parse_failure_rate"] == 0.1
+    # the lumped figure survives under an honest name, so history stays comparable
+    assert r["no_fragment_rate"] == 0.3
+    assert any("unparsed 1" in a and "empty 1" in a and "provider 1" in a
+               for a in r["alarms"])
 
 
 def test_clean_run_has_no_alarms(tmp_path):
