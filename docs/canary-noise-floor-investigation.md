@@ -67,6 +67,34 @@ baseline, independently of the ontology's content:
   nodes. The reasoner has label/text-prefix guards as a "timing-robust secondary
   guard", which may or may not fully cover this.
 
+## Stronger evidence: it shows up in PRODUCTION runs too (2026-07-25)
+
+The autonomy pass gave a cleaner instance than any canary measurement, because it
+compares two ordinary **production** gap runs with no canary machinery involved,
+across one adoption:
+
+| run | gaps | characteristics | gap rate | self-coverage |
+|---|---|---|---|---|
+| run-4fd5a5 (pre-adopt) | 919 | 11,723 | 0.0784 | 92.2% |
+| run-236686 (pre-adopt) | 919 | 11,723 | 0.0784 | 92.2% |
+| **run-5fdff4 (post-adopt)** | **1,467** | 12,064 | **0.1216** | **87.8%** |
+
+Adoption added 106 outcomes (+2.7%) and 341 characteristics (+2.9%). Gaps rose
+**60%**. Normalising by ontology size does **not** explain it: the *rate* ratio is
+still **1.55×**, and self-coverage drops **4.3 points**. Two consecutive
+pre-adoption runs are identical (919, 919), so the metric is stable until an
+adoption happens.
+
+**Consequence for the alarms.** The `gap spike` alarm is therefore *correct* to
+fire, and must not be normalised away — it is reporting a real, unexplained
+degradation. The factory ending `HEALTHY=False` after an autonomous adoption is
+the honest outcome, not a bug to be tuned out. Only the `gap_regression` alarm
+needed fixing, and only for the part that genuinely was growth (gaps on outcomes
+that did not exist at the baseline run).
+
+This also sharpens the decisive experiment below: the phenomenon reproduces
+without the canary, so the experiment can be run purely with production gap runs.
+
 ## The decisive experiment (next step)
 
 Isolate projection from ontology change:

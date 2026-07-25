@@ -1338,13 +1338,18 @@ def list_pending_interventions(limit: int = None, cursor: str = None) -> dict:
             kv = _kv_subject(ev.subject)
             new = int(kv.get("new", 0) or 0)
             resolved = int(kv.get("resolved", 0) or 0)
-            # Fire on a NET regression, not on any new gap at all. Counting gross
-            # additions made "new=3; resolved=6" — a net improvement of three —
-            # queue as a regression, the same gross-vs-net flaw the canary had
-            # (it counted gaps on newly added outcomes as regressions until
-            # `_baseline_outcome_ids` partitioned them). A cycle that resolves at
-            # least as many gaps as it introduces is not a regression.
-            if new > resolved:
+            # `growth` = new gaps on outcomes that did not exist at the baseline
+            # run; those are expected, not regressions. Absent (older events) it
+            # defaults to 0, i.e. the previous gross behaviour.
+            growth = int(kv.get("growth", 0) or 0)
+            regressions = max(0, new - growth)
+            # Fire on a NET regression of *regressions*, not on any new gap at
+            # all. Two flaws were compounding here: counting gross additions made
+            # "new=3; resolved=6" — a net improvement — queue as a regression; and
+            # counting growth as regression made a healthy adoption of 106
+            # outcomes report "new=713" and queue. Both are the same mistake the
+            # canary made before `_baseline_outcome_ids` partitioned it.
+            if regressions > resolved:
                 items.append({"kind": "gap_regression", "subject": ev.subject,
                               "ts": ev.ts,
                               "age_s": max(0, round((now_ms - ev.ts) / 1000))})
@@ -1637,9 +1642,25 @@ def run_pipeline(config_path: str = "pipeline.json") -> dict:
             if len(prod) >= 2:
                 d = diff_runs(prod[-2].run_id, prod[-1].run_id)
                 if d.get("status") == "ok":
-                    step["delta"] = d["counts"]
+                    # Partition new gaps into GROWTH (on outcomes that did not
+                    # exist when the baseline run scored) and REGRESSION (on
+                    # outcomes that did). Without this the alarm counts growth as
+                    # regression: adopting 106 outcomes brings ~300
+                    # initially-uncovered characteristics, so a healthy cycle
+                    # reports "new=713" and queues. Same fix as the canary's
+                    # `_baseline_outcome_ids` partition — the flaw was fixed there
+                    # and left standing here.
+                    base_ids = _baseline_outcome_ids(
+                        ws, getattr(prod[-2], "kg_version", None))
+                    growth = 0
+                    if base_ids is not None:
+                        growth = sum(1 for t in d.get("new_gaps") or []
+                                     if str(t).partition(":")[0] not in base_ids)
+                    step["delta"] = {**d["counts"], "growth": growth,
+                                     "regressions": d["counts"]["new"] - growth}
                     subject = (f"new={d['counts']['new']};"
                                f"resolved={d['counts']['resolved']};"
+                               f"growth={growth};"
                                f"run={prod[-1].run_id}")
                     try:
                         ws.record_event("gap_delta", subject)

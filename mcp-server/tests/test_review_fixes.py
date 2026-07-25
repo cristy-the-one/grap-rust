@@ -405,6 +405,23 @@ def test_net_improvement_is_not_a_gap_regression(monkeypatch):
     assert not _gap_alarm_fires("new=3;resolved=6;run=run-x", monkeypatch)
 
 
+def test_growth_is_not_counted_as_gap_regression(monkeypatch):
+    """The real incident: adopting 106 outcomes brought ~300 initially-uncovered
+    characteristics, so a healthy cycle reported new=713 and queued. Gaps on
+    outcomes that did not exist at the baseline are GROWTH, not regression."""
+    # 713 new, but 700 of them are on outcomes that did not exist before
+    assert not _gap_alarm_fires("new=713;resolved=165;growth=700;run=run-x",
+                                monkeypatch)
+    # strip the growth term and the same event fires (the old behaviour)
+    assert _gap_alarm_fires("new=713;resolved=165;run=run-x", monkeypatch)
+
+
+def test_real_regression_survives_the_growth_partition(monkeypatch):
+    """Growth must not become a loophole: genuine regressions still fire."""
+    assert _gap_alarm_fires("new=713;resolved=100;growth=300;run=run-x",
+                            monkeypatch)
+
+
 def test_net_regression_still_fires(monkeypatch):
     assert _gap_alarm_fires("new=9;resolved=2;run=run-x", monkeypatch)
 
