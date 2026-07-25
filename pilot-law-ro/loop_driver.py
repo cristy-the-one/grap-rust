@@ -26,10 +26,10 @@ DOCS = PILOT / "docs"
 POOL = ROOT / "real-data-law-ro"
 # Phase 2 (2026-07-24): finer 5-doc batches, continue 400 -> 600. Separate
 # metrics file so the 10-doc study (loop-metrics-10doc.json) stays intact.
-METRICS = PILOT / "loop-metrics-5doc.json"
+METRICS = PILOT / "loop-metrics-700.json"
 
-TOTAL_DOCS = 600
-PER_BATCH = 5
+TOTAL_DOCS = 700
+PER_BATCH = 10
 
 os.environ["GRAP_WORKSPACE"] = str(PILOT / "ws")
 os.environ["GRAP_ROLE"] = "admin"
@@ -39,6 +39,12 @@ os.environ["GRAP_LLM_EXTRA_BODY"] = '{"chat_template_kwargs": {"enable_thinking"
 os.environ["GRAP_LLM_TIMEOUT"] = "420"        # > 2048/5.8 = 353s (v1 lesson)
 os.environ["GRAP_LLM_RETRIES"] = "2"
 os.environ["GRAP_LLM_MAX_TOKENS"] = "2048"
+# Measured-best extraction context (distillation iter 4b arm C): class vocabulary
+# + known concept NAMES only. The class list is the distilled schema from iter 5b.
+os.environ["GRAP_KEE_CONTEXT_MODE"] = "names"
+os.environ["GRAP_KEE_CLASS_VOCAB"] = ("NormativeAct, AuthoritativeBody, Official, "
+                                      "OfficialGazette, StructuralPart, "
+                                      "LegalChallenge, Budget")
 os.environ["GRAP_EMBED_BACKEND"] = "ollama"
 os.environ["GRAP_EMBED_MODEL"] = "bge-m3"
 os.environ["GRAP_EMBED_BASE_URL"] = "http://127.0.0.1:11434/v1"
@@ -103,9 +109,24 @@ def main():
     # The canary now gates on REGRESSIONS only (gaps on outcomes that existed
     # before), not on growth, so this budget is a real threshold rather than the
     # blunt 2500 that accepted everything. Growth gaps are reported separately.
+    # ARMED for autonomous adoption. The scale-free rate is now the QUALITY gate
+    # (observed 0.67 outcomes/chunk over 405 chunks, so 3.0 leaves ~4.5x headroom
+    # and still catches a real anomaly); the absolute budgets are a BLAST-RADIUS
+    # backstop sized at ~10% of the 3892-outcome active ontology, generous enough
+    # that a single batch (~55-70 outcomes) adopts and therefore never accumulates
+    # a cascade. Removals sized from the 650-doc run (14 outcomes / 48 chars over
+    # 5 batches).
+    #
+    # canary_max_new_gaps is deliberately GENEROUS: the corrected canary (which
+    # gates on REGRESSIONS only, not growth) has never run on real data, so its
+    # baseline is unknown. Per lessons Theme VIII — never set an absolute
+    # threshold without measuring its baseline — this run MEASURES the regression
+    # count rather than relying on it. Tighten next run from the recorded numbers.
     policy = {"enabled": True, "canary_enabled": True,
-              "max_outcomes_added": 150, "max_outcomes_removed": 20,
-              "max_characteristics_removed": 60, "canary_max_new_gaps": 25}
+              "max_outcomes_added": 400, "max_outcomes_removed": 25,
+              "max_characteristics_removed": 80,
+              "max_outcomes_added_per_chunk": 3.0,
+              "canary_max_new_gaps": 200}
     for k, v in policy.items():
         r = s.set_policy(k, v, rationale="10x10 loop v2 (timeout+canary calibrated)")
         assert r["status"] == "ok", r
@@ -145,9 +166,16 @@ def main():
                 "extract_added": ext.get("added"),
                 "churn_pass": bool(adopt.get("pass")),
                 "churn_detail": adopt.get("failed_checks") or "ok",
+                # the *reason*, not just the check name: metrics recorded a bare
+                # ['churn'] fourteen times across two runs and the actual budget
+                # that tripped had to be queried separately each time
+                "churn_violations": adopt.get("churn_violations"),
+                "failed_detail": adopt.get("failed_detail"),
+                "adopted_hash": adopt.get("version_hash") or adopt.get("adopted"),
                 "canary_result": can.get("result"),
                 "canary_new_gaps": can.get("new"),
                 "canary_growth_gaps": can.get("growth"),
+                "canary_raw_new_gaps": can.get("raw_new"),
                 "active_before": pre_active, "active_after": post_active,
                 "active_advanced": post_active > pre_active,
                 "concepts": post_wg.get("concepts"),
@@ -158,14 +186,30 @@ def main():
                 "parked": post_wg.get("parked"),
                 "gaps_found": gaps.get("gaps_found"),
                 "gaps_delta": gaps.get("delta"),
+                "context_mode": ext.get("context_mode"),
+                "quality": ext.get("quality"),
             }
             rows.append(row)
             METRICS.write_text(json.dumps(rows, indent=2, default=str), encoding="utf-8")
             print(f"[loop] batch {bi:>2} docs={docs_total} added={row['extract_added']} "
                   f"churn={'ok' if row['churn_pass'] else row['churn_detail']} "
-                  f"canary={row['canary_result']}(new={row['canary_new_gaps']}) "
+                  f"canary={row['canary_result']}(reg={row['canary_new_gaps']},"
+                  f"grow={row['canary_growth_gaps']}) "
                   f"active={pre_active}->{post_active} conc+={row['concepts_delta']} "
                   f"edges+={row['edges_delta']} {row['wall_s']}s", flush=True)
+            if not row["churn_pass"] and row.get("churn_violations"):
+                for v in (row["churn_violations"] if isinstance(row["churn_violations"], list)
+                          else [row["churn_violations"]]):
+                    print(f"        churn: {str(v)[:150]}", flush=True)
+            q = row.get("quality") or {}
+            if q:
+                print(f"        quality: relCV={q.get('relation_count_cv')} "
+                      f"types={q.get('distinct_relation_types')} "
+                      f"parsefail={q.get('parse_failure_rate')} "
+                      f"clsname={q.get('class_named_outcomes')} "
+                      f"notation={q.get('notation_leaks')}", flush=True)
+                for a in q.get("alarms", []):
+                    print(f"        !! QUALITY ALARM: {a}", flush=True)
     finally:
         restore_strict("restore strict after loop")
         print("[loop] strict policy restored", flush=True)

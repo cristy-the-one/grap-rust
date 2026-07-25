@@ -565,6 +565,11 @@ def _publish_and_gate_proposal(yaml_text: str, source: str, provider_name: str,
             _yaml.safe_load(yaml_text) or {}, _active_ontology_dict(ws), policy,
             pg_referenced_ids=_pg_referenced_outcome_ids())
         failed = [c["name"] for c in verdict["checks"] if not c["ok"]]
+        # The check NAMES alone are not actionable: a bare ['churn'] was recorded
+        # fourteen times across two runs and the budget that actually tripped had
+        # to be queried from the workspace each time. Carry the details too.
+        failed_detail = {c["name"]: c.get("detail")
+                         for c in verdict["checks"] if not c["ok"]}
         if verdict["pass"] and _state.kg is not None:
             prev_version = getattr(_state, "ontology_version", None)
             # Fresh pre-adoption baseline (review fix 1): measured against the
@@ -611,7 +616,10 @@ def _publish_and_gate_proposal(yaml_text: str, source: str, provider_name: str,
                 logger.warning("audit record_event failed for policy_rejected",
                                exc_info=True)
             auto_adoption = {"attempted": True, "pass": False,
-                             "failed_checks": failed}
+                             "failed_checks": failed,
+                             "failed_detail": failed_detail,
+                             "churn_violations": failed_detail.get("churn"),
+                             "version_hash": version.hash}
     return version, auto_adoption
 
 
