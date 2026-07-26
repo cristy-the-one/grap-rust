@@ -84,7 +84,14 @@ class GrapServerState:
         self.role = None
         self.ontology = None
         self.ontology_version = None
+        # Nodes projected into the EVIDENCE kg that must not count as evidence.
+        # Since the ontology moved to its own graph this holds PG steps only.
         self.projected_nodes = set()
+        # The ontology's own graph: scaffolding lives here so it never enters
+        # the evidence index. See docs/canary-noise-floor-investigation.md.
+        self.ontology_kg = None
+        self.ontology_kg_path = None
+        self.ontology_nodes = set()
         self.explanations = {}
         self.extraction_workdir = None
 
@@ -117,6 +124,9 @@ class GrapServerState:
         self.ontology = None
         self.ontology_version = None
         self.projected_nodes = set()
+        self.ontology_kg = None
+        self.ontology_kg_path = None
+        self.ontology_nodes = set()
         self.explanations = {}
         self.extraction_workdir = None
 
@@ -189,6 +199,60 @@ def _get_workspace():
         _state.ws_root = root
         _rehydrate_active_ontology()
     return _state.ws
+
+
+def _project_ontology(ontology):
+    """Project `ontology` into its OWN graph and return the projection record.
+
+    The ontology used to be projected into the evidence KG. Measured at 950
+    documents, that took the index from 4,692 nodes to 23,170 — **80% of what
+    BM25 ranked over was ontology scaffolding**. Excluding those nodes from
+    *results* does not stop them being *ranked*: a top-5 computed over the
+    polluted index and filtered afterwards returned 1-2 real documents, which is
+    the whole of the canary's ~830 "regression" floor and a permanent tax on
+    retrieval quality for every production gap run.
+    (docs/canary-noise-floor-investigation.md)
+
+    So the scaffolding gets its own graph. Two consequences worth stating:
+
+    - The evidence index contains evidence only, so idf means what it says.
+    - The graph is rebuilt from scratch on every projection, so it always
+      describes the *current* ontology. The old union-into-the-evidence-KG
+      accumulated every projection ever made and could never be pruned, because
+      pruning it would have meant deleting nodes out of the evidence index.
+    """
+    if _state.kg_path:
+        path = str(Path(_state.kg_path).parent / "ontology-kg")
+    else:
+        path = str(Path(_state.ws_root or ".") / "ontology-kg")
+    # Release the handle before removing the directory: on Windows an open
+    # pygrap handle makes rmtree silently skip files (same trap as
+    # WorkingGraph._project).
+    _state.ontology_kg = None
+    shutil.rmtree(path, ignore_errors=True)
+    okg = pygrap.IndexedKnowledgeGraph.with_merge_policy(path, 2)
+    projection = onto_loader.project_ontology_to_grap(ontology, okg)
+    _state.ontology_kg = okg
+    _state.ontology_kg_path = path
+    _state.ontology_nodes = set(projection.get("projected_node_ids", []))
+    return projection
+
+
+def _reference_resolver():
+    """Resolve `kg:aspice.*` PG references against the ontology graph, falling
+    back to the evidence KG for anything else (PG steps still live there)."""
+    onto = _state.ontology_kg
+    evidence = _state.kg
+    r_onto = _default_resolver(onto) if onto is not None else None
+    r_evidence = _default_resolver(evidence) if evidence is not None else None
+
+    def resolve(ref_id):
+        if r_onto is not None and str(ref_id).startswith("kg:aspice."):
+            hit = r_onto(ref_id)
+            if hit is not None:
+                return hit
+        return r_evidence(ref_id) if r_evidence is not None else None
+    return resolve
 
 
 def _rehydrate_active_ontology():
@@ -742,7 +806,8 @@ def draft_pg_patch(model: str = None) -> dict:
             draft, pg_ids, set(uncovered_ids), set(orphaned))
         if violations:
             return _fail("; ".join(violations))
-        report = validate_for_publish(draft, _state.kg, _state.ontology)
+        report = validate_for_publish(draft, _state.kg, _state.ontology,
+                                      resolver=_reference_resolver())
         if report["errors"]:
             return _fail(f"publish validation errors: {report['errors']}")
 
@@ -1002,14 +1067,16 @@ def _adopt_record(ws, kg, version_hash: str, raw: str, rationale: str,
                 "hashes_checked": checked,
                 "mismatches": mismatches}
     ontology = _load_ontology_from_raw(raw)
-    projection = onto_loader.project_ontology_to_grap(ontology, kg)
+    projection = _project_ontology(ontology)
     # Post-projection self-check: the nodes just written must pass the core's
-    # stored-hash-vs-blob verification.
+    # stored-hash-vs-blob verification. Follows the projection to the ontology
+    # graph — it verifies the nodes that were actually written.
+    okg = _state.ontology_kg
     projection_verified = True
-    if hasattr(kg, "verify_node"):
+    if hasattr(okg, "verify_node"):
         for nid in projection.get("projected_node_ids", []):
             try:
-                if kg.verify_node(nid) != "match":
+                if okg.verify_node(nid) != "match":
                     projection_verified = False
             except Exception:
                 projection_verified = False
@@ -1018,7 +1085,6 @@ def _adopt_record(ws, kg, version_hash: str, raw: str, rationale: str,
         raw, metadata={"version": ontology.version, "adopted_from": version_hash,
                        "rationale": rationale, "adopted_by": adopted_by})
     _state.set_ontology(ontology, version.hash)
-    _state.projected_nodes.update(projection.get("projected_node_ids", []))
     ws.record_event(
         "ontology_adopted", version_hash,
         details={"new_version": version.hash,
@@ -1133,9 +1199,8 @@ def rollback_ontology(to_version_hash: str, reason: str = None) -> dict:
                     "mismatches": mismatches}
         previous = getattr(_state, "ontology_version", None)
         ontology = _load_ontology_from_raw(raw)
-        projection = onto_loader.project_ontology_to_grap(ontology, kg)
+        projection = _project_ontology(ontology)
         _state.set_ontology(ontology, to_version_hash)
-        _state.projected_nodes.update(projection.get("projected_node_ids", []))
         ws.record_event("ontology_rolled_back", to_version_hash,
                         details={"from": previous or "",
                                  "outcomes": str(projection["outcomes_projected"])},
@@ -2280,12 +2345,11 @@ def load_ontology(path: str) -> dict:
         return {"status": "error", "message": "Load a Knowledge Graph first."}
     try:
         ontology = onto_loader.load_ontology_from_file(path)
-        projection = onto_loader.project_ontology_to_grap(ontology, kg)
+        projection = _project_ontology(ontology)
         raw = open(path, "r", encoding="utf-8").read()
         version = _get_workspace().publish_ontology(raw, metadata={"version": ontology.version})
         _state.ontology = ontology
         _state.ontology_version = version.hash
-        _state.projected_nodes.update(projection.get("projected_node_ids", []))
         _get_workspace().record_event("ontology_loaded", path,
                                       details={"outcomes": str(projection["outcomes_projected"])})
         return {
@@ -2490,7 +2554,8 @@ def validate_procedure_graph(path: str) -> dict:
         pg = pg_loader.load_from_file(path)
     except Exception as e:
         return {"status": "error", "message": str(e)}
-    report = validate_for_publish(pg, _state.kg, _state.ontology)
+    report = validate_for_publish(pg, _state.kg, _state.ontology,
+                                  resolver=_reference_resolver())
     return {"status": "ok", "path": path, **report}
 
 
@@ -2575,7 +2640,8 @@ def publish_pg(level: str = "draft", rationale: str = None) -> dict:
         _state.current_logic_id = pg.name
         _state.pg_version = version.hash
 
-        report = validate_for_publish(pg, _state.kg, _state.ontology)
+        report = validate_for_publish(pg, _state.kg, _state.ontology,
+                                  resolver=_reference_resolver())
         report["ontology_version"] = getattr(_state, "ontology_version", None)
         ws.record_validation(version.hash, json.dumps(report), report["ok"])
 
@@ -2602,7 +2668,8 @@ def promote_pg(version_hash: str, rationale: str) -> dict:
             if not raw:
                 return {"status": "error", "message": f"Unknown version '{version_hash}'."}
             pg = pg_loader.load_from_string(raw)
-            report = validate_for_publish(pg, _state.kg, _state.ontology)
+            report = validate_for_publish(pg, _state.kg, _state.ontology,
+                                  resolver=_reference_resolver())
             report["ontology_version"] = getattr(_state, "ontology_version", None)
             ws.record_validation(version_hash, json.dumps(report), report["ok"])
 

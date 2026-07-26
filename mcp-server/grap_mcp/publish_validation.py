@@ -13,9 +13,17 @@ from .validation import validate_pg
 _OUTCOME_PREFIX = "kg:aspice.process_outcome."
 
 
-def validate_for_publish(pg: ProcedureGraph, kg=None, ontology=None) -> Dict[str, Any]:
-    """Return {ok, errors, warnings} for publish-time validation."""
-    resolver = _default_resolver(kg) if kg else None
+def validate_for_publish(pg: ProcedureGraph, kg=None, ontology=None,
+                         resolver=None) -> Dict[str, Any]:
+    """Return {ok, errors, warnings} for publish-time validation.
+
+    `resolver` overrides the default KG-derived one. The caller needs this
+    because `kg:aspice.*` references resolve against the *ontology* graph, which
+    is no longer the evidence KG. Reference resolution is advisory either way —
+    the authoritative check below reads the ontology object, not any graph.
+    """
+    if resolver is None:
+        resolver = _default_resolver(kg) if kg else None
     base = validate_pg(pg, resolver=resolver)
     errors = list(base["errors"])
     warnings = list(base["warnings"])

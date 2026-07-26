@@ -228,3 +228,44 @@ def test_diff_runs_shows_resolved_gaps(tmp_path, monkeypatch):
     assert d["counts"]["a"] == r1["gaps_found"]
 
     assert "not found" in s.diff_runs("run-nope", r2["run_id"])["message"]
+
+
+# ---- the ontology must not pollute the evidence index ---------------------
+#
+# Adoption used to project the ontology INTO the evidence KG. At 950 documents
+# that took the index from 4,692 nodes to 23,170 — 80% of what BM25 ranked over
+# was scaffolding — which was the whole of the canary's ~830 "regression" floor
+# and a standing tax on retrieval for every gap run. Excluding those nodes from
+# results does not stop them being ranked.
+
+def test_adoption_does_not_grow_the_evidence_index(tmp_path, monkeypatch):
+    s = _server(tmp_path, monkeypatch, role="admin")
+    before = s._state.kg.node_count()
+
+    v = _publish(s, _proposal_yaml("req_ver", "Requirement Verification", "verification_method"))
+    assert s.adopt_proposed_ontology(v, rationale="first")["status"] == "ok"
+
+    assert s._state.kg.node_count() == before, "ontology leaked into the evidence KG"
+    # ...and it really was projected, just somewhere else
+    assert s._state.ontology_kg is not None
+    assert s._state.ontology_kg.node_count() > 0
+    assert len(s._state.ontology_nodes) > 0
+    # the evidence-side exclusion set stays empty: nothing to exclude any more
+    assert s._state.projected_nodes == set()
+
+
+def test_ontology_graph_describes_only_the_current_ontology(tmp_path, monkeypatch):
+    """Rebuilt per projection, so it cannot accumulate every version ever."""
+    s = _server(tmp_path, monkeypatch, role="admin")
+    v1 = _publish(s, _proposal_yaml("req_ver", "Requirement Verification", "verification_method"))
+    assert s.adopt_proposed_ontology(v1, rationale="first")["status"] == "ok"
+    n1 = s._state.ontology_kg.node_count()
+
+    v2 = _publish(s, _proposal_yaml("qa", "Quality Assurance", "quality_plan"))
+    assert s.adopt_proposed_ontology(v2, rationale="second")["status"] == "ok"
+    n2 = s._state.ontology_kg.node_count()
+
+    # second ontology is the same shape as the first: the graph must not have
+    # grown by accumulating the first one alongside it
+    assert n2 == n1, f"ontology graph accumulated across adoptions ({n1} -> {n2})"
+    assert s._state.kg.node_count() == 0
