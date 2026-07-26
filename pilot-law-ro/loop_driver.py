@@ -26,10 +26,16 @@ DOCS = PILOT / "docs"
 POOL = ROOT / "real-data-law-ro"
 # Phase 2 (2026-07-24): finer 5-doc batches, continue 400 -> 600. Separate
 # metrics file so the 10-doc study (loop-metrics-10doc.json) stays intact.
-METRICS = PILOT / "loop-metrics-800.json"
+METRICS = PILOT / "loop-metrics-1050.json"
 
-TOTAL_DOCS = 800
-PER_BATCH = 10
+TOTAL_DOCS = 1050
+# Batches are sized by CHUNKS, not documents — a chunk is ~95s of decode, a
+# document is anywhere from 1 to 248 of them. 25 keeps a batch at the wall-time
+# the count-based runs actually produced (10 docs ~ 22 chunks ~ 35 min), so the
+# schedule stays what it has been while the documents get larger.
+CHUNK_BUDGET = 25
+CHUNK_CHARS = 2000            # must match pipeline.json extract.chunk_chars
+MAX_DOCS_PER_BATCH = 25       # guard for a run of tiny documents
 
 os.environ["GRAP_WORKSPACE"] = str(PILOT / "ws")
 os.environ["GRAP_ROLE"] = "admin"
@@ -52,6 +58,8 @@ os.environ.pop("GRAP_LLM_STUB", None)
 
 sys.path.insert(0, str(ROOT / "mcp-server"))
 import grap_mcp.server as s  # noqa: E402
+from grap_mcp.ingest import chunk_text  # noqa: E402
+from grap_mcp.kee.pipeline import _text_and_label_from_json  # noqa: E402
 
 WORKDIR_DB = PILOT / "kee-workdir" / "graph_store.db"
 
@@ -89,11 +97,45 @@ def latest_canary(ws, since_ts=None):
             "growth": int(kv.get("growth", 0) or 0)}
 
 
-def next_batch_docs(n):
+def doc_chunks(p):
+    """Chunks this document will cost, using the pipeline's own chunker.
+
+    Cheap (a read plus a split) next to ~95s of decode per chunk, and it has to
+    be the real chunker: file size is a poor proxy because the law-aware JSON
+    extractor discards metadata, and chunking splits on blank lines first."""
+    try:
+        text, _ = _text_and_label_from_json(json.loads(p.read_text(encoding="utf-8")), p.stem)
+    except Exception:
+        return 1
+    return max(1, len(chunk_text(text, max_chars=CHUNK_CHARS)))
+
+
+def next_batch_docs(remaining_docs):
+    """Stage documents until the batch's CHUNK budget is spent.
+
+    Batches used to be sized by document COUNT, which was fine while documents
+    were uniform: 10 docs ~ 22 chunks ~ 35 min. The corpus is staged
+    smallest-first, so the remaining documents are all larger than the processed
+    ones and the tail is extreme — `50738.json` alone is 248 chunks, ~6.5h, and
+    under count-based staging it would have shared a batch with nine others and
+    turned a 35-minute batch into an all-nighter.
+
+    Work, not cardinality, is what a batch should hold constant. A document
+    bigger than the whole budget gets a batch to itself rather than being
+    unschedulable."""
     present = {p.name for p in DOCS.glob("*.json")}
     pool = sorted((p for p in POOL.glob("*.json") if p.name not in present),
                   key=lambda p: p.stat().st_size)
-    return pool[:n]
+    picked, spent = [], 0
+    for p in pool[:max(1, remaining_docs)]:
+        c = doc_chunks(p)
+        if picked and spent + c > CHUNK_BUDGET:
+            break
+        picked.append(p)
+        spent += c
+        if len(picked) >= MAX_DOCS_PER_BATCH or spent >= CHUNK_BUDGET:
+            break
+    return picked, spent
 
 
 STRICT = {"max_outcomes_added": 5, "max_outcomes_removed": 0,
@@ -150,10 +192,13 @@ def main():
         while len(list(DOCS.glob("*.json"))) < TOTAL_DOCS:
             bi += 1
             pre_wg, pre_active = wg_counts(), active_size()
-            want = min(PER_BATCH, TOTAL_DOCS - len(list(DOCS.glob("*.json"))))
-            for src in next_batch_docs(want):
+            want = TOTAL_DOCS - len(list(DOCS.glob("*.json")))
+            staged, staged_chunks = next_batch_docs(want)
+            for src in staged:
                 shutil.copy2(src, DOCS / src.name)
             docs_total = len(list(DOCS.glob("*.json")))
+            print(f"[loop] batch {bi:2d} staging {len(staged)} docs "
+                  f"= {staged_chunks} chunks (budget {CHUNK_BUDGET})", flush=True)
 
             t0 = time.time()
             canary_ts0 = (ws.query_events("canary_result") or [None])[-1]
