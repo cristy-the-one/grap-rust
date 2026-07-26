@@ -2,7 +2,8 @@
 
 > **Status:** OPEN, but narrowed. E0 executed 2026-07-26 (see below): the canary
 > *baseline* run is the outlier, not the candidate; three hypotheses refuted; a
-> concrete code-level mechanism identified with a one-line test to confirm it.
+> candidate mechanism identified (not yet demonstrated) with a one-line test to
+> settle it. The obvious fix is unsafe as first written — see the correction.
 > Tracked 2026-07-25 after the 650→700 autonomous run.
 > **Impact:** the canary cannot currently act as a fine-grained regression gate.
 > Mitigated (not fixed) by calibrating `canary_max_new_gaps` to the measured
@@ -166,7 +167,7 @@ pre-adoption runs are identical (919, 919 — no adoption between them, so no
 update), and the floor creeps upward as the ontology grows (818→863 over the 750
 run, 822→868 over the 800 run).
 
-### Confirmed by production telemetry: the floor is a sawtooth (2026-07-26)
+### The floor is a sawtooth — measured in production (2026-07-26)
 
 The 850-doc run supplied the confirmation without any code change. Across three
 consecutive runs of five batches each, the canary floor **rises monotonically
@@ -191,8 +192,51 @@ If the floor were a function of ontology size it could only go up. It drops by
 the workspace and `_state.projected_nodes` is reset to `set()`. **The floor
 tracks the number of adoptions since process start, not the size of the
 ontology** — roughly +9 to +11 per adoption within a run, reset on restart.
-Nothing else in the system has that shape. The accumulating exclusion set is the
-cause.
+Nothing else in the system has that shape, and the accumulating exclusion set is
+the only piece of state with that lifetime — but see the correction below: that
+is a strong association, not a demonstrated mechanism.
+
+### What the sawtooth does and does not establish (correction, same day)
+
+The sawtooth is solid and replicated: the floor depends on **how many adoptions
+have happened in this process**, and resets when the process restarts. That much
+is measured.
+
+It does **not** establish the causal path I attached to it. Two further offline
+checks weakened that step:
+
+- **No projected node appears in either run's results.** Across all 1,138
+  distinct nodes retrieved by the two runs, **zero** carry the `[ASPICE ...]`
+  projection marker. Exclusion is working correctly in *both* runs, so the
+  difference between them is not ontology text leaking in as evidence.
+- **The dropped nodes show no id clustering.** The 249 nodes production dropped
+  are spread across the whole id range roughly in proportion to the nodes it
+  kept — not concentrated in a band, as a stale-id-collision story would predict.
+
+So: process lifetime changes the floor, and the exclusion set is the only piece
+of state with that lifetime — but the mechanism connecting them is not yet
+demonstrated. `excluded_nodes` in the run summary (`79258f9`) is what closes it.
+
+### The fix is not "replace instead of union" (do not apply as first written)
+
+An earlier draft of this document recommended making `projected_nodes` describe
+the current projection. That is **unsafe**, for two reasons found by reading the
+producers:
+
+1. **Two different producers feed the set.** Ontology projection
+   (`ontology.py:89-114`, at adopt/rollback/load) and *procedure graph*
+   projection (`procedure_graph.py:229`, at PG load) both `.update()` it.
+   Replacing on adoption would silently un-exclude every PG step node.
+2. **Old projected nodes are never deleted from the KG.**
+   `project_ontology_to_grap` only ever calls `kg.add_node`. Nodes from earlier
+   projections remain in the graph, so they must remain excluded. Replacing the
+   set would make stale ontology text retrievable as evidence — the
+   self-coverage failure, introduced by the fix meant to prevent it.
+
+Any real fix has to track *which* projection each id came from, or exclude
+projected nodes from the **index** rather than from the results. That is a
+larger change than one line, and it invalidates the 1,200 calibration, so it
+needs a decision rather than a patch.
 
 **A correction to an earlier projection.** After the 800 run I noted the floor
 creeping (818→863→868) and warned it would reach the 1,200 budget around
