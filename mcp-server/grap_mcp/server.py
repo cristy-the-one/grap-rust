@@ -2376,11 +2376,12 @@ def run_procedure(scope: str = "all") -> dict:
         ws.start_run(run_id, kind="production", activation_id=activation_id,
                      pg_version=pg_version, kg_version=kg_version, scope=scope)
 
-        gaps = (reasoner.detect_gaps(kg, ontology, pg,
-                                     exclude_nodes=getattr(_state, "projected_nodes", set()))
+        excluded = getattr(_state, "projected_nodes", set())
+        gaps = (reasoner.detect_gaps(kg, ontology, pg, exclude_nodes=excluded)
                 if ontology else [])
         ws.complete_run(run_id, status="completed", gaps_found=len(gaps),
-                        explanation_hashes=[], summary={"scope": scope})
+                        explanation_hashes=[],
+                        summary={"scope": scope, "excluded_nodes": str(len(excluded))})
 
         return {
             "status": "ok",
@@ -2421,8 +2422,15 @@ def _run_gap_detection(scope: str, kind: str, extra_summary: dict = None) -> dic
             weights = dict(activation.frozen_weights)
         else:
             weights = config_store.load_config(_resolve_ws_root())["weights"]
+        # Record the size of the exclusion set with the run. Two runs over the
+        # SAME ontology, scope and weights have reported 1,579 and 824 gaps
+        # (docs/canary-noise-floor-investigation.md); `projected_nodes` only ever
+        # grows within a process, and the canary baseline runs before an adoption
+        # updates it while the production run runs after. If that is the cause,
+        # these two numbers differ — which is not visible anywhere today.
+        excluded = getattr(_state, "projected_nodes", set())
         gaps = reasoner.detect_gaps(kg, ontology, pg, weights=weights,
-                                    exclude_nodes=getattr(_state, "projected_nodes", set()))
+                                    exclude_nodes=excluded)
         session.record_query(f"gaps:{scope}", len(gaps))
         explanations = {}
         hashes = []
@@ -2435,7 +2443,9 @@ def _run_gap_detection(scope: str, kind: str, extra_summary: dict = None) -> dic
             hashes.append(version.hash)
         _state.explanations = explanations
 
-        summary = {"scope": scope, "weights": json.dumps(weights)}
+        summary = {"scope": scope, "weights": json.dumps(weights),
+                   "excluded_nodes": str(len(excluded)),
+                   "kg_nodes": str(kg.node_count() if hasattr(kg, "node_count") else -1)}
         if extra_summary:
             summary.update(extra_summary)
         ws.complete_run(run_id, status="completed", gaps_found=len(gaps),
