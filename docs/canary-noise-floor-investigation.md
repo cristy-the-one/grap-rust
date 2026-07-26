@@ -441,3 +441,45 @@ ontology nodes.
 sides, baseline and candidate become comparable and the floor should largely
 disappear. The budget must then be re-measured, not guessed — the same discipline
 that set 1,200 against a measured 830.
+
+---
+
+## Outcome of the fix (2026-07-26, 950→1000 run)
+
+First run with the ontology in its own graph. Both pre-registered predictions
+held.
+
+**1. The floor collapsed.**
+
+| run | canary "new gaps" per batch |
+|---|---|
+| 900→950 (polluted index) | 842, 851, 876, 889, 888 |
+| **950→1000 (clean index)** | **0, 2, 5, 4, 0** |
+
+**2. Gaps fell by half, as *resolved*, not as churn.** Batch 1 reported
+`new=98, resolved=1028` and the total went **1,880 → 950**. The ~870 that
+disappeared are the pollution. Subsequent batches settled at 964 → 1,007 as the
+corpus grew normally.
+
+**3. The two sides of the canary now score the same corpus.** From the run
+summaries: baseline and candidate both report `kg_nodes=5003`,
+`excluded_nodes=0`. Before the fix those columns read 4,692 / 0 for the baseline
+and 23,170 / 18,478 for the candidate.
+
+So the canary is a working fine-grained regression gate again, for the first
+time. After batch 1's one-off re-baseline (84 regressions as the index changed),
+per-batch regressions were 11, 17, 13, 3 — small enough to mean something.
+
+### The budget is now the open item
+
+`canary_max_new_gaps = 1200` was calibrated against the polluted floor and is
+meaningless at a measured floor of 0–5. It is loose in the *safe* direction, so
+nothing is at risk, but the gate is not gating.
+
+**Recommendation: do not tighten on this run alone.** Batch 1 contained a
+one-time re-baseline transient (84 regressions) that a tight budget would have
+caught as a failure, and one run cannot distinguish a stable floor from a quiet
+one. Run 1000→1050 at the current budget, confirm the 0–5 floor holds across a
+second run, then set the budget from **two** runs of evidence — the same
+measure-then-set discipline that produced 1,200, applied to a floor that is now
+worth measuring.
