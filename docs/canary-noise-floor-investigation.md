@@ -166,6 +166,45 @@ pre-adoption runs are identical (919, 919 — no adoption between them, so no
 update), and the floor creeps upward as the ontology grows (818→863 over the 750
 run, 822→868 over the 800 run).
 
+### Confirmed by production telemetry: the floor is a sawtooth (2026-07-26)
+
+The 850-doc run supplied the confirmation without any code change. Across three
+consecutive runs of five batches each, the canary floor **rises monotonically
+within a run and drops at every process boundary** — while the ontology only ever
+grows:
+
+| run | batch 1 → batch 5 floor | outcomes at batch 1 |
+|---|---|---|
+| 750 | 818 → 863 | 3,998 |
+| 800 | 822 → 868 | 4,097 |
+| 850 | 824 → 843 | 4,222 |
+
+At the two boundaries:
+
+| boundary | outcomes | floor |
+|---|---|---|
+| 750 b5 → 800 b1 | **+8** | **−41** |
+| 800 b5 → 850 b1 | **+30** | **−44** |
+
+If the floor were a function of ontology size it could only go up. It drops by
+~40, twice, at exactly the two points where a new `loop_driver.py` process opens
+the workspace and `_state.projected_nodes` is reset to `set()`. **The floor
+tracks the number of adoptions since process start, not the size of the
+ontology** — roughly +9 to +11 per adoption within a run, reset on restart.
+Nothing else in the system has that shape. The accumulating exclusion set is the
+cause.
+
+**A correction to an earlier projection.** After the 800 run I noted the floor
+creeping (818→863→868) and warned it would reach the 1,200 budget around
+2,500–3,000 documents. That was wrong, because it read a sawtooth as a trend.
+The *run-start* floor moves only +3 per 50 documents (818 → 822 → 824), which
+would not reach 1,200 within this corpus at all. The real exposure is different
+and more specific: a run with **many batches in one process** accumulates ~10 per
+adoption, so a 40-batch run would cross the budget from process lifetime alone,
+with no change in the data. Until `projected_nodes` is fixed, keep runs to ≲20
+batches — or restart the process between them, which is what the current 5-batch
+driver has been doing by accident.
+
 ### The one-line test that settles it
 
 Record `len(exclude_nodes)` in each run's summary alongside `scope` and
