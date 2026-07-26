@@ -1,6 +1,15 @@
-# The canary noise floor — open investigation
+# The canary noise floor — investigation
 
-> **Status:** OPEN, but narrowed. E0 executed 2026-07-26 (see below): the canary
+> **Status: RESOLVED 2026-07-26.** Cause is **index pollution**, the original
+> candidate A. Adoption projects the ontology *into the evidence KG*, taking it
+> from 4,692 to 23,170 nodes — **real evidence is 20% of what BM25 ranks over**.
+> The canary baseline scores a clean index (reloaded from disk) and the candidate
+> scores the polluted one, so the canary has been comparing two different
+> corpora. Fix: project the ontology into a separate graph. See *Resolution*.
+> Everything above that section is the investigation as it happened, including
+> two of my own hypotheses that the evidence killed.
+
+> **Superseded status:** OPEN, but narrowed. E0 executed 2026-07-26 (see below): the canary
 > *baseline* run is the outlier, not the candidate; three hypotheses refuted; a
 > candidate mechanism identified (not yet demonstrated) with a one-line test to
 > settle it. The obvious fix is unsafe as first written — see the correction.
@@ -345,3 +354,90 @@ The self-coverage gap metric is used for more than the canary: it drives
 or vanish from a projection rather than from evidence, then **the absolute gap
 count is a far softer number than it looks**, and only *large* movements in it
 should be treated as signal.
+
+---
+
+## Resolution (2026-07-26) — index pollution, confirmed by telemetry
+
+`79258f9` added `excluded_nodes` and `kg_nodes` to every persisted run summary.
+The 900→950 run produced 15 instrumented runs, and the first three lines answer
+the whole question:
+
+| role | gaps | kg_nodes | excluded_nodes | evidence share |
+|---|---|---|---|---|
+| canary baseline | 885 | **4,692** | 0 | 100% |
+| candidate | 1,648 | **23,170** | 18,478 | **20.3%** |
+| production | 1,648 | 23,170 | 18,478 | 20.3% |
+
+`23,170 − 4,692 = 18,478`, exactly the exclusion-set size. So:
+
+**Adoption projects the ontology into the evidence KG and quintuples it.** The
+graph is reloaded from disk at the start of each batch (~4,700 real evidence
+nodes); the canary baseline runs against that clean index; adoption then adds
+18,478 ontology nodes in memory; the candidate and production runs score against
+an index in which **only 20% of the nodes are evidence**.
+
+The canary has not been detecting regression. It has been **comparing two
+different corpora** — a clean one and one that is four-fifths ontology
+scaffolding — and reporting the difference as the candidate's fault.
+
+### Why every earlier observation now fits
+
+Excluding projected nodes from *results* does not stop them being ranked. The
+top-k is computed over the polluted index and the ontology nodes are filtered
+out **afterwards**, so a top-5 that is 80% ontology returns 1–2 real documents.
+
+- *Production returns 2–3 hits where the baseline returns 5.* Its top-k is being
+  eaten by ontology nodes and filtered after the fact — retrieval is starved by
+  post-hoc filtering, not by exclusion of the wrong ids.
+- *The dropped hits are ordinary documents, spread across the id range.* They
+  were displaced out of the top-k by projected nodes, not excluded.
+- *No `[ASPICE …]` text ever appears in results.* The filter works; that was
+  never the problem.
+- *Scores shift ±5% on common nodes.* idf computed over a 4.9× corpus.
+- *The floor is stable and content-independent.* It is a property of index
+  composition, not of the documents in the batch.
+- *It rises within a run and resets at process restart.* Each adoption adds
+  ~160–190 more projected nodes; reloading the KG from disk restores the clean
+  index.
+
+### Two of my own hypotheses that this kills
+
+- **Stale ids wrongly excluding real evidence.** Dead. `excluded_nodes` tracks
+  the projection exactly, and projected ids are allocated *above* the evidence id
+  range (4,692+), so applying a stale set to a freshly reloaded 4,731-node graph
+  is a harmless no-op. That is also why the baseline's carried-over set does no
+  damage.
+- **Threshold adjacency.** Already refuted by the coverage histogram; it plays no
+  part.
+
+Candidate A — stated in the first version of this document and then set aside in
+favour of more elaborate stories — was right all along. It was dismissed because
+the effect was imagined as a subtle idf perturbation. It is not subtle: the index
+quintuples.
+
+### The consequence that matters more than the canary
+
+**Every production gap run has been scoring against an index that is 80%
+ontology scaffolding.** The headline self-coverage figures come from those runs.
+On a clean index the same ontology reports 885 gaps instead of 1,648 — so the
+factory's real self-coverage is materially better than it has been reporting,
+and the "gap spike" alarm after each adoption was measuring pollution, not
+degradation.
+
+This also retires the note under *Established facts* that "the retrieval index is
+only ~53% evidence". At 950 documents it is **20%**, and falling as the ontology
+grows faster than the corpus.
+
+### The fix
+
+Project the ontology into its **own graph**, leaving the evidence KG pure. Costed
+in the section above: gap detection loses nothing (no structural signals exist),
+PG reference resolution degrades to warnings while the authoritative check reads
+the in-memory ontology, and the `exclude_nodes` plumbing becomes unnecessary for
+ontology nodes.
+
+**It invalidates the 1,200 canary calibration.** With a clean index on both
+sides, baseline and candidate become comparable and the floor should largely
+disappear. The budget must then be re-measured, not guessed — the same discipline
+that set 1,200 against a measured 830.
