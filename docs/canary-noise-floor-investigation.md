@@ -217,6 +217,51 @@ So: process lifetime changes the floor, and the exclusion set is the only piece
 of state with that lifetime — but the mechanism connecting them is not yet
 demonstrated. `excluded_nodes` in the run summary (`79258f9`) is what closes it.
 
+**Re-reading the two checks above (same day, correcting the correction).**
+`_is_projected` (`reasoner.py:90`) applies **three** guards, not one: the
+`exclude_nodes` id set, a text-prefix guard (`[ASPICE outcome]`,
+`[characteristic]`, `[PG Step]`), and a label-prefix guard (`kg:aspice.`,
+`pg-step-`). The id check runs first and is unconditional — it never verifies
+that the node really is projected.
+
+That structure explains the "zero ASPICE text in results" finding without
+exonerating the id set: genuine projected nodes are caught by the text and label
+guards *whatever* the id set contains. Which yields a sharper statement:
+
+> Because genuine projected nodes are suppressed by the prefix guards anyway,
+> the **only** way `exclude_nodes` can change a result is by dropping a node that
+> is *not* a projected node. Any difference in results attributable to the id set
+> is, by construction, **real evidence wrongly discarded**.
+
+It also explains why the dropped nodes are ordinary legal chunks spread across
+the whole id range — chunk ids are spread across that range. Both observations
+now support the mechanism rather than weakening it. The direct test is unchanged
+and still pending: compare `excluded_nodes` between a batch's baseline and
+production run.
+
+### Costing the "separate graph" option (2026-07-26)
+
+Two measurements say the ontology's presence in the *evidence* KG buys gap
+detection nothing:
+
+- `pygrap.IndexedKnowledgeGraph` has **no `has_characteristic` method**, so
+  `_structural_signals`' `hasattr` guard always fails and it returns `[]`
+  unconditionally.
+- Across **4,070 persisted explanations** from three runs: **zero** carry a
+  structural signal. Confirmed empirically, not just from the code.
+
+So projected ontology nodes are never read as structural evidence, and are always
+suppressed as lexical evidence. What they *do* is enlarge the index (perturbing
+BM25 statistics for everything else — candidate A) and force the `exclude_nodes`
+plumbing that is the suspected cause of the floor. Projecting the ontology into
+its own graph removes both at once and deletes the stale-id hazard by
+construction, rather than managing it.
+
+**Not yet checked:** whether any *other* consumer (demos, `blast_radius`,
+neighbour queries, the augmented-audit demo) relies on ontology nodes living in
+the evidence KG. The gap path does not; that has to be established for the rest
+before the change is scoped as cheap.
+
 ### The fix is not "replace instead of union" (do not apply as first written)
 
 An earlier draft of this document recommended making `projected_nodes` describe
