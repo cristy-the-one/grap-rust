@@ -26,9 +26,9 @@ DOCS = PILOT / "docs"
 POOL = ROOT / "real-data-law-ro"
 # Phase 2 (2026-07-24): finer 5-doc batches, continue 400 -> 600. Separate
 # metrics file so the 10-doc study (loop-metrics-10doc.json) stays intact.
-METRICS = PILOT / "loop-metrics-1050.json"
+METRICS = PILOT / "loop-metrics-1100.json"
 
-TOTAL_DOCS = 1050
+TOTAL_DOCS = 1100
 # Batches are sized by CHUNKS, not documents — a chunk is ~95s of decode, a
 # document is anywhere from 1 to 248 of them. 25 keeps a batch at the wall-time
 # the count-based runs actually produced (10 docs ~ 22 chunks ~ 35 min), so the
@@ -159,23 +159,36 @@ def main():
     # a cascade. Removals sized from the 650-doc run (14 outcomes / 48 chars over
     # 5 batches).
     #
-    # canary_max_new_gaps CALIBRATED TO ITS MEASURED FLOOR (2026-07-25). The
-    # 650->700 run measured it: 830 +/- 12 "regressions" per batch (816/820/838/
-    # 844), remarkably stable across batches with very different content, and with
-    # growth=0 every time. That floor is NOT semantic regression — see
-    # docs/canary-noise-floor-investigation.md. Three hypotheses were falsified
-    # (growth mislabelled as regression; mapping-hint variance; scoring
-    # nondeterminism — gap detection is bit-identical on fixed inputs). Until the
-    # root cause is found the canary can only be a GROSS-FAILURE detector, so the
-    # budget sits above the measured floor with margin. This is a threshold with a
-    # baseline behind it (lessons Theme VIII), not a guess.
+    # canary_max_new_gaps RE-CALIBRATED (2026-07-26) after the floor was fixed.
+    #
+    # History, because the number moved by 100x and the reason matters. The
+    # budget used to be 1200, set above a measured floor of 830 +/- 12
+    # "regressions" per batch. That floor was never semantic regression: adoption
+    # projected the ontology INTO the evidence KG, taking the index from 4,692
+    # nodes to 23,170, so the canary baseline scored a clean corpus and the
+    # candidate scored one that was 80% ontology scaffolding. Excluding those
+    # nodes from results never stopped them being ranked. The ontology now lives
+    # in its own graph (`_project_ontology`), and the floor went with it.
+    #
+    # MEASURED over the first ten batches on a clean index (950->1000 and
+    # 1000->1050): 0, 0, 0, 2, 2, 3, 3, 4, 5, 11 — mean 3.0, sd 3.1, max 11.
+    # 50 is ~4.5x the observed max, so ordinary variance cannot trip it (the
+    # batch-1 re-baseline transient shrank 84 -> 11 between the two runs), while
+    # still being 24x tighter than the old budget and small enough to be a real
+    # gate: batches add ~25-30 outcomes, so 50 PRE-EXISTING outcomes losing
+    # coverage in one adoption is unambiguous. Deliberately not ~16 (the 1.4x
+    # margin the old budget used), because the corpus is entering its
+    # large-document tail and variance is visibly rising — a threshold that has
+    # to be loosened again is a threshold nobody trusts.
+    # See docs/canary-noise-floor-investigation.md.
     policy = {"enabled": True, "canary_enabled": True,
               "max_outcomes_added": 400, "max_outcomes_removed": 25,
               "max_characteristics_removed": 80,
               "max_outcomes_added_per_chunk": 3.0,
-              "canary_max_new_gaps": 1200}
+              "canary_max_new_gaps": 50}
     for k, v in policy.items():
-        r = s.set_policy(k, v, rationale="10x10 loop v2 (timeout+canary calibrated)")
+        r = s.set_policy(k, v, rationale="loop v3: canary re-calibrated to the "
+                                         "post-fix measured floor (10 batches, max 11)")
         assert r["status"] == "ok", r
 
     s.load_knowledge_graph(str(PILOT / "kg"))
