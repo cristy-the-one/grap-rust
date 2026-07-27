@@ -26,9 +26,9 @@ DOCS = PILOT / "docs"
 POOL = ROOT / "real-data-law-ro"
 # Phase 2 (2026-07-24): finer 5-doc batches, continue 400 -> 600. Separate
 # metrics file so the 10-doc study (loop-metrics-10doc.json) stays intact.
-METRICS = PILOT / "loop-metrics-1242.json"
+METRICS = PILOT / "loop-metrics-1292.json"
 
-TOTAL_DOCS = 1242
+TOTAL_DOCS = 1292
 # Batches are sized by CHUNKS, not documents — a chunk is ~95s of decode, a
 # document is anywhere from 1 to 248 of them. 25 keeps a batch at the wall-time
 # the count-based runs actually produced (10 docs ~ 22 chunks ~ 35 min), so the
@@ -140,7 +140,15 @@ def next_batch_docs(remaining_docs):
 
 def rss_mb():
     """Resident set size, or None. The working graph lives in RAM for the whole
-    process and a long run is now ~28h, so growth here is worth a column."""
+    process and a run is now ~28h, so growth here is worth a column.
+
+    The restypes/argtypes below are load-bearing, not decoration. Without them
+    ctypes defaults GetCurrentProcess's return to c_int, which truncates the
+    64-bit pseudo-handle, and GetProcessMemoryInfo just returns 0 — silently,
+    because the whole thing sat inside `except: pass`. The first run wrote
+    `rss_mb: null` seven times and nobody would have noticed until we went
+    looking for a memory trend that was never recorded. Theme VIII, again:
+    test the path, not the producer."""
     try:
         import ctypes
         from ctypes import wintypes
@@ -155,12 +163,18 @@ def rss_mb():
                         ("QuotaNonPagedPoolUsage", ctypes.c_size_t),
                         ("PagefileUsage", ctypes.c_size_t),
                         ("PeakPagefileUsage", ctypes.c_size_t)]
+        k32 = ctypes.windll.kernel32
+        k32.GetCurrentProcess.restype = wintypes.HANDLE
+        k32.GetCurrentProcess.argtypes = []
+        psapi = ctypes.windll.psapi
+        psapi.GetProcessMemoryInfo.restype = wintypes.BOOL
+        psapi.GetProcessMemoryInfo.argtypes = [wintypes.HANDLE,
+                                               ctypes.POINTER(PMC), wintypes.DWORD]
         c = PMC(); c.cb = ctypes.sizeof(PMC)
-        if ctypes.windll.psapi.GetProcessMemoryInfo(
-                ctypes.windll.kernel32.GetCurrentProcess(), ctypes.byref(c), c.cb):
+        if psapi.GetProcessMemoryInfo(k32.GetCurrentProcess(), ctypes.byref(c), c.cb):
             return round(c.WorkingSetSize / (1024 * 1024), 1)
     except Exception:
-        pass
+        logger_warn = True  # noqa: F841 - keep the failure non-fatal, see above
     return None
 
 
