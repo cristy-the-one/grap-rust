@@ -26,9 +26,9 @@ DOCS = PILOT / "docs"
 POOL = ROOT / "real-data-law-ro"
 # Phase 2 (2026-07-24): finer 5-doc batches, continue 400 -> 600. Separate
 # metrics file so the 10-doc study (loop-metrics-10doc.json) stays intact.
-METRICS = PILOT / "loop-metrics-1100.json"
+METRICS = PILOT / "loop-metrics-1242.json"
 
-TOTAL_DOCS = 1100
+TOTAL_DOCS = 1242
 # Batches are sized by CHUNKS, not documents — a chunk is ~95s of decode, a
 # document is anywhere from 1 to 248 of them. 25 keeps a batch at the wall-time
 # the count-based runs actually produced (10 docs ~ 22 chunks ~ 35 min), so the
@@ -136,6 +136,73 @@ def next_batch_docs(remaining_docs):
         if len(picked) >= MAX_DOCS_PER_BATCH or spent >= CHUNK_BUDGET:
             break
     return picked, spent
+
+
+def rss_mb():
+    """Resident set size, or None. The working graph lives in RAM for the whole
+    process and a long run is now ~28h, so growth here is worth a column."""
+    try:
+        import ctypes
+        from ctypes import wintypes
+
+        class PMC(ctypes.Structure):
+            _fields_ = [("cb", wintypes.DWORD), ("PageFaultCount", wintypes.DWORD),
+                        ("PeakWorkingSetSize", ctypes.c_size_t),
+                        ("WorkingSetSize", ctypes.c_size_t),
+                        ("QuotaPeakPagedPoolUsage", ctypes.c_size_t),
+                        ("QuotaPagedPoolUsage", ctypes.c_size_t),
+                        ("QuotaPeakNonPagedPoolUsage", ctypes.c_size_t),
+                        ("QuotaNonPagedPoolUsage", ctypes.c_size_t),
+                        ("PagefileUsage", ctypes.c_size_t),
+                        ("PeakPagefileUsage", ctypes.c_size_t)]
+        c = PMC(); c.cb = ctypes.sizeof(PMC)
+        if ctypes.windll.psapi.GetProcessMemoryInfo(
+                ctypes.windll.kernel32.GetCurrentProcess(), ctypes.byref(c), c.cb):
+            return round(c.WorkingSetSize / (1024 * 1024), 1)
+    except Exception:
+        pass
+    return None
+
+
+# ---- circuit breaker -------------------------------------------------------
+#
+# The loop reported every batch and stopped for nothing. At ~7 batches per
+# launch with a human reading the output every few hours that was fine. At 40
+# batches it is not: a degradation at batch 12 would grind through 28 more
+# before anyone looked, spending ~20h of decode and 28 adoptions on a factory
+# that had already told us it was unwell.
+#
+# Anything here means STOP and let a human look. These are not tuning knobs —
+# each one is a condition where continuing destroys information or compounds a
+# fault. Routine variation (parse-failure ticks, quarantines, wall-time drift)
+# deliberately does NOT stop the loop.
+CANARY_WARN = 40          # log loudly; one outlier is not a pattern
+CANARY_WARN_STREAK = 2    # ...but two in a row is
+
+
+def abort_reasons(row, prev_rows):
+    out = []
+    q = row.get("quality") or {}
+    if row.get("canary_result") == "failed":
+        out.append(f"canary FAILED (reg={row.get('canary_new_gaps')}) — adoption was rolled back")
+    if not row.get("churn_pass"):
+        out.append(f"churn REJECTED ({row.get('churn_detail')}) — a rejected proposal never "
+                   "becomes the baseline, so the next batch churns against a stale one")
+    if row.get("adopted_hash") and not row.get("active_advanced"):
+        out.append("adopted but the active ontology did not advance — the "
+                   "'adopted with active_delta=0' failure mode")
+    # Quality alarms that mean the extraction itself degraded. The no_fragment
+    # alarm is excluded on purpose: empty/unparseable chunks are absorbed by the
+    # dead-letter queue and self-clear, as the 1050->1100 run demonstrated.
+    for a in q.get("alarms", []):
+        if not a.startswith("no_fragment"):
+            out.append(f"quality alarm: {a}")
+    recent = [r.get("canary_new_gaps") or 0 for r in prev_rows[-(CANARY_WARN_STREAK - 1):]]
+    if (row.get("canary_new_gaps") or 0) >= CANARY_WARN and \
+            all(v >= CANARY_WARN for v in recent) and len(recent) == CANARY_WARN_STREAK - 1:
+        out.append(f"canary regressions >= {CANARY_WARN} on {CANARY_WARN_STREAK} consecutive "
+                   f"batches ({recent + [row.get('canary_new_gaps')]}) — no longer an outlier")
+    return out
 
 
 STRICT = {"max_outcomes_added": 5, "max_outcomes_removed": 0,
@@ -251,6 +318,10 @@ def main():
                 "gaps_delta": gaps.get("delta"),
                 "context_mode": ext.get("context_mode"),
                 "quality": ext.get("quality"),
+                "staged_docs": len(staged),
+                "staged_chunks": staged_chunks,
+                "sec_per_chunk": round(dt / max(1, (ext.get("added") or 1)), 1),
+                "rss_mb": rss_mb(),
             }
             rows.append(row)
             METRICS.write_text(json.dumps(rows, indent=2, default=str), encoding="utf-8")
@@ -273,6 +344,20 @@ def main():
                       f"notation={q.get('notation_leaks')}", flush=True)
                 for a in q.get("alarms", []):
                     print(f"        !! QUALITY ALARM: {a}", flush=True)
+            print(f"        cost: {row['sec_per_chunk']}s/chunk  rss={row['rss_mb']}MB",
+                  flush=True)
+            if (row.get("canary_new_gaps") or 0) >= CANARY_WARN:
+                print(f"        !! canary regressions {row['canary_new_gaps']} "
+                      f">= warn threshold {CANARY_WARN}", flush=True)
+
+            stop = abort_reasons(row, rows[:-1])
+            if stop:
+                print("[loop] CIRCUIT BREAKER — stopping the loop:", flush=True)
+                for r in stop:
+                    print(f"         * {r}", flush=True)
+                print(f"[loop] stopped after batch {bi} at {docs_total} docs; "
+                      f"metrics -> {METRICS}", flush=True)
+                raise SystemExit(3)
     finally:
         restore_strict("restore strict after loop")
         print("[loop] strict policy restored", flush=True)
