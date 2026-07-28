@@ -232,11 +232,29 @@ CANARY_WARN_STREAK = 2    # ...but two in a row is
 def abort_reasons(row, prev_rows):
     out = []
     q = row.get("quality") or {}
+    # Check the infrastructure BEFORE the governance verdicts. When the LLM
+    # server is unreachable every chunk fails, nothing is extracted, no proposal
+    # exists, and `churn_pass` is False purely because there was nothing to
+    # adopt — which the churn branch below then reported as "churn REJECTED
+    # (ok)". That is a true stop for a false reason, and it sends whoever reads
+    # it to the governance policy instead of to the dead server. The first real
+    # trip of this breaker (2026-07-28) said exactly that.
+    provider_errors = q.get("provider_errors") or 0
+    chunks = q.get("chunks") or 0
+    if provider_errors and chunks and provider_errors >= chunks:
+        out.append(f"LLM PROVIDER UNREACHABLE — all {chunks} chunks failed with transport "
+                   f"errors. Nothing was extracted and nothing was quarantined (provider "
+                   f"errors are exempt by design). Check the inference server, then resume; "
+                   f"the work is still pending.")
+        return out                      # everything below is a consequence of this
     if row.get("canary_result") == "failed":
         out.append(f"canary FAILED (reg={row.get('canary_new_gaps')}) — adoption was rolled back")
-    if not row.get("churn_pass"):
+    if not row.get("churn_pass") and (row.get("extract_added") or 0) > 0:
         out.append(f"churn REJECTED ({row.get('churn_detail')}) — a rejected proposal never "
                    "becomes the baseline, so the next batch churns against a stale one")
+    elif not row.get("churn_pass"):
+        out.append(f"no proposal to adopt (extract_added={row.get('extract_added')}) — "
+                   "the batch produced nothing")
     if row.get("adopted_hash") and not row.get("active_advanced"):
         out.append("adopted but the active ontology did not advance — the "
                    "'adopted with active_delta=0' failure mode")
