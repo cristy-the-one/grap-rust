@@ -26,9 +26,9 @@ DOCS = PILOT / "docs"
 POOL = ROOT / "real-data-law-ro"
 # Phase 2 (2026-07-24): finer 5-doc batches, continue 400 -> 600. Separate
 # metrics file so the 10-doc study (loop-metrics-10doc.json) stays intact.
-METRICS = PILOT / "loop-metrics-1392.json"
+METRICS = PILOT / "loop-metrics-1442.json"
 
-TOTAL_DOCS = 1392
+TOTAL_DOCS = 1442
 # Batches are sized by CHUNKS, not documents — a chunk is ~95s of decode, a
 # document is anywhere from 1 to 248 of them. 25 keeps a batch at the wall-time
 # the count-based runs actually produced (10 docs ~ 22 chunks ~ 35 min), so the
@@ -155,7 +155,14 @@ def next_batch_docs(remaining_docs):
     pending = pending_chunks()
     picked, spent = [], pending
     if pending:
-        print(f"[loop] {pending} chunks pending from an interrupted batch; "
+        # Two quite different causes, same accounting: an interrupted run leaves
+        # a whole batch unextracted, and ordinary batches leave a small tail of
+        # chunks that failed and are awaiting their next of three attempts.
+        # Both are work the next run_pipeline will do, so both belong in the
+        # budget — but calling a routine retry tail "interrupted" sent me
+        # looking for an interruption that had not happened.
+        print(f"[loop] {pending} chunks already staged and unextracted "
+              f"(interrupted batch and/or retry tail); "
               f"staging against the remaining budget", flush=True)
     for p in pool[:max(1, remaining_docs)]:
         c = doc_chunks(p)
