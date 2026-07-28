@@ -26,9 +26,9 @@ DOCS = PILOT / "docs"
 POOL = ROOT / "real-data-law-ro"
 # Phase 2 (2026-07-24): finer 5-doc batches, continue 400 -> 600. Separate
 # metrics file so the 10-doc study (loop-metrics-10doc.json) stays intact.
-METRICS = PILOT / "loop-metrics-1292.json"
+METRICS = PILOT / "loop-metrics-1392.json"
 
-TOTAL_DOCS = 1292
+TOTAL_DOCS = 1392
 # Batches are sized by CHUNKS, not documents — a chunk is ~95s of decode, a
 # document is anywhere from 1 to 248 of them. 25 keeps a batch at the wall-time
 # the count-based runs actually produced (10 docs ~ 22 chunks ~ 35 min), so the
@@ -110,6 +110,26 @@ def doc_chunks(p):
     return max(1, len(chunk_text(text, max_chars=CHUNK_CHARS)))
 
 
+def pending_chunks():
+    """Chunks sitting in docs/ that the working graph has not extracted yet.
+
+    Normally zero. After an interrupted run it is that batch's unfinished work,
+    which the next `run_pipeline` will pick up whether or not this driver stages
+    anything more."""
+    import sqlite3
+    if not WORKDIR_DB.exists():
+        return 0
+    c = sqlite3.connect(f"file:{WORKDIR_DB}?mode=ro", uri=True)
+    recorded = {}
+    for (cid,) in c.execute("SELECT chunk_id FROM chunks"):
+        recorded[cid.rsplit("#", 1)[0]] = recorded.get(cid.rsplit("#", 1)[0], 0) + 1
+    c.close()
+    total = 0
+    for p in DOCS.glob("*.json"):
+        total += max(0, doc_chunks(p) - recorded.get(p.stem, 0))
+    return total
+
+
 def next_batch_docs(remaining_docs):
     """Stage documents until the batch's CHUNK budget is spent.
 
@@ -126,10 +146,25 @@ def next_batch_docs(remaining_docs):
     present = {p.name for p in DOCS.glob("*.json")}
     pool = sorted((p for p in POOL.glob("*.json") if p.name not in present),
                   key=lambda p: p.stat().st_size)
-    picked, spent = [], 0
+    # Work already staged but not yet extracted counts against this batch's
+    # budget. An interrupted run (the 2026-07-28 session restart killed one
+    # mid-batch) leaves its documents in docs/, and the next run extracts them
+    # alongside whatever it stages — so a naive resume produced a double-size
+    # batch. The budget is about how much the FACTORY will do, not about how
+    # much this function copies.
+    pending = pending_chunks()
+    picked, spent = [], pending
+    if pending:
+        print(f"[loop] {pending} chunks pending from an interrupted batch; "
+              f"staging against the remaining budget", flush=True)
     for p in pool[:max(1, remaining_docs)]:
         c = doc_chunks(p)
-        if picked and spent + c > CHUNK_BUDGET:
+        # `picked or pending`: the empty-picked case exists so a document larger
+        # than the whole budget still gets scheduled (alone) rather than being
+        # skipped forever. That exemption must not apply when the budget is
+        # already spoken for by an interrupted batch — otherwise a resume stages
+        # a document on top of a full batch, which is the case it was added for.
+        if (picked or pending) and spent + c > CHUNK_BUDGET:
             break
         picked.append(p)
         spent += c
