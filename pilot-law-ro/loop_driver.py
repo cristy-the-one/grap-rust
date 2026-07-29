@@ -26,9 +26,9 @@ DOCS = PILOT / "docs"
 POOL = ROOT / "real-data-law-ro"
 # Phase 2 (2026-07-24): finer 5-doc batches, continue 400 -> 600. Separate
 # metrics file so the 10-doc study (loop-metrics-10doc.json) stays intact.
-METRICS = PILOT / "loop-metrics-1442.json"
+METRICS = PILOT / "loop-metrics-1630.json"
 
-TOTAL_DOCS = 1442
+TOTAL_DOCS = 1630
 # Batches are sized by CHUNKS, not documents — a chunk is ~95s of decode, a
 # document is anywhere from 1 to 248 of them. 25 keeps a batch at the wall-time
 # the count-based runs actually produced (10 docs ~ 22 chunks ~ 35 min), so the
@@ -59,6 +59,7 @@ os.environ.pop("GRAP_LLM_STUB", None)
 sys.path.insert(0, str(ROOT / "mcp-server"))
 import grap_mcp.server as s  # noqa: E402
 from grap_mcp.ingest import chunk_text  # noqa: E402
+from grap_mcp.kee import tabular  # noqa: E402
 from grap_mcp.kee.pipeline import _text_and_label_from_json  # noqa: E402
 
 WORKDIR_DB = PILOT / "kee-workdir" / "graph_store.db"
@@ -107,7 +108,12 @@ def doc_chunks(p):
         text, _ = _text_and_label_from_json(json.loads(p.read_text(encoding="utf-8")), p.stem)
     except Exception:
         return 1
-    return max(1, len(chunk_text(text, max_chars=CHUNK_CHARS)))
+    # Count only what will actually be SENT to the model. Tabular chunks are
+    # skipped at extraction and so never enter the manifest — counting them here
+    # would make pending_chunks() permanently non-zero and shrink every batch
+    # budget by the size of the tables it is not going to process.
+    cs = [c for c in chunk_text(text, max_chars=CHUNK_CHARS) if not tabular.is_tabular(c)]
+    return max(1, len(cs))
 
 
 def pending_chunks():
