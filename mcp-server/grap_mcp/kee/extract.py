@@ -212,8 +212,42 @@ def _clean_str_list(value: Any) -> List[str]:
     return out
 
 
-def normalize_fragment(obj: Dict[str, Any], source: str) -> Dict[str, Any]:
-    """Coerce a parsed object into a valid Fragment, dropping malformed parts."""
+def _fold_name(s: str) -> str:
+    """Normalisation used to compare a name against the class vocabulary.
+
+    Must match `extract_quality.QualityMonitor.record`, or the detector and the
+    filter would disagree about what a class name is."""
+    return str(s or "").strip().lower().replace(" ", "")
+
+
+def is_class_name(name: str, class_vocab=None) -> bool:
+    """True if `name` IS one of the ontology's class names rather than an instance.
+
+    A chunk dense with cross-references and no dominant subject can push the
+    model into organising by TYPE: it emits `NormativeAct` as an outcome and
+    files the actual acts underneath as characteristics, inverting instances and
+    classes. Chunk 19811#3 did exactly that on 2026-07-28 — four class-named
+    outcomes, sixteen real acts demoted to attributes, and nine edges anchored
+    on a generic node.
+
+    Such a node is also an embedding magnet: every future act in the corpus is a
+    candidate to resolve into a node literally called "NormativeAct", which is
+    the instance collapse the quality alarm has always warned about."""
+    vocab = class_vocab if class_vocab is not None else CLASS_VOCAB
+    folded = _fold_name(name)
+    return bool(folded) and folded in {_fold_name(c) for c in vocab}
+
+
+def normalize_fragment(obj: Dict[str, Any], source: str, class_vocab=None) -> Dict[str, Any]:
+    """Coerce a parsed object into a valid Fragment, dropping malformed parts.
+
+    Also drops class-named outcomes and any relation that touches one. This is a
+    deterministic filter rather than a prompt rule on purpose: the measured
+    instruction budget for this model is ONE extra rule (the short-characteristics
+    experiment regressed when a second was added), and that slot is spent on the
+    language pin. A filter costs nothing and does not depend on compliance.
+    """
+    rejected_class_named: List[str] = []
     outcomes: List[Dict[str, Any]] = []
     for o in obj.get("outcomes", []) if isinstance(obj.get("outcomes"), list) else []:
         if not isinstance(o, dict):
@@ -221,20 +255,33 @@ def normalize_fragment(obj: Dict[str, Any], source: str) -> Dict[str, Any]:
         name = o.get("name")
         if not isinstance(name, str) or not name.strip():
             continue  # an outcome with no name is unusable
+        if is_class_name(name, class_vocab):
+            rejected_class_named.append(name.strip())
+            continue
         outcomes.append({
             "name": name.strip(),
             "characteristics": _clean_str_list(o.get("characteristics")),
         })
 
     relations: List[Dict[str, str]] = []
+    rejected_class_edges = 0
     for r in obj.get("relations", []) if isinstance(obj.get("relations"), list) else []:
         if not isinstance(r, dict):
             continue
         f, t, ty = r.get("from"), r.get("to"), r.get("type")
         if all(isinstance(x, str) and x.strip() for x in (f, t, ty)):
+            # Endpoints matter as much as outcomes: an ungrounded relation to
+            # "NormativeAct" is parked, and `promote_parked_endpoints` promotes
+            # endpoints that recur — which would rebuild the very node the
+            # outcome filter just refused.
+            if is_class_name(f, class_vocab) or is_class_name(t, class_vocab):
+                rejected_class_edges += 1
+                continue
             relations.append({"from": f.strip(), "type": ty.strip(), "to": t.strip()})
 
-    return {"source": source, "outcomes": outcomes, "relations": relations}
+    return {"source": source, "outcomes": outcomes, "relations": relations,
+            "rejected_class_named": rejected_class_named,
+            "rejected_class_edges": rejected_class_edges}
 
 
 def extract_fragments(chunks: Sequence[Tuple[str, str]], provider) -> List[Dict[str, Any]]:

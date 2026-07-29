@@ -1,6 +1,7 @@
 """Phase 3: extractor — JSON robustness, normalization, provenance."""
 
 import grap_mcp.kee.extract as ex
+from grap_mcp.kee.extract_quality import QualityMonitor
 from grap_mcp.kee.llm import StubProvider
 
 
@@ -188,3 +189,79 @@ def test_class_vocab_is_configuration_not_hardcoded(monkeypatch):
     finally:
         monkeypatch.delenv("GRAP_KEE_CLASS_VOCAB", raising=False)
         importlib.reload(ex)
+
+
+# ---- class-name filter -----------------------------------------------------
+#
+# Chunk 19811#3 (2026-07-28) inverted the ontology: a reference-dense amending
+# clause with no dominant subject pushed the model into organising by TYPE. It
+# emitted the class vocabulary as outcomes and filed the real acts underneath as
+# characteristics, then wired nine edges off the generic node. A node literally
+# named "NormativeAct" is an embedding magnet, so every future act is a
+# candidate to collapse into it.
+
+_VOCAB = ["NormativeAct", "AuthoritativeBody", "Official", "StructuralPart"]
+
+
+def test_class_named_outcomes_are_rejected():
+    obj = {
+        "outcomes": [
+            {"name": "NormativeAct", "characteristics": ["Legea nr. 9/1998"]},
+            {"name": "AuthoritativeBody", "characteristics": ["PRIM-MINISTRU RADU VASILE"]},
+            {"name": "Hotărârea Guvernului nr. 753/1998", "characteristics": ["publicată 1998"]},
+        ],
+        "relations": [],
+    }
+    frag = ex.normalize_fragment(obj, "19811#3", class_vocab=_VOCAB)
+    assert [o["name"] for o in frag["outcomes"]] == ["Hotărârea Guvernului nr. 753/1998"]
+    assert sorted(frag["rejected_class_named"]) == ["AuthoritativeBody", "NormativeAct"]
+
+
+def test_relations_touching_a_class_name_are_dropped():
+    """Endpoints matter as much as outcomes: an ungrounded relation to
+    "NormativeAct" gets parked, and promote_parked_endpoints promotes endpoints
+    that recur — rebuilding the node the outcome filter just refused."""
+    obj = {"outcomes": [], "relations": [
+        {"from": "NormativeAct", "type": "publicată în", "to": "Monitorul Oficial"},
+        {"from": "Legea nr. 9/1998", "type": "aprobată de", "to": "StructuralPart"},
+        {"from": "Legea nr. 9/1998", "type": "publicată în", "to": "Monitorul Oficial"},
+    ]}
+    frag = ex.normalize_fragment(obj, "s", class_vocab=_VOCAB)
+    assert len(frag["relations"]) == 1
+    assert frag["relations"][0]["from"] == "Legea nr. 9/1998"
+    assert frag["rejected_class_edges"] == 2
+
+
+def test_class_match_is_case_and_space_insensitive():
+    obj = {"outcomes": [{"name": "  normative act ", "characteristics": []}],
+           "relations": []}
+    frag = ex.normalize_fragment(obj, "s", class_vocab=_VOCAB)
+    assert frag["outcomes"] == []
+    assert frag["rejected_class_named"] == ["normative act"]
+
+
+def test_instances_that_merely_contain_a_class_word_survive():
+    """The filter must reject the class name itself, not anything mentioning it."""
+    obj = {"outcomes": [
+        {"name": "Normative Acts of 1998", "characteristics": []},
+        {"name": "Official Gazette nr. 458", "characteristics": []},
+    ], "relations": []}
+    frag = ex.normalize_fragment(obj, "s", class_vocab=_VOCAB)
+    assert len(frag["outcomes"]) == 2
+    assert frag["rejected_class_named"] == []
+
+
+def test_quality_monitor_counts_rejections_without_alarming():
+    """Filtering must not silence the signal that caught the incident."""
+    qm = QualityMonitor(class_vocab=_VOCAB)
+    for _ in range(6):
+        qm.record(ex.normalize_fragment(
+            {"outcomes": [{"name": "NormativeAct", "characteristics": []},
+                          {"name": "Legea nr. 9/1998", "characteristics": []}],
+             "relations": [{"from": "a", "type": "t", "to": "b"},
+                           {"from": "a", "type": "u", "to": "c"}]},
+            "s", class_vocab=_VOCAB))
+    r = qm.report()
+    assert r["class_named_rejected"] == 6      # the model kept trying
+    assert r["class_named_outcomes"] == 0      # nothing reached the graph
+    assert not any("class_named_outcomes" in a for a in r["alarms"])

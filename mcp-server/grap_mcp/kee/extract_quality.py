@@ -36,7 +36,9 @@ class QualityMonitor:
         self.rel_counts: list[int] = []
         self.outcome_counts: list[int] = []
         self.rel_types: Counter = Counter()
-        self.class_named = 0          # outcome name equals a class name
+        self.class_named = 0          # outcome name equals a class name (LEAKED past the filter)
+        self.class_named_rejected = 0 # ...and how many the filter refused
+        self.class_edges_rejected = 0 # relations dropped for a class-named endpoint
         self.notation_leak = 0        # relation type carries prompt notation ("-->")
         self.empty_typed = 0          # relation with a blank type
 
@@ -58,6 +60,18 @@ class QualityMonitor:
         relations = frag.get("relations") or []
         self.outcome_counts.append(len(outcomes))
         self.rel_counts.append(len(relations))
+        # Two different questions, deliberately kept apart:
+        #   class_named_rejected — the model TRIED to name an outcome after a
+        #     class and the extractor refused. Reported, never alarmed: it is
+        #     handled, and the rate is interesting (how often the context format
+        #     tips the model into organising by type).
+        #   class_named        — a class-named outcome REACHED the graph. Should
+        #     be 0 forever now; if it is not, the filter has a hole and the
+        #     circuit breaker stops the loop.
+        # Filtering without counting would have silenced the very signal that
+        # caught chunk 19811#3.
+        self.class_named_rejected += len(frag.get("rejected_class_named") or [])
+        self.class_edges_rejected += int(frag.get("rejected_class_edges") or 0)
         for o in outcomes:
             name = str(o.get("name", "")).strip().lower().replace(" ", "")
             if name and name in self.class_vocab:
@@ -106,6 +120,8 @@ class QualityMonitor:
             if self.rel_types else 0.0,
             # known failure modes, each from a real incident
             "class_named_outcomes": self.class_named,
+            "class_named_rejected": self.class_named_rejected,
+            "class_edges_rejected": self.class_edges_rejected,
             "notation_leaks": self.notation_leak,
             "blank_relation_types": self.empty_typed,
             "alarms": self.alarms(rel_cv),
