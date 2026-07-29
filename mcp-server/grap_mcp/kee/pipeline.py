@@ -10,17 +10,21 @@ deterministically in tests (StubProvider + HashingEmbedder).
 from __future__ import annotations
 
 import json
+import logging
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 # _text_and_label_from_json lives in ..ingest so evidence ingestion and KEE
 # extraction read the SAME text for the same file (law-ro pilot finding 13).
 from ..ingest import _EXTS, _text_and_label_from_json, chunk_text
-from . import extract, reconcile
+from . import extract, reconcile, tabular
+
+logger = logging.getLogger("grap-mcp.kee")
 
 
 def read_chunks(root: str, max_files: Optional[int] = None,
-                chunk_chars: int = 800) -> List[Tuple[str, str]]:
+                chunk_chars: int = 800,
+                stats: Optional[dict] = None) -> List[Tuple[str, str]]:
     """Walk .md/.txt/.json under `root` → [(source_label, chunk_text), ...].
 
     JSON files are read via the law-aware/generic extractor. `max_files` caps how
@@ -38,6 +42,7 @@ def read_chunks(root: str, max_files: Optional[int] = None,
     if max_files is not None and max_files > 0:
         files = files[:max_files]
     chunks: List[Tuple[str, str]] = []
+    skipped = 0
     for f in files:
         try:
             raw = f.read_text(encoding="utf-8")
@@ -50,8 +55,21 @@ def read_chunks(root: str, max_files: Optional[int] = None,
                 continue
         else:
             text, label = raw, f.stem
+        # Enumerate FIRST, then filter. Chunk ids embed the index, so filtering
+        # before numbering would renumber every chunk after the first skip and
+        # make ~1,500 already-processed documents look changed — a full
+        # re-extract of the entire corpus. Skipped chunks simply leave gaps.
         for i, c in enumerate(chunk_text(text, max_chars=chunk_chars)):
+            if tabular.is_tabular(c):
+                skipped += 1
+                continue
             chunks.append((f"{label}#{i}", c))
+    if skipped:
+        logger.info("read_chunks: skipped %d tabular chunk(s) (score >= %.2f); "
+                    "they are still ingested as evidence, just not extracted",
+                    skipped, tabular._threshold())
+    if stats is not None:
+        stats["tabular_skipped"] = skipped
     return chunks
 
 
