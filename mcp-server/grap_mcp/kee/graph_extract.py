@@ -160,14 +160,25 @@ def extend_graph_ontology(workdir: str, docs_path: str, provider, embedder, *,
             if progress is not None:
                 progress(ev)
 
-        chunks = read_chunks(docs_path, max_files=max_files, chunk_chars=chunk_chars)
+        read_stats: Dict[str, Any] = {}
+        chunks = read_chunks(docs_path, max_files=max_files, chunk_chars=chunk_chars,
+                             stats=read_stats)
+        skipped_ids = set(read_stats.get("tabular_skipped_ids") or [])
         current = {src: text for (src, text) in chunks}
         hashes = {src: incremental.chunk_hash(text) for src, text in current.items()}
         prev = dict(wg.manifest)
 
         new = [s for s in current if s not in prev]
         changed = [s for s in current if s in prev and prev[s] != hashes[s]]
-        removed = [s for s in prev if s not in current]
+        # SKIPPED IS NOT REMOVED. A chunk the tabular filter declines to extract
+        # is absent from `current`, which without this guard looks identical to a
+        # chunk deleted from the corpus — so enabling the filter retracted
+        # everything the already-extracted tables had contributed. It cost 135
+        # concepts and 28 edges from the working graph on 2026-07-30 before the
+        # churn gate rejected the proposal and the circuit breaker stopped the
+        # loop. The document is still there; we have merely stopped asking the
+        # model about part of it.
+        removed = [s for s in prev if s not in current and s not in skipped_ids]
 
         for s in changed + removed:
             wg.retract_chunk(s)

@@ -42,7 +42,7 @@ def read_chunks(root: str, max_files: Optional[int] = None,
     if max_files is not None and max_files > 0:
         files = files[:max_files]
     chunks: List[Tuple[str, str]] = []
-    skipped = 0
+    skipped_ids: List[str] = []
     for f in files:
         try:
             raw = f.read_text(encoding="utf-8")
@@ -61,15 +61,19 @@ def read_chunks(root: str, max_files: Optional[int] = None,
         # re-extract of the entire corpus. Skipped chunks simply leave gaps.
         for i, c in enumerate(chunk_text(text, max_chars=chunk_chars)):
             if tabular.is_tabular(c):
-                skipped += 1
+                skipped_ids.append(f"{label}#{i}")
                 continue
             chunks.append((f"{label}#{i}", c))
-    if skipped:
+    if skipped_ids:
         logger.info("read_chunks: skipped %d tabular chunk(s) (score >= %.2f); "
                     "they are still ingested as evidence, just not extracted",
-                    skipped, tabular._threshold())
+                    len(skipped_ids), tabular._threshold())
     if stats is not None:
-        stats["tabular_skipped"] = skipped
+        stats["tabular_skipped"] = len(skipped_ids)
+        # The IDS matter, not just the count. A caller diffing this list against
+        # its manifest must be able to tell "skipped" from "removed" — see
+        # extend_graph_ontology.
+        stats["tabular_skipped_ids"] = skipped_ids
     return chunks
 
 

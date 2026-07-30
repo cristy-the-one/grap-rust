@@ -63,3 +63,41 @@ def test_disabled_filter_keeps_every_chunk(tmp_path, monkeypatch):
     got = read_chunks(str(tmp_path), chunk_chars=2000, stats=stats)
     assert [s for s, _ in got] == ["d#0", "d#1", "d#2"]
     assert stats["tabular_skipped"] == 0
+
+
+def test_enabling_the_filter_does_not_retract_already_extracted_chunks(tmp_path, monkeypatch):
+    """SKIPPED IS NOT REMOVED.
+
+    Turning the filter on made already-extracted tabular chunks vanish from
+    read_chunks, which is indistinguishable from being deleted from the corpus —
+    so extend_graph_ontology retracted everything they had contributed. It cost
+    135 concepts and 28 edges from the live working graph before the churn gate
+    rejected the proposal.
+    """
+    import json as _json
+    from grap_mcp.kee.graph_extract import extend_graph_ontology
+    from grap_mcp.kee.embeddings import HashingEmbedder
+    from grap_mcp.kee.llm import StubProvider
+
+    docs = tmp_path / "docs"; docs.mkdir()
+    wd = str(tmp_path / "g")
+    (docs / "d.txt").write_text("\n\n".join([PLAIN_LAW, BUDGET_TABLE]), encoding="utf-8")
+
+    def handler(system, user):
+        return _json.dumps({"outcomes": [{"name": "Alpha", "characteristics": ["x"]}],
+                            "relations": []})
+
+    # Pass 1: filter OFF — both chunks extracted.
+    monkeypatch.setenv("GRAP_KEE_SKIP_TABULAR", "off")
+    out1 = extend_graph_ontology(wd, str(docs), StubProvider(handler=handler),
+                                 HashingEmbedder(), sim=0.9, chunk_chars=2000)
+    assert out1["added"] == 2, out1
+    concepts_before = out1["concepts"]
+
+    # Pass 2: filter ON — the table is skipped. It must NOT be treated as removed.
+    monkeypatch.setenv("GRAP_KEE_SKIP_TABULAR", "0.75")
+    out2 = extend_graph_ontology(wd, str(docs), StubProvider(handler=handler),
+                                 HashingEmbedder(), sim=0.9, chunk_chars=2000)
+    assert out2["removed"] == 0, f"skipped chunk was retracted: {out2}"
+    assert out2["concepts"] == concepts_before, (
+        f"enabling the filter destroyed {concepts_before - out2['concepts']} concept(s)")
