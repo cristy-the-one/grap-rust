@@ -105,6 +105,11 @@ class LocalEmbedder:
         return [[float(x) for x in row] for row in arr]
 
 
+# Texts per /embeddings request. Bounds the payload so a large caller cannot
+# blow the server's request limit (see OpenAICompatEmbedder.embed).
+EMBED_BATCH = 128
+
+
 class OpenAICompatEmbedder:
     """Embedder backed by an OpenAI-compatible /embeddings endpoint.
 
@@ -138,6 +143,26 @@ class OpenAICompatEmbedder:
             self.retry_backoff = 2.0
 
     def embed(self, texts: Sequence[str]) -> List[List[float]]:
+        """Embed any number of texts, splitting into bounded requests.
+
+        The batching lives HERE rather than at the call sites on purpose. Two
+        callers already batched (`working_graph._prefetch_vectors`,
+        `ingest.ingest_paths`) and a third did not: `reconcile._dedup_strings`
+        embeds every distinct characteristic in one call, which was fine at 5,000
+        and returned HTTP 400 at 23,956 — mid-run, at 1,547 documents, after the
+        batch's extraction had already been paid for. A payload limit is a
+        property of the transport, so the transport should enforce it; leaving it
+        to callers means every new caller re-discovers the wall.
+        """
+        texts = list(texts)
+        if len(texts) <= EMBED_BATCH:
+            return self._embed_batch(texts)
+        out: List[List[float]] = []
+        for start in range(0, len(texts), EMBED_BATCH):
+            out.extend(self._embed_batch(texts[start:start + EMBED_BATCH]))
+        return out
+
+    def _embed_batch(self, texts: Sequence[str]) -> List[List[float]]:
         last_exc: Optional[Exception] = None
         for attempt in range(self.retries + 1):
             try:

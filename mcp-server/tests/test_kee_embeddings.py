@@ -158,3 +158,40 @@ def test_default_embed_url_is_ipv4_literal():
     import grap_mcp.kee.embeddings as em
     assert "127.0.0.1" in em._DEFAULT_EMBED_BASE_URL
     assert "localhost" not in em._DEFAULT_EMBED_BASE_URL
+
+
+# ---- payload bounding -------------------------------------------------------
+#
+# reconcile._dedup_strings embeds every distinct characteristic in ONE call.
+# That was fine at 5,000 and returned HTTP 400 at 23,956, mid-run, after the
+# batch's extraction had already been paid for. A payload limit is a property of
+# the transport, so the transport enforces it.
+
+def test_large_embed_is_split_into_bounded_requests(monkeypatch):
+    from grap_mcp.kee import embeddings as em
+
+    emb = em.OpenAICompatEmbedder(base_url="http://x/v1", model="m")
+    sizes = []
+
+    def fake_once(texts):
+        sizes.append(len(texts))
+        if len(texts) > em.EMBED_BATCH:
+            raise AssertionError(f"payload of {len(texts)} exceeds EMBED_BATCH")
+        return [[0.0]] * len(texts)
+
+    monkeypatch.setattr(emb, "_embed_once", fake_once)
+    out = emb.embed([f"t{i}" for i in range(23956)])
+    assert len(out) == 23956
+    assert max(sizes) <= em.EMBED_BATCH
+    assert sum(sizes) == 23956
+
+
+def test_small_embed_still_makes_one_request(monkeypatch):
+    from grap_mcp.kee import embeddings as em
+
+    emb = em.OpenAICompatEmbedder(base_url="http://x/v1", model="m")
+    calls = []
+    monkeypatch.setattr(emb, "_embed_once",
+                        lambda texts: (calls.append(len(texts)) or [[0.0]] * len(texts)))
+    emb.embed(["a", "b", "c"])
+    assert calls == [3]

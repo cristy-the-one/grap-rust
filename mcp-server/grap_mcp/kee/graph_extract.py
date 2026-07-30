@@ -267,8 +267,16 @@ def extend_graph_ontology(workdir: str, docs_path: str, provider, embedder, *,
         for a in quality.get("alarms", []):
             logger.warning("extraction quality alarm: %s", a)
 
-        ontology = wg.to_candidate_ontology(version)
+        # Persist the extraction BEFORE deriving the proposal from it. These were
+        # the other way round, and on 2026-07-30 `to_candidate_ontology` raised
+        # (an unbatched embed call hit HTTP 400 at 23,956 characteristics) — which
+        # discarded a batch of extraction that had already been paid for in full,
+        # because `save()` never ran. The working graph is the truth and the
+        # candidate ontology is a derivative; a failure computing the derivative
+        # must not cost the truth. `save()` itself follows the same rule
+        # internally, persisting the store before rebuilding the projection.
         wg.save()
+        ontology = wg.to_candidate_ontology(version)
         _emit({"phase": "done", "added": len(new), "changed": len(changed),
                "removed": len(removed), "concepts": len(wg._live_concepts()),
                "edges": len(wg.relations), "relooks": relooks, "parked": len(wg.parked)})
