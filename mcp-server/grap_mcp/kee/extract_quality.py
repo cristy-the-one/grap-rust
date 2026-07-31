@@ -38,6 +38,7 @@ class QualityMonitor:
         self.rel_types: Counter = Counter()
         self.class_named = 0          # outcome name equals a class name (LEAKED past the filter)
         self.class_named_rejected = 0 # ...and how many the filter refused
+        self.structural_rejected = 0  # bare "Articolul 2"/"Anexa 1" outcome names
         self.class_edges_rejected = 0 # relations dropped for a class-named endpoint
         self.notation_leak = 0        # relation type carries prompt notation ("-->")
         self.empty_typed = 0          # relation with a blank type
@@ -71,6 +72,7 @@ class QualityMonitor:
         # Filtering without counting would have silenced the very signal that
         # caught chunk 19811#3.
         self.class_named_rejected += len(frag.get("rejected_class_named") or [])
+        self.structural_rejected += len(frag.get("rejected_structural") or [])
         self.class_edges_rejected += int(frag.get("rejected_class_edges") or 0)
         for o in outcomes:
             name = str(o.get("name", "")).strip().lower().replace(" ", "")
@@ -121,6 +123,7 @@ class QualityMonitor:
             # known failure modes, each from a real incident
             "class_named_outcomes": self.class_named,
             "class_named_rejected": self.class_named_rejected,
+            "structural_rejected": self.structural_rejected,
             "class_edges_rejected": self.class_edges_rejected,
             "notation_leaks": self.notation_leak,
             "blank_relation_types": self.empty_typed,

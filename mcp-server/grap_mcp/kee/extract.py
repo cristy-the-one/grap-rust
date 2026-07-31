@@ -16,6 +16,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 logger = logging.getLogger("grap-mcp.kee")
@@ -238,6 +239,41 @@ def is_class_name(name: str, class_vocab=None) -> bool:
     return bool(folded) and folded in {_fold_name(c) for c in vocab}
 
 
+# Bare document-structure labels: "Articolul 2", "Anexa 1", "Cap. III".
+# Anchored on purpose — "Articolul 2 din Legea nr. 9/1998" names a specific
+# provision and must survive; "Articolul 2" alone does not name anything.
+_STRUCTURAL_LABEL = re.compile(
+    r"^(articolul|articol|art\.?|anexa|anexe|anexă|capitolul|cap\.?|"
+    r"sec[țţt]iunea|titlul|alineatul|alin\.?|litera|lit\.?|punctul|pct\.?)"
+    r"\s*[0-9ivxlIVXL]*[.)]?$", re.IGNORECASE)
+
+
+def is_structural_label(name: str) -> bool:
+    """True if `name` is a bare structural label rather than an entity.
+
+    Almost every Romanian act has an "Articolul 2" and an "Anexa 1", so these
+    resolve across documents into single super-nodes: measured at 1,629
+    documents, `Articolul 2` was ONE concept fed by 116 different source
+    documents and carrying 202 characteristics, against a median of 1 source
+    chunk for an ordinary concept. 54 such nodes (0.6% of concepts) held 4.8% of
+    all characteristics.
+
+    They are also the dominant source of canary instability: of the 46 true
+    regressions in the first canary failure (2026-07-31), 41 — 89% — were on
+    `anexa_1` alone. Because nearly every incoming document feeds them, they
+    churn on every batch, which is why regression counts tracked ontology SIZE
+    (corr 0.42) rather than batch size (corr 0.22) and why the rate per outcome
+    kept climbing.
+
+    Dropping them is not a loss of knowledge. A provision filed under a node fed
+    by 116 documents cannot be attributed to any of them — the text
+    "(1) Creditul va fi garantat printr-un depozit bancar..." appears twice under
+    `Articolul 2` from two different laws, distinguishable only by the amount.
+    The information was already lost; this removes the bucket.
+    """
+    return bool(_STRUCTURAL_LABEL.match((name or "").strip()))
+
+
 def normalize_fragment(obj: Dict[str, Any], source: str, class_vocab=None) -> Dict[str, Any]:
     """Coerce a parsed object into a valid Fragment, dropping malformed parts.
 
@@ -248,6 +284,7 @@ def normalize_fragment(obj: Dict[str, Any], source: str, class_vocab=None) -> Di
     language pin. A filter costs nothing and does not depend on compliance.
     """
     rejected_class_named: List[str] = []
+    rejected_structural: List[str] = []
     outcomes: List[Dict[str, Any]] = []
     for o in obj.get("outcomes", []) if isinstance(obj.get("outcomes"), list) else []:
         if not isinstance(o, dict):
@@ -257,6 +294,9 @@ def normalize_fragment(obj: Dict[str, Any], source: str, class_vocab=None) -> Di
             continue  # an outcome with no name is unusable
         if is_class_name(name, class_vocab):
             rejected_class_named.append(name.strip())
+            continue
+        if is_structural_label(name):
+            rejected_structural.append(name.strip())
             continue
         outcomes.append({
             "name": name.strip(),
@@ -274,13 +314,15 @@ def normalize_fragment(obj: Dict[str, Any], source: str, class_vocab=None) -> Di
             # "NormativeAct" is parked, and `promote_parked_endpoints` promotes
             # endpoints that recur — which would rebuild the very node the
             # outcome filter just refused.
-            if is_class_name(f, class_vocab) or is_class_name(t, class_vocab):
+            if (is_class_name(f, class_vocab) or is_class_name(t, class_vocab)
+                    or is_structural_label(f) or is_structural_label(t)):
                 rejected_class_edges += 1
                 continue
             relations.append({"from": f.strip(), "type": ty.strip(), "to": t.strip()})
 
     return {"source": source, "outcomes": outcomes, "relations": relations,
             "rejected_class_named": rejected_class_named,
+            "rejected_structural": rejected_structural,
             "rejected_class_edges": rejected_class_edges}
 
 

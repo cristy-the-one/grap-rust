@@ -265,3 +265,39 @@ def test_quality_monitor_counts_rejections_without_alarming():
     assert r["class_named_rejected"] == 6      # the model kept trying
     assert r["class_named_outcomes"] == 0      # nothing reached the graph
     assert not any("class_named_outcomes" in a for a in r["alarms"])
+
+
+# ---- structural-label filter ------------------------------------------------
+#
+# Almost every Romanian act has an "Articolul 2" and an "Anexa 1", so they
+# resolved across documents into super-nodes: at 1,629 documents `Articolul 2`
+# was ONE concept fed by 116 source documents holding 202 characteristics,
+# against a median of 1 source chunk for an ordinary concept. Of the 46 true
+# regressions in the first canary failure, 41 (89%) were on `anexa_1` alone.
+
+def test_bare_structural_labels_are_rejected():
+    for name in ("Articolul 2", "Anexa 1", "Cap. III", "art. 42", "Anexa",
+                 "pct. 5", "ARTICOLUL 12", "Secţiunea 3"):
+        assert ex.is_structural_label(name), name
+
+
+def test_specific_provisions_survive():
+    """Anchored on purpose: a label qualified by its act names something real."""
+    for name in ("Articolul 2 din Legea nr. 9/1998", "Anexa 1 la normele metodologice",
+                 "Hotărârea Guvernului nr. 753/1998", "Articolul unic",
+                 "Legea nr. 9/1998", "Ministerul Finanţelor"):
+        assert not ex.is_structural_label(name), name
+
+
+def test_structural_outcomes_and_their_edges_are_dropped():
+    obj = {"outcomes": [
+               {"name": "Articolul 2", "characteristics": ["(1) Creditul va fi garantat"]},
+               {"name": "Hotărârea Guvernului nr. 753/1998", "characteristics": ["publicată"]}],
+           "relations": [
+               {"from": "Articolul 2", "type": "prevede", "to": "garanţie"},
+               {"from": "Legea nr. 9/1998", "type": "publicată în", "to": "Monitorul Oficial"}]}
+    frag = ex.normalize_fragment(obj, "19811#3", class_vocab=[])
+    assert [o["name"] for o in frag["outcomes"]] == ["Hotărârea Guvernului nr. 753/1998"]
+    assert frag["rejected_structural"] == ["Articolul 2"]
+    assert len(frag["relations"]) == 1
+    assert frag["rejected_class_edges"] == 1
