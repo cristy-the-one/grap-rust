@@ -340,7 +340,12 @@ def main():
               # RESTORE TO 25 once the re-baseline adoption has gone through;
               # restore_strict() already puts it back to 0 at the end of the run.
               "max_outcomes_removed": 100,
-              "max_characteristics_removed": 80,
+              # Widened with the SAME one-time rationale as max_outcomes_removed
+              # and for the same adoption: the 59 excluded structural labels carry
+              # 1,694 characteristics between them (anexa_1 alone has 220). Raising
+              # the outcome budget alone was not enough — that was not even the
+              # binding constraint. RESTORE TO 80 after the re-baseline.
+              "max_characteristics_removed": 2000,
               "max_outcomes_added_per_chunk": 3.0,
               "canary_max_new_gaps": 50}
     for k, v in policy.items():
