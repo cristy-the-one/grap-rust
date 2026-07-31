@@ -268,6 +268,22 @@ class WorkingGraph:
                     self.node_sources.setdefault(res.node_id, set()).add(src)
         promoted = len(self.canonical) - before_nodes
 
+        # Prefetch EVERY endpoint the re-attempt below will try to resolve, not
+        # just the handful being promoted. `_resolve_endpoint` falls through to
+        # `_embed_one` for any name the alias index misses, and that is a
+        # single-text round-trip: measured 0.178s each against 6,727 uncached
+        # endpoints = 1,194s, which matched the 1,241s this phase actually took.
+        # Batched at 128 the same names cost 74s — a 16x saving on the phase and
+        # ~19 minutes off every batch.
+        #
+        # This is the third appearance of one defect. The docstring on
+        # _prefetch_vectors already calls single-text embedding a 42x mistake and
+        # the call two lines above already fixes it for the promoted names; the
+        # thousands of names resolved during re-attempt were simply never
+        # included.
+        self._prefetch_vectors(
+            [n for p in ungrounded for n in (p.get("from"), p.get("to"))])
+
         # Re-attempt the parked relations through the normal path, so the
         # self-loop guard, conflict detection and provenance all still apply.
         # Drop them first; whatever still fails simply gets re-parked.

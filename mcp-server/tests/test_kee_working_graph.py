@@ -491,3 +491,30 @@ def test_changed_characteristics_are_re_derived(tmp_path):
         assert emb.calls > base, "changed characteristics were served from the memo"
     finally:
         wg.close()
+
+
+def test_promotion_prefetches_every_endpoint_it_will_resolve(tmp_path):
+    """_resolve_endpoint falls through to a SINGLE-TEXT embed for any name the
+    alias index misses. Measured on the live pilot: 6,727 uncached endpoints at
+    0.178s each = 1,194s, matching the 1,241s the phase actually took. Batched,
+    the same names cost 74s."""
+    emb = _CountingEmbedder()
+    wg = WorkingGraph(emb, workdir=str(tmp_path), merge_threshold=0.99)
+    try:
+        # Park a pile of relations whose endpoints never appear as outcomes.
+        for i in range(40):
+            wg.upsert_fragment(
+                {"source": f"s#{i}",
+                 "outcomes": [{"name": f"Act {i}", "characteristics": []}],
+                 "relations": [{"from": f"Act {i}", "type": "emis de",
+                                "to": f"Body {i % 7}"}]}, f"s#{i}")
+        assert any(p.get("reason") == "ungrounded" for p in wg.parked)
+        emb.calls = 0
+        wg.promote_parked_endpoints(min_refs=2, max_promote=5)
+        # The endpoints are embedded in bounded batches, not one request each.
+        distinct = len({p["to"] for p in wg.parked} | {"Body %d" % i for i in range(7)})
+        assert emb.calls <= 4, (
+            f"{emb.calls} embed calls for ~{distinct} endpoints — prefetch is not covering "
+            "the re-attempt loop")
+    finally:
+        wg.close()
