@@ -518,3 +518,29 @@ def test_promotion_prefetches_every_endpoint_it_will_resolve(tmp_path):
             "the re-attempt loop")
     finally:
         wg.close()
+
+
+def test_structural_labels_excluded_from_export_but_kept_in_the_graph(tmp_path):
+    """Intake filtering stops NEW structural outcomes; it does nothing about the
+    ones already there, and those were the ones doing the damage — `anexa_1`
+    produced the same 41 regressions across three consecutive canary failures.
+    Excluding at export (rather than retracting) keeps the gathered data and
+    makes the decision reversible."""
+    wg = WorkingGraph(HashingEmbedder(), workdir=str(tmp_path), merge_threshold=0.99)
+    try:
+        wg.upsert_fragment(
+            {"source": "s#0",
+             "outcomes": [{"name": "Anexa 1", "characteristics": ["I. Total dobânzi"]},
+                          {"name": "Legea nr. 9/1998", "characteristics": ["publicată"]}],
+             "relations": [{"from": "Anexa 1", "type": "face parte din",
+                            "to": "Legea nr. 9/1998"}]}, "s#0")
+        onto = wg.to_candidate_ontology("v")
+        assert [o["name"] for o in onto["process_outcomes"]] == ["Legea nr. 9/1998"]
+        assert onto["structural_excluded"] == 1
+        # an edge to a non-exported outcome would dangle
+        assert onto["relations"] == []
+        # ...and nothing was destroyed
+        assert "Anexa 1" in set(wg.canonical.values())
+        assert wg.chars[[n for n, v in wg.canonical.items() if v == "Anexa 1"][0]]
+    finally:
+        wg.close()

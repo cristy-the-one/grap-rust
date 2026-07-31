@@ -26,9 +26,9 @@ DOCS = PILOT / "docs"
 POOL = ROOT / "real-data-law-ro"
 # Phase 2 (2026-07-24): finer 5-doc batches, continue 400 -> 600. Separate
 # metrics file so the 10-doc study (loop-metrics-10doc.json) stays intact.
-METRICS = PILOT / "loop-metrics-1630.json"
+METRICS = PILOT / "loop-metrics-1683.json"
 
-TOTAL_DOCS = 1630
+TOTAL_DOCS = 1683
 # Batches are sized by CHUNKS, not documents — a chunk is ~95s of decode, a
 # document is anywhere from 1 to 248 of them. 25 keeps a batch at the wall-time
 # the count-based runs actually produced (10 docs ~ 22 chunks ~ 35 min), so the
@@ -329,7 +329,17 @@ def main():
     # to be loosened again is a threshold nobody trusts.
     # See docs/canary-noise-floor-investigation.md.
     policy = {"enabled": True, "canary_enabled": True,
-              "max_outcomes_added": 400, "max_outcomes_removed": 25,
+              "max_outcomes_added": 400,
+              # ONE-TIME WIDENING (2026-07-31). The export filter stops bare
+              # structural labels reaching the active ontology, and the active
+              # ontology already contains 54 of them, so the first adoption after
+              # the change is a REMOVAL of 54 — over the standing budget of 25,
+              # which would churn-reject it forever (a rejected proposal never
+              # becomes the baseline, so the next batch proposes the same
+              # removal). 100 covers the known 54 with headroom and nothing more.
+              # RESTORE TO 25 once the re-baseline adoption has gone through;
+              # restore_strict() already puts it back to 0 at the end of the run.
+              "max_outcomes_removed": 100,
               "max_characteristics_removed": 80,
               "max_outcomes_added_per_chunk": 3.0,
               "canary_max_new_gaps": 50}

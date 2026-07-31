@@ -19,6 +19,7 @@ from typing import Dict, List, Optional, Set, Tuple
 
 import pygrap
 
+from . import extract as _extract
 from . import reconcile as rc
 from .graph_store import GraphStore, GraphState
 from .. import session
@@ -660,8 +661,25 @@ class WorkingGraph:
         relations_out: List[dict] = []
         used: Set[str] = set()
 
+        structural_excluded = 0
         for node in sorted(self.canonical):
             label = self._canonical_label(node)
+            # Bare structural labels are excluded from the EXPORT, not deleted.
+            # The intake filter (extract.is_structural_label) stops new ones being
+            # created but does nothing about the 54 already in the graph, and
+            # those are the ones doing the damage: `anexa_1` alone accounted for
+            # 41 of 55 canary regressions on 2026-07-31, the same 41 across three
+            # consecutive canary failures. Its 220 characteristics have marginal
+            # coverage and flip every time the evidence index grows.
+            #
+            # Excluding at export rather than retracting keeps the concepts,
+            # characteristics and provenance in the working graph — nothing
+            # gathered is lost, and the decision is reversible by changing this
+            # predicate. The active ontology simply stops carrying buckets that
+            # cannot be attributed to any single document.
+            if _extract.is_structural_label(label):
+                structural_excluded += 1
+                continue
             raw_chars = self.chars.get(node, [])
             # Reuse reconcile's (package-private) clustering to collapse near-dup
             # characteristics, matching the legacy path's behavior exactly.
@@ -706,16 +724,24 @@ class WorkingGraph:
         session.record_query(f"to_candidate:{len(self.canonical)}", len(process_outcomes))
 
         for e in self.relations:
+            fl, tl = self._canonical_label(e["from_id"]), self._canonical_label(e["to_id"])
+            # An edge to an outcome that is no longer exported would dangle.
+            if _extract.is_structural_label(fl) or _extract.is_structural_label(tl):
+                continue
             relations_out.append({
-                "from": self._canonical_label(e["from_id"]),
+                "from": fl,
                 "type": e["type"],
-                "to": self._canonical_label(e["to_id"]),
+                "to": tl,
                 "sources": sorted(self._rel_sources.get(
                     (e["from_id"], e["type"], e["to_id"]), set())),
             })
 
+        if structural_excluded:
+            logger.info("to_candidate_ontology: excluded %d bare structural label(s) "
+                        "from the export (kept in the working graph)", structural_excluded)
         return {
             "version": version,
+            "structural_excluded": structural_excluded,
             "process_outcomes": process_outcomes,
             "mapping_hints": mapping_hints,
             "provenance": provenance,
