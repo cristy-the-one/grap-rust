@@ -330,22 +330,14 @@ def main():
     # See docs/canary-noise-floor-investigation.md.
     policy = {"enabled": True, "canary_enabled": True,
               "max_outcomes_added": 400,
-              # ONE-TIME WIDENING (2026-07-31). The export filter stops bare
-              # structural labels reaching the active ontology, and the active
-              # ontology already contains 54 of them, so the first adoption after
-              # the change is a REMOVAL of 54 — over the standing budget of 25,
-              # which would churn-reject it forever (a rejected proposal never
-              # becomes the baseline, so the next batch proposes the same
-              # removal). 100 covers the known 54 with headroom and nothing more.
-              # RESTORE TO 25 once the re-baseline adoption has gone through;
-              # restore_strict() already puts it back to 0 at the end of the run.
-              "max_outcomes_removed": 100,
-              # Widened with the SAME one-time rationale as max_outcomes_removed
-              # and for the same adoption: the 59 excluded structural labels carry
-              # 1,694 characteristics between them (anexa_1 alone has 220). Raising
-              # the outcome budget alone was not enough — that was not even the
-              # binding constraint. RESTORE TO 80 after the re-baseline.
-              "max_characteristics_removed": 2000,
+              # RESTORED 2026-07-31 after the structural-label re-baseline
+              # adopted (batch 3 of the 1683 run: 59 outcomes and 1,694
+              # characteristics removed, canary passed at 48). The widening was
+              # for that one adoption; leaving it open would let an accidental
+              # mass-removal through unnoticed, which is the thing this budget
+              # exists to stop.
+              "max_outcomes_removed": 25,
+              "max_characteristics_removed": 80,
               "max_outcomes_added_per_chunk": 3.0,
               "canary_max_new_gaps": 50}
     for k, v in policy.items():
