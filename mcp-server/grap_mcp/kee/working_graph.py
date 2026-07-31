@@ -9,6 +9,8 @@ ontology in the same schema as reconcile. No LLM here.
 from __future__ import annotations
 
 import hashlib
+import json
+import logging
 import tempfile
 import time
 from dataclasses import dataclass, field
@@ -21,6 +23,8 @@ from . import reconcile as rc
 from .graph_store import GraphStore, GraphState
 from .. import session
 from ..entity_index import EntityIndex
+
+logger = logging.getLogger("grap-mcp.kee")
 
 EMBED_BATCH = 128     # texts per /embeddings request; bounds payload + peak memory
 REL_VOCAB_CAP = 40    # most-frequent relation types injected into extraction context
@@ -92,6 +96,8 @@ class WorkingGraph:
         self.concept_hashes: Dict[int, str] = {}           # node -> hex content_hash from core (provenance + dedup)
         self._hash_to_node: Dict[str, int] = {}            # content hash -> node for exact dedup
         self._vec_cache: Dict[str, List[float]] = {}       # name -> embedding (see _prefetch_vectors)
+        self._char_tokens_mem: Dict[str, List[str]] = {}   # content hash -> dedup'd tokens
+        self._ccdb = None                                  # sqlite sidecar for the above
 
     # ---- union-find (component tracking for bridge signals) ----
     def _find(self, x: int) -> int:
@@ -293,6 +299,12 @@ class WorkingGraph:
     def close(self) -> None:
         """Release the sqlite handle and, if we created it, remove the temp dir."""
         self.idx.close()
+        if getattr(self, "_ccdb", None) is not None:
+            try:
+                self._ccdb.close()
+            except Exception:
+                pass
+            self._ccdb = None
         if self._owned_workdir:
             import shutil
             shutil.rmtree(self._dir, ignore_errors=True)
@@ -556,6 +568,69 @@ class WorkingGraph:
                     wanted.append(hits[0])
         return self._context_from_nodes(wanted)
 
+    # ---- characteristic-token memo ---------------------------------------
+    #
+    # Lives in its own sqlite sidecar rather than in graph_store.db. It is a
+    # derived artifact: deleting the file costs one slow batch and nothing else,
+    # whereas putting a cache in the truth store means a schema migration and a
+    # way for a cache bug to look like data loss.
+
+    def _char_cache_db(self):
+        if getattr(self, "_ccdb", None) is None:
+            import sqlite3
+            path = Path(self._dir) / "char_tokens_cache.db"
+            self._ccdb = sqlite3.connect(str(path))
+            self._ccdb.execute("CREATE TABLE IF NOT EXISTS char_tokens ("
+                               "key TEXT PRIMARY KEY, tokens TEXT NOT NULL)")
+            self._ccdb.commit()
+        return self._ccdb
+
+    @staticmethod
+    def _char_cache_key(raw_chars: List[str], threshold: float) -> str:
+        # Order matters to _dedup_strings (first-seen wins), so hash the list as
+        # given rather than a sorted copy. The threshold is part of the key
+        # because it changes the clustering.
+        h = hashlib.sha1()
+        h.update(f"{threshold:.6f}\x00".encode("utf-8"))
+        for c in raw_chars:
+            h.update(c.encode("utf-8", "replace"))
+            h.update(b"\x00")
+        return h.hexdigest()
+
+    def _cached_char_tokens(self, raw_chars: List[str]) -> List[str]:
+        if not raw_chars:
+            return []
+        key = self._char_cache_key(raw_chars, self.merge_threshold)
+        mem = self._char_tokens_mem.get(key)
+        if mem is not None:
+            return list(mem)
+        try:
+            row = self._char_cache_db().execute(
+                "SELECT tokens FROM char_tokens WHERE key=?", (key,)).fetchone()
+        except Exception:
+            row = None
+        if row:
+            toks = json.loads(row[0])
+            self._char_tokens_mem[key] = toks
+            return list(toks)
+        clusters = rc._dedup_strings(raw_chars, self.embedder, self.merge_threshold)
+        toks: List[str] = []
+        seen: Set[str] = set()
+        for c_can, _members in clusters:
+            tok = rc.tokenize(c_can)
+            if tok and tok not in seen:
+                seen.add(tok)
+                toks.append(tok)
+        self._char_tokens_mem[key] = toks
+        try:
+            db = self._char_cache_db()
+            db.execute("INSERT OR REPLACE INTO char_tokens(key, tokens) VALUES (?,?)",
+                       (key, json.dumps(toks, ensure_ascii=False)))
+            db.commit()
+        except Exception:
+            logger.debug("char token cache write failed; continuing", exc_info=True)
+        return list(toks)
+
     def to_candidate_ontology(self, version: str = "kee-candidate") -> dict:
         # rel_vocab may contain types whose edges were all retracted; recompute.
         self.rel_vocab = []
@@ -574,14 +649,18 @@ class WorkingGraph:
             raw_chars = self.chars.get(node, [])
             # Reuse reconcile's (package-private) clustering to collapse near-dup
             # characteristics, matching the legacy path's behavior exactly.
-            char_clusters = rc._dedup_strings(raw_chars, self.embedder, self.merge_threshold)
-            char_tokens: List[str] = []
-            seen: Set[str] = set()
-            for c_can, _members in char_clusters:
-                tok = rc.tokenize(c_can)
-                if tok and tok not in seen:
-                    seen.add(tok)
-                    char_tokens.append(tok)
+            #
+            # Memoized on the CONTENT of the characteristic list, because this
+            # ran for every concept on every batch: 6,233 embedding round-trips
+            # at 0.226s = 23.5 minutes per batch, re-deriving 32,528
+            # characteristics of which ~50 were new. It is also the term that
+            # made per-chunk cost grow with ontology size (114s -> 170s as
+            # concepts went 5,452 -> 8,025).
+            #
+            # Keyed by content, not by node id: `to_state()` renumbers concepts
+            # densely on every save, so a node-keyed cache would miss constantly
+            # while looking like it worked.
+            char_tokens = self._cached_char_tokens(raw_chars)
             base = rc.tokenize(label) or "concept"
             oid, n = base, 2
             while oid in used:

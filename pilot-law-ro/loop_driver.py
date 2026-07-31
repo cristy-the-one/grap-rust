@@ -398,6 +398,8 @@ def main():
                 "gaps_delta": gaps.get("delta"),
                 "context_mode": ext.get("context_mode"),
                 "quality": ext.get("quality"),
+                "step_s": rep.get("step_s"),
+                "phase_s": ext.get("phase_s"),
                 "staged_docs": len(staged),
                 "staged_chunks": staged_chunks,
                 "sec_per_chunk": round(dt / max(1, (ext.get("added") or 1)), 1),
@@ -426,6 +428,10 @@ def main():
                     print(f"        !! QUALITY ALARM: {a}", flush=True)
             print(f"        cost: {row['sec_per_chunk']}s/chunk  rss={row['rss_mb']}MB",
                   flush=True)
+            if row.get("step_s") or row.get("phase_s"):
+                parts = [f"{k}={v}" for k, v in (row.get("step_s") or {}).items()]
+                parts += [f"{k}={v}" for k, v in (row.get("phase_s") or {}).items()]
+                print("        where: " + "  ".join(parts), flush=True)
             if (row.get("canary_new_gaps") or 0) >= CANARY_WARN:
                 print(f"        !! canary regressions {row['canary_new_gaps']} "
                       f">= warn threshold {CANARY_WARN}", flush=True)

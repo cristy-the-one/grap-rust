@@ -1600,6 +1600,16 @@ def run_pipeline(config_path: str = "pipeline.json") -> dict:
     except Exception as e:
         return {"status": "error", "message": f"cannot read config '{config_path}': {e}"}
     report = {"status": "ok", "steps": {}}
+    # Wall-clock per pipeline step. A batch is ~69 minutes and until now the
+    # only visible number was the total, so "which part is slow" was answered by
+    # reasoning rather than measurement — and the reasoning was wrong twice.
+    step_s: Dict[str, float] = {}
+    _step_t = time.time()
+
+    def _mark(name: str) -> None:
+        nonlocal _step_t
+        step_s[name] = round(time.time() - _step_t, 1)
+        _step_t = time.time()
     try:
         kgp = cfg.get("kg_path")
         if not kgp:
@@ -1626,6 +1636,7 @@ def run_pipeline(config_path: str = "pipeline.json") -> dict:
                              "nodes_removed": rr.get("nodes_removed"),
                              "skipped": rr.get("skipped")})
         report["steps"]["evidence"] = ingested
+        _mark("evidence")
         if ingested:
             # Latest-state alarm feed: gap detection against a KG that holds
             # zero evidence silently reports every characteristic as a gap
@@ -1673,7 +1684,9 @@ def run_pipeline(config_path: str = "pipeline.json") -> dict:
                     "promoted": out.get("promoted"),
                     "relations_recovered": out.get("relations_recovered"),
                     "parked": out.get("parked"),
-                    "quarantined": out.get("quarantined")}
+                    "quarantined": out.get("quarantined"),
+                    "phase_s": out.get("phase_s")}
+                _mark("extract")
             elif ext.get("models"):
                 rr = extract_ontology_nversion(ext["docs_path"],
                                                models=ext["models"],
@@ -1733,6 +1746,7 @@ def run_pipeline(config_path: str = "pipeline.json") -> dict:
                     except Exception:
                         logger.warning("audit record_event failed for gap_delta",
                                        exc_info=True)
+            _mark("gaps")
             report["steps"]["gaps"] = step
 
         if cfg.get("maintenance"):
@@ -1743,10 +1757,14 @@ def run_pipeline(config_path: str = "pipeline.json") -> dict:
                 "pipeline_run", "ok" if report["status"] == "ok" else "failed")
         except Exception:
             pass
+        report["step_s"] = step_s
+        logger.info("run_pipeline steps: %s",
+                    " ".join(f"{k}={v}s" for k, v in step_s.items()))
         return report
     except Exception as e:
         logger.exception("run_pipeline failed")
-        return {"status": "error", "message": str(e), "steps": report.get("steps")}
+        return {"status": "error", "message": str(e), "steps": report.get("steps"),
+                "step_s": step_s}
 
 
 @tiered

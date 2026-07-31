@@ -409,3 +409,85 @@ def test_quarantine_survives_save_and_reopen(tmp_path):
         assert wg2.chunk_failures["bad#1"]["attempts"] == 3
     finally:
         wg2.close()
+
+
+# ---- characteristic-token memo ---------------------------------------------
+#
+# to_candidate_ontology called _dedup_strings for EVERY concept on EVERY batch:
+# 6,233 embedding round-trips at 0.226s = 23.5 minutes per batch, re-deriving
+# 32,528 characteristics of which ~50 were new. It was also the term that made
+# per-chunk cost grow with ontology size.
+
+class _CountingEmbedder(HashingEmbedder):
+    def __init__(self):
+        super().__init__()
+        self.calls = 0
+        self.texts = 0
+
+    def embed(self, texts):
+        self.calls += 1
+        self.texts += len(texts)
+        return super().embed(texts)
+
+
+def test_candidate_ontology_does_not_re_embed_unchanged_characteristics(tmp_path):
+    emb = _CountingEmbedder()
+    wg = WorkingGraph(emb, workdir=str(tmp_path), merge_threshold=0.9)
+    try:
+        for i in range(5):
+            wg.upsert_fragment({"source": f"s#{i}",
+                                "outcomes": [{"name": f"Concept {i}",
+                                              "characteristics": [f"alpha {i}", f"beta {i}"]}],
+                                "relations": []}, f"s#{i}")
+        wg.to_candidate_ontology("v1")
+        after_first = emb.calls
+        assert after_first > 0
+        # Nothing changed: the second export must not touch the embedder at all.
+        wg.to_candidate_ontology("v2")
+        assert emb.calls == after_first, (
+            f"re-derived unchanged characteristics: {emb.calls - after_first} extra call(s)")
+    finally:
+        wg.close()
+
+
+def test_memo_survives_reopen(tmp_path):
+    """The cache is a sqlite sidecar, so a fresh process still skips the work —
+    the loop driver restarts every launch, so an in-memory-only memo would pay
+    the full cost on the first batch of every run."""
+    emb = _CountingEmbedder()
+    wg = WorkingGraph(emb, workdir=str(tmp_path), merge_threshold=0.9)
+    try:
+        wg.upsert_fragment({"source": "s#0",
+                            "outcomes": [{"name": "Thing", "characteristics": ["x", "y"]}],
+                            "relations": []}, "s#0")
+        wg.to_candidate_ontology("v1")
+        wg.save()
+    finally:
+        wg.close()
+    emb2 = _CountingEmbedder()
+    wg2 = WorkingGraph.open(str(tmp_path), emb2, merge_threshold=0.9)
+    try:
+        before = emb2.calls
+        wg2.to_candidate_ontology("v2")
+        assert emb2.calls == before, "reopened graph re-embedded cached characteristics"
+    finally:
+        wg2.close()
+
+
+def test_changed_characteristics_are_re_derived(tmp_path):
+    """The memo is keyed on content, so a real change must miss it."""
+    emb = _CountingEmbedder()
+    wg = WorkingGraph(emb, workdir=str(tmp_path), merge_threshold=0.9)
+    try:
+        wg.upsert_fragment({"source": "s#0",
+                            "outcomes": [{"name": "Thing", "characteristics": ["x"]}],
+                            "relations": []}, "s#0")
+        wg.to_candidate_ontology("v1")
+        base = emb.calls
+        wg.upsert_fragment({"source": "s#1",
+                            "outcomes": [{"name": "Thing", "characteristics": ["brand new"]}],
+                            "relations": []}, "s#1")
+        wg.to_candidate_ontology("v2")
+        assert emb.calls > base, "changed characteristics were served from the memo"
+    finally:
+        wg.close()

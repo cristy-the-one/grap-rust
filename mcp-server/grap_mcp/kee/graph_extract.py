@@ -160,12 +160,20 @@ def extend_graph_ontology(workdir: str, docs_path: str, provider, embedder, *,
             if progress is not None:
                 progress(ev)
 
+        # Per-phase timing. The optimisation work of 2026-07-31 had to start by
+        # MEASURING where a 69-minute batch went, and the only honest answer
+        # available was "sec_per_chunk is rising". Phases are cheap to time and
+        # expensive to guess at — the first guess (O(n^2) clustering) was wrong;
+        # the cost was 6,233 embedding round-trips.
+        phase: Dict[str, float] = {}
+        _t = time.time()
         read_stats: Dict[str, Any] = {}
         chunks = read_chunks(docs_path, max_files=max_files, chunk_chars=chunk_chars,
                              stats=read_stats)
         skipped_ids = set(read_stats.get("tabular_skipped_ids") or [])
         current = {src: text for (src, text) in chunks}
         hashes = {src: incremental.chunk_hash(text) for src, text in current.items()}
+        phase["read_chunks_s"] = round(time.time() - _t, 1)
         prev = dict(wg.manifest)
 
         new = [s for s in current if s not in prev]
@@ -191,6 +199,7 @@ def extend_graph_ontology(workdir: str, docs_path: str, provider, embedder, *,
         _emit({"phase": "diff", "new": len(new), "changed": len(changed),
                "removed": len(removed)})
         n = len(to_extract)
+        _t = time.time()
         since_ckpt = 0
         quarantined: List[dict] = []
         qm = QualityMonitor(class_vocab=extract.CLASS_VOCAB)
@@ -244,6 +253,8 @@ def extend_graph_ontology(workdir: str, docs_path: str, provider, embedder, *,
         # candidate ontology is built so the recovered edges are proposed with
         # it. Frequency (`min_refs`) is the gate; anything still ungrounded stays
         # parked, so this only ever adds grounded structure.
+        phase["extract_s"] = round(time.time() - _t, 1)
+        _t = time.time()
         promo = {}
         if promote_min_refs > 0:
             try:
@@ -255,6 +266,7 @@ def extend_graph_ontology(workdir: str, docs_path: str, provider, embedder, *,
                 logger.exception("endpoint promotion failed; continuing")
                 promo = {}
 
+        phase["promote_s"] = round(time.time() - _t, 1)
         quality = qm.report()
         # Dead letters are part of the run's quality picture: they are the work
         # the factory decided to stop paying for, and nobody sees them unless
@@ -286,8 +298,14 @@ def extend_graph_ontology(workdir: str, docs_path: str, provider, embedder, *,
         # candidate ontology is a derivative; a failure computing the derivative
         # must not cost the truth. `save()` itself follows the same rule
         # internally, persisting the store before rebuilding the projection.
+        _t = time.time()
         wg.save()
+        phase["save_s"] = round(time.time() - _t, 1)
+        _t = time.time()
         ontology = wg.to_candidate_ontology(version)
+        phase["candidate_ontology_s"] = round(time.time() - _t, 1)
+        logger.info("extend_graph_ontology phases: %s",
+                    " ".join(f"{k}={v}" for k, v in phase.items()))
         _emit({"phase": "done", "added": len(new), "changed": len(changed),
                "removed": len(removed), "concepts": len(wg._live_concepts()),
                "edges": len(wg.relations), "relooks": relooks, "parked": len(wg.parked)})
@@ -302,6 +320,7 @@ def extend_graph_ontology(workdir: str, docs_path: str, provider, embedder, *,
             "quality": quality,
             "context_mode": extract.CONTEXT_MODE,
             "quarantined": quarantined,
+            "phase_s": phase,
         }
     finally:
         wg.close()
