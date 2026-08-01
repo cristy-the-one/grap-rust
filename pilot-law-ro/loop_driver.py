@@ -26,9 +26,9 @@ DOCS = PILOT / "docs"
 POOL = ROOT / "real-data-law-ro"
 # Phase 2 (2026-07-24): finer 5-doc batches, continue 400 -> 600. Separate
 # metrics file so the 10-doc study (loop-metrics-10doc.json) stays intact.
-METRICS = PILOT / "loop-metrics-1683.json"
+METRICS = PILOT / "loop-metrics-1725.json"
 
-TOTAL_DOCS = 1683
+TOTAL_DOCS = 1725
 # Batches are sized by CHUNKS, not documents — a chunk is ~95s of decode, a
 # document is anywhere from 1 to 248 of them. 25 keeps a batch at the wall-time
 # the count-based runs actually produced (10 docs ~ 22 chunks ~ 35 min), so the
