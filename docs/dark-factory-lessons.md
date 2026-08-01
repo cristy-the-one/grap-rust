@@ -567,6 +567,90 @@ more a quantitative indicator is used for decisions, the more it distorts what i
 was meant to track. Also *garbage in, gospel out* — a dashboard laundering a
 number into a belief.
 
+## IX. The same bug three times - and the instrument that found it
+
+Three days of optimisation and stabilisation work produced one uncomfortable
+pattern: **almost every confident hypothesis about this system has been wrong,
+and almost every measurement has been cheap.**
+
+### The recurring defect
+
+A single defect appeared in three unrelated places, each costing more as the
+graph grew:
+
+| site | symptom | cost when found |
+|---|---|---|
+| concept-name resolution | one embed round-trip per name | fixed early; docstring records 42x |
+| characteristic dedup | one round-trip per **concept**, every batch | 6,233 requests = 23.5 min/batch |
+| parked-endpoint re-resolution | one round-trip per **endpoint**, every batch | 6,727 requests = 20 min/batch |
+
+All three are the same shape: *a per-item network call inside a loop over a
+collection that grows with the corpus*. The third sat three lines below a
+function whose docstring explains the mistake and fixes it for a different set of
+names. Knowing the lesson, writing it down, and fixing it once did not prevent
+writing it again.
+
+**The principle.** A per-item round-trip is not a performance detail, it is a
+latent scaling wall: correct at 5,000 items, fatal at 24,000. Batching belongs at
+the **transport**, not at the call sites - every caller that has to remember is a
+caller that can forget.
+
+### Generic labels are attractors
+
+Twice the ontology was damaged by names that are *categories rather than
+entities*, both times through embedding-similarity resolution pulling many things
+into one node:
+
+- **Class vocabulary.** A reference-dense chunk pushed the model into organising
+  by type: `NormativeAct` and `AuthoritativeBody` became outcomes, and the real
+  acts became their characteristics.
+- **Document structure.** Nearly every Romanian act has an `Articolul 2` and an
+  `Anexa 1`, so they merged across documents. `Articolul 2` became one concept
+  fed by **116 different laws**; `anexa_1` produced **41 of 55** canary
+  regressions - the same 41 across three consecutive failures.
+
+**The principle.** In a corpus of similar documents, any label that recurs
+*because of form rather than content* becomes a super-node. The test is not "is
+this a valid name" but "would this name mean the same thing in another
+document?" `Hotararea Guvernului nr. 753/1998` passes; `Articolul 2` does not.
+
+**Corollary, learned the hard way:** filtering intake does not fix an existing
+inventory. The intake filter changed the canary not at all, because the 59 labels
+already in the graph were the ones doing the damage. Two remedies for one
+finding - the diagnosis was right the first time and the *scope* was wrong.
+
+### Absence has meaning
+
+Enabling the tabular filter destroyed 135 concepts. The chunks were not deleted
+from the corpus, merely no longer *offered* for extraction - but the sync logic
+computes `removed = manifest - current`, and "not offered" and "deleted" are the
+same absence. Everything those chunks had contributed was retracted.
+
+**The principle.** When a stage decides what to look at, it changes the meaning
+of "missing" for every stage downstream that diffs against a manifest. A filter
+is not a read-only operation.
+
+### What the instrumentation was worth
+
+Per-phase timing took about twenty minutes to add. In its first batch it
+overturned three hypotheses, each of which was ready to be implemented:
+
+- *"Three gap runs per batch is a major fixed cost"* -> gap detection is **85 s**,
+  2% of a batch.
+- *"`_would_resolve` is the hot path"* -> 12,228 calls, **0.25 s** total.
+- *"Memoize it"* -> wrong remedy; the fix was batched prefetch.
+
+Each was plausible, structurally sound, and confidently argued. The measured
+answer - a function nobody suspected, at 28% of the batch - was on nobody's list.
+
+**The principle.** In a system with this many interacting parts, reasoning about
+cost generates hypotheses; it does not choose between them. Cost questions are
+answered by a timer, and the timer should be permanent: the `where:` line now
+prints under every batch, so the next surprise is visible the day it appears
+rather than the week someone goes looking.
+
+---
+
 ## Field data — round 3: the distillation arc (2026-07-25)
 
 Five iterations, each pre-registered, run in a single day at seconds-to-minutes of
@@ -693,90 +777,6 @@ not a later refinement.
 - **Idempotency of adoption vs the working graph.** The working graph compounds
   monotonically while the active ontology can roll back; the divergence between
   them under repeated batches deserves a clean mental model.
-
----
-
-## IX. The same bug three times - and the instrument that found it
-
-Three days of optimisation and stabilisation work produced one uncomfortable
-pattern: **almost every confident hypothesis about this system has been wrong,
-and almost every measurement has been cheap.**
-
-### The recurring defect
-
-A single defect appeared in three unrelated places, each costing more as the
-graph grew:
-
-| site | symptom | cost when found |
-|---|---|---|
-| concept-name resolution | one embed round-trip per name | fixed early; docstring records 42x |
-| characteristic dedup | one round-trip per **concept**, every batch | 6,233 requests = 23.5 min/batch |
-| parked-endpoint re-resolution | one round-trip per **endpoint**, every batch | 6,727 requests = 20 min/batch |
-
-All three are the same shape: *a per-item network call inside a loop over a
-collection that grows with the corpus*. The third sat three lines below a
-function whose docstring explains the mistake and fixes it for a different set of
-names. Knowing the lesson, writing it down, and fixing it once did not prevent
-writing it again.
-
-**The principle.** A per-item round-trip is not a performance detail, it is a
-latent scaling wall: correct at 5,000 items, fatal at 24,000. Batching belongs at
-the **transport**, not at the call sites - every caller that has to remember is a
-caller that can forget.
-
-### Generic labels are attractors
-
-Twice the ontology was damaged by names that are *categories rather than
-entities*, both times through embedding-similarity resolution pulling many things
-into one node:
-
-- **Class vocabulary.** A reference-dense chunk pushed the model into organising
-  by type: `NormativeAct` and `AuthoritativeBody` became outcomes, and the real
-  acts became their characteristics.
-- **Document structure.** Nearly every Romanian act has an `Articolul 2` and an
-  `Anexa 1`, so they merged across documents. `Articolul 2` became one concept
-  fed by **116 different laws**; `anexa_1` produced **41 of 55** canary
-  regressions - the same 41 across three consecutive failures.
-
-**The principle.** In a corpus of similar documents, any label that recurs
-*because of form rather than content* becomes a super-node. The test is not "is
-this a valid name" but "would this name mean the same thing in another
-document?" `Hotararea Guvernului nr. 753/1998` passes; `Articolul 2` does not.
-
-**Corollary, learned the hard way:** filtering intake does not fix an existing
-inventory. The intake filter changed the canary not at all, because the 59 labels
-already in the graph were the ones doing the damage. Two remedies for one
-finding - the diagnosis was right the first time and the *scope* was wrong.
-
-### Absence has meaning
-
-Enabling the tabular filter destroyed 135 concepts. The chunks were not deleted
-from the corpus, merely no longer *offered* for extraction - but the sync logic
-computes `removed = manifest - current`, and "not offered" and "deleted" are the
-same absence. Everything those chunks had contributed was retracted.
-
-**The principle.** When a stage decides what to look at, it changes the meaning
-of "missing" for every stage downstream that diffs against a manifest. A filter
-is not a read-only operation.
-
-### What the instrumentation was worth
-
-Per-phase timing took about twenty minutes to add. In its first batch it
-overturned three hypotheses, each of which was ready to be implemented:
-
-- *"Three gap runs per batch is a major fixed cost"* -> gap detection is **85 s**,
-  2% of a batch.
-- *"`_would_resolve` is the hot path"* -> 12,228 calls, **0.25 s** total.
-- *"Memoize it"* -> wrong remedy; the fix was batched prefetch.
-
-Each was plausible, structurally sound, and confidently argued. The measured
-answer - a function nobody suspected, at 28% of the batch - was on nobody's list.
-
-**The principle.** In a system with this many interacting parts, reasoning about
-cost generates hypotheses; it does not choose between them. Cost questions are
-answered by a timer, and the timer should be permanent: the `where:` line now
-prints under every batch, so the next surprise is visible the day it appears
-rather than the week someone goes looking.
 
 ---
 
