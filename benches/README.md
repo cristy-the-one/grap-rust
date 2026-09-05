@@ -14,6 +14,31 @@ cargo bench --features "fulltext,sharding,mmap"
 
 Results are written to `target/criterion/`.
 
+## Engine regression workloads
+
+`engine_workloads` needs no feature flags or Python services:
+
+```bash
+cargo bench --bench engine_workloads -- --save-baseline before
+# After an engine change:
+cargo bench --bench engine_workloads -- --baseline before
+```
+
+- `bounded_traversal`: the same reachable 32-node chain in arenas of 1K, 100K,
+  and 500K nodes. This exposes whole-arena allocation during small queries.
+- `selective_disk_search`: exactly one match in 1K, 10K, and 50K documents through
+  `OnDiskTextIndex`. The index is in its active buffer: this isolates adapter
+  overhead, not physical disk latency or a cold persisted-index open.
+- `replace_document`: repeatedly replace three terms, two shared with every
+  document. This exposes posting-list movement costs under mutation. It must
+  be paired with `tests/index_mutation.rs`; a faster index retaining obsolete
+  terms is not a valid improvement.
+
+The first two probes held returned work constant while the old implementation's
+latency grew with corpus size. See the [September engine report](../docs/engine-improvement-2026-09.md)
+for before/after numbers, regression coverage, and tradeoffs. Timing results are
+local measurements, not CI thresholds or general throughput guarantees.
+
 ## The Five Scenarios
 
 ### 1. Bitmask Pruning Benefit (`bitmask_pruning`)

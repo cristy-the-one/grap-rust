@@ -75,3 +75,7 @@ codegen-units = 1
 name = "graph_benches"
 harness = false
 required-features = ["fulltext", "sharding"]
+
+[[bench]]
+name = "engine_workloads"
+harness = false

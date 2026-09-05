@@ -4,7 +4,9 @@
 
 grap is built for the specific workload of *storing rich text nodes* and *retrieving them by traversing property-weighted relationships* with excellent pruning and hybrid text+graph ranking.
 
-It is a faithful implementation of the architecture described in [`core_graph_design.md`](./core_graph_design.md).
+Its architecture starts with [`core_graph_design.md`](./core_graph_design.md).
+The current [engine contracts and measured improvements](docs/engine-improvement-2026-09.md)
+describe the implemented behavior and where it has evolved beyond that prototype.
 
 ## Why grap?
 
@@ -15,7 +17,7 @@ Most graph libraries are either:
 
 grap is different:
 
-- **O(1) bitmask pruning** — every edge carries a 64-bit property mask. During traversal we reject entire subtrees in constant time if they cannot possibly satisfy the required properties.
+- **O(1) property-mask checks** — every edge carries a 64-bit property mask. Traversal skips edges and outgoing expansions that cannot satisfy required properties before inspecting property values.
 - **Hot topology + cold blobs** — adjacency and masks live in RAM; full text lives in a separate `BlobStore` (chunked or memory-mapped).
 - **BM25 seed selection** — text search finds high-quality starting points; the graph traversal then expands from them using strength and property filters.
 - **Ghost edges for sharding** — consistent hashing + transparent cross-shard "ghost" references let a logical graph span many shards with automatic distributed traversal and rebalancing.
@@ -38,8 +40,8 @@ fn main() {
     let topic = g.graph.properties.register("topic");
     let confidence = g.graph.properties.register("confidence");
 
-    let rust = g.add_node("Rust guarantees memory safety without garbage collection.", Some("Rust"));
-    let ownership = g.add_node("Every value has exactly one owner.", Some("Ownership"));
+    let rust = g.add_node("Rust guarantees memory safety without garbage collection.", Some("Rust"), None);
+    let ownership = g.add_node("Every value has exactly one owner.", Some("Ownership"), None);
 
     g.add_edge(rust, ownership, 0.95, vec![
         (topic, PropertyValue::Label("memory_safety".into())),
@@ -54,7 +56,7 @@ fn main() {
         0.6,                                  // min strength
         3,                                    // max depth
         20,                                   // max results
-        FusionWeights { text: 0.6, graph: 0.4 },
+        FusionWeights { text: 0.6, graph: 0.4, ..Default::default() },
     );
 
     for r in results {
@@ -157,6 +159,11 @@ grap = { version = "0.1", features = ["fulltext", "sharding"] }
 ```
 
 ## The Three Main APIs
+
+The engine owns index consistency, traversal, and ranking. Python and MCP expose
+those operations; extraction and lifecycle workflows build on them. For a focused
+development loop, run `cargo test -p grap` and
+`cargo bench --bench engine_workloads`; see [benchmark notes](benches/README.md).
 
 ### 1. `KnowledgeGraph` (always available)
 
