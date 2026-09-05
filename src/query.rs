@@ -15,7 +15,7 @@ use crate::graph::KnowledgeGraph;
 use crate::ids::{EdgeId, NodeId, PropertyTag};
 use crate::properties::{PropertyFilter, PropertyValue};
 use std::cmp::Ordering;
-use std::collections::BinaryHeap;
+use std::collections::{BinaryHeap, HashMap};
 
 /// Low-level query descriptor (mostly used internally by the traversal engine).
 #[derive(Debug, Clone)]
@@ -69,6 +69,7 @@ pub struct QueryBuilder<'g> {
     max_results: usize,
     sort_by_strength: bool,
     traversal_weight_property: Option<PropertyTag>,
+    unsatisfiable: bool,
 }
 
 impl std::fmt::Debug for QueryBuilder<'_> {
@@ -113,6 +114,7 @@ impl KnowledgeGraph {
             max_results: 100,
             sort_by_strength: true,
             traversal_weight_property: None,
+            unsatisfiable: false,
         }
     }
 
@@ -192,7 +194,7 @@ impl KnowledgeGraph {
             .collect()
     }
 
-    /// Multi-hop BFS up to `depth` hops, following only edges where
+    /// Best-first traversal up to `depth` hops, following only edges where
     /// `property == value`. Returns full [`QueryResult`] (path, depth, strength).
     ///
     /// This is a thin wrapper over [`KnowledgeGraph::find`] with
@@ -231,25 +233,34 @@ impl<'g> QueryBuilder<'g> {
     }
 
     /// Require that every edge on the path has the named property.
+    /// An unregistered name makes the query return no results.
     pub fn with_property(mut self, name: &str) -> Self {
         if let Some(tag) = self.graph.properties.get_tag(name) {
             self.filters.push((tag, PropertyFilter::Exists));
+        } else {
+            self.unsatisfiable = true;
         }
         self
     }
 
     /// Require that a property equals a specific value.
+    /// An unregistered name makes the query return no results.
     pub fn where_property(mut self, name: &str, value: PropertyValue) -> Self {
         if let Some(tag) = self.graph.properties.get_tag(name) {
             self.filters.push((tag, PropertyFilter::Equals(value)));
+        } else {
+            self.unsatisfiable = true;
         }
         self
     }
 
     /// Require that a numeric property falls inside a range.
+    /// An unregistered name makes the query return no results.
     pub fn where_in_range(mut self, name: &str, min: f64, max: f64) -> Self {
         if let Some(tag) = self.graph.properties.get_tag(name) {
             self.filters.push((tag, PropertyFilter::Range { min, max }));
+        } else {
+            self.unsatisfiable = true;
         }
         self
     }
@@ -264,11 +275,9 @@ impl<'g> QueryBuilder<'g> {
     /// Falls back to `edge.strength` for any edge that lacks the property.
     /// `min_strength` still gates on `edge.strength`, not on the property value.
     ///
-    /// **Value range:** the property value is used directly as a multiplicative
-    /// weight. For well-behaved priority ordering, values should be in `[0.0, 1.0]`
-    /// (the same convention as `edge.strength`). Values outside this range will
-    /// produce `cumulative_strength` outside `[0.0, 1.0]` and may distort heap
-    /// ordering across multi-hop traversals.
+    /// **Value range:** effective weights must be finite and in `[0.0, 1.0]`.
+    /// Edges with invalid effective weights are skipped, so extending a path
+    /// cannot increase its score and best-first ordering remains correct.
     pub fn weight_by_property(mut self, name: &str) -> Self {
         if let Some(tag) = self.graph.properties.get_tag(name) {
             self.traversal_weight_property = Some(tag);
@@ -276,7 +285,8 @@ impl<'g> QueryBuilder<'g> {
         self
     }
 
-    /// Set the minimum cumulative path strength required to keep expanding.
+    /// Skip edges whose stored strength is below this threshold.
+    /// This threshold is applied per edge, not to the cumulative path score.
     pub fn min_strength(mut self, s: f64) -> Self {
         self.min_strength = s;
         self
@@ -296,6 +306,9 @@ impl<'g> QueryBuilder<'g> {
 
     /// Execute the traversal and return ranked results.
     pub fn execute(self) -> Vec<QueryResult> {
+        if self.unsatisfiable {
+            return Vec::new();
+        }
         let mut required_mask = 0u64;
         for (tag, _) in &self.filters {
             required_mask |= 1u64 << tag.0;
@@ -313,83 +326,134 @@ impl<'g> QueryBuilder<'g> {
         self.graph.query(&q)
     }
 
-    /// Like [`execute`] but also returns the text content of each result node.
+    /// Like [`Self::execute`] but also returns the text content of each result node.
     pub fn execute_with_text(self) -> Vec<(QueryResult, &'g str)> {
         let g = self.graph;
         self.execute()
             .into_iter()
-            .map(|r| (r.clone(), g.read_blob(r.node_id)))
+            .map(|r| {
+                let text = g.read_blob(r.node_id);
+                (r, text)
+            })
             .collect()
     }
 }
 
 impl KnowledgeGraph {
-    /// The main traversal engine. See md:525 for the algorithm.
+    /// Return distinct live nodes in descending path-score order, including seeds.
+    /// Empty seeds mean all live nodes; invalid and duplicate seeds are ignored.
+    /// A zero result limit returns nothing.
+    ///
+    /// Effective edge weights must be finite and in `[0, 1]`; other weights are
+    /// skipped. Each result carries its strongest path within `max_depth` hops.
+    /// A shorter, weaker route may still expand to reach further descendants.
+    /// Exploration state is sparse and queued routes share predecessor records;
+    /// full edge paths are materialized only for returned results.
     pub fn query(&self, q: &GraphQuery) -> Vec<QueryResult> {
-        // PORT NOTE: This is a "greedy best-first" search (priority = cumulative strength product).
-        // The visited set means we take the first (highest-strength prefix) path that reaches each node.
-        // Not guaranteed to be the globally strongest path to every node (would require decrease-key Dijkstra).
-        // This matches the prototype in the design document exactly.
+        if q.max_results == 0 {
+            return Vec::new();
+        }
 
         #[derive(Debug)]
         struct QueueEntry {
             node: NodeId,
             cumulative_strength: f64,
             depth: u32,
-            path: Vec<EdgeId>,
+            parent: Option<usize>,
+            via: Option<EdgeId>,
+        }
+
+        struct PathLink {
+            parent: Option<usize>,
+            edge: EdgeId,
         }
 
         impl PartialEq for QueueEntry {
             fn eq(&self, other: &Self) -> bool {
-                self.cumulative_strength == other.cumulative_strength
+                self.cmp(other) == Ordering::Equal
             }
         }
         impl Eq for QueueEntry {}
         impl PartialOrd for QueueEntry {
             fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-                self.cumulative_strength
-                    .partial_cmp(&other.cumulative_strength)
+                Some(self.cmp(other))
             }
         }
         impl Ord for QueueEntry {
             fn cmp(&self, other: &Self) -> Ordering {
-                // Higher strength = "greater" so BinaryHeap pops strongest first.
-                self.partial_cmp(other).unwrap_or(Ordering::Equal)
+                self.cumulative_strength
+                    .total_cmp(&other.cumulative_strength)
+                    .then_with(|| other.depth.cmp(&self.depth))
+                    .then_with(|| other.node.0.cmp(&self.node.0))
+                    .then_with(|| other.parent.cmp(&self.parent))
+                    .then_with(|| other.via.cmp(&self.via))
             }
         }
 
-        let mut results = Vec::new();
-        let mut visited = vec![false; self.node_count()];
+        // A small bounded reservation avoids repeated growth for common queries
+        // without allocating in proportion to the arena or an untrusted limit.
+        let capacity = q.max_results.min(self.node_count()).min(64);
+        let mut results = Vec::with_capacity(capacity);
+        // Popped scores never increase. A prior route dominates this route iff
+        // it used no more hops. Record the smallest expanded depth per node,
+        // allowing later shorter routes to expand without emitting duplicates.
+        let mut expanded_depth: HashMap<NodeId, u32> = HashMap::with_capacity(capacity);
+        let mut paths: Vec<PathLink> = Vec::with_capacity(capacity);
         let mut heap: BinaryHeap<QueueEntry> = BinaryHeap::new();
 
-        let seeds: Vec<NodeId> = if q.seeds.is_empty() {
-            (0..self.node_count() as u32).map(NodeId).collect()
-        } else {
-            q.seeds.clone()
-        };
-
-        for seed in seeds {
-            if (seed.0 as usize) < visited.len() {
-                visited[seed.0 as usize] = true;
+        let mut push_seed = |seed| {
+            if self.is_node_deleted(seed) {
+                return;
             }
             heap.push(QueueEntry {
                 node: seed,
                 cumulative_strength: 1.0,
                 depth: 0,
-                path: Vec::new(),
+                parent: None,
+                via: None,
             });
+        };
+        if q.seeds.is_empty() {
+            for i in 0..self.node_count() {
+                push_seed(NodeId(i as u32));
+            }
+        } else {
+            for &seed in &q.seeds {
+                push_seed(seed);
+            }
         }
 
         while let Some(entry) = heap.pop() {
-            results.push(QueryResult {
-                node_id: entry.node,
-                path: entry.path.clone(),
-                cumulative_strength: entry.cumulative_strength,
-                depth: entry.depth,
+            let previous = expanded_depth.get(&entry.node).copied();
+            if previous.is_some_and(|depth| depth <= entry.depth) {
+                continue;
+            }
+            expanded_depth.insert(entry.node, entry.depth);
+            let tail = entry.via.map(|edge| {
+                let index = paths.len();
+                paths.push(PathLink {
+                    parent: entry.parent,
+                    edge,
+                });
+                index
             });
-
-            if results.len() >= q.max_results {
-                break;
+            if previous.is_none() {
+                let mut path = Vec::with_capacity(entry.depth as usize);
+                let mut cursor = tail;
+                while let Some(index) = cursor {
+                    path.push(paths[index].edge);
+                    cursor = paths[index].parent;
+                }
+                path.reverse();
+                results.push(QueryResult {
+                    node_id: entry.node,
+                    path,
+                    cumulative_strength: entry.cumulative_strength,
+                    depth: entry.depth,
+                });
+                if results.len() >= q.max_results {
+                    break;
+                }
             }
             if entry.depth >= q.max_depth {
                 continue;
@@ -411,24 +475,22 @@ impl KnowledgeGraph {
                 if !edge.matches_mask(q.required_mask) {
                     continue;
                 }
-                if edge.strength < q.min_strength {
+                if !edge.strength.is_finite() || edge.strength < q.min_strength {
                     continue;
                 }
-                // Detailed filters (stub for now - full impl in Phase 1 completion)
+                // Detailed property values are checked only after mask pruning.
                 if !self.edge_passes_filters(edge, &q.property_filters) {
                     continue;
                 }
 
                 let target = edge.target;
-                if (target.0 as usize) < visited.len() && visited[target.0 as usize] {
+                if self.is_node_deleted(target)
+                    || expanded_depth
+                        .get(&target)
+                        .is_some_and(|&depth| depth <= entry.depth + 1)
+                {
                     continue;
                 }
-                if (target.0 as usize) < visited.len() {
-                    visited[target.0 as usize] = true;
-                }
-
-                let mut new_path = entry.path.clone();
-                new_path.push(edge_id);
 
                 let w = match q.traversal_weight_property {
                     Some(tag) => edge
@@ -443,22 +505,21 @@ impl KnowledgeGraph {
                         .unwrap_or(edge.strength),
                     None => edge.strength,
                 };
+                if !w.is_finite() || !(0.0..=1.0).contains(&w) {
+                    continue;
+                }
                 heap.push(QueueEntry {
                     node: target,
                     cumulative_strength: entry.cumulative_strength * w,
                     depth: entry.depth + 1,
-                    path: new_path,
+                    parent: tail,
+                    via: Some(edge_id),
                 });
             }
         }
 
-        if q.sort_by_strength {
-            results.sort_by(|a, b| {
-                b.cumulative_strength
-                    .partial_cmp(&a.cumulative_strength)
-                    .unwrap_or(Ordering::Equal)
-            });
-        }
+        // The heap already emits nonincreasing strengths, satisfying both
+        // sort_by_strength=true and the unspecified ordering when it is false.
         results
     }
 
@@ -508,9 +569,6 @@ impl KnowledgeGraph {
         true
     }
 }
-
-// The internal Edge type is currently private in graph.rs; we need a small bridge.
-// For the initial skeleton we accept the stub above. Real impl will move the fn or make Edge pub(crate).
 
 #[cfg(test)]
 mod weight_property_tests {
