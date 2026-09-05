@@ -1,6 +1,31 @@
 use grap::{IndexedKnowledgeGraph, InvertedIndex, NodeId, TextIndex};
 
 #[test]
+fn disk_replacement_mapping_survives_save_load_and_vacuum() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut index = grap::OnDiskTextIndex::new();
+    index.index_document(NodeId(17), "obsolete amber violet");
+    index.index_document(NodeId(3), "stable amber violet");
+    index.save_to_dir(dir.path()).unwrap();
+    // Replace through TextIndex itself, without a separate delete call.
+    index.index_document(NodeId(17), "fresh indigo");
+    assert!(index.search("obsolete", 1).is_empty());
+    assert_eq!(index.phrase_search("amber violet", 10, 1)[0].0, NodeId(3));
+    index.save_to_dir(dir.path()).unwrap();
+    let mut loaded = <grap::OnDiskTextIndex as TextIndex>::load_from_dir(dir.path()).unwrap();
+    assert_eq!(loaded.search("fresh", 1)[0].0, NodeId(17));
+    loaded.delete_document(NodeId(17));
+    loaded.vacuum();
+    assert!(loaded.search("fresh", 10).is_empty());
+    assert_eq!(loaded.search("stable", 1)[0].0, NodeId(3));
+    loaded.index_document(NodeId(17), "reborn amber violet");
+    loaded.save_to_dir(dir.path()).unwrap();
+    let reloaded = <grap::OnDiskTextIndex as TextIndex>::load_from_dir(dir.path()).unwrap();
+    assert_eq!(reloaded.search("reborn", 1)[0].0, NodeId(17));
+    assert_eq!(reloaded.phrase_search("amber violet", 10, 10).len(), 2);
+}
+
+#[test]
 fn replacement_matches_a_fresh_index_including_phrase_positions_and_scores() {
     let mut edited = InvertedIndex::new();
     edited.index_document(NodeId(8), "obsolete amber violet amber");

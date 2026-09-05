@@ -33,6 +33,8 @@ pub struct OnDiskTextIndex {
     /// Maps NodeId.0 → global doc id returned by the engine.
     /// Persisted to `node_map.json` on save, restored on load.
     node_to_global: std::collections::HashMap<u32, u32>,
+    // Maintain the reverse lookup on writes/loads, not once per search.
+    global_to_node: std::collections::HashMap<u32, u32>,
 }
 
 impl std::fmt::Debug for OnDiskTextIndex {
@@ -50,6 +52,7 @@ impl OnDiskTextIndex {
             engine: std::sync::Arc::new(std::sync::Mutex::new(OnDiskIndex::new())),
             tokenizer: Box::new(DefaultTokenizer::new()),
             node_to_global: std::collections::HashMap::new(),
+            global_to_node: std::collections::HashMap::new(),
         }
     }
 
@@ -63,6 +66,7 @@ impl OnDiskTextIndex {
             engine: std::sync::Arc::new(std::sync::Mutex::new(engine)),
             tokenizer: Box::new(DefaultTokenizer::new()),
             node_to_global: std::collections::HashMap::new(),
+            global_to_node: std::collections::HashMap::new(),
         }
     }
 
@@ -132,6 +136,7 @@ impl Default for OnDiskTextIndex {
 
 impl TextIndex for OnDiskTextIndex {
     fn index_document(&mut self, node: NodeId, text: &str) {
+        self.delete_document(node);
         // The engine stores terms verbatim, so normalization (lowercase +
         // diacritic folding) MUST happen here on both the write and read
         // paths — otherwise `sănătate` in a document is unreachable by a
@@ -145,9 +150,13 @@ impl TextIndex for OnDiskTextIndex {
         let positions: Vec<Vec<u32>> = tokens.iter().map(|(_, pos)| vec![*pos]).collect();
         let global_id = self.engine.lock().unwrap().add_document(&terms, &positions);
         self.node_to_global.insert(node.0, global_id);
+        self.global_to_node.insert(global_id, node.0);
     }
 
     fn search(&self, query: &str, max_results: usize) -> Vec<(NodeId, f64)> {
+        if max_results == 0 {
+            return Vec::new();
+        }
         let tokens = self.tokenizer.tokenize(query);
         let normed: Vec<String> = tokens
             .iter()
@@ -158,23 +167,20 @@ impl TextIndex for OnDiskTextIndex {
             return vec![];
         }
         let raw = self.engine.lock().unwrap().search(&terms);
-        // Build reverse map: global_id → NodeId
-        let reverse: std::collections::HashMap<u32, u32> = self
-            .node_to_global
-            .iter()
-            .map(|(&nid, &gid)| (gid, nid))
-            .collect();
         raw.into_iter()
-            .take(max_results)
             .filter_map(|(global_id, score)| {
-                reverse
+                self.global_to_node
                     .get(&global_id)
                     .map(|&nid| (NodeId(nid), score as f64))
             })
+            .take(max_results)
             .collect()
     }
 
     fn phrase_search(&self, phrase: &str, max_gap: u32, max_results: usize) -> Vec<(NodeId, f64)> {
+        if max_results == 0 {
+            return Vec::new();
+        }
         let tokens = self.tokenizer.tokenize(phrase);
         let normed: Vec<String> = tokens
             .iter()
@@ -185,18 +191,13 @@ impl TextIndex for OnDiskTextIndex {
             return vec![];
         }
         let raw = self.engine.lock().unwrap().phrase_search(&terms, max_gap);
-        let reverse: std::collections::HashMap<u32, u32> = self
-            .node_to_global
-            .iter()
-            .map(|(&nid, &gid)| (gid, nid))
-            .collect();
         raw.into_iter()
-            .take(max_results)
             .filter_map(|(global_id, score)| {
-                reverse
+                self.global_to_node
                     .get(&global_id)
                     .map(|&nid| (NodeId(nid), score as f64))
             })
+            .take(max_results)
             .collect()
     }
 
@@ -213,6 +214,7 @@ impl TextIndex for OnDiskTextIndex {
     fn delete_document(&mut self, node: NodeId) {
         if let Some(&global_id) = self.node_to_global.get(&node.0) {
             self.engine.lock().unwrap().delete(global_id);
+            self.global_to_node.remove(&global_id);
         }
     }
 
@@ -296,6 +298,10 @@ impl TextIndex for OnDiskTextIndex {
         Ok(Box::new(Self {
             engine: std::sync::Arc::new(std::sync::Mutex::new(engine)),
             tokenizer: Box::new(crate::index::DefaultTokenizer::new()),
+            global_to_node: node_to_global
+                .iter()
+                .map(|(&node, &global)| (global, node))
+                .collect(),
             node_to_global,
         }))
     }
