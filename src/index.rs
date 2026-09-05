@@ -246,7 +246,9 @@ pub enum FusionMode {
 
 impl Default for FusionMode {
     fn default() -> Self {
-        FusionMode::Rrf { k: crate::ranking::DEFAULT_RRF_K }
+        FusionMode::Rrf {
+            k: crate::ranking::DEFAULT_RRF_K,
+        }
     }
 }
 
@@ -484,8 +486,11 @@ impl TextIndex for InvertedIndex {
     }
 
     fn delete_document(&mut self, node: NodeId) {
-        // The current in-memory index does not have delete yet (0.2 work)
-        let _ = node;
+        InvertedIndex::delete_document(self, node);
+    }
+
+    fn is_document_deleted(&self, node: NodeId) -> bool {
+        matches!(self.doc_terms.get(node.0 as usize), Some(None))
     }
 }
 
@@ -501,6 +506,9 @@ pub struct InvertedIndex {
     index: HashMap<TermId, PostingList>,
     document_count: u32,
     doc_lengths: Vec<u32>,
+    // Reverse membership makes replacement/deletion touch only this document's
+    // terms, rather than scan the vocabulary. Some(empty) is a live empty doc.
+    doc_terms: Vec<Option<Vec<TermId>>>,
     /// Running sum of all `doc_lengths`, maintained incrementally so
     /// `avg_doc_length` is O(1) per insert instead of an O(N) re-sum (which
     /// made bulk ingest O(N^2)).
@@ -522,13 +530,15 @@ impl InvertedIndex {
             index: HashMap::new(),
             document_count: 0,
             doc_lengths: Vec::new(),
+            doc_terms: Vec::new(),
             total_tokens: 0,
             avg_doc_length: 0.0,
             tokenizer,
         }
     }
 
-    /// Index a document's text. Called automatically by `IndexedKnowledgeGraph::add_node`.
+    /// Index a document's text, replacing any previous text at the same node id.
+    /// Called automatically by `IndexedKnowledgeGraph::add_node`.
     pub fn index_document(&mut self, node_id: NodeId, text: &str) {
         let tokens = self.tokenizer.tokenize(text);
 
@@ -541,8 +551,10 @@ impl InvertedIndex {
         let doc_length = tokens.len() as u32;
         let idx = node_id.0 as usize;
 
+        self.delete_document(node_id);
         if idx >= self.doc_lengths.len() {
             self.doc_lengths.resize(idx + 1, 0);
+            self.doc_terms.resize_with(idx + 1, || None);
         }
         // Maintain `total_tokens` incrementally: subtract the previous length for
         // this slot (0 if new/just-resized) and add the new one. Equivalent to the
@@ -550,26 +562,60 @@ impl InvertedIndex {
         let old_length = self.doc_lengths[idx];
         self.total_tokens = self.total_tokens - old_length as u64 + doc_length as u64;
         self.doc_lengths[idx] = doc_length;
-        self.document_count = self.document_count.max(idx as u32 + 1);
+        self.document_count += 1;
 
         self.avg_doc_length = self.total_tokens as f64 / self.document_count.max(1) as f64;
 
+        let mut doc_terms = Vec::with_capacity(term_positions.len());
         for (term, positions) in term_positions {
             let term_id = self.interner.intern(&term);
+            doc_terms.push(term_id);
             let pl = self.index.entry(term_id).or_default();
             pl.add_posting(node_id, positions);
         }
+        self.doc_terms[idx] = Some(doc_terms);
+    }
+
+    /// Remove a document and its postings. Repeated deletes are harmless.
+    /// Cost depends on the document's terms and their posting lists, not the
+    /// entire index vocabulary. Node ids may be indexed again after deletion.
+    pub fn delete_document(&mut self, node_id: NodeId) {
+        let idx = node_id.0 as usize;
+        let Some(terms) = self.doc_terms.get_mut(idx).and_then(Option::take) else {
+            return;
+        };
+        for term in terms {
+            if let Some(pl) = self.index.get_mut(&term) {
+                if let Ok(pos) = pl
+                    .postings
+                    .binary_search_by_key(&node_id.0, |p| p.node_id.0)
+                {
+                    pl.total_frequency -= pl.postings.remove(pos).frequency as u64;
+                }
+                if pl.postings.is_empty() {
+                    self.index.remove(&term);
+                }
+            }
+        }
+        self.total_tokens -= self.doc_lengths[idx] as u64;
+        self.doc_lengths[idx] = 0;
+        self.document_count -= 1;
+        self.avg_doc_length = self.total_tokens as f64 / self.document_count.max(1) as f64;
     }
 
     /// BM25 search. Returns the top `max_results` nodes ranked by relevance.
     pub fn search(&self, query: &str, max_results: usize) -> Vec<TextSearchResult> {
+        if max_results == 0 {
+            return Vec::new();
+        }
         let query_tokens = self.tokenizer.tokenize(query);
-        let query_terms: Vec<String> = query_tokens
+        let mut query_terms: Vec<String> = query_tokens
             .iter()
             .map(|(w, _)| normalize_term(w))
             .collect::<HashSet<_>>()
             .into_iter()
             .collect();
+        query_terms.sort_unstable();
 
         if query_terms.is_empty() {
             return Vec::new();
@@ -611,9 +657,7 @@ impl InvertedIndex {
             }
         }
 
-        let cmp = |a: &(u32, f64), b: &(u32, f64)| {
-            b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal)
-        };
+        let cmp = |a: &(u32, f64), b: &(u32, f64)| b.1.total_cmp(&a.1).then_with(|| a.0.cmp(&b.0));
 
         // Top-k via partial selection: O(M) partition + O(k log k) sort, instead of a
         // full O(M log M) sort to keep only `max_results` of M matched docs.
@@ -664,6 +708,9 @@ impl InvertedIndex {
         max_gap: u32,
         max_results: usize,
     ) -> Vec<TextSearchResult> {
+        if max_results == 0 {
+            return Vec::new();
+        }
         let tokens = self.tokenizer.tokenize(phrase);
         let terms: Vec<String> = tokens.iter().map(|(w, _)| normalize_term(w)).collect();
 
@@ -742,8 +789,8 @@ impl InvertedIndex {
 
         results.sort_by(|a, b| {
             b.score
-                .partial_cmp(&a.score)
-                .unwrap_or(std::cmp::Ordering::Equal)
+                .total_cmp(&a.score)
+                .then_with(|| a.node_id.0.cmp(&b.node_id.0))
         });
         results.truncate(max_results);
         results
@@ -958,8 +1005,7 @@ impl IndexedKnowledgeGraph {
     /// Replace a node's text content and optionally its embedding.
     ///
     /// - Text index is updated: old terms are removed (tombstoned for on-disk
-    ///   indexes; may linger for the in-memory `InvertedIndex`) and new text is
-    ///   indexed.
+    ///   indexes) and new text is indexed.
     /// - If `new_embedding` is `Some`, the vector index entry is replaced.
     /// - If `new_embedding` is `None`, the existing vector index entry is kept.
     /// - **Edges are never touched.**
@@ -977,10 +1023,11 @@ impl IndexedKnowledgeGraph {
         self.text_index.delete_document(id);
         self.text_index.index_document(id, new_text);
         if let Some(emb) = new_embedding {
-            if let Some(vidx) = &mut self.vector_index {
-                vidx.remove_vector(id);
-                vidx.add_vector(id, emb);
-            }
+            let vidx = self
+                .vector_index
+                .get_or_insert_with(crate::vector_index::create_default_vector_index);
+            vidx.remove_vector(id);
+            vidx.add_vector(id, emb);
         }
         // No PageRank cache invalidation needed: content edits never touch edges,
         // and PageRank depends only on edge topology.
@@ -1308,7 +1355,15 @@ impl IndexedKnowledgeGraph {
             })
             .collect();
 
-        self.fuse_combined(combined, weights.text, 0.0, weights.graph, 0.0, weights.mode, max_results)
+        self.fuse_combined(
+            combined,
+            weights.text,
+            0.0,
+            weights.graph,
+            0.0,
+            weights.mode,
+            max_results,
+        )
     }
 
     /// High-level hybrid "text + vector + graph" query.
@@ -1547,7 +1602,15 @@ impl IndexedKnowledgeGraph {
             })
             .collect();
 
-        self.fuse_combined(combined, weights.text, 0.0, weights.graph, 0.0, weights.mode, max_results)
+        self.fuse_combined(
+            combined,
+            weights.text,
+            0.0,
+            weights.graph,
+            0.0,
+            weights.mode,
+            max_results,
+        )
     }
 
     /// Convenience wrapper that uses [`FusionWeights::default()`].
@@ -1780,6 +1843,9 @@ impl IndexedKnowledgeGraph {
         let removed = self.graph.remove_node(node);
         if removed {
             self.text_index.delete_document(node);
+            if let Some(vidx) = &mut self.vector_index {
+                vidx.remove_vector(node);
+            }
 
             // Optional background ghost-edge cleanup hook.
             // In a real deployment this could be scheduled asynchronously.
@@ -2167,12 +2233,18 @@ mod tests {
         idx.index_document(NodeId(0), "alpha beta gamma delta"); // 4 tokens
         idx.index_document(NodeId(1), "one two"); // 2 tokens
         let before = idx.stats().avg_doc_length;
-        assert!((before - 3.0).abs() < 1e-9, "expected (4+2)/2 = 3.0, got {before}");
+        assert!(
+            (before - 3.0).abs() < 1e-9,
+            "expected (4+2)/2 = 3.0, got {before}"
+        );
 
         // Re-index node 0 with a shorter body; avg must reflect the replacement.
         idx.index_document(NodeId(0), "alpha"); // now 1 token
         let after = idx.stats().avg_doc_length;
-        assert!((after - 1.5).abs() < 1e-9, "expected (1+2)/2 = 1.5, got {after}");
+        assert!(
+            (after - 1.5).abs() < 1e-9,
+            "expected (1+2)/2 = 1.5, got {after}"
+        );
     }
 
     #[test]
@@ -2476,7 +2548,8 @@ mod indexed_relation_tests {
         let mut g = IndexedKnowledgeGraph::new();
         let a = g.add_node("brake redundancy requirement text", Some("REQ-1"), None);
         g.update_node(a, &"Z".repeat(4000), None).unwrap();
-        g.update_node(a, "brake redundancy requirement text", None).unwrap();
+        g.update_node(a, "brake redundancy requirement text", None)
+            .unwrap();
         let before = g.blob_bytes();
         let rep = g.vacuum_blobs();
         assert!(rep.bytes_reclaimed > 3000 && g.blob_bytes() < before);
