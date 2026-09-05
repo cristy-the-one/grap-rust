@@ -495,7 +495,7 @@ impl IndexedKnowledgeGraph {
         text_weight = 0.4,
         vector_weight = 0.4,
         graph_weight = 0.2,
-        centrality_weight = 0.4,
+        centrality_weight = 0.0,
         traversal_weight_property = None,
         fusion_mode = String::from("rrf"),
         rrf_k = 60.0,
@@ -608,6 +608,11 @@ impl IndexedKnowledgeGraph {
     /// Return the number of edges in the graph.
     fn edge_count(&self) -> usize {
         self.inner.graph.edge_count()
+    }
+
+    /// Clear topology, retaining node ids, text and embeddings. Invalidates edge ids.
+    fn clear_edges(&mut self) {
+        self.inner.clear_edges();
     }
 
     /// Hex SHA-256 of the node's text, or None.

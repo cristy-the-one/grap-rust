@@ -1169,6 +1169,13 @@ impl IndexedKnowledgeGraph {
         edge
     }
 
+    /// Replaceable topology: clear edges and cached ranking, retaining all
+    /// node ids and text/vector indexes. Existing edge ids become invalid.
+    pub fn clear_edges(&mut self) {
+        self.graph.clear_edges();
+        *self.pagerank_cache.lock().unwrap() = None;
+    }
+
     /// Global PageRank with lazy caching for the unmasked (`mask == None`) case.
     ///
     /// The unmasked result is memoized in `pagerank_cache` and invalidated by

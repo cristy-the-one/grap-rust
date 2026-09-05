@@ -191,7 +191,7 @@ impl ShardedGraph {
     ///
     /// `fusion_mode` is `"rrf"` (default) or `"linear"`.
     /// `rrf_k` is the RRF rank-smoothing constant (default 60.0).
-    /// `centrality_weight` scales the PageRank contribution to scoring (default 0.4).
+    /// `centrality_weight` scales the optional PageRank contribution (default 0.0).
     /// `traversal_weight_property` optionally prioritises edges that carry the named property
     /// during BFS expansion (mirrors the non-sharded `search_and_traverse_hybrid` parameter).
     ///
@@ -209,7 +209,7 @@ impl ShardedGraph {
         text_weight = 0.4,
         vector_weight = 0.4,
         graph_weight = 0.2,
-        centrality_weight = 0.4,
+        centrality_weight = 0.0,
         traversal_weight_property = None,
         fusion_mode = String::from("rrf"),
         rrf_k = 60.0,

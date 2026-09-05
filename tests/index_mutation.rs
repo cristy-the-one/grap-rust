@@ -1,6 +1,27 @@
 use grap::{IndexedKnowledgeGraph, InvertedIndex, NodeId, TextIndex};
 
 #[test]
+fn replacing_topology_preserves_retrieval_and_survives_reload() {
+    let mut graph = IndexedKnowledgeGraph::new_on_disk();
+    let a = graph.add_node("alpha", None, Some(&[1.0, 0.0]));
+    let b = graph.add_node("beta", None, Some(&[0.0, 1.0]));
+    graph.add_edge(a, b, 1.0, vec![]);
+    assert_eq!(graph.graph.edge_count(), 1);
+    graph.clear_edges();
+    assert_eq!(graph.graph.edge_count(), 0);
+    assert_eq!(graph.search("alpha", 1)[0].node_id, a);
+    assert_eq!(graph.vector_search(&[0.0, 1.0], 1)[0].0, b);
+    let dir = tempfile::tempdir().unwrap();
+    graph.save_to_dir(dir.path()).unwrap();
+    let mut restored = IndexedKnowledgeGraph::load_from_dir(dir.path()).unwrap();
+    assert_eq!(restored.graph.edge_count(), 0);
+    restored.add_edge(b, a, 1.0, vec![]);
+    assert_eq!(restored.graph.edge_count(), 1);
+    assert_eq!(restored.graph.all_edges()[0].source, b);
+    assert_eq!(restored.graph.all_edges()[0].target, a);
+}
+
+#[test]
 fn disk_replacement_mapping_survives_save_load_and_vacuum() {
     let dir = tempfile::tempdir().unwrap();
     let mut index = grap::OnDiskTextIndex::new();

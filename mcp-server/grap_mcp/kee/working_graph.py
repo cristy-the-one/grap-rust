@@ -22,7 +22,7 @@ import pygrap
 from . import extract as _extract
 from . import reconcile as rc
 from .graph_store import GraphStore, GraphState
-from .. import session
+from ..session import SessionJournal
 from ..entity_index import EntityIndex
 
 logger = logging.getLogger("grap-mcp.kee")
@@ -58,7 +58,8 @@ class _Resolution:
 
 class WorkingGraph:
     def __init__(self, embedder, *, merge_threshold: float = 0.86,
-                 context_cap: int = 8, workdir: Optional[str] = None) -> None:
+                 context_cap: int = 8, workdir: Optional[str] = None,
+                 _state: Optional[GraphState] = None) -> None:
         """Build an empty working graph.
 
         `workdir` must be an empty or non-existent directory: this is a fresh
@@ -74,8 +75,8 @@ class WorkingGraph:
         self._owned_workdir = workdir is None
         self._dir = workdir or tempfile.mkdtemp(prefix="kee-wg-")
         Path(self._dir).mkdir(parents=True, exist_ok=True)
-        self.kg = pygrap.IndexedKnowledgeGraph.with_merge_policy(
-            str(Path(self._dir) / "graph"), 2)
+        self.kg = (pygrap.IndexedKnowledgeGraph.with_merge_policy(
+            str(Path(self._dir) / "graph"), 2) if _state is None else None)
         self.idx = EntityIndex(str(Path(self._dir) / "entities.db"))
 
         self.canonical: Dict[int, str] = {}           # node -> first-seen name
@@ -99,6 +100,50 @@ class WorkingGraph:
         self._vec_cache: Dict[str, List[float]] = {}       # name -> embedding (see _prefetch_vectors)
         self._char_tokens_mem: Dict[str, List[str]] = {}   # content hash -> dedup'd tokens
         self._ccdb = None                                  # sqlite sidecar for the above
+
+        self.session = SessionJournal()
+        self._next_concept_id = 0
+        self._concept_to_node: Dict[int, int] = {}
+        self._node_to_concept: Dict[int, int] = {}
+        self._edges_dirty = False
+        if _state is not None:
+            self._load_state(_state)
+
+    def _embedding_model(self) -> str:
+        """Identity of cached vectors. Model changes require a new projection."""
+        e = self.embedder
+        model = getattr(e, "model", None) or getattr(e, "model_name", None)
+        return json.dumps({"backend": getattr(e, "name", type(e).__qualname__),
+                           "model": model, "endpoint": getattr(e, "base_url", None),
+                           "dim": None if model else getattr(e, "dim", None)}, sort_keys=True)
+
+    def _alias_concepts(self, name: str) -> List[int]:
+        return [self._node_to_concept[n] for n in self.idx.resolve(name)
+                if n in self._node_to_concept]
+
+    def _vector_concepts(self, vec, limit) -> List[Tuple[int, float]]:
+        return [(self._node_to_concept[n], score)
+                for n, score in self.kg.vector_search(vec, limit)
+                if n in self._node_to_concept]
+
+    def _sync_edges(self) -> None:
+        """Replace derived topology after a retraction, retaining node indexes.
+
+        Rebuild component membership too: union-find cannot remove an edge.
+        Ordinary insertions and checkpoints never take this path.
+        """
+        if not self._edges_dirty:
+            return
+        self.kg.clear_edges()
+        self._parent = {cid: cid for cid in self.canonical}
+        self._has_edge = set()
+        for e in self.relations:
+            f, t = e["from_id"], e["to_id"]
+            self.kg.add_edge(self._concept_to_node[f], self._concept_to_node[t],
+                             1.0, {"rel": e["type"]})
+            self._has_edge.update((f, t))
+            self._union(f, t)
+        self._edges_dirty = False
 
     # ---- union-find (component tracking for bridge signals) ----
     def _find(self, x: int) -> int:
@@ -156,14 +201,14 @@ class WorkingGraph:
         return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
     def _register_alias(self, alias: str, node: int) -> None:
-        self.idx.register(alias, node)
+        self.idx.register(alias, self._concept_to_node[node])
         lst = self.aliases_by_node.setdefault(node, [])
         if alias not in lst:
             lst.append(alias)
 
     # ---- resolution ----
     def _resolve_outcome(self, name: str) -> _Resolution:
-        hits = [h for h in self.idx.resolve(name) if h not in self._retracted]
+        hits = self._alias_concepts(name)
         if hits:
             return _Resolution(hits[0], len(hits) > 1)
 
@@ -177,13 +222,17 @@ class WorkingGraph:
                 return _Resolution(node, False)
 
         vec = self._embed_one(name)
-        matches = [(n, s) for (n, s) in self.kg.vector_search(vec, 2) if n not in self._retracted]
+        matches = self._vector_concepts(vec, 2)
         if matches and matches[0][1] >= self.merge_threshold:
             node = matches[0][0]
             ambiguous = len(matches) > 1 and matches[1][1] >= self.merge_threshold
             self._register_alias(name, node)
             return _Resolution(node, ambiguous)
-        node = self.kg.add_node(text=name, label="concept", embedding=vec)
+        node = self._next_concept_id
+        native = self.kg.add_node(text=name, label="concept", embedding=vec)
+        self._next_concept_id += 1
+        self._concept_to_node[node] = native
+        self._node_to_concept[native] = node
         self._register_alias(name, node)
         self.canonical[node] = name
         self.chars.setdefault(node, [])
@@ -191,13 +240,13 @@ class WorkingGraph:
         # Capture core content hash for integrity, provenance, and future dedup using hardened node hashes.
         if hasattr(self.kg, "get_node_content_hash"):
             try:
-                h = self.kg.get_node_content_hash(node)
+                h = self.kg.get_node_content_hash(self._concept_to_node[node])
                 if h:
                     self.concept_hashes[node] = h
                     self._hash_to_node[h] = node
             except Exception:
                 pass
-        session.record_node_access(node, "resolve_outcome")
+        self.session.record_node_access(node, "resolve_outcome")
         return _Resolution(node, False)
 
     def _would_resolve(self, name: str) -> bool:
@@ -211,7 +260,7 @@ class WorkingGraph:
         if not isinstance(name, str) or not name.strip():
             return False
         name = name.strip()
-        if [h for h in self.idx.resolve(name) if h not in self._retracted]:
+        if self._alias_concepts(name):
             return True
         return self._content_hash(name) in self._hash_to_node
 
@@ -371,11 +420,11 @@ class WorkingGraph:
         if not isinstance(name, str) or not name.strip():
             return None
         name = name.strip()
-        hits = [h for h in self.idx.resolve(name) if h not in self._retracted]
+        hits = self._alias_concepts(name)
         if hits:
             return hits[0]
         vec = self._embed_one(name)
-        matches = [(n, s) for (n, s) in self.kg.vector_search(vec, 1) if n not in self._retracted]
+        matches = self._vector_concepts(vec, 1)
         if matches and matches[0][1] >= self.merge_threshold:
             self._register_alias(name, matches[0][0])
             return matches[0][0]
@@ -415,7 +464,7 @@ class WorkingGraph:
             # bridge (they start as disconnected singletons).
             bridge = (fn in self._has_edge and tn in self._has_edge
                       and self._find(fn) != self._find(tn))
-            self.kg.add_edge(fn, tn, 1.0, {"rel": ty})
+            self.kg.add_edge(self._concept_to_node[fn], self._concept_to_node[tn], 1.0, {"rel": ty})
             self._edge_types[key] = ty
             self.relations.append({"from_id": fn, "to_id": tn, "type": ty})
             self._rel_sources[(fn, ty, tn)] = {source}
@@ -497,6 +546,7 @@ class WorkingGraph:
             if not srcs:
                 self._retract_concept(node)
         self.parked = [p for p in self.parked if p.get("source") != chunk_id]
+        self._sync_edges()
 
     def _park(self, f: str, ty: str, t: str, source: str, reason: str) -> None:
         """Park a relation once per (from, type, to, chunk). The store's
@@ -510,6 +560,7 @@ class WorkingGraph:
                             "source": source, "reason": reason})
 
     def _remove_edge(self, fn: int, tn: int, ty: str) -> None:
+        self._edges_dirty = True
         self._edge_types.pop((fn, tn), None)
         self._rel_sources.pop((fn, ty, tn), None)
         self.relations = [e for e in self.relations
@@ -523,7 +574,14 @@ class WorkingGraph:
         self.aliases_by_node.pop(node, None)
         self._parent.pop(node, None)
         self._has_edge.discard(node)
-        self.idx.remove_node(node)
+        native = self._concept_to_node.pop(node)
+        self._node_to_concept.pop(native)
+        self.kg.remove_node(native)
+        self.idx.remove_node(native)
+        old_hash = self.concept_hashes.pop(node, None)
+        if old_hash:
+            self._hash_to_node.pop(old_hash, None)
+        self._edges_dirty = True
         for e in list(self.relations):
             if e["from_id"] == node or e["to_id"] == node:
                 self._remove_edge(e["from_id"], e["to_id"], e["type"])
@@ -531,7 +589,7 @@ class WorkingGraph:
             self._char_sources.pop(key, None)
 
     def _canonical_label(self, node: int) -> str:
-        aliases = self.idx.aliases_for(node)
+        aliases = self.idx.aliases_for(self._concept_to_node[node])
         if aliases:
             return min(aliases, key=lambda s: (len(s), s))
         return self.canonical.get(node, f"concept_{node}")
@@ -564,8 +622,7 @@ class WorkingGraph:
         if not self.canonical:
             return Context([], {}, [], [])
         vec = self._embed_one(text)
-        cand: List[int] = [nid for nid, _ in self.kg.vector_search(vec, self.context_cap)
-                           if nid not in self._retracted]
+        cand: List[int] = [cid for cid, _ in self._vector_concepts(vec, self.context_cap)]
         low = text.lower()
         for nid, name in self.canonical.items():
             if nid in cand:
@@ -580,7 +637,7 @@ class WorkingGraph:
         wanted: List[int] = []
         for s in list(signals.conflicts) + list(signals.correlations):
             for name in s.get("names", []):
-                hits = self.idx.resolve(name)
+                hits = self._alias_concepts(name)
                 if hits and hits[0] not in wanted:
                     wanted.append(hits[0])
         return self._context_from_nodes(wanted)
@@ -617,7 +674,7 @@ class WorkingGraph:
     def _cached_char_tokens(self, raw_chars: List[str]) -> List[str]:
         if not raw_chars:
             return []
-        key = self._char_cache_key(raw_chars, self.merge_threshold)
+        key = self._embedding_model() + ":" + self._char_cache_key(raw_chars, self.merge_threshold)
         mem = self._char_tokens_mem.get(key)
         if mem is not None:
             return list(mem)
@@ -721,7 +778,7 @@ class WorkingGraph:
             })
             provenance[oid] = sorted(self.node_sources.get(node, set()))
 
-        session.record_query(f"to_candidate:{len(self.canonical)}", len(process_outcomes))
+        self.session.record_query(f"to_candidate:{len(self.canonical)}", len(process_outcomes))
 
         for e in self.relations:
             fl, tl = self._canonical_label(e["from_id"]), self._canonical_label(e["to_id"])
@@ -755,29 +812,30 @@ class WorkingGraph:
         return sorted(n for n in self.canonical if n not in self._retracted)
 
     def to_state(self) -> GraphState:
-        """Snapshot live state with COMPACTED dense concept ids (0..M-1) so a
-        reload reproduces node id == concept id under the fresh projection."""
+        """Snapshot live extraction records, preserving stable concept ids."""
         live = self._live_concepts()
-        remap = {old: new for new, old in enumerate(live)}
-        st = GraphState()
-        for old in live:
-            new = remap[old]
-            st.concepts[new] = self.canonical[old]
-            st.aliases[new] = list(self.aliases_by_node.get(old, []))
-            st.chars[new] = list(self.chars.get(old, []))
-            st.concept_sources[new] = sorted(self.node_sources.get(old, set()))
-        for (old, text), srcs in self._char_sources.items():
-            if old in remap:
-                st.char_sources[(remap[old], text)] = sorted(srcs)
+        live_ids = set(live)
+        st = GraphState(next_concept_id=self._next_concept_id,
+                        embedding_model=self._embedding_model())
+        st.embeddings = {self.canonical[cid]: list(self._vec_cache[self.canonical[cid]])
+                         for cid in live if self.canonical[cid] in self._vec_cache}
+        for cid in live:
+            st.concepts[cid] = self.canonical[cid]
+            st.aliases[cid] = list(self.aliases_by_node.get(cid, []))
+            st.chars[cid] = list(self.chars.get(cid, []))
+            st.concept_sources[cid] = sorted(self.node_sources.get(cid, set()))
+        for (cid, text), srcs in self._char_sources.items():
+            if cid in live_ids:
+                st.char_sources[(cid, text)] = sorted(srcs)
         for e in self.relations:
             f, t = e["from_id"], e["to_id"]
-            if f in remap and t in remap:
-                st.edges.append((remap[f], remap[t], e["type"]))
+            if f in live_ids and t in live_ids:
+                st.edges.append((f, t, e["type"]))
                 srcs = self._rel_sources.get((f, e["type"], t), set())
-                st.edge_sources[(remap[f], remap[t])] = sorted(srcs)
+                st.edge_sources[(f, t)] = sorted(srcs)
         st.manifest = dict(self.manifest)
         st.chunk_failures = {k: dict(v) for k, v in self.chunk_failures.items()}
-        st.concept_hashes = {remap.get(old, old): h for old, h in self.concept_hashes.items() if old in remap}
+        st.concept_hashes = {cid: h for cid, h in self.concept_hashes.items() if cid in live_ids}
         st.rel_vocab = list(dict.fromkeys(e["type"] for e in self.relations))
         st.parked = [{"from": p["from"], "type": p["type"], "to": p["to"],
                       "chunk_id": p.get("source", ""), "reason": p.get("reason", "")}
@@ -785,7 +843,10 @@ class WorkingGraph:
         return st
 
     def _load_state(self, st: GraphState) -> None:
-        """Populate in-memory dicts from a (dense-id) GraphState, then project."""
+        """Populate records from SQLite, then rebuild disposable retrieval views."""
+        self._next_concept_id = max(st.next_concept_id, max(st.concepts, default=-1) + 1)
+        self._vec_cache = (dict(st.embeddings)
+                           if st.embedding_model == self._embedding_model() else {})
         self.canonical = dict(st.concepts)
         self.aliases_by_node = {cid: list(al) for cid, al in st.aliases.items()}
         self.chars = {cid: list(cs) for cid, cs in st.chars.items()}
@@ -817,61 +878,61 @@ class WorkingGraph:
         self._project()
 
     def _project(self) -> None:
-        """Rebuild the pygrap KG + EntityIndex from live state. Node ids come out
-        equal to the (already-dense) concept ids because we add in id order."""
+        """Rebuild Rust and EntityIndex views; native ids need not equal concept ids."""
         import shutil
         graph_dir = str(Path(self._dir) / "graph")
         # Release the current graph handle before deleting its directory: on
         # Windows an open pygrap handle would make rmtree silently skip files.
         self.kg = None
-        shutil.rmtree(graph_dir, ignore_errors=True)
+        if Path(graph_dir).exists():
+            shutil.rmtree(graph_dir)
         self.idx.clear()
         self.kg = pygrap.IndexedKnowledgeGraph.with_merge_policy(graph_dir, 2)
-        # Every concept below needs its vector. Embedding them one at a time cost
-        # ~2.2s each (≈1h for 1671 concepts), which is what made save() — and
-        # therefore any checkpoint — prohibitively expensive. Batch them first;
-        # names resolved earlier this run are already cached and cost nothing.
+        self._concept_to_node = {}
+        self._node_to_concept = {}
+        # Saved vectors avoid network calls. Legacy stores and changed embedding
+        # models need one batched embedding pass, cached at the next checkpoint.
         self._prefetch_vectors([self.canonical[cid] for cid in sorted(self.canonical)])
         for cid in sorted(self.canonical):
             nid = self.kg.add_node(text=self.canonical[cid], label="concept",
                                    embedding=self._embed_one(self.canonical[cid]))
-            assert nid == cid, "projection must reproduce dense concept ids"
+            self._concept_to_node[cid] = nid
+            self._node_to_concept[nid] = cid
             if hasattr(self.kg, "get_node_content_hash"):
                 try:
                     h = self.kg.get_node_content_hash(nid)
                     if h:
-                        self.concept_hashes[nid] = h
-                        self._hash_to_node[h] = nid
+                        self.concept_hashes[cid] = h
+                        self._hash_to_node[h] = cid
                 except Exception:
                     pass
             for alias in self.aliases_by_node.get(cid, []):
                 self._register_alias(alias, cid)
         for e in self.relations:
-            self.kg.add_edge(e["from_id"], e["to_id"], 1.0, {"rel": e["type"]})
+            self.kg.add_edge(self._concept_to_node[e["from_id"]],
+                             self._concept_to_node[e["to_id"]], 1.0, {"rel": e["type"]})
 
     def save(self) -> None:
-        """Persist truth FIRST (GraphStore), then rebuild + persist the projection."""
-        st = self.to_state()
+        """Commit changed extraction records. Retrieval views are rebuildable.
+
+        Does not rebuild or serialize the Rust arena, re-register aliases, or
+        invoke an embedder. A failed SQL transaction leaves the last checkpoint
+        intact; reopening always derives views from that committed checkpoint.
+        """
         with GraphStore(str(Path(self._dir) / "graph_store.db")) as store:
-            store.save(st)
-        self._load_state(st)
-        self.kg.save_to_dir(str(Path(self._dir) / "graph"))
+            store.save(self.to_state())
 
     @classmethod
     def open(cls, workdir: str, embedder, *, merge_threshold: float = 0.86,
              context_cap: int = 8) -> "WorkingGraph":
-        """Open an existing durable graph (or a fresh one if absent)."""
-        wg = cls(embedder, merge_threshold=merge_threshold,
-                 context_cap=context_cap, workdir=workdir)
-        store_path = Path(workdir) / "graph_store.db"
-        with GraphStore(str(store_path)) as store:
+        """Load authoritative records and rebuild views using cached embeddings.
+
+        Older stores migrate in place. Legacy graphs need one embedding pass;
+        the next checkpoint persists those vectors with their model identity.
+        Empty committed stores also replace stale projections.
+        """
+        Path(workdir).mkdir(parents=True, exist_ok=True)
+        with GraphStore(str(Path(workdir) / "graph_store.db")) as store:
             st = store.load()
-        # Not just `st.concepts`: a run in which every chunk failed extraction
-        # still has state worth reloading — the manifest of chunks already tried
-        # and the dead-letter counts. Gating on concepts alone silently discarded
-        # both, so such a run re-did all of its work (and re-paid for it) next
-        # time. The manifest is the record of what was attempted, not only of
-        # what succeeded.
-        if st.concepts or st.manifest or st.chunk_failures:
-            wg._load_state(st)
-        return wg
+        return cls(embedder, merge_threshold=merge_threshold,
+                   context_cap=context_cap, workdir=workdir, _state=st)

@@ -268,6 +268,18 @@ impl KnowledgeGraph {
         self.edges.len()
     }
 
+    /// Clear all edges while preserving nodes, their ids, text and embeddings.
+    /// Previously returned edge ids become invalid. Used when replacing a
+    /// derived topology without rebuilding the node arena or retrieval indexes.
+    pub fn clear_edges(&mut self) {
+        self.edges.clear();
+        for node in &mut self.nodes {
+            node.outgoing.clear();
+            node.incoming.clear();
+            node.outgoing_property_mask = 0;
+        }
+    }
+
     /// Adds a directed, weighted edge from `source` to `target`.
     ///
     /// `strength` should normally be in `[0.0, 1.0]`. Higher values indicate
@@ -351,6 +363,22 @@ impl Default for KnowledgeGraph {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn clear_edges_resets_both_adjacencies_and_property_masks() {
+        let mut g = KnowledgeGraph::new();
+        let a = g.add_node("alpha", None, None);
+        let b = g.add_node("beta", None, None);
+        let tag = g.properties.register("rel");
+        g.add_edge(a, b, 1.0, vec![(tag, PropertyValue::Label("uses".into()))]);
+        g.clear_edges();
+        for node in &g.nodes {
+            assert!(node.incoming.is_empty());
+            assert!(node.outgoing.is_empty());
+            assert_eq!(node.outgoing_property_mask, 0);
+        }
+        assert_eq!(g.live_node_count(), 2);
+    }
 
     #[test]
     fn try_read_blob_returns_none_for_invalid_id() {
