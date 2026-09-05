@@ -11,8 +11,8 @@ from grap_mcp.kee.llm import StubProvider
 def _server(tmp_path, monkeypatch, role="admin"):
     monkeypatch.setenv("GRAP_WORKSPACE", str(tmp_path / "ws"))
     monkeypatch.setenv("GRAP_ROLE", role)
-    import grap_mcp.server as s
-    importlib.reload(s)
+    from grap_mcp.application import GrapApplication
+    s = GrapApplication()
     return s
 
 
@@ -154,7 +154,8 @@ def test_maintenance_failure_surfaces_until_next_clean_run(tmp_path, monkeypatch
 
 
 def test_kv_subject_parser():
-    import grap_mcp.server as s
+    from grap_mcp.application import GrapApplication
+    s = GrapApplication()
     assert s._kv_subject("checked=10;mismatch=0;unknown=2") == {
         "checked": "10", "mismatch": "0", "unknown": "2"}
     assert s._kv_subject("ok") == {}

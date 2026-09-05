@@ -1,3 +1,4 @@
+from grap_mcp import reasoner
 from tests.test_phase4 import _server, _adopt, _load_pg, ONTO_RV, PG_V1
 
 
@@ -13,13 +14,13 @@ def test_both_entry_points_use_frozen_scope_weights_and_save_explanations(tmp_pa
     ws.activate("a", "P", v.hash, weights={"lexical_threshold": 0.99})
     ws.set_production("a")
     seen = []
-    detect = s.reasoner.detect_gaps
+    detect = reasoner.detect_gaps
 
     def capture(kg, onto, pg, **kwargs):
         seen.append((pg.to_dict(), kwargs["weights"]))
         return detect(kg, onto, pg, **kwargs)
 
-    monkeypatch.setattr(s.reasoner, "detect_gaps", capture)
+    monkeypatch.setattr(reasoner, "detect_gaps", capture)
     s._state.pg.steps[0].references = []  # unsaved edit must not replace activation
     a = s.run_procedure()
     b = s.detect_gaps()

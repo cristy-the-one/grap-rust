@@ -33,7 +33,8 @@ def test_register_many_and_remove_node(tmp_path):
         assert ei.aliases_for(1) == []
 
 
-import grap_mcp.server as s
+from grap_mcp.application import GrapApplication
+s = GrapApplication()
 
 class _LabelKG:
     def __init__(self, labels):  # {node_id: label or None}

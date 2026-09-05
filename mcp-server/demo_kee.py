@@ -101,7 +101,8 @@ def main() -> int:
     os.environ["GRAP_ROLE"] = "operator"
     if args.real:
         os.environ.pop("GRAP_LLM_STUB", None)   # a stale stub flag would defeat --real
-    import grap_mcp.server as s
+    from grap_mcp.application import GrapApplication
+    s = GrapApplication()
     # Wire the demo-controlled provider/embedder into the server's single
     # indirection point (all KEE tools resolve providers via s.get_provider /
     # s.get_embedder — the same seam the tests monkeypatch).

@@ -4,7 +4,8 @@ Uses the same _FakeKG + monkeypatch.setitem(s._state, ...) pattern as
 test_graph_neighbors_wire.py.  The default role in _state is "operator" which
 satisfies the _require("operator") gate each analytics tool uses.
 """
-import grap_mcp.server as s
+from grap_mcp.application import GrapApplication
+s = GrapApplication()
 
 
 class _FakeKG:

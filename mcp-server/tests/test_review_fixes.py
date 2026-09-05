@@ -29,8 +29,8 @@ def _onto(entries):
 def _server(tmp_path, monkeypatch, role="admin"):
     monkeypatch.setenv("GRAP_WORKSPACE", str(tmp_path / "ws"))
     monkeypatch.setenv("GRAP_ROLE", role)
-    import grap_mcp.server as s
-    importlib.reload(s)
+    from grap_mcp.application import GrapApplication
+    s = GrapApplication()
     return s
 
 
@@ -131,8 +131,9 @@ def test_restart_rehydrates_active_ontology(tmp_path, monkeypatch):
     vh = s._get_workspace().publish_ontology(yaml_text, metadata={}).hash
     assert s.adopt_proposed_ontology(vh, rationale="pre-restart")["status"] == "ok"
 
-    import grap_mcp.server as smod
-    s2 = importlib.reload(smod)                # simulated restart
+    from grap_mcp.application import GrapApplication
+    smod = GrapApplication()
+    s2 = GrapApplication()                # simulated restart
     assert s2._state.ontology is None
     s2.get_status()                            # first workspace open
     assert s2._state.ontology is not None
@@ -147,8 +148,9 @@ def test_rehydration_follows_rollback(tmp_path, monkeypatch):
     _adopt(s, _onto([("qa", "Quality Assurance", ["quality_plan"])]))
     assert s.rollback_ontology(h1, reason="prefer v1")["status"] == "ok"
 
-    import grap_mcp.server as smod
-    s2 = importlib.reload(smod)
+    from grap_mcp.application import GrapApplication
+    smod = GrapApplication()
+    s2 = GrapApplication()
     s2.get_status()
     assert s2._state.ontology_version == h1    # latest event wins (rollback)
     assert s2._state.ontology.outcome("rv") is not None
@@ -233,7 +235,8 @@ class _FakeWS:
 
 
 def test_canary_ignores_gaps_on_newly_added_outcomes(monkeypatch):
-    import grap_mcp.server as s
+    from grap_mcp.application import GrapApplication
+    s = GrapApplication()
     prev_yaml = _onto([("existing_a", "A", ["c1"]), ("existing_b", "B", ["c2"])])
     ws = _FakeWS({"prevhash": prev_yaml})
 
@@ -256,7 +259,8 @@ def test_canary_ignores_gaps_on_newly_added_outcomes(monkeypatch):
 
 def test_canary_still_catches_a_real_regression(monkeypatch):
     """A batch that adds nothing but breaks existing coverage must be caught."""
-    import grap_mcp.server as s
+    from grap_mcp.application import GrapApplication
+    s = GrapApplication()
     prev_yaml = _onto([("existing_a", "A", ["c1"]), ("existing_b", "B", ["c2"])])
     ws = _FakeWS({"prevhash": prev_yaml})
     monkeypatch.setattr(s, "diff_runs", lambda a, b: {
@@ -273,7 +277,8 @@ def test_canary_still_catches_a_real_regression(monkeypatch):
 
 def test_canary_falls_back_when_baseline_ontology_unavailable(monkeypatch):
     """No prev ontology -> conservative old behaviour, not a silent pass."""
-    import grap_mcp.server as s
+    from grap_mcp.application import GrapApplication
+    s = GrapApplication()
     ws = _FakeWS({})
     monkeypatch.setattr(s, "diff_runs", lambda a, b: {
         "status": "ok", "new_gaps": ["x:1", "y:2"], "resolved_gaps": [], "counts": {}})
@@ -393,7 +398,8 @@ class _EvWS:
 
 
 def _gap_alarm_fires(subject, monkeypatch):
-    import grap_mcp.server as s
+    from grap_mcp.application import GrapApplication
+    s = GrapApplication()
     monkeypatch.setattr(s, "_get_workspace", lambda: _EvWS(subject))
     monkeypatch.setattr(s, "_open_kee_workdir_parked", lambda *a, **k: [], raising=False)
     q = s.list_pending_interventions()

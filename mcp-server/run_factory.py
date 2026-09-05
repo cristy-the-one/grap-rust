@@ -66,7 +66,9 @@ def main() -> int:
     ap.add_argument("--interval", type=int, default=300, help="watch poll seconds")
     args = ap.parse_args()
 
-    import grap_mcp.server as s
+    from grap_mcp.application import GrapApplication
+
+    s = GrapApplication()
     cfg = json.loads(Path(args.config).read_text(encoding="utf-8"))
 
     if not args.watch:

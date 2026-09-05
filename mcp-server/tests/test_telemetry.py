@@ -1,5 +1,6 @@
 import grap_mcp.telemetry as tel
-import grap_mcp.server as s
+from grap_mcp.application import GrapApplication
+s = GrapApplication()
 
 
 def test_records_and_aggregates(monkeypatch):

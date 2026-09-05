@@ -27,12 +27,13 @@ def test_frequency_sort():
     assert ctx["nodes_accessed"][0]["node"] == 1
 
 
-import grap_mcp.server as s
+from grap_mcp.application import GrapApplication
+s = GrapApplication()
 
 
 def test_get_session_context_tool():
-    sess.reset()
-    sess.record_query("q", result_count=1)
+    s.session.reset()
+    s.session.record_query("q", result_count=1)
     out = s.get_session_context()
     assert out["status"] == "ok"
     assert out["total_unique_queries"] == 1
@@ -49,7 +50,7 @@ class _BundleKG:
         return f"doc:{nid}"
 
 def test_context_bundle_packs_within_budget(monkeypatch):
-    sess.reset()
+    s.session.reset()
     monkeypatch.setitem(s._state, "kg", _BundleKG())
     out = s.get_context_bundle("memory safety", token_budget=120)
     assert out["status"] == "ok"
@@ -57,4 +58,4 @@ def test_context_bundle_packs_within_budget(monkeypatch):
     assert len(out["bundle"]) >= 1
     assert out["bundle"][0]["node"] == 1
     assert out["truncated"] is True
-    assert any(q["query"] == "memory safety" for q in sess.get_context()["recent_queries"])
+    assert any(q["query"] == "memory safety" for q in s.session.get_context()["recent_queries"])

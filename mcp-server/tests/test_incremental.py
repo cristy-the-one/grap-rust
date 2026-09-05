@@ -64,7 +64,8 @@ def test_incremental_tombstones_deleted_file(tmp_path):
     assert all("b.md" not in k for k in saved)  # b's manifest entry purged
 
 
-import grap_mcp.server as s
+from grap_mcp.application import GrapApplication
+s = GrapApplication()
 
 
 def test_reingest_documents_tool(tmp_path, monkeypatch):

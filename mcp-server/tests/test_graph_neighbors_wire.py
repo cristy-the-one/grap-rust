@@ -7,7 +7,8 @@ string (wire_format="compact"). Also pins the new signature parameter.
 """
 import inspect
 
-import grap_mcp.server as s
+from grap_mcp.application import GrapApplication
+s = GrapApplication()
 
 
 class _FakeKG:

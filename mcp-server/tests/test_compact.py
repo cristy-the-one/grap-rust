@@ -1,4 +1,5 @@
-import grap_mcp.server as s
+from grap_mcp.application import GrapApplication
+s = GrapApplication()
 
 
 class _CompactKG:

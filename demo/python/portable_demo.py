@@ -39,7 +39,9 @@ _WORK = Path(tempfile.mkdtemp(prefix="grap-portable-demo-"))
 os.environ.setdefault("GRAP_WORKSPACE", str(_WORK / "workspace"))
 os.environ.setdefault("GRAP_TELEMETRY", "1")  # so get_telemetry has something to show
 
-import grap_mcp.server as srv  # noqa: E402  (after sys.path/env setup)
+from grap_mcp.application import GrapApplication
+
+srv = GrapApplication()
 
 
 # --- tiny pretty-printing helpers --------------------------------------------

@@ -21,8 +21,8 @@ def test_citation_pairs_resolves_within_set():
 def test_build_legal_graph_merges_citations(tmp_path, monkeypatch):
     monkeypatch.setenv("GRAP_WORKSPACE", str(tmp_path / "ws"))
     monkeypatch.setenv("GRAP_ROLE", "operator")
-    import grap_mcp.server as s
-    importlib.reload(s)
+    from grap_mcp.application import GrapApplication
+    s = GrapApplication()
 
     corpus = tmp_path / "acts"
     corpus.mkdir()

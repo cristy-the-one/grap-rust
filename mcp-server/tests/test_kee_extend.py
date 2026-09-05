@@ -76,7 +76,8 @@ def test_extend_honors_chunk_chars(tmp_path):
 
 
 def test_server_lifecycle_tools(tmp_path, monkeypatch):
-    import grap_mcp.server as s
+    from grap_mcp.application import GrapApplication
+    s = GrapApplication()
     from grap_mcp.kee.llm import StubProvider
     from grap_mcp.kee.embeddings import HashingEmbedder
 
@@ -184,7 +185,8 @@ def test_extend_concurrent_progress_in_order(tmp_path):
 
 
 def test_server_extend_accepts_concurrency(tmp_path, monkeypatch):
-    import grap_mcp.server as s
+    from grap_mcp.application import GrapApplication
+    s = GrapApplication()
     monkeypatch.setattr(s, "get_provider", lambda model=None: StubProvider(handler=_handler))
     monkeypatch.setattr(s, "get_embedder", lambda: HashingEmbedder())
     docs = _three_docs(tmp_path)

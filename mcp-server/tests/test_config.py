@@ -59,7 +59,8 @@ def test_get_role_env_override_is_process_scoped(tmp_path, monkeypatch):
 def test_list_proposed_ontologies_pagination_meta(monkeypatch):
     # Regression: an inner variable used to shadow the pagination meta dict,
     # spreading a node's metadata into the response instead of total/cursor.
-    import grap_mcp.server as s
+    from grap_mcp.application import GrapApplication
+    s = GrapApplication()
 
     class _Ev:
         def __init__(self, i):

@@ -407,7 +407,7 @@ def _extraction_events(corpus: str, model: Optional[str], sim: float,
     stream (token events from real LLM deltas) → reconcile → version. Ends with
     an 'extracted' event carrying the extract_ontology-shaped result. Shared by
     the Extract card stream and the demo wizard."""
-    import grap_mcp.server as srv
+    srv = bridge.application
     from grap_mcp.kee import embeddings, extract, llm, pipeline, reconcile, validate
 
     # provider only; embedder is deferred to reconcile so tokens flow immediately

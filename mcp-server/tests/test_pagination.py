@@ -3,7 +3,8 @@
 import inspect
 
 import grap_mcp.pagination as pg
-import grap_mcp.server as s
+from grap_mcp.application import GrapApplication
+s = GrapApplication()
 
 
 # ---------------------------------------------------------------------------

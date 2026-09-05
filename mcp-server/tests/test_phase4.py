@@ -71,8 +71,8 @@ steps:
 def _server(tmp_path, monkeypatch, role="admin"):
     monkeypatch.setenv("GRAP_WORKSPACE", str(tmp_path / "ws"))
     monkeypatch.setenv("GRAP_ROLE", role)
-    import grap_mcp.server as s
-    importlib.reload(s)
+    from grap_mcp.application import GrapApplication
+    s = GrapApplication()
     assert s.create_knowledge_graph(str(tmp_path / "kg"))["status"] == "ok"
     return s
 

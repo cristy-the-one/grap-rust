@@ -26,8 +26,8 @@ concept_hashes:
 def _server(tmp_path, monkeypatch):
     monkeypatch.setenv("GRAP_WORKSPACE", str(tmp_path / "ws"))
     monkeypatch.setenv("GRAP_ROLE", "operator")
-    import grap_mcp.server as s
-    importlib.reload(s)
+    from grap_mcp.application import GrapApplication
+    s = GrapApplication()
     assert s.create_knowledge_graph(str(tmp_path / "kg"))["status"] == "ok"
     return s
 
