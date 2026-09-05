@@ -1,61 +1,41 @@
-"""Phase 4 (P-10): LLM-drafted Procedure Graph patches.
-
-The LLM only *drafts*; every draft passes deterministic machine checks
-(coverage rules below + publish validation) before being published at
-level=draft for a human's one-click promotion. Pure helpers here — the
-orchestration lives in server.draft_pg_patch.
-"""
+"""Deterministic PG reference maintenance; publication policy lives in the application."""
 from __future__ import annotations
 
-import re
 from typing import List, Set
+import re
+import yaml
 
 REF_MARKER = "process_outcome."
 
-SYSTEM_PROMPT = (
-    "You maintain Procedure Graph (PG) YAML files for a process-governance "
-    "system. You will receive the current PG YAML, a list of ontology process "
-    "outcomes the PG must newly cover, and a list of outcome ids whose "
-    "references must be removed. Return ONLY the complete updated PG YAML - "
-    "no prose, no code fences. Rules: keep the PG name; bump the patch "
-    "version; keep every existing step that is still valid; add one step per "
-    "newly covered outcome with a reference of the form "
-    "'kg:aspice.process_outcome.<outcome_id>'; remove steps or references "
-    "pointing at the removed outcome ids; every step needs an id and an "
-    "operation."
-)
 
+def patch_references(pg, uncovered: List[dict], orphaned: List[str]) -> str:
+    """Preserve existing step semantics and edit only outcome coverage.
 
-def build_user_prompt(pg_yaml: str, uncovered: List[dict], orphaned: List[str]) -> str:
-    lines = ["Current PG YAML:", "---", pg_yaml.rstrip(), "---", ""]
-    if uncovered:
-        lines.append("Outcomes the PG must newly cover (id: characteristics):")
-        for o in uncovered:
-            chars = ", ".join(o.get("required_characteristics") or []) or "(none)"
-            lines.append(f"- {o.get('id')}: {chars}")
-        # Small local models follow examples far better than prose rules:
-        # without this template they tend to drop the references field.
-        lines.append("")
-        lines.append("Add EXACTLY ONE step per outcome above, in this form "
-                     "(the references line is mandatory):")
-        first = uncovered[0].get("id")
-        lines.append(f"  - id: cover_{first}")
-        lines.append(f"    operation: ensure_{first}")
-        lines.append(f'    references: ["kg:aspice.process_outcome.{first}"]')
-    if orphaned:
-        lines.append("Outcome ids to remove references to (no longer in the ontology):")
-        for oid in orphaned:
-            lines.append(f"- {oid}")
-    lines.append("")
-    lines.append("Return only the updated YAML.")
-    return "\n".join(lines)
-
-
-def strip_fences(text: str) -> str:
-    """Models often wrap YAML in ``` fences despite instructions — unwrap."""
-    t = (text or "").strip()
-    m = re.match(r"^```[\w-]*\s*\n(.*?)\n?```\s*$", t, re.DOTALL)
-    return m.group(1).strip() if m else t
+    Removed references leave their step intact for review. Added steps are
+    explicitly gap checks, with deterministic collision-free ids.
+    """
+    data = pg.to_dict()
+    data.pop("source_path", None)
+    removed = set(orphaned)
+    for step in data["steps"]:
+        step["references"] = [ref for ref in step["references"]
+                              if REF_MARKER not in str(ref)
+                              or str(ref).split(REF_MARKER, 1)[1] not in removed]
+    used = {step["id"] for step in data["steps"]}
+    for outcome in sorted(uncovered, key=lambda o: o["id"]):
+        oid = outcome["id"]
+        base = "cover_" + re.sub(r"[^a-zA-Z0-9_-]", "_", oid)
+        sid, suffix = base, 2
+        while sid in used:
+            sid = f"{base}_{suffix}"
+            suffix += 1
+        used.add(sid)
+        data["steps"].append({"id": sid, "operation": "gap_check",
+                              "references": [f"kg:aspice.process_outcome.{oid}"]})
+    version = str(data["version"])
+    match = re.fullmatch(r"(\d+\.\d+\.)(\d+)", version)
+    data["version"] = match[1] + str(int(match[2]) + 1) if match else version + ".1"
+    return yaml.safe_dump(data, sort_keys=False, allow_unicode=True)
 
 
 def referenced_outcome_ids(pg) -> Set[str]:
@@ -70,7 +50,7 @@ def referenced_outcome_ids(pg) -> Set[str]:
 
 def coverage_violations(draft_pg, previous_ids: Set[str], uncovered_ids: Set[str],
                         orphaned_ids: Set[str]) -> List[str]:
-    """Deterministic gate on an LLM draft: it must add every uncovered id,
+    """Coverage gate on a reference patch: it must add every uncovered id,
     drop every orphaned id, and keep every still-valid previous reference.
     Returns human-readable violations (empty = pass)."""
     new_ids = referenced_outcome_ids(draft_pg)

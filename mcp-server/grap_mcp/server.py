@@ -753,16 +753,11 @@ def extract_ontology(path: str, out_path: str = None, sim: float = 0.86,
 
 @tiered
 def draft_pg_patch(model: str = None) -> dict:
-    """LLM-draft an updated Procedure Graph covering the active ontology.
+    """Draft deterministic reference additions/removals for the active ontology.
 
-    Computes the coverage delta (active-ontology outcomes the loaded PG does
-    not reference; PG references to outcomes no longer in the ontology), asks
-    the configured local LLM to draft the updated YAML, then machine-checks
-    it: deterministic coverage rules (must add every uncovered outcome, drop
-    every orphaned one, keep everything still valid) plus publish validation.
-    A passing draft is published at level=draft with its validation report
-    recorded, and waits in the exception queue (kind pg_draft_pending) for a
-    one-click promote_pg. The machine authors and verifies; the human decides."""
+    Existing operations, guards and dataflow are preserved. Validation and
+    promotion policy still apply. The legacy model argument is ignored.
+    """
     denied = _require("operator")
     if denied:
         return denied
@@ -784,11 +779,7 @@ def draft_pg_patch(model: str = None) -> dict:
             return {"status": "ok", "note": "PG already covers the active ontology",
                     "uncovered": [], "orphaned": [], "draft_version_hash": None}
         uncovered = [o for o in onto_out if o.get("id") in set(uncovered_ids)]
-        pg_yaml = open(pg.source_path, "r", encoding="utf-8").read()
-        provider = get_provider(model=model)
-        raw = pg_patch.strip_fences(provider.complete(
-            pg_patch.SYSTEM_PROMPT,
-            pg_patch.build_user_prompt(pg_yaml, uncovered, orphaned)))
+        raw = pg_patch.patch_references(pg, uncovered, orphaned)
 
         def _fail(reason: str) -> dict:
             try:
@@ -813,8 +804,8 @@ def draft_pg_patch(model: str = None) -> dict:
 
         version = ws.publish_pg(
             raw, level="draft",
-            rationale="LLM-drafted PG patch (machine-checked; awaiting human promotion)",
-            metadata={"name": draft.name, "drafted_by": "llm",
+            rationale="Deterministic PG reference patch (validated; subject to promotion policy)",
+            metadata={"name": draft.name, "drafted_by": "reference_patch",
                       "covers": ",".join(uncovered_ids),
                       "removes": ",".join(orphaned)})
         report["ontology_version"] = getattr(_state, "ontology_version", None)
@@ -2394,18 +2385,12 @@ def load_procedure_graph(path: str) -> dict:
     try:
         pg = pg_loader.load_from_file(path)
         _state.pg = pg
+        _state.pg_version = None
         _state.current_logic_id = pg.name
         try:
             _get_workspace().record_event("pg_loaded", path, details={"name": pg.name})
         except Exception:
             logger.warning("audit record_event failed for pg_loaded", exc_info=True)
-
-        # Attempt early projection into the KG (POC)
-        projection_result = {}
-        kg = _state.kg
-        if kg:
-            projection_result = pg_loader.project_to_grap(pg, kg)
-            _state.projected_nodes.update(projection_result.get("projected_node_ids", []))
 
         return {
             "status": "ok",
@@ -2413,8 +2398,9 @@ def load_procedure_graph(path: str) -> dict:
             "name": pg.name,
             "version": pg.version,
             "step_count": len(pg.steps),
-            "projection": projection_result,
-            "message": "Procedure Graph loaded, parsed, and projected (POC)"
+            "projection": {},
+            "execution_mode": "gap_check",
+            "message": "Procedure Graph loaded as gap-check scope metadata"
         }
     except Exception as e:
         logger.exception("Failed to load PG")
@@ -2423,62 +2409,25 @@ def load_procedure_graph(path: str) -> dict:
 
 @tiered
 def run_procedure(scope: str = "all") -> dict:
+    """Compatibility entry point for a tracked, PG-scoped gap check.
+
+    Operations, guards and dataflow in the PG are descriptive; there is no
+    procedure interpreter. Only its outcome references scope this check.
     """
-    Execute the currently active (or loaded) Procedure Graph against the KG.
-    Respects the current activation and frozen weights when present.
-    """
-    logger.info(f"Running procedure with scope: {scope}")
     denied = _require("operator")
     if denied:
         return denied
-
-    activation = None
-    logic_id = _state.current_logic_id
-    if logic_id and _state.ws:
-        activation = _state.ws.current_production(logic_id)
-
-    pg = _state.pg
-    kg = _state.kg
-
-    if not kg:
-        return {"status": "error", "message": "No Knowledge Graph loaded."}
-    if not pg:
+    if not _state.pg:
         return {"status": "error", "message": "No Procedure Graph loaded or activated."}
-
-    try:
-        node_count = kg.node_count()
-        step_count = len(pg.steps) if hasattr(pg, "steps") else 0
-
-        ws = _get_workspace()
-        ontology = _state.ontology
-        run_id = f"run-{uuid.uuid4().hex[:8]}"
-        activation_id = activation.activation_id if activation else None
-        pg_version = activation.pg_version if activation else None
-        kg_version = (activation.kg_version if activation else None) or getattr(_state, "ontology_version", None)
-        ws.start_run(run_id, kind="production", activation_id=activation_id,
-                     pg_version=pg_version, kg_version=kg_version, scope=scope)
-
-        excluded = getattr(_state, "projected_nodes", set())
-        gaps = (reasoner.detect_gaps(kg, ontology, pg, exclude_nodes=excluded)
-                if ontology else [])
-        ws.complete_run(run_id, status="completed", gaps_found=len(gaps),
-                        explanation_hashes=[],
-                        summary={"scope": scope, "excluded_nodes": str(len(excluded))})
-
-        return {
-            "status": "ok",
-            "message": "Procedure executed (gap detection wired)",
-            "scope": scope,
-            "run_id": run_id,
-            "activation_id": activation_id,
-            "kg_node_count": node_count,
-            "pg_step_count": step_count,
-            "gaps_found": len(gaps),
-            "gap_summary": [f"{g['outcome_id']}:{g['missing_characteristic']}" for g in gaps],
-        }
-    except Exception as e:
-        logger.exception("Execution failed")
-        return {"status": "error", "message": str(e)}
+    result = _run_gap_detection(scope, "production")
+    if result.get("status") == "ok":
+        result.update(
+            message="PG-scoped gap check completed; procedure operations were not executed.",
+            execution_mode="gap_check", procedure_executed=False,
+            kg_node_count=_state.kg.node_count(), pg_step_count=len(_state.pg.steps),
+            gap_summary=[f"{g['outcome_id']}:{g['missing_characteristic']}"
+                         for g in result["gaps"]])
+    return result
 
 
 def _run_gap_detection(scope: str, kind: str, extra_summary: dict = None) -> dict:
@@ -2494,7 +2443,14 @@ def _run_gap_detection(scope: str, kind: str, extra_summary: dict = None) -> dic
         activation = ws.current_production(logic_id) if logic_id else None
         activation_id = activation.activation_id if activation else None
         pg_version = (activation.pg_version if activation else None) or getattr(_state, "pg_version", None)
-        kg_version = (activation.kg_version if activation else None) or getattr(_state, "ontology_version", None)
+        # Record the ontology actually inspected. An activation's ontology
+        # reference is not a snapshot of the current evidence graph.
+        kg_version = _state.ontology_version
+        if activation is not None:
+            raw = ws.get_record(activation.pg_version)
+            if raw is None:
+                raise ValueError("The production PG artifact is missing")
+            pg = pg_loader.load_from_string(raw)
 
         run_id = f"run-{uuid.uuid4().hex[:8]}"
         ws.start_run(run_id, kind=kind, activation_id=activation_id,
@@ -2526,6 +2482,9 @@ def _run_gap_detection(scope: str, kind: str, extra_summary: dict = None) -> dic
         _state.explanations = explanations
 
         summary = {"scope": scope, "weights": json.dumps(weights),
+                   "execution_mode": "gap_check",
+                   "evidence_snapshot": "not_recorded",
+                   "kg_version_kind": "ontology",
                    "excluded_nodes": str(len(excluded)),
                    "kg_nodes": str(kg.node_count() if hasattr(kg, "node_count") else -1)}
         if extra_summary:
@@ -2533,7 +2492,9 @@ def _run_gap_detection(scope: str, kind: str, extra_summary: dict = None) -> dic
         ws.complete_run(run_id, status="completed", gaps_found=len(gaps),
                         explanation_hashes=hashes, summary=summary)
         return {"status": "ok", "run_id": run_id, "kind": kind, "scope": scope,
-                "gaps": gaps, "gaps_found": len(gaps)}
+                "gaps": gaps, "gaps_found": len(gaps),
+                "activation_id": activation_id, "execution_mode": "gap_check",
+                "procedure_executed": False}
     except Exception as e:
         logger.exception("gap detection failed")
         return {"status": "error", "message": str(e)}
@@ -2821,10 +2782,13 @@ def get_run(run_id: str) -> dict:
 
 @tiered
 def reconstruct_run(run_id: str) -> dict:
-    """Reconstruct a past run, reporting any missing frozen artifacts."""
+    """Check archived artifact availability; this does not replay the evidence graph."""
     try:
         rep = _get_workspace().reconstruct(run_id)
         return {"status": "ok", "run_id": rep.run_id, "complete": rep.complete,
+                "artifacts_available": rep.complete, "replayable": False,
+                "replay_limitations": ["Evidence graph snapshots are not recorded",
+                                       "No procedure interpreter or replay engine is implemented"],
                 "pg_version_present": rep.pg_version_present,
                 "kg_version_present": rep.kg_version_present,
                 "explanations_present": rep.explanations_present,

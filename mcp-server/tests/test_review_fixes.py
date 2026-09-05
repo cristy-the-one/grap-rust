@@ -198,8 +198,8 @@ def test_write_back_syncs_pg_file_and_state(tmp_path, monkeypatch):
     s, pgf = _pg_setup(tmp_path, monkeypatch, write_back=True)
     out = s.draft_pg_patch()
     assert out["auto_promoted"] is True and out["written_back"] is True
-    assert "s2" in pgf.read_text(encoding="utf-8")           # file tracks head
-    assert any(st.id == "s2" for st in s._state.pg.steps)    # state reloaded
+    assert "cover_qa" in pgf.read_text(encoding="utf-8")           # file tracks head
+    assert any(st.id == "cover_qa" for st in s._state.pg.steps)    # state reloaded
     # next draft is a no-op: the file already covers the ontology
     assert "already covers" in s.draft_pg_patch()["note"]
 
@@ -208,7 +208,7 @@ def test_without_write_back_file_stays_untouched(tmp_path, monkeypatch):
     s, pgf = _pg_setup(tmp_path, monkeypatch, write_back=False)
     out = s.draft_pg_patch()
     assert out["auto_promoted"] is True and out["written_back"] is False
-    assert "s2" not in pgf.read_text(encoding="utf-8")
+    assert "cover_qa" not in pgf.read_text(encoding="utf-8")
 
 
 def test_set_policy_write_back_bool_cast(tmp_path, monkeypatch):

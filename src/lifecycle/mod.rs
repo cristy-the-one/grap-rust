@@ -39,7 +39,8 @@ pub struct ChangeStatus {
     pub production_hash: Option<ContentHash>,
 }
 
-/// Result of attempting to reconstruct a past run from its frozen references.
+/// Availability of a past run's referenced artifacts. This is not execution
+/// replay: evidence snapshots and an interpreter are outside this API.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ReconstructionReport {
     /// The run being reconstructed.

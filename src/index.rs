@@ -309,7 +309,7 @@ impl Default for HybridWeights {
             text: 0.4,
             vector: 0.4,
             graph: 0.2,
-            centrality: 0.4,
+            centrality: 0.0,
             traversal_weight_property: None,
             mode: FusionMode::default(),
         }
@@ -2454,10 +2454,10 @@ mod hybrid_weight_tests {
     }
 
     #[test]
-    fn hybrid_weights_default_is_rrf_with_centrality() {
+    fn hybrid_weights_default_is_rrf_without_centrality() {
         let w = HybridWeights::default();
         assert!(matches!(w.mode, crate::index::FusionMode::Rrf { .. }));
-        assert!(w.centrality >= 0.0);
+        assert_eq!(w.centrality, 0.0);
     }
 }
 

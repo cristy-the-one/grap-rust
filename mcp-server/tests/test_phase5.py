@@ -117,6 +117,8 @@ def test_trivial_draft_auto_promotes_and_queue_stays_empty(tmp_path, monkeypatch
 
 def test_intrusive_draft_stays_queued_for_a_human(tmp_path, monkeypatch):
     s = _setup(tmp_path, monkeypatch, DRAFT_INTRUSIVE)
+    # Removing an obsolete reference changes an existing step and needs review.
+    s._state.pg.steps[0].references.append("kg:aspice.process_outcome.obsolete")
     out = s.draft_pg_patch()
     assert out["status"] == "ok"
     assert out["auto_promoted"] is False           # changes existing step s1

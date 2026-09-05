@@ -98,10 +98,19 @@ def _stub_llm(s, monkeypatch, response):
 
 # ---- pure helpers -------------------------------------------------------------
 
-def test_strip_fences():
-    assert pg_patch.strip_fences("```yaml\nname: P\n```") == "name: P"
-    assert pg_patch.strip_fences("name: P") == "name: P"
-    assert pg_patch.strip_fences("") == ""
+def test_reference_patch_preserves_steps_and_handles_collisions():
+    pg = pg_loader.load_from_string(PG_V1)
+    pg.steps[0].id = "cover_qa"
+    pg.steps[0].guards = ["keep this guard"]
+    pg.steps[0].references.append("kg:aspice.process_outcome.old")
+    raw = pg_patch.patch_references(pg, [{"id": "qa"}], ["old"])
+    draft = pg_loader.load_from_string(raw)
+    assert draft.steps[0].operation == "verify"
+    assert draft.steps[0].guards == ["keep this guard"]
+    assert draft.steps[1].id == "cover_qa_2"
+    assert pg_patch.referenced_outcome_ids(draft) == {"rv", "qa"}
+    assert raw == pg_patch.patch_references(pg, [{"id": "qa"}], ["old"])
+    assert "old" in pg.steps[0].references[-1]  # original untouched
 
 
 def test_coverage_violations():
@@ -129,7 +138,7 @@ def test_draft_publish_and_promote_clears_queue(tmp_path, monkeypatch):
     assert out["status"] == "ok"
     assert out["uncovered"] == ["qa"] and out["orphaned"] == []
     assert out["validation"]["ok"] is True
-    assert "s2" in str(out["diff"])                            # diff shows the new step
+    assert "cover_qa" in str(out["diff"])                            # diff shows the new step
     h = out["draft_version_hash"]
     assert h
 
@@ -147,18 +156,19 @@ def test_bad_draft_rejected_and_alarm_clears_on_success(tmp_path, monkeypatch):
     _adopt(s, ONTO_RV_QA)
     _load_pg(s, tmp_path)
 
-    _stub_llm(s, monkeypatch, "definitely: [not a pg")
+    original = pg_patch.patch_references
+    monkeypatch.setattr(pg_patch, "patch_references", lambda *args: "definitely: [not a pg")
     out = s.draft_pg_patch()
     assert out["status"] == "error"
     assert any(i["kind"] == "pg_draft_failed"
                for i in s.list_pending_interventions()["pending"])
 
     # a draft that ignores the coverage instruction is also rejected
-    _stub_llm(s, monkeypatch, PG_V1)                            # still misses qa
+    monkeypatch.setattr(pg_patch, "patch_references", lambda *args: PG_V1)
     out2 = s.draft_pg_patch()
     assert out2["status"] == "error" and "does not cover" in out2["message"]
 
-    _stub_llm(s, monkeypatch, DRAFT_OK)
+    monkeypatch.setattr(pg_patch, "patch_references", original)
     assert s.draft_pg_patch()["status"] == "ok"
     pending = s.list_pending_interventions()["pending"]
     assert not any(i["kind"] == "pg_draft_failed" for i in pending)
