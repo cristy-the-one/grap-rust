@@ -95,6 +95,7 @@ class WorkingGraph:
         self._chunk_contrib: Dict[str, dict] = {}          # chunk -> {concepts,chars,edges}
         self.manifest: Dict[str, str] = {}                 # chunk_id -> content hash
         self.chunk_failures: Dict[str, dict] = {}          # chunk_id -> dead-letter record
+        self.extractions: Dict[str, dict] = {}            # latest successful source proposals
         self.concept_hashes: Dict[int, str] = {}           # node -> hex content_hash from core (provenance + dedup)
         self._hash_to_node: Dict[str, int] = {}            # content hash -> node for exact dedup
         self._vec_cache: Dict[str, List[float]] = {}       # name -> embedding (see _prefetch_vectors)
@@ -381,6 +382,22 @@ class WorkingGraph:
     def __exit__(self, *_exc) -> None:
         self.close()
 
+    def replace_fragment(self, frag: dict, source: str) -> Signals:
+        """Replace a successful chunk proposal, preserving ids of reused concepts.
+
+        Keep nodes alive during replacement so exact names still resolve to their
+        existing ids; remove concepts only if the new proposal leaves them with
+        no source. A second look can now retract its first incorrect assertion.
+        """
+        old = [cid for cid, sources in self.node_sources.items() if source in sources]
+        self.retract_chunk(source, keep_concepts=True)
+        signals = self.upsert_fragment(frag, source)
+        for cid in old:
+            if not self.node_sources.get(cid):
+                self._retract_concept(cid)
+        self._sync_edges()
+        return signals
+
     def upsert_fragment(self, frag: dict, source: str) -> Signals:
         sig = Signals()
         contrib = self._chunk_contrib.setdefault(
@@ -414,6 +431,16 @@ class WorkingGraph:
             if res.ambiguous:
                 sig.conflicts.append({"kind": "ambiguous", "names": [name.strip()]})
         self._relations_pass(frag, source, fragment_nodes, sig)
+        if "extraction" in frag:
+            receipt = dict(frag["extraction"])
+            receipt["content_hash"] = hashlib.sha256(receipt["source_text"].encode("utf-8")).hexdigest()
+            receipt["outcomes"] = frag["outcomes"]
+            receipt["relations"] = frag["relations"]
+            # Proposals and resolved graph nodes are distinct: record the mapping
+            # so a reviewer can see which source name was merged into which concept.
+            receipt["concept_ids"] = {o["name"]: fragment_nodes[rc.tokenize(o["name"])]
+                                      for o in frag["outcomes"]}
+            self.extractions[source] = receipt
         return sig
 
     def _resolve_endpoint(self, name: str, fragment_nodes: Dict[str, int]) -> Optional[int]:
@@ -488,7 +515,7 @@ class WorkingGraph:
 
     def record_chunk_failure(self, chunk_id: str, content_hash: str, reason: str,
                              max_attempts: int = 3) -> bool:
-        """Count a deterministic failure. Returns True once it is quarantined.
+        """Record a failure; only model-output failures count toward quarantine.
 
         A record is reset when the chunk's content changes, so editing a
         poisonous document gives it a fresh set of attempts.
@@ -497,10 +524,10 @@ class WorkingGraph:
         if rec is None or rec.get("content_hash") != content_hash:
             rec = {"content_hash": content_hash, "attempts": 0,
                    "reason": reason, "quarantined": False}
-        rec["attempts"] = int(rec.get("attempts", 0)) + 1
+        rec["attempts"] = int(rec.get("attempts", 0)) + (0 if reason == "provider" else 1)
         rec["reason"] = reason
         rec["last_ts"] = time.time()
-        rec["quarantined"] = rec["attempts"] >= max(1, int(max_attempts))
+        rec["quarantined"] = reason != "provider" and rec["attempts"] >= max(1, int(max_attempts))
         self.chunk_failures[chunk_id] = rec
         return bool(rec["quarantined"])
 
@@ -514,10 +541,11 @@ class WorkingGraph:
         return [{"chunk_id": cid, **rec} for cid, rec in sorted(self.chunk_failures.items())
                 if rec.get("quarantined")]
 
-    def retract_chunk(self, chunk_id: str) -> None:
-        """Logically remove everything `chunk_id` contributed. pygrap is NOT
-        mutated here (append-only during a run); retracted concepts are excluded
-        from resolution/context/export and dropped at the next _project."""
+    def retract_chunk(self, chunk_id: str, *, keep_concepts: bool = False) -> None:
+        """Remove a chunk's assertions and synchronize the Rust graph.
+
+        Replacement can retain concept identities until new claims are resolved.
+        """
         contrib = self._chunk_contrib.pop(chunk_id, None)
         for (node, text) in (contrib["chars"] if contrib else list(self._char_sources)):
             srcs = self._char_sources.get((node, text))
@@ -543,8 +571,9 @@ class WorkingGraph:
             if srcs is None:
                 continue
             srcs.discard(chunk_id)
-            if not srcs:
+            if not srcs and not keep_concepts:
                 self._retract_concept(node)
+        self.extractions.pop(chunk_id, None)
         self.parked = [p for p in self.parked if p.get("source") != chunk_id]
         self._sync_edges()
 
@@ -748,9 +777,8 @@ class WorkingGraph:
             # made per-chunk cost grow with ontology size (114s -> 170s as
             # concepts went 5,452 -> 8,025).
             #
-            # Keyed by content, not by node id: `to_state()` renumbers concepts
-            # densely on every save, so a node-keyed cache would miss constantly
-            # while looking like it worked.
+            # Keyed by content so a changed characteristic list invalidates the
+            # cache, while identical lists across concepts share the work.
             char_tokens = self._cached_char_tokens(raw_chars)
             base = rc.tokenize(label) or "concept"
             oid, n = base, 2
@@ -835,6 +863,7 @@ class WorkingGraph:
                 st.edge_sources[(f, t)] = sorted(srcs)
         st.manifest = dict(self.manifest)
         st.chunk_failures = {k: dict(v) for k, v in self.chunk_failures.items()}
+        st.extractions = dict(self.extractions)
         st.concept_hashes = {cid: h for cid, h in self.concept_hashes.items() if cid in live_ids}
         st.rel_vocab = list(dict.fromkeys(e["type"] for e in self.relations))
         st.parked = [{"from": p["from"], "type": p["type"], "to": p["to"],
@@ -861,6 +890,7 @@ class WorkingGraph:
                         "source": p["chunk_id"], "reason": p["reason"]} for p in st.parked]
         self.manifest = dict(st.manifest)
         self.chunk_failures = {k: dict(v) for k, v in st.chunk_failures.items()}
+        self.extractions = dict(st.extractions)
         self.concept_hashes = dict(st.concept_hashes)
         self._hash_to_node = {h: nid for nid, h in self.concept_hashes.items()}
         self._retracted = set()

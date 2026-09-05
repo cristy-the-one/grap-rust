@@ -32,6 +32,11 @@ class QualityMonitor:
         # nothing in it to extract.
         self.parse_failures = 0       # reply arrived, no JSON in it
         self.empty_extractions = 0    # valid JSON, no outcomes and no relations
+        self.schema_failures = 0
+        self.filtered_extractions = 0
+        self.quoted_claims = 0
+        self.unquoted_claims = 0
+        self.rejected_evidence = 0
         self.provider_errors = 0      # transport/server failure, model not at fault
         self.rel_counts: list[int] = []
         self.outcome_counts: list[int] = []
@@ -50,6 +55,10 @@ class QualityMonitor:
         self.chunks += 1
         if reason == "empty":
             self.empty_extractions += 1
+        elif reason == "schema":
+            self.schema_failures += 1
+        elif reason == "filtered":
+            self.filtered_extractions += 1
         elif reason == "provider":
             self.provider_errors += 1
         else:
@@ -59,6 +68,14 @@ class QualityMonitor:
         self.chunks += 1
         outcomes = frag.get("outcomes") or []
         relations = frag.get("relations") or []
+        if not outcomes and not relations:
+            self.empty_extractions += 1
+        for claim in outcomes + relations:
+            if claim.get("evidence", {}).get("status") == "quoted":
+                self.quoted_claims += 1
+            else:
+                self.unquoted_claims += 1
+        self.rejected_evidence += int(frag.get("rejected_evidence") or 0)
         self.outcome_counts.append(len(outcomes))
         self.rel_counts.append(len(relations))
         # Two different questions, deliberately kept apart:
@@ -107,11 +124,17 @@ class QualityMonitor:
             "parse_failure_rate": round(self.parse_failures / n, 3),
             "empty_extractions": self.empty_extractions,
             "provider_errors": self.provider_errors,
+            "schema_failures": self.schema_failures,
+            "filtered_extractions": self.filtered_extractions,
+            "quoted_claims": self.quoted_claims,
+            "unquoted_claims": self.unquoted_claims,
+            "rejected_evidence": self.rejected_evidence,
             # The old `parse_failure_rate` was this: every chunk that yielded no
             # fragment, whatever the cause. Kept under an honest name so the
             # history series in extract_quality_history.jsonl stays comparable.
             "no_fragment_rate": round(
-                (self.parse_failures + self.empty_extractions + self.provider_errors) / n, 3),
+                (self.parse_failures + self.empty_extractions + self.provider_errors
+                 + self.schema_failures + self.filtered_extractions) / n, 3),
             "outcomes_per_chunk": round(sum(self.outcome_counts) / max(1, len(self.outcome_counts)), 2),
             "relations_per_chunk": round(sum(self.rel_counts) / max(1, len(self.rel_counts)), 2),
             # shape metrics — the ones a mean cannot see

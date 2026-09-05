@@ -51,6 +51,9 @@ _MIGRATIONS = [
     lambda c: c.execute(
         "CREATE TABLE IF NOT EXISTS embeddings (text TEXT PRIMARY KEY, vector TEXT NOT NULL)"
     ),
+    lambda c: c.execute(
+        "CREATE TABLE IF NOT EXISTS extractions (chunk_id TEXT PRIMARY KEY, record TEXT NOT NULL)"
+    ),
 ]
 
 SCHEMA_VERSION = len(_MIGRATIONS)
@@ -76,6 +79,7 @@ class GraphState:
     next_concept_id: int = 0
     embeddings: Dict[str, List[float]] = field(default_factory=dict)
     embedding_model: str = ""
+    extractions: Dict[str, dict] = field(default_factory=dict)
 
 
 class GraphStore:
@@ -117,6 +121,8 @@ class GraphStore:
                  f.get("reason"), int(bool(f.get("quarantined"))), f.get("last_ts"))
                 for cid, f in state.chunk_failures.items()]),
             "embeddings": (1, [(text, json.dumps(vec)) for text, vec in state.embeddings.items()]),
+            "extractions": (1, [(source, json.dumps(record, ensure_ascii=False, sort_keys=True))
+                                 for source, record in state.extractions.items()]),
             "meta": (1, [("rel_vocab", json.dumps(state.rel_vocab)),
                          ("next_concept_id", str(state.next_concept_id)),
                          ("embedding_model", state.embedding_model)]),
@@ -187,6 +193,8 @@ class GraphStore:
         meta = dict(c.execute("SELECT key, value FROM meta"))
         s.next_concept_id = int(meta.get("next_concept_id", "0"))
         s.embedding_model = meta.get("embedding_model", "")
+        s.extractions = {r["chunk_id"]: json.loads(r["record"])
+                         for r in c.execute("SELECT * FROM extractions")}
         for r in c.execute("SELECT * FROM embeddings"):
             # Embeddings are a disposable cache, unlike extraction records.
             try:
@@ -197,6 +205,11 @@ class GraphStore:
             except (ValueError, TypeError):
                 pass  # missing/broken cache entries are embedded during projection
         return s
+
+    def get_extraction(self, source: str):
+        """Read one source receipt without materializing the full graph."""
+        row = self.conn.execute("SELECT record FROM extractions WHERE chunk_id=?", (source,)).fetchone()
+        return json.loads(row["record"]) if row else None
 
     def close(self) -> None:
         self.conn.close()

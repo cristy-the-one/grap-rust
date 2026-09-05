@@ -1665,7 +1665,8 @@ class GrapApplication:
                         relook_ratio=float(ext.get("relook_ratio", 0.2)),
                         max_files=ext.get("max_files"),
                         chunk_chars=int(ext.get("chunk_chars", 800)),
-                        concurrency=int(ext.get("concurrency", 1)))
+                        concurrency=int(ext.get("concurrency", 1)),
+                        refresh=bool(ext.get("refresh", False)))
                     yaml_text = kee_pipeline.to_yaml(out["ontology"])
                     version, auto = self._publish_and_gate_proposal(
                         yaml_text, ext["docs_path"],
@@ -1687,6 +1688,8 @@ class GrapApplication:
                         "relations_recovered": out.get("relations_recovered"),
                         "parked": out.get("parked"),
                         "quarantined": out.get("quarantined"),
+                        "stale_chunks": out.get("stale_chunks"),
+                        "pending_chunks": out.get("pending_chunks"),
                         "phase_s": out.get("phase_s")}
                     _mark("extract")
                 elif ext.get("models"):
@@ -1800,7 +1803,7 @@ class GrapApplication:
     def extend_extraction_graph(self, path: str, docs_path: str, model: str = None,
                                 sim: float = 0.86, relook_ratio: float = 0.2,
                                 max_files: int = None, chunk_chars: int = 800,
-                                concurrency: int = 1) -> dict:
+                                concurrency: int = 1, refresh: bool = False) -> dict:
         """Sync a durable extraction graph to `docs_path` (new/changed/removed) and
         persist it, then load its projection as the active KG. Returns sync stats.
 
@@ -1816,18 +1819,45 @@ class GrapApplication:
             from .kee.working_graph import WorkingGraph
             out = extend_graph_ontology(path, docs_path, self.get_provider(model), self.get_embedder(),
                                         sim=sim, relook_ratio=relook_ratio, max_files=max_files,
-                                        chunk_chars=chunk_chars, concurrency=concurrency)
+                                        chunk_chars=chunk_chars, concurrency=concurrency, refresh=refresh)
             wg = WorkingGraph.open(path, self.get_embedder())
             self._state.set_kg(wg.kg, None)  # projection is derived; see open_extraction_graph
             self._state.extraction_workdir = path
             wg.close()  # non-owned workdir: releases the sqlite handle only; wg.kg stays valid
             out["status"] = "ok"
             return {k: out[k] for k in ("status", "added", "changed", "removed",
-                                        "concepts", "edges", "relooks", "parked")}
+                                        "concepts", "edges", "relooks", "parked",
+                                        "stale_chunks", "pending_chunks", "quality")}
         except Exception as e:
             logger.exception("extend_extraction_graph failed")
             return {"status": "error", "message": str(e)}
 
+
+    @operation
+    def get_extraction_evidence(self, path: str, source: str) -> dict:
+        """Read a chunk's source text, checked quotes, proposed claims and model.
+
+        Quote offsets establish traceability, not semantic truth. Earlier stores
+        need an explicit refresh to acquire receipts. A failed refresh leaves its
+        previous receipt available alongside the latest failure record.
+        """
+        denied = self._require("operator")
+        if denied:
+            return denied
+        db = Path(path) / "graph_store.db"
+        if not db.is_file():
+            return {"status": "error", "message": "No extraction store at this path"}
+        from .kee.graph_store import GraphStore
+        try:
+            with GraphStore(str(db)) as store:
+                record = store.get_extraction(source)
+                failure = store.conn.execute("SELECT content_hash, reason, attempts, quarantined "
+                                             "FROM chunk_failures WHERE chunk_id=?", (source,)).fetchone()
+            return {"status": "ok", "source": source, "receipt": record,
+                    "latest_failure": dict(failure) if failure else None,
+                    "note": None if record else "No source receipt; refresh older extractions to record one"}
+        except Exception as exc:
+            return {"status": "error", "message": str(exc)}
 
     @operation
     def export_ontology(self, path: str, out_path: str = None) -> dict:
@@ -3207,6 +3237,7 @@ class GrapApplication:
                               "extract_ontology_nversion",
                               "rollback_ontology", "diff_ontologies", "project_relations",
                               "open_extraction_graph", "extend_extraction_graph", "export_ontology",
+                              "get_extraction_evidence",
                               "build_legal_graph", "legal_graph_from_relations",
                               "graph_neighbors", "load_ontology",
                               "get_blast_radius", "find_cycles", "find_orphans", "kg_health",
