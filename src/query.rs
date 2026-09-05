@@ -368,6 +368,12 @@ impl KnowledgeGraph {
             edge: EdgeId,
         }
 
+        struct VisitState {
+            expanded_depth: Option<u32>,
+            queued_depth: u32,
+            queued_strength: f64,
+        }
+
         impl PartialEq for QueueEntry {
             fn eq(&self, other: &Self) -> bool {
                 self.cmp(other) == Ordering::Equal
@@ -397,7 +403,7 @@ impl KnowledgeGraph {
         // Popped scores never increase. A prior route dominates this route iff
         // it used no more hops. Record the smallest expanded depth per node,
         // allowing later shorter routes to expand without emitting duplicates.
-        let mut expanded_depth: HashMap<NodeId, u32> = HashMap::with_capacity(capacity);
+        let mut visits: HashMap<NodeId, VisitState> = HashMap::with_capacity(capacity);
         let mut paths: Vec<PathLink> = Vec::with_capacity(capacity);
         let mut heap: BinaryHeap<QueueEntry> = BinaryHeap::new();
 
@@ -405,6 +411,14 @@ impl KnowledgeGraph {
             if self.is_node_deleted(seed) {
                 return;
             }
+            let std::collections::hash_map::Entry::Vacant(slot) = visits.entry(seed) else {
+                return;
+            };
+            slot.insert(VisitState {
+                expanded_depth: None,
+                queued_depth: 0,
+                queued_strength: 1.0,
+            });
             heap.push(QueueEntry {
                 node: seed,
                 cumulative_strength: 1.0,
@@ -424,11 +438,14 @@ impl KnowledgeGraph {
         }
 
         while let Some(entry) = heap.pop() {
-            let previous = expanded_depth.get(&entry.node).copied();
+            let visit = visits
+                .get_mut(&entry.node)
+                .expect("queued node has visit state");
+            let previous = visit.expanded_depth;
             if previous.is_some_and(|depth| depth <= entry.depth) {
                 continue;
             }
-            expanded_depth.insert(entry.node, entry.depth);
+            visit.expanded_depth = Some(entry.depth);
             let tail = entry.via.map(|edge| {
                 let index = paths.len();
                 paths.push(PathLink {
@@ -484,11 +501,7 @@ impl KnowledgeGraph {
                 }
 
                 let target = edge.target;
-                if self.is_node_deleted(target)
-                    || expanded_depth
-                        .get(&target)
-                        .is_some_and(|&depth| depth <= entry.depth + 1)
-                {
+                if self.is_node_deleted(target) {
                     continue;
                 }
 
@@ -508,10 +521,35 @@ impl KnowledgeGraph {
                 if !w.is_finite() || !(0.0..=1.0).contains(&w) {
                     continue;
                 }
+                let depth = entry.depth + 1;
+                let strength = entry.cumulative_strength * w;
+                match visits.entry(target) {
+                    std::collections::hash_map::Entry::Occupied(mut slot) => {
+                        let visit = slot.get_mut();
+                        if visit.expanded_depth.is_some_and(|d| d <= depth)
+                            || (visit.queued_depth <= depth && visit.queued_strength >= strength)
+                        {
+                            continue;
+                        }
+                        // This route is not dominated. Remember one candidate
+                        // to cheaply prune duplicate/converging routes. Other
+                        // incomparable routes remain in the heap and are still
+                        // considered on pop; this is not a node-level visited bit.
+                        visit.queued_depth = depth;
+                        visit.queued_strength = strength;
+                    }
+                    std::collections::hash_map::Entry::Vacant(slot) => {
+                        slot.insert(VisitState {
+                            expanded_depth: None,
+                            queued_depth: depth,
+                            queued_strength: strength,
+                        });
+                    }
+                }
                 heap.push(QueueEntry {
                     node: target,
-                    cumulative_strength: entry.cumulative_strength * w,
-                    depth: entry.depth + 1,
+                    cumulative_strength: strength,
+                    depth,
                     parent: tail,
                     via: Some(edge_id),
                 });

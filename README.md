@@ -146,9 +146,9 @@ This is currently the best end-to-end showcase of what the engine + Python surfa
 
 | Feature     | Description                                                                 | Brings in                  |
 |-------------|-----------------------------------------------------------------------------|----------------------------|
-| `fulltext`  | BM25 inverted index + phrase search + hybrid fusion                         | —                          |
+| `fulltext`  | Compatibility flag; text indexes and hybrid fusion are always available    | —                          |
 | `mmap`      | Real memory-mapped blob store (zero-copy reads)                             | `memmap2`, `crc32fast`     |
-| `sharding`  | `ShardedGraph` + consistent hashing + ghost edges + rebalancing             | —                          |
+| `sharding`  | Compatibility flag; sharding types are always available                    | —                          |
 
 The segmented on-disk text index (WAL, tiered merging, incremental vacuum, background workers, `save_to_dir`/`load_from_dir` with automatic backend detection) is **always available** — no extra feature flag is required.
 
@@ -174,7 +174,7 @@ The low-level arena-based graph.
 - `QueryBuilder` + `search_and_traverse` with property masks and strength pruning
 - `save_to_disk` / `load_from_disk`
 
-### 2. `IndexedKnowledgeGraph` (requires `fulltext`)
+### 2. `IndexedKnowledgeGraph` (always available)
 
 Wraps `KnowledgeGraph` with an incremental BM25 index.
 
@@ -193,7 +193,7 @@ let g2 = IndexedKnowledgeGraph::load_from_dir("my-index/")?;
 
 The on-disk backend supports incremental vacuum, background merge workers, per-segment statistics (`SegmentInfo`), and automatic detection on load.
 
-### 3. `ShardedGraph` (requires `sharding`)
+### 3. `ShardedGraph` (always available)
 
 High-level facade over a multi-shard cluster.
 

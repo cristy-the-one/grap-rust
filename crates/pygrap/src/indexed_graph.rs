@@ -394,10 +394,12 @@ impl IndexedKnowledgeGraph {
         Ok(results.into_iter().map(|(id, s)| (id.0, s)).collect())
     }
 
-    /// BFS traversal from `node` following edges that match `(property_name, value)`.
+    /// Best-first traversal from `node` following matching `(property_name, value)` edges.
     ///
     /// Returns a list of `TraversalResult` objects (node_id, depth, strength).
     /// `value` must be `str`, `int`, `float`, or `bool`.
+    /// Includes the seed and returns the strongest path score within `depth` hops.
+    /// Unknown required properties, invalid/deleted seeds, and zero limits return no results.
     #[pyo3(signature = (node, property_name, value, depth=3, max_results=50))]
     fn traverse_by_relation(
         &self,
@@ -436,10 +438,6 @@ impl IndexedKnowledgeGraph {
         text_weight: f64,
         graph_weight: f64,
     ) -> PyResult<Vec<QueryResult>> {
-        // Note: Property filtering via string names is simplified here.
-        // A better version would resolve property names to tags.
-        // For the MVP we pass empty required properties to keep things simple.
-
         let weights = FusionWeights {
             text: text_weight,
             graph: graph_weight,

@@ -78,30 +78,36 @@ after translating valid document ids into node ids.
 Windows x64, local release build, Criterion. Baseline for traversal and adapter
 lookup was captured before those implementations changed, after the first
 index-mutation fix. Initial probe: 10 samples, 100 ms warmup, 200 ms measurement.
-Final traversal probe: 20 samples, 300 ms warmup, 1 s measurement. These are
+Final focused probes: 20 samples, 300 ms warmup, 1 s measurement. These are
 synthetic attribution probes; the disk-adapter probe uses the active buffer and
 does not measure physical disk I/O.
 
 | Workload | Before | After |
 | --- | ---: | ---: |
-| 32-node chain, 1K-node arena | 2.83 µs | 3.25 µs |
-| Same chain, 100K-node arena | 4.89 µs | 2.68 µs |
-| Same chain, 500K-node arena | 36.35 µs | 2.65 µs |
-| One text hit, 1K documents | 6.86 µs | 0.35 µs |
-| One text hit, 10K documents | 64.74 µs | 0.35 µs |
-| One text hit, 50K documents | 404.60 µs | 0.35 µs |
+| 32-node chain, 1K-node arena | 2.83 µs | 2.31 µs |
+| Same chain, 100K-node arena | 4.89 µs | 2.50 µs |
+| Same chain, 500K-node arena | 36.35 µs | 2.52 µs |
+| One text hit, 1K documents | 6.86 µs | 0.40 µs |
+| One text hit, 10K documents | 64.74 µs | 0.36 µs |
+| One text hit, 50K documents | 404.60 µs | 0.40 µs |
 
-The small-graph traversal regresses about 0.42 µs (15%) in this measurement;
-accepting that cost buys correct competing-path behavior and removes whole-arena
-initialization from bounded queries. Large-graph speedups do not establish that
-every traversal workload improves. Dense converging graphs can queue additional
-routes, and hop-limited correctness may expand a node more than once.
+The existing `large_n_traversal` benchmark exposed redundant queue entries after
+the initial correctness repair. Remembering a queued candidate's depth and score
+allows safe pruning of dominated routes without discarding stronger or shorter
+alternatives. This brought that workload back from roughly 19–21 µs to 10–12 µs.
+Against a detached checkout of original commit `1e10009`, its final measurements
+are 9.63 → 11.61 µs (10K nodes), 9.85 → 9.89 µs (50K), and 11.27 → 11.93 µs
+(200K). These probes used 20 samples, 100 ms warmup, 200 ms measurement.
+Thus correctness still costs about 0–2 µs on this converging workload; the
+large-arena chain speedup is not a universal traversal speedup. Hop-limited
+correctness may expand a node more than once.
 
-Replacement with common terms remains about 2.5 µs at 1K documents and 19 µs at
-10K: sorted posting vectors still shift on removal/insertion. The reverse term
-map adds per-document memory. The string interner retains historical vocabulary
-after deletion. These are explicit remaining tradeoffs, not claims of solved
-mutation scaling.
+Replacement with common terms measured 2.5–3.5 µs at 1K documents and 19–21 µs
+at 10K across runs. That implementation was unchanged between these timing runs;
+no mutation throughput improvement is claimed. Sorted posting vectors still
+shift on removal/insertion. The reverse term map adds per-document memory. The
+string interner retains historical vocabulary after deletion. These are explicit
+remaining tradeoffs, not claims of solved mutation scaling.
 
 ## Harness and verification
 
