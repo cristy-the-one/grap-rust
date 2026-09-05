@@ -43,6 +43,7 @@ def read_chunks(root: str, max_files: Optional[int] = None,
         files = files[:max_files]
     chunks: List[Tuple[str, str]] = []
     skipped_ids: List[str] = []
+    source_files: Dict[str, Path] = {}
     for f in files:
         try:
             raw = f.read_text(encoding="utf-8")
@@ -55,6 +56,10 @@ def read_chunks(root: str, max_files: Optional[int] = None,
                 continue
         else:
             text, label = raw, f.stem
+        if label in source_files:
+            raise ValueError(f"Duplicate extraction source label {label!r}: "
+                             f"{source_files[label]} and {f}; use unique file stems or JSON ids")
+        source_files[label] = f
         # Enumerate FIRST, then filter. Chunk ids embed the index, so filtering
         # before numbering would renumber every chunk after the first skip and
         # make ~1,500 already-processed documents look changed — a full
@@ -102,7 +107,7 @@ def extract_ontology(docs_path: str, provider, embedder, sim: float = 0.86,
 
 
 def to_yaml(ontology: Dict[str, Any]) -> str:
-    """Serialize only the loadable ontology fields (drops provenance, keeps concept_hashes for verification)."""
+    """Serialize the loadable fields and reviewable relation/evidence proposals."""
     import yaml
 
     loadable = {
@@ -112,6 +117,9 @@ def to_yaml(ontology: Dict[str, Any]) -> str:
     }
     if "concept_hashes" in ontology:
         loadable["concept_hashes"] = ontology["concept_hashes"]
+    for key in ("relations", "extraction_evidence"):
+        if ontology.get(key):
+            loadable[key] = ontology[key]
     # Per-outcome source-chunk counts: the adoption policy's provenance-floor
     # check reads these (full chunk lists stay out of the loadable file).
     if "provenance" in ontology:

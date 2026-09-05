@@ -740,7 +740,9 @@ class GrapApplication:
                 "model": getattr(provider, "model", None),
                 "embedder": embedder.name,
                 "chunks": result.get("chunks", 0),
-                "fragments": result.get("fragments", result.get("relooks", 0)),
+                "fragments": result.get("fragments", 0),
+                "quality": result.get("quality"),
+                "failures": result.get("failures", []),
                 "process_outcomes": [
                     {"id": o["id"], "name": o["name"],
                      "characteristics": o["required_characteristics"]}

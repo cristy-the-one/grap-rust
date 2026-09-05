@@ -432,10 +432,7 @@ class WorkingGraph:
                 sig.conflicts.append({"kind": "ambiguous", "names": [name.strip()]})
         self._relations_pass(frag, source, fragment_nodes, sig)
         if "extraction" in frag:
-            receipt = dict(frag["extraction"])
-            receipt["content_hash"] = hashlib.sha256(receipt["source_text"].encode("utf-8")).hexdigest()
-            receipt["outcomes"] = frag["outcomes"]
-            receipt["relations"] = frag["relations"]
+            receipt = _extract.extraction_record(frag)
             # Proposals and resolved graph nodes are distinct: record the mapping
             # so a reviewer can see which source name was merged into which concept.
             receipt["concept_ids"] = {o["name"]: fragment_nodes[rc.tokenize(o["name"])]
@@ -745,6 +742,7 @@ class WorkingGraph:
         provenance: Dict[str, List[str]] = {}
         outcome_hashes: Dict[str, str] = {}
         relations_out: List[dict] = []
+        outcome_ids: Dict[int, str] = {}
         used: Set[str] = set()
 
         structural_excluded = 0
@@ -786,6 +784,7 @@ class WorkingGraph:
                 oid = f"{base}_{n}"
                 n += 1
             used.add(oid)
+            outcome_ids[node] = oid
             process_outcomes.append({
                 "id": oid,
                 "name": label,
@@ -815,8 +814,10 @@ class WorkingGraph:
                 continue
             relations_out.append({
                 "from": fl,
+                "from_id": outcome_ids[e["from_id"]],
                 "type": e["type"],
                 "to": tl,
+                "to_id": outcome_ids[e["to_id"]],
                 "sources": sorted(self._rel_sources.get(
                     (e["from_id"], e["type"], e["to_id"]), set())),
             })
@@ -832,6 +833,7 @@ class WorkingGraph:
             "provenance": provenance,
             "relations": relations_out,
             "concept_hashes": outcome_hashes,
+            "extraction_evidence": _extract.proposal_evidence(self.extractions),
         }
 
     # ---- persistence (Phase 2) ----

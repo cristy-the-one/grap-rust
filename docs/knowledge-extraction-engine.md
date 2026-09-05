@@ -1,5 +1,11 @@
 # Knowledge Extraction Engine — direction note
 
+> September 2026: LLM extraction remains active. The [current implementation and
+> local-model evaluation](llm-extraction-improvement-2026-09.md) cover source quotes,
+> replacement on successful refresh, durable receipts, and relation-preserving
+> candidate exports. The design discussion below includes aspirations beyond the
+> implemented behavior.
+
 > Status: **implemented (v1, assisted extraction).** The design discussion below
 > has been built as `mcp-server/grap_mcp/kee/` (embeddings, llm, extract,
 > reconcile, pipeline, validate), the `extract_ontology` MCP tool, a GUI hook in

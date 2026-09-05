@@ -42,6 +42,92 @@ model/prompt identity, accepted claims, quote offsets and stable concept IDs.
 Older graphs migrate without model calls; refresh them explicitly to add receipts.
 The existing Rust graph and entity index remain the resolver and retrieval engine.
 
-Validation so far: **372 Python tests pass**, including failed-refresh recovery,
+Validation: **375 Python tests pass**, including failed-refresh recovery,
 empty-result retraction, persisted receipts, malformed-output quarantine, second
 look replacement, and literal endpoint recovery.
+
+## Proposals survive export
+
+Candidate YAML now retains `relations` and compact `extraction_evidence`, including
+quotes, offsets, chunk hashes and model/prompt identity. This covers both the
+default graph loop and the legacy stateless path. Full chunk text stays in SQLite
+for durable graphs; exports carry quoted excerpts instead of duplicating whole
+documents. Graph-loop relation endpoints also carry the exported outcome IDs.
+Duplicate source labels fail before extraction so files cannot silently overwrite
+each other's claims. Single-use extraction reports failed chunks and quality
+counts, and its fragment count no longer accidentally reports second looks.
+
+These relations remain proposals in the candidate artifact. Loading its ASPICE
+outcome model does not automatically turn them into evidence or logical axioms.
+The existing explicit relation projection tools remain available. In particular,
+the `process_outcomes`/`required_characteristics` compatibility model is still an
+ASPICE-oriented view, not a general class/instance ontology or OWL reasoner.
+
+## Local model experiment
+
+Six authored development cases cover a process requirement, negation, English and
+Romanian legal relations, an empty page and a malicious instruction embedded in
+source text. Five positive triples and selected forbidden claims are labeled.
+These were used during development, so they are not a held-out acceptance set.
+
+Both arms use the current extraction boundary and Rust-backed `WorkingGraph`;
+only the system prompt changes (baseline commit `bd27c20`). The resolver uses a
+deterministic hashing embedder with approximate merging disabled (`sim=1.1`).
+This isolates naming/direction/endpoint retention; it does not measure semantic
+entity resolution, long-document accuracy or graph-context quality. No second
+looks are used. Ollama served both models locally, temperature 0, maximum 1,200
+output tokens, no retries, after a warm-up call per model. Times are single runs,
+with the old arm run first, and should not be treated as a performance benchmark.
+
+| Model / prompt | Usable replies | Selected triples retained | Forbidden assertions detected | Quoted claims | Median seconds |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Llama 3.1 8B Q4 / old | 4/6 | 0/5 | 0 | 0/20 | 0.91 |
+| Llama 3.1 8B Q4 / new | 5/6 | 5/5 | 0 | 20/22 | 1.38 |
+| Qwen 2.5 14B Q4 / old | 5/6 | 1/5 | 2 | 0/13 | 0.86 |
+| Qwen 2.5 14B Q4 / new | 6/6 | 5/5 | 1 | 23/23 | 2.33 |
+
+Counts include deterministic recovery of omitted, literally quoted endpoints.
+Forbidden counts cover parsed proposals only; zero is not a precision score.
+The Llama new-prompt empty-page response was prose and correctly failed parsing.
+Qwen still extracted the fabricated Moon claim from the malicious instruction,
+with an exact quote. Llama also emitted a Romanian negative relation type despite
+the instruction to omit it. Quotes establish location, not entailment or truth;
+an outcome quote also does not independently validate every characteristic.
+The result supports retaining LLM extraction and improving its boundary, not
+automatic trust or a claim that hallucination has been solved.
+
+Raw replies and scores: [extraction-evaluation-2026-09.json](experiments/extraction-evaluation-2026-09.json).
+Cases: [extraction-cases.json](experiments/extraction-cases.json).
+Runner: [evaluate_extraction.py](experiments/evaluate_extraction.py).
+
+From the repository root, reproduce scoring without a model:
+
+```powershell
+$env:PYTHONPATH = "$PWD/mcp-server"
+.venv/Scripts/python.exe docs/experiments/evaluate_extraction.py `
+  --rescore docs/experiments/extraction-evaluation-2026-09.json `
+  --output .logs/extraction-rescored.json
+```
+
+For fresh model replies, omit `--rescore` and use `--models` with the installed
+model names from the result file. `--base-url` defaults to the local Ollama `/v1`
+endpoint. No paid service or additional model download was used in this pass.
+
+## Using the improved path
+
+`extract_ontology(path, model=...)` writes a proposed artifact with relation and
+quote metadata. Inspect it through `get_proposed_ontology(version_hash)`.
+For a durable corpus, `extend_extraction_graph(path, docs_path, refresh=True)`
+deliberately re-extracts visible chunks with the configured model/prompt; normal
+runs skip successfully processed unchanged chunks. Batch configurations accept
+`extract.refresh`. Inspect one durable source with
+`get_extraction_evidence(path, source="plan#0")`. Its successful receipt and latest
+failed attempt are separate. Provider configuration still uses `GRAP_LLM_BASE_URL`
+and `GRAP_LLM_MODEL`; `GRAP_LLM_STUB=1` selects the offline stub.
+
+Existing graphs acquire receipts when refreshed; they cannot retroactively prove
+old claims. Schema migration itself makes no model calls. Refreshing a corpus is
+an explicit cost, not an automatic consequence of upgrading. SQLite saves still
+compare O(N) records and write only changes; receipts add storage and comparison
+work proportional to source text and claims. Larger corpus measurements remain
+necessary before claiming an end-to-end throughput improvement.

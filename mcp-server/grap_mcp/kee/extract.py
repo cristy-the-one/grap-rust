@@ -13,6 +13,7 @@ Fragment shape:
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import os
@@ -412,3 +413,18 @@ def extract_fragments(chunks: Sequence[Tuple[str, str]], provider) -> List[Dict[
         if frag is not None and (frag["outcomes"] or frag["relations"]):
             fragments.append(frag)
     return fragments
+
+
+def extraction_record(frag: dict) -> dict:
+    """Source receipt shared by durable and single-use extraction."""
+    record = dict(frag["extraction"])
+    record["content_hash"] = hashlib.sha256(record["source_text"].encode("utf-8")).hexdigest()
+    record["outcomes"] = frag["outcomes"]
+    record["relations"] = frag["relations"]
+    return record
+
+
+def proposal_evidence(records: dict) -> dict:
+    """Keep quotes and source fingerprints without copying full documents into YAML."""
+    return {source: {key: value for key, value in record.items() if key != "source_text"}
+            for source, record in records.items()}

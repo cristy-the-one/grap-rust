@@ -66,13 +66,18 @@ def graph_extract_ontology(chunks: Sequence[Tuple[str, str]], provider, embedder
                            concurrency: int = 1) -> Dict[str, Any]:
     budget = math.ceil(relook_ratio * len(chunks)) if chunks else 0
     relooks = 0
+    quality = QualityMonitor(class_vocab=extract.CLASS_VOCAB)
+    failures = []
 
     with WorkingGraph(embedder, merge_threshold=sim, context_cap=context_cap,
                       workdir=workdir) as wg:
         for window, results in _extract_windows(wg, list(chunks), provider, concurrency):
-            for (source, text), (frag, _reason) in zip(window, results):
+            for (source, text), (frag, reason) in zip(window, results):
                 if frag is None:
+                    quality.record_failure(reason)
+                    failures.append({"source": source, "reason": reason})
                     continue
+                quality.record(frag)
                 sig = wg.upsert_fragment(frag, source)
                 if sig.warrants_relook() and relooks < budget:
                     relooks += 1
@@ -86,8 +91,11 @@ def graph_extract_ontology(chunks: Sequence[Tuple[str, str]], provider, embedder
         return {
             "ontology": wg.to_candidate_ontology(version),
             "chunks": len(chunks),
+            "fragments": len(wg.extractions),
             "relooks": relooks,
             "parked": len(wg.parked),
+            "quality": quality.report(),
+            "failures": failures,
         }
 
 

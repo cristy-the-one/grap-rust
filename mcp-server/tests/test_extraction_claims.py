@@ -1,13 +1,51 @@
 import hashlib
 import json
 
+import pytest
+import yaml
+
 from grap_mcp.application import GrapApplication
 from grap_mcp.kee import extract
+from grap_mcp.kee import pipeline
 from grap_mcp.kee.embeddings import HashingEmbedder
 from grap_mcp.kee.graph_extract import extend_graph_ontology
 from grap_mcp.kee.graph_store import GraphStore
 from grap_mcp.kee.llm import StubProvider
 from grap_mcp.kee.working_graph import WorkingGraph
+
+
+@pytest.mark.parametrize("graph_augmented", [True, False])
+def test_single_use_export_keeps_relations_and_source_quotes(tmp_path, graph_augmented):
+    source = "The Council issues Order 17."
+    (tmp_path / "act.txt").write_text(source, encoding="utf-8")
+    provider = StubProvider(default=json.dumps({"outcomes": [], "relations": [
+        {"from": "Council", "type": "issues", "to": "Order 17", "evidence": source}]}))
+    result = pipeline.extract_ontology(str(tmp_path), provider, HashingEmbedder(),
+                                       sim=1.1, graph_augmented=graph_augmented)
+    saved = yaml.safe_load(pipeline.to_yaml(result["ontology"]))
+    assert saved["relations"][0]["from"] == "Council"
+    assert saved["relations"][0]["to"] == "Order 17"
+    receipt = saved["extraction_evidence"]["act#0"]
+    assert receipt["content_hash"] == hashlib.sha256(source.encode()).hexdigest()
+    assert "source_text" not in receipt  # compact exports retain quoted excerpts
+    assert receipt["relations"][0]["evidence"]["quote"] == source
+    assert receipt["prompt_version"] == extract.PROMPT_VERSION
+    if graph_augmented:
+        assert result["fragments"] == 1
+        assert result["quality"]["quoted_claims"] == 3
+        ids = {o["id"] for o in saved["process_outcomes"]}
+        assert saved["relations"][0]["from_id"] in ids
+        assert saved["relations"][0]["to_id"] in ids
+
+
+def test_duplicate_source_labels_fail_before_model_calls(tmp_path):
+    for folder in ("a", "b"):
+        (tmp_path / folder).mkdir()
+        (tmp_path / folder / "plan.txt").write_text("Plan defines coverage.", encoding="utf-8")
+    provider = StubProvider(default=response())
+    with pytest.raises(ValueError, match="Duplicate extraction source label"):
+        pipeline.extract_ontology(str(tmp_path), provider, HashingEmbedder())
+    assert not provider.calls
 
 
 def response(char="coverage", evidence=None):
