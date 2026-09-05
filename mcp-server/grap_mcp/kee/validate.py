@@ -30,6 +30,6 @@ def validate_ontology(onto: Dict[str, Any]) -> Dict[str, Any]:
         if not str(o.get("name", "")).strip():
             errors.append(f"outcome '{oid}' has no name")
         if not o.get("required_characteristics"):
-            warnings.append(f"outcome '{oid}' has no characteristics (will always read as a gap)")
+            warnings.append(f"outcome '{oid}' has no assessment requirements; gap detection skips it")
 
     return {"ok": not errors, "errors": errors, "warnings": warnings}

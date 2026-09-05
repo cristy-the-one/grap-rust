@@ -24,7 +24,7 @@ def test_empty_characteristics_is_warning_not_error():
     onto = {"process_outcomes": [{"id": "x", "name": "X", "required_characteristics": []}]}
     rep = validate_ontology(onto)
     assert rep["ok"] is True
-    assert any("no characteristics" in w for w in rep["warnings"])
+    assert any("no assessment requirements" in w for w in rep["warnings"])
 
 
 def test_no_outcomes_warns():

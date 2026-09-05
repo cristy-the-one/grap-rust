@@ -1,0 +1,28 @@
+[
+  {
+    "id": "required-en",
+    "text": "The Test Plan shall record coverage. The Council issues Order 17.",
+    "relations": [["Council", "issues", "Order 17"]],
+    "requirements": [["Test Plan", "coverage"]],
+    "no_requirements": ["Council", "Order 17"]
+  },
+  {
+    "id": "descriptive-en",
+    "text": "The Test Plan records coverage. The Council issues Order 17.",
+    "relations": [["Council", "issues", "Order 17"]],
+    "no_requirements": ["Test Plan", "Council", "Order 17"]
+  },
+  {
+    "id": "required-ro",
+    "text": "Planul de testare trebuie să precizeze acoperirea. Consiliul emite Ordinul 17.",
+    "relations": [["Consiliul", "emite", "Ordinul 17"]],
+    "requirements": [["Planul de testare", "acoperire"]],
+    "no_requirements": ["Consiliul", "Ordinul 17"]
+  },
+  {
+    "id": "descriptive-ro",
+    "text": "Planul de testare precizează acoperirea. Consiliul emite Ordinul 17.",
+    "relations": [["Consiliul", "emite", "Ordinul 17"]],
+    "no_requirements": ["Planul de testare", "Consiliul", "Ordinul 17"]
+  }
+]

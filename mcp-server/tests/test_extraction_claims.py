@@ -5,6 +5,7 @@ import pytest
 import yaml
 
 from grap_mcp.application import GrapApplication
+from grap_mcp import ontology, reasoner
 from grap_mcp.kee import extract
 from grap_mcp.kee import pipeline
 from grap_mcp.kee.embeddings import HashingEmbedder
@@ -46,6 +47,23 @@ def test_duplicate_source_labels_fail_before_model_calls(tmp_path):
     with pytest.raises(ValueError, match="Duplicate extraction source label"):
         pipeline.extract_ontology(str(tmp_path), provider, HashingEmbedder())
     assert not provider.calls
+
+
+def test_named_entities_do_not_become_assessment_requirements(tmp_path):
+    source = "The Test Plan shall record coverage. The Council issues Order 17."
+    (tmp_path / "doc.txt").write_text(source, encoding="utf-8")
+    provider = StubProvider(default=json.dumps({"outcomes": [
+        {"name": "Test Plan", "requirements": ["coverage"], "evidence": source},
+        {"name": "Council", "requirements": [], "characteristics": ["issues Order 17"], "evidence": source}],
+        "relations": [{"from": "Council", "type": "issues", "to": "Order 17", "evidence": source}]}))
+    result = pipeline.extract_ontology(str(tmp_path), provider, HashingEmbedder(), sim=1.1)
+    candidate = tmp_path / "candidate.yaml"
+    candidate.write_text(pipeline.to_yaml(result["ontology"]), encoding="utf-8")
+    loaded = ontology.load_ontology_from_file(str(candidate))
+    assert {o.name for o in loaded.process_outcomes} == {"Test Plan", "Council", "Order 17"}
+    with WorkingGraph(HashingEmbedder()) as empty_evidence:
+        gaps = reasoner.detect_gaps(empty_evidence.kg, loaded)
+    assert [(g["outcome_name"], g["missing_characteristic"]) for g in gaps] == [("Test Plan", "coverage")]
 
 
 def response(char="coverage", evidence=None):
@@ -152,6 +170,18 @@ def test_explicit_refresh_reprocesses_unchanged_sources(tmp_path):
     assert len(p.calls) == 1
     run(tmp_path, p, refresh=True)
     assert len(p.calls) == 2
+
+
+def test_malformed_requirements_cannot_erase_previous_criteria(tmp_path):
+    path = document(tmp_path)
+    run(tmp_path, StubProvider(default=response("coverage")))
+    path.write_text("The Test Plan shall record ownership.", encoding="utf-8")
+    provider = StubProvider(default=json.dumps({
+        "outcomes": [{"name": "Test Plan", "requirements": "ownership"}], "relations": []}))
+    result = run(tmp_path, provider)
+    assert result["stale_chunks"] == ["plan#0"]
+    assert result["quality"]["schema_failures"] == 1
+    assert result["ontology"]["process_outcomes"][0]["required_characteristics"] == ["coverage"]
 
 
 def test_deleted_failed_source_clears_failure_record(tmp_path):

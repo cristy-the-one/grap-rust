@@ -42,7 +42,7 @@ model/prompt identity, accepted claims, quote offsets and stable concept IDs.
 Older graphs migrate without model calls; refresh them explicitly to add receipts.
 The existing Rust graph and entity index remain the resolver and retrieval engine.
 
-Validation: **375 Python tests pass**, including failed-refresh recovery,
+Validation: **378 Python tests and 18 GUI tests pass**, including failed-refresh recovery,
 empty-result retraction, persisted receipts, malformed-output quarantine, second
 look replacement, and literal endpoint recovery.
 
@@ -56,6 +56,12 @@ documents. Graph-loop relation endpoints also carry the exported outcome IDs.
 Duplicate source labels fail before extraction so files cannot silently overwrite
 each other's claims. Single-use extraction reports failed chunks and quality
 counts, and its fragment count no longer accidentally reports second looks.
+
+Two-model extraction also retains each complete source proposal as an immutable
+artifact. The agreement artifact and response link these in `source_proposals`,
+including each arm's quality and failed chunks. Intersecting outcomes no longer
+destroys the only record of relations and supporting quotes. Agreement measures
+consistency between model responses; it does not establish factual correctness.
 
 These relations remain proposals in the candidate artifact. Loading its ASPICE
 outcome model does not automatically turn them into evidence or logical axioms.
@@ -82,21 +88,24 @@ with the old arm run first, and should not be treated as a performance benchmark
 | Model / prompt | Usable replies | Selected triples retained | Forbidden assertions detected | Quoted claims | Median seconds |
 | --- | ---: | ---: | ---: | ---: | ---: |
 | Llama 3.1 8B Q4 / old | 4/6 | 0/5 | 0 | 0/20 | 0.91 |
-| Llama 3.1 8B Q4 / new | 5/6 | 5/5 | 0 | 20/22 | 1.38 |
+| Llama 3.1 8B Q4 / new (v4) | 5/6 | 5/5 | 0 | 23/24 | 1.46 |
 | Qwen 2.5 14B Q4 / old | 5/6 | 1/5 | 2 | 0/13 | 0.86 |
-| Qwen 2.5 14B Q4 / new | 6/6 | 5/5 | 1 | 23/23 | 2.33 |
+| Qwen 2.5 14B Q4 / new (v4) | 5/6 | 5/5 | 1 | 16/18 | 1.99 |
 
 Counts include deterministic recovery of omitted, literally quoted endpoints.
 Forbidden counts cover parsed proposals only; zero is not a precision score.
-The Llama new-prompt empty-page response was prose and correctly failed parsing.
-Qwen still extracted the fabricated Moon claim from the malicious instruction,
-with an exact quote. Llama also emitted a Romanian negative relation type despite
-the instruction to omit it. Quotes establish location, not entailment or truth;
+The Llama new-prompt empty-page response was prose; Qwen returned `{}` without
+the required arrays. Both correctly failed the extraction boundary. The earlier
+v2 prompt produced a valid empty Qwen response; the longer requirement prompt
+regressed that case. Qwen still extracted the fabricated Moon entity from the
+malicious instruction, with an exact quote. Llama supplied an invented Moon quote
+that the normalizer rejected. Quotes establish location, not entailment or truth;
 an outcome quote also does not independently validate every characteristic.
 The result supports retaining LLM extraction and improving its boundary, not
 automatic trust or a claim that hallucination has been solved.
 
-Raw replies and scores: [extraction-evaluation-2026-09.json](experiments/extraction-evaluation-2026-09.json).
+Final v4 replies and scores: [extraction-v4-2026-09.json](experiments/extraction-v4-2026-09.json).
+Initial v2 run: [extraction-evaluation-2026-09.json](experiments/extraction-evaluation-2026-09.json).
 Cases: [extraction-cases.json](experiments/extraction-cases.json).
 Runner: [evaluate_extraction.py](experiments/evaluate_extraction.py).
 
@@ -105,13 +114,57 @@ From the repository root, reproduce scoring without a model:
 ```powershell
 $env:PYTHONPATH = "$PWD/mcp-server"
 .venv/Scripts/python.exe docs/experiments/evaluate_extraction.py `
-  --rescore docs/experiments/extraction-evaluation-2026-09.json `
+  --rescore docs/experiments/extraction-v4-2026-09.json `
   --output .logs/extraction-rescored.json
 ```
 
 For fresh model replies, omit `--rescore` and use `--models` with the installed
 model names from the result file. `--base-url` defaults to the local Ollama `/v1`
 endpoint. No paid service or additional model download was used in this pass.
+
+## Requirements are not descriptions
+
+The old model-facing `characteristics` field fed directly into the ontology's
+`required_characteristics`. A description such as "Plan records coverage" could
+therefore become a mandatory assessment criterion. The current prompt (v4) names
+the field `requirements` and gives a contrast with "Plan shall record coverage".
+One adapter in `normalize_fragment` maps it to existing graph storage; explicit
+requirements, including an empty list, take precedence over the legacy field.
+Existing callers using `characteristics` remain supported.
+
+No new graph type or assessment flag is necessary: the Rust-backed pipeline can
+already keep named entities with no criteria, and the reasoner skips those
+entities during gap checking. A regression spans extraction, YAML loading and
+gap detection to verify this. The validator's contrary "always a gap" warning
+was wrong and is corrected.
+
+Four additional English/Romanian cases compare required and descriptive sentences:
+
+| Model | Actual requirements retained (v2 / v3 / v4) | Descriptive concepts incorrectly given requirements (v2 / v3 / v4) |
+| --- | --- | --- |
+| Llama 3.1 8B Q4 | 2/2 / 2/2 / 2/2 | 2 / 1 / 2 |
+| Qwen 2.5 14B Q4 | 2/2 / 2/2 / 2/2 | 2 / 2 / 1 |
+
+v3 only strengthened the wording; v4 renamed the field and added examples. The
+results do **not** establish reliable requirement classification. The explicit
+field clarifies the interface with a small compatibility adapter, but a longer
+prompt is not a semantic validator. Further work should evaluate domain-labeled
+requirements and model quality, not add a series of language-specific keyword
+filters that happen to pass these four cases. Automatic adoption remains an
+optional policy; its existing integrity/churn checks do not validate entailment.
+
+[Cases](experiments/extraction-requirement-cases.json),
+[v3 replies](experiments/extraction-requirements-2026-09.json),
+[v3 prompt](experiments/extraction-requirements-v3-prompt.txt), and
+[v4 replies](experiments/extraction-requirements-v4-2026-09.json) retain the failed
+approach as well as the final one. Use `--cases` with this case file and
+`--baseline ba46e2f` for a v2-to-current comparison.
+
+Incomplete extraction is now a deterministic reason to block **automatic**
+adoption across single-use, incremental batch and two-model paths. Its candidate
+stays available for review, while the active ontology remains unchanged. This
+checks completeness, not semantic truth, and avoids a partial model response
+silently replacing a complete earlier ontology.
 
 ## Using the improved path
 

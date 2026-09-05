@@ -607,7 +607,8 @@ class GrapApplication:
 
 
     def _publish_and_gate_proposal(self, yaml_text: str, source: str, provider_name: str,
-                                   embedder_name: str, outcomes_count: int):
+                                   embedder_name: str, outcomes_count: int, *,
+                                   extraction_complete: bool = True):
         """Publish a candidate ontology as a *proposed* version, audit it, and —
         when the governed adoption policy is enabled — let the policy decide:
         pass -> auto-adopt (audited adopted_by=policy); fail -> audited rejection
@@ -631,6 +632,12 @@ class GrapApplication:
         auto_adoption = None
         policy = governance.merged_policy(config_store.load_config(self._resolve_ws_root()))
         if policy.get("enabled"):
+            if not extraction_complete:
+                ws.record_event("adoption_policy_rejected", version.hash,
+                                details={"failed": "incomplete_extraction"})
+                return version, {"attempted": False, "pass": False, "adopted": False,
+                                 "failed_checks": ["incomplete_extraction"],
+                                 "reason": "Some source chunks failed extraction; review or retry before adoption"}
             active_hash = getattr(self._state, "ontology_version", None)
             if active_hash and ws.get_record(active_hash) == yaml_text:
                 return version, {"attempted": False, "reason": "already_active"}
@@ -730,7 +737,8 @@ class GrapApplication:
             Path(out).write_text(yaml_text, encoding="utf-8")
             version, auto_adoption = self._publish_and_gate_proposal(
                 yaml_text, path, provider.name, embedder.name,
-                len(onto["process_outcomes"]))
+                len(onto["process_outcomes"]),
+                extraction_complete=not result.get("failures"))
 
             return {
                 "status": "ok",
@@ -889,7 +897,9 @@ class GrapApplication:
         model_disagreement, cleared when a later run agrees fully).
 
         `models`: exactly two specs — a model name string, or
-        {"base_url", "model", "extra_body"} for a specific local server."""
+        {"base_url", "model", "extra_body"} for a specific local server.
+        Each source proposal remains inspectable by hash. Agreement measures
+        consistency between models, not factual verification."""
         denied = self._require("operator")
         if denied:
             return denied
@@ -899,13 +909,28 @@ class GrapApplication:
             from .kee import pipeline as kee_pipeline
             embedder = self.get_embedder()
             ontos = []
+            source_proposals = []
+            ws = self._get_workspace()
             for spec in models:                     # sequential on purpose: local
                 prov = self._provider_from_spec(spec)    # models share one GPU
                 res = kee_pipeline.extract_ontology(path, prov, embedder,
                                                     sim=sim, max_files=max_files)
                 ontos.append(res["ontology"])
+                # Keep each model's complete proposal, including quotes and
+                # relations, before intersecting outcomes and requirements.
+                model_name = getattr(prov, "model", None) or (
+                    spec.get("model", "?") if isinstance(spec, dict) else spec)
+                source_version = ws.publish_ontology(
+                    kee_pipeline.to_yaml(res["ontology"]),
+                    metadata={"kind": "extraction_source", "source": path,
+                              "model": str(model_name)})
+                source_proposals.append({"version_hash": source_version.hash,
+                                         "model": model_name,
+                                         "quality": res.get("quality"),
+                                         "failures": res.get("failures", [])})
             merged, disagreement = governance.agreement_merge(
                 ontos[0], ontos[1], embedder, sim)
+            merged["source_proposals"] = source_proposals
 
             import yaml as _yaml
             header = ("# Agreement-set ontology from n-version extraction.\n"
@@ -916,7 +941,8 @@ class GrapApplication:
                                                  default_flow_style=False)
             version, auto = self._publish_and_gate_proposal(
                 yaml_text, path, "nversion", getattr(embedder, "name", "?"),
-                len(merged.get("process_outcomes", [])))
+                len(merged.get("process_outcomes", [])),
+                extraction_complete=not any(p["failures"] for p in source_proposals))
 
             ws = self._get_workspace()
             n_outcomes = (len(disagreement["outcomes_only_in_a"])
@@ -935,6 +961,7 @@ class GrapApplication:
                 logger.warning("audit record_event failed for model_disagreement",
                                exc_info=True)
             return {"status": "ok", "version_hash": version.hash,
+                    "source_proposals": source_proposals,
                     "auto_adoption": auto,
                     "agreed_outcomes": disagreement["agreed_outcomes"],
                     "disagreement": disagreement,
@@ -1674,7 +1701,8 @@ class GrapApplication:
                         yaml_text, ext["docs_path"],
                         getattr(self.get_provider(), "name", "?"),
                         getattr(self.get_embedder(), "name", "?"),
-                        len(out["ontology"].get("process_outcomes", [])))
+                        len(out["ontology"].get("process_outcomes", [])),
+                        extraction_complete=not out.get("pending_chunks"))
                     # Forward the extractor's own telemetry rather than a fixed key
                     # list: quality indicators and promotion counts were being
                     # silently dropped here, so a run's extraction *shape* never

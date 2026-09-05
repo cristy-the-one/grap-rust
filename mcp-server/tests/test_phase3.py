@@ -173,6 +173,14 @@ def test_nversion_adopts_agreement_and_queues_disagreement(tmp_path, monkeypatch
     assert res["agreed_outcomes"] == 1
     assert res["auto_adoption"]["adopted"] is True       # agreement set adopted
     assert res["disputed_version_hash"]                  # residue published
+    sources = res["source_proposals"]
+    assert [p["model"] for p in sources] == ["m1", "m2"]
+    saved = [s.get_proposed_ontology(p["version_hash"])["parsed"] for p in sources]
+    assert all("v#0" in p["extraction_evidence"] for p in saved)
+    assert len(saved[0]["process_outcomes"]) == 2
+    assert len(saved[1]["process_outcomes"]) == 1
+    agreement = s.get_proposed_ontology(res["version_hash"])["parsed"]
+    assert agreement["source_proposals"] == sources
     q = s.list_pending_interventions()
     assert any(i["kind"] == "model_disagreement" for i in q["pending"])
 
@@ -186,3 +194,26 @@ def test_nversion_adopts_agreement_and_queues_disagreement(tmp_path, monkeypatch
 def test_nversion_requires_two_models(tmp_path, monkeypatch):
     s = _server(tmp_path, monkeypatch)
     assert s.extract_ontology_nversion("x", models=["only-one"])["status"] == "error"
+
+
+def test_partial_extraction_never_auto_replaces_the_active_ontology(tmp_path, monkeypatch):
+    s = _server(tmp_path, monkeypatch)
+    baseline = _baseline(s, tmp_path)
+    assert s.set_policy("enabled", True, rationale="on")["status"] == "ok"
+    docs = tmp_path / "partial"
+    docs.mkdir()
+    (docs / "a.txt").write_text("Plan shall include coverage.", encoding="utf-8")
+    (docs / "b.txt").write_text("Broken response for this source.", encoding="utf-8")
+    def handler(system, user):
+        if "Broken response" in user:
+            return "not JSON"
+        return json.dumps({"outcomes": [{"name": "Plan", "requirements": ["coverage"]}], "relations": []})
+    monkeypatch.setattr(s, "get_provider", lambda **kwargs: StubProvider(handler=handler))
+    monkeypatch.setattr(s, "get_embedder", lambda: HashingEmbedder(64))
+    result = s.extract_ontology(str(docs))
+    assert result["status"] == "ok"  # the partial proposal remains inspectable
+    assert result["failures"] == [{"source": "b#0", "reason": "unparsed"}]
+    assert result["auto_adoption"]["failed_checks"] == ["incomplete_extraction"]
+    assert not result["auto_adoption"]["adopted"]
+    assert s._state.ontology_version == baseline
+    assert s.get_proposed_ontology(result["version_hash"])["status"] == "ok"
