@@ -17,7 +17,7 @@
 > via a stub provider + hashing embedder.
 >
 > **Configuration (env):**
-> - `GRAP_LLM_BASE_URL` (default `http://localhost:11434/v1`), `GRAP_LLM_MODEL`,
+> - `GRAP_LLM_BASE_URL` (default `http://127.0.0.1:11434/v1`), `GRAP_LLM_MODEL`,
 >   `GRAP_LLM_API_KEY`; `GRAP_LLM_STUB=1` forces the offline stub. The model is
 >   also selectable per-call (`extract_ontology(model=…)`) / from the GUI.
 > - `GRAP_EMBED_BACKEND`: `auto` (default — sentence-transformers, else hashing),

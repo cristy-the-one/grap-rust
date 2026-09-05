@@ -317,6 +317,9 @@ class WorkingGraph:
             for src in sources_for.get(name, ()):
                 if src:
                     self.node_sources.setdefault(res.node_id, set()).add(src)
+                    self._chunk_contrib.setdefault(
+                        src, {"concepts": set(), "chars": set(), "edges": set()}
+                    )["concepts"].add(res.node_id)
         promoted = len(self.canonical) - before_nodes
 
         # Prefetch EVERY endpoint the re-attempt below will try to resolve, not
@@ -345,9 +348,7 @@ class WorkingGraph:
         before_rels = len(self.relations)
         sig = Signals()
         for source, items in by_source.items():
-            # On a graph reopened from disk `_chunk_contrib` is empty (it is
-            # per-run bookkeeping, not persisted), and _relations_pass indexes
-            # into it directly.
+            # Promotion shares the same contribution index as normal intake.
             self._chunk_contrib.setdefault(
                 source, {"concepts": set(), "chars": set(), "edges": set()})
             frag = {"relations": [{"from": p.get("from"), "type": p.get("type"),
@@ -389,11 +390,14 @@ class WorkingGraph:
         existing ids; remove concepts only if the new proposal leaves them with
         no source. A second look can now retract its first incorrect assertion.
         """
-        old = [cid for cid, sources in self.node_sources.items() if source in sources]
+        previous = self._chunk_contrib.get(source)
+        if previous is None:
+            return self.upsert_fragment(frag, source)
+        old = set(previous["concepts"])
         self.retract_chunk(source, keep_concepts=True)
         signals = self.upsert_fragment(frag, source)
         for cid in old:
-            if not self.node_sources.get(cid):
+            if cid in self.canonical and not self.node_sources.get(cid):
                 self._retract_concept(cid)
         self._sync_edges()
         return signals
@@ -543,8 +547,8 @@ class WorkingGraph:
 
         Replacement can retain concept identities until new claims are resolved.
         """
-        contrib = self._chunk_contrib.pop(chunk_id, None)
-        for (node, text) in (contrib["chars"] if contrib else list(self._char_sources)):
+        contrib = self._chunk_contrib.pop(chunk_id, {"concepts": set(), "chars": set(), "edges": set()})
+        for (node, text) in contrib["chars"]:
             srcs = self._char_sources.get((node, text))
             if srcs is None:
                 continue
@@ -553,7 +557,7 @@ class WorkingGraph:
                 self._char_sources.pop((node, text), None)
                 if node in self.chars and text in self.chars[node]:
                     self.chars[node].remove(text)
-        for (fn, tn) in (contrib["edges"] if contrib else [(e["from_id"], e["to_id"]) for e in list(self.relations)]):
+        for (fn, tn) in contrib["edges"]:
             ty = self._edge_types.get((fn, tn))
             if ty is None:
                 continue
@@ -563,7 +567,7 @@ class WorkingGraph:
                 srcs.discard(chunk_id)
             if not srcs:
                 self._remove_edge(fn, tn, ty)
-        for node in (contrib["concepts"] if contrib else list(self.node_sources)):
+        for node in contrib["concepts"]:
             srcs = self.node_sources.get(node)
             if srcs is None:
                 continue
@@ -897,6 +901,24 @@ class WorkingGraph:
         self._hash_to_node = {h: nid for nid, h in self.concept_hashes.items()}
         self._retracted = set()
         self._chunk_contrib = {}
+        # Rebuild the inverse provenance map once. New chunks then need no
+        # corpus scan, and refreshed chunks touch only their own contributions.
+        def contribution(source):
+            return self._chunk_contrib.setdefault(
+                source, {"concepts": set(), "chars": set(), "edges": set()})
+        for node, sources in self.node_sources.items():
+            for source in sources:
+                contribution(source)["concepts"].add(node)
+        for key, sources in self._char_sources.items():
+            for source in sources:
+                contribution(source)["chars"].add(key)
+        for (f, _ty, t), sources in self._rel_sources.items():
+            for source in sources:
+                contribution(source)["edges"].add((f, t))
+        for source in self.extractions:
+            contribution(source)
+        for parked in self.parked:
+            contribution(parked["source"])
         self._parent = {}
         self._has_edge = set()
         for f, t, _ty in st.edges:

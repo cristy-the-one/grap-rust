@@ -12,7 +12,7 @@ By default it uses a deterministic StubProvider (canned per-chunk responses) so
 the demo runs offline with no model. To use a real local model, start Ollama
 (or any OpenAI-compatible server) and run with:
 
-    GRAP_LLM_BASE_URL=http://localhost:11434/v1 GRAP_LLM_MODEL=llama3.1:8b \
+    GRAP_LLM_BASE_URL=http://127.0.0.1:11434/v1 GRAP_LLM_MODEL=llama3.1:8b \
         python mcp-server/demo_kee.py --real
 
 For fully-local embeddings via Ollama too (instead of sentence-transformers):

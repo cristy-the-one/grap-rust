@@ -10,7 +10,7 @@ Two GPUs example (one Ollama per GPU):
   # terminal 1: $env:CUDA_VISIBLE_DEVICES="0"; $env:OLLAMA_HOST="127.0.0.1:11434"; ollama serve
   # terminal 2: $env:CUDA_VISIBLE_DEVICES="1"; $env:OLLAMA_HOST="127.0.0.1:11435"; ollama serve
   python scripts/extract_corpus.py real-data-law-ro \
-      --endpoints http://localhost:11434/v1,http://localhost:11435/v1 \
+      --endpoints http://127.0.0.1:11434/v1,http://127.0.0.1:11435/v1 \
       --model llama3.2:3b --chunk-chars 2000 --workers 4 --out out/legal-ontology
 
 Output (in --out):
@@ -135,7 +135,7 @@ def main(argv=None) -> int:
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("path", help="corpus folder (.md/.txt/.json) or single file")
     ap.add_argument("--endpoints",
-                    default=os.environ.get("GRAP_LLM_BASE_URL", "http://localhost:11434/v1"),
+                    default=os.environ.get("GRAP_LLM_BASE_URL", "http://127.0.0.1:11434/v1"),
                     help="comma-separated OpenAI-compatible base URLs (one per GPU)")
     ap.add_argument("--model", default=os.environ.get("GRAP_LLM_MODEL", "llama3.2:3b"))
     ap.add_argument("--api-key", default=os.environ.get("GRAP_LLM_API_KEY"))

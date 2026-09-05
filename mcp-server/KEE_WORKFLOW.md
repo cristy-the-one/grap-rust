@@ -24,7 +24,7 @@ All KEE tools resolve the model through one seam (`GRAP_LLM_BASE_URL` +
 `GRAP_LLM_MODEL`, OpenAI-compatible `/chat/completions`).
 
 ```powershell
-# Ollama (default): base URL already http://localhost:11434/v1
+# Ollama (default): base URL already http://127.0.0.1:11434/v1
 $env:GRAP_LLM_MODEL = "llama3.1:8b"
 
 # Bonsai (llama.cpp llama-server from D:\projects\Bonsai-demo):

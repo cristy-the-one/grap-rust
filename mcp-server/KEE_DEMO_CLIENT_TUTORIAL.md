@@ -147,7 +147,7 @@ ollama pull nomic-embed-text
 ### Run the demo with a real model
 
 ```powershell
-$env:GRAP_LLM_BASE_URL = "http://localhost:11434/v1"
+$env:GRAP_LLM_BASE_URL = "http://127.0.0.1:11434/v1"
 $env:GRAP_LLM_MODEL = "llama3.1:8b"
 # Optional: force embeddings via Ollama
 $env:GRAP_EMBED_BACKEND = "ollama"

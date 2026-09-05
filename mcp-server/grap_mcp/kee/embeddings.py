@@ -113,7 +113,7 @@ EMBED_BATCH = 128
 class OpenAICompatEmbedder:
     """Embedder backed by an OpenAI-compatible /embeddings endpoint.
 
-    Works with Ollama (`http://localhost:11434/v1`, e.g. model
+    Works with Ollama (`http://127.0.0.1:11434/v1`, e.g. model
     `nomic-embed-text`), vLLM, and hosted APIs — so embeddings can be fully
     local via Ollama. Stdlib urllib only; vectors are L2-normalized for
     consistency with the other embedders.

@@ -18,7 +18,9 @@ import urllib.error
 import urllib.request
 from typing import Callable, Iterator, List, Optional, Protocol, runtime_checkable
 
-DEFAULT_BASE_URL = "http://localhost:11434/v1"   # Ollama's OpenAI-compatible API
+# Numeric IPv4 avoids Windows' ~2-second failed ::1 connection before every
+# request to the local IPv4-only Ollama server. Explicit endpoints still win.
+DEFAULT_BASE_URL = "http://127.0.0.1:11434/v1"
 DEFAULT_MODEL = "llama3.1"
 
 

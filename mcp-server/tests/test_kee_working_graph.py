@@ -315,8 +315,7 @@ def test_promote_keeps_provenance_and_is_idempotent(tmp_path):
 
 
 def test_promote_works_on_graph_reopened_from_disk(tmp_path):
-    """The real path: parked relations are promoted on a graph loaded from disk,
-    where per-run bookkeeping like _chunk_contrib is empty."""
+    """Promotion works after restoring provenance from the authoritative store."""
     wd = str(tmp_path / "wd")
     emb = HashingEmbedder()
     wg = WorkingGraph(emb, workdir=wd, merge_threshold=0.99)
@@ -330,7 +329,7 @@ def test_promote_works_on_graph_reopened_from_disk(tmp_path):
     wg.close()
 
     reopened = WorkingGraph.open(wd, emb, merge_threshold=0.99)
-    assert reopened._chunk_contrib == {}, "precondition: bookkeeping is not persisted"
+    assert set(reopened._chunk_contrib) == {"s0", "s1"}
     assert sum(1 for p in reopened.parked if p["reason"] == "ungrounded") == 2
 
     res = reopened.promote_parked_endpoints(min_refs=2)
