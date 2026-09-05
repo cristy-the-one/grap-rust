@@ -36,6 +36,7 @@ def score(case, raw):
                 "expected_emitted": 0, "expected_retained": 0, "forbidden_assertions": 0,
                 "requirements_expected": len(case.get("requirements", [])),
                 "requirements_retained": 0, "unwanted_requirement_concepts": 0,
+                "forbidden_requirements": 0,
                 "claims": 0, "quoted_claims": 0, "rejected_quotes": 0,
                 "empty_correct": False if case.get("empty") else None}
     emitted = {triple((r["from"], r["type"], r["to"])) for r in frag["relations"]}
@@ -62,6 +63,9 @@ def score(case, raw):
                                          for name, term in requirements),
             "unwanted_requirement_concepts": sum(bool(by_name.get(norm(name)))
                                                   for name in case.get("no_requirements", [])),
+            "forbidden_requirements": sum(any(term.lower() in value.lower()
+                                                for value in by_name.get(norm(name), []))
+                                          for name, term in case.get("forbidden_requirements", [])),
             "claims": len(claims), "quoted_claims": sum(c["evidence"]["status"] == "quoted" for c in claims),
             "rejected_quotes": frag["rejected_evidence"],
             "empty_correct": not claims if case.get("empty") else None}

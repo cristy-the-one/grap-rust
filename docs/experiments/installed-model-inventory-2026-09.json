@@ -1,0 +1,714 @@
+{
+  "comfy_root": "D:/ComfyUI_windows_portable/ComfyUI/models",
+  "files": [
+    {
+      "path": "checkpoints\\DreamShaper_8_pruned.safetensors",
+      "gib": 1.99
+    },
+    {
+      "path": "checkpoints\\hunyuan_3d_v2.1.safetensors",
+      "gib": 6.86
+    },
+    {
+      "path": "checkpoints\\v1-5-pruned-emaonly-fp16.safetensors",
+      "gib": 1.99
+    },
+    {
+      "path": "diffusion_models\\flux-2-klein-base-9b-fp8.safetensors",
+      "gib": 8.91
+    },
+    {
+      "path": "diffusion_models\\ideogram4_fp8_scaled.safetensors",
+      "gib": 8.64
+    },
+    {
+      "path": "diffusion_models\\ideogram4_unconditional_fp8_scaled.safetensors",
+      "gib": 8.64
+    },
+    {
+      "path": "diffusion_models\\ltx-2.5-22b-distilled-transformer-comfy-int8-convrot.safetensors",
+      "gib": 20.03
+    },
+    {
+      "path": "diffusion_models\\minimax_h3_fl2va_pruned_int8_convrot.safetensors",
+      "gib": 19.53
+    },
+    {
+      "path": "diffusion_models\\minimax_h3_ref2va_pruned_int8_convrot.safetensors",
+      "gib": 19.53
+    },
+    {
+      "path": "diffusion_models\\minimax_music3_dit_fp16.safetensors",
+      "gib": 4.58
+    },
+    {
+      "path": "diffusion_models\\pid_flux1_1024_to_4096_4step_bf16.safetensors",
+      "gib": 2.54
+    },
+    {
+      "path": "diffusion_models\\pixeldit_1300m_1024px_bf16.safetensors",
+      "gib": 2.43
+    },
+    {
+      "path": "diffusion_models\\qwen_image_edit_2509_fp8_e4m3fn.safetensors",
+      "gib": 19.03
+    },
+    {
+      "path": "diffusion_models\\z_image_turbo_bf16.safetensors",
+      "gib": 11.46
+    },
+    {
+      "path": "diffusion_models\\z_image_turbo_int8_convrot.safetensors",
+      "gib": 5.78
+    },
+    {
+      "path": "latent_upscale_models\\ltx-2.5-latent-spatial-upscaler-x2-bf16-1.0.safetensors",
+      "gib": 0.93
+    },
+    {
+      "path": "loras\\minimax_h3_ref2v_turbo_4step_v0.1_comfyui_bf16.safetensors",
+      "gib": 1.82
+    },
+    {
+      "path": "loras\\Qwen-Image-Edit-2509-Lightning-4steps-V1.0-bf16.safetensors",
+      "gib": 0.79
+    },
+    {
+      "path": "text_encoders\\gemma4-12b-with-proj-ltx-2.5-comfy-int8-convrot.safetensors",
+      "gib": 14.32,
+      "tensors": 1342,
+      "keys_sample": [
+        "model.layers.0.mlp.down_proj.weight_scale",
+        "model.layers.0.mlp.gate_proj.weight_scale",
+        "model.layers.0.mlp.up_proj.weight_scale"
+      ],
+      "heads": [],
+      "embeddings": [
+        [
+          "model.embed_tokens.weight",
+          [
+            262144,
+            3840
+          ]
+        ]
+      ],
+      "metadata_keys": [
+        "format",
+        "gemma_config"
+      ],
+      "architecture": [
+        "Gemma4UnifiedForConditionalGeneration"
+      ]
+    },
+    {
+      "path": "text_encoders\\gemma4_e2b_it_bf16.safetensors",
+      "gib": 9.57,
+      "tensors": 2012,
+      "keys_sample": [
+        "audio_model.layers.0.feed_forward1.ffw_layer_1.input_max",
+        "audio_model.layers.0.feed_forward1.ffw_layer_1.input_min",
+        "audio_model.layers.0.feed_forward1.ffw_layer_1.linear.weight"
+      ],
+      "heads": [],
+      "embeddings": [
+        [
+          "model.embed_tokens.weight",
+          [
+            262144,
+            1536
+          ]
+        ]
+      ]
+    },
+    {
+      "path": "text_encoders\\gemma4_e4b_it_fp8_scaled.safetensors",
+      "gib": 8.44,
+      "tensors": 2417,
+      "keys_sample": [
+        "model.embed_tokens.weight_scale",
+        "model.embed_tokens_per_layer.weight_scale",
+        "model.layers.0.mlp.down_proj.weight_scale"
+      ],
+      "heads": [],
+      "embeddings": [
+        [
+          "model.embed_tokens.weight_scale",
+          []
+        ],
+        [
+          "model.embed_tokens.weight",
+          [
+            262144,
+            2560
+          ]
+        ]
+      ]
+    },
+    {
+      "path": "text_encoders\\gemma_2_2b_it_elm_bf16.safetensors",
+      "gib": 4.87,
+      "tensors": 289,
+      "keys_sample": [
+        "model.embed_tokens.weight",
+        "model.layers.0.input_layernorm.weight",
+        "model.layers.0.mlp.down_proj.weight"
+      ],
+      "heads": [],
+      "embeddings": [
+        [
+          "model.embed_tokens.weight",
+          [
+            256000,
+            2304
+          ]
+        ]
+      ]
+    },
+    {
+      "path": "text_encoders\\minimax_music3_text_encoder_pruned_int8_convrot.safetensors",
+      "gib": 8.57,
+      "tensors": 648,
+      "keys_sample": [
+        "model.audio_decoder.layers.0.mlp.down_proj.weight_scale",
+        "model.audio_decoder.layers.0.mlp.gate_up_proj.weight_scale",
+        "model.audio_decoder.layers.0.self_attn.o_proj.weight_scale"
+      ],
+      "heads": [
+        "model.lm_head_pruned.weight"
+      ],
+      "embeddings": [],
+      "metadata_keys": [
+        "comfy_model",
+        "format"
+      ]
+    },
+    {
+      "path": "text_encoders\\qwen3.5_4b_bf16.safetensors",
+      "gib": 8.68,
+      "tensors": 738,
+      "keys_sample": [
+        "model.language_model.layers.0.linear_attn.A_log",
+        "model.language_model.layers.0.linear_attn.norm.weight",
+        "model.language_model.layers.1.linear_attn.A_log"
+      ],
+      "heads": [],
+      "embeddings": [
+        [
+          "model.language_model.embed_tokens.weight",
+          [
+            248320,
+            2560
+          ]
+        ]
+      ]
+    },
+    {
+      "path": "text_encoders\\qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors",
+      "gib": 14.61,
+      "tensors": 2054,
+      "keys_sample": [
+        "model.embed_tokens.weight_scale",
+        "model.layers.0.mlp.down_proj.weight_scale_2",
+        "model.layers.0.mlp.gate_proj.weight_scale_2"
+      ],
+      "heads": [],
+      "embeddings": [
+        [
+          "model.embed_tokens.weight_scale",
+          [
+            151936,
+            1
+          ]
+        ],
+        [
+          "model.embed_tokens.weight",
+          [
+            151936,
+            5120
+          ]
+        ]
+      ]
+    },
+    {
+      "path": "text_encoders\\qwen3vl_4b_fp8_scaled.safetensors",
+      "gib": 4.88,
+      "tensors": 1217,
+      "keys_sample": [
+        "model.layers.0.mlp.down_proj.weight_scale",
+        "model.layers.0.mlp.gate_proj.weight_scale",
+        "model.layers.0.mlp.up_proj.weight_scale"
+      ],
+      "heads": [],
+      "embeddings": [
+        [
+          "model.embed_tokens.weight",
+          [
+            151936,
+            2560
+          ]
+        ]
+      ],
+      "metadata_keys": [
+        "format"
+      ]
+    },
+    {
+      "path": "text_encoders\\qwen3vl_8b_fp8_scaled.safetensors",
+      "gib": 9.86,
+      "tensors": 1254,
+      "keys_sample": [
+        "model.layers.0.mlp.down_proj.weight_scale",
+        "model.layers.0.mlp.gate_proj.weight_scale",
+        "model.layers.0.mlp.up_proj.weight_scale"
+      ],
+      "heads": [
+        "lm_head.weight"
+      ],
+      "embeddings": [
+        [
+          "model.embed_tokens.weight",
+          [
+            151936,
+            4096
+          ]
+        ]
+      ],
+      "metadata_keys": [
+        "format"
+      ]
+    },
+    {
+      "path": "text_encoders\\qwen_2.5_vl_7b_fp8_scaled.safetensors",
+      "gib": 8.74,
+      "tensors": 1446,
+      "keys_sample": [
+        "model.layers.0.mlp.down_proj.scale_input",
+        "model.layers.0.mlp.down_proj.scale_weight",
+        "model.layers.0.mlp.gate_proj.scale_input"
+      ],
+      "heads": [
+        "lm_head.weight"
+      ],
+      "embeddings": [
+        [
+          "model.embed_tokens.weight",
+          [
+            152064,
+            3584
+          ]
+        ]
+      ]
+    },
+    {
+      "path": "text_encoders\\qwen_3_4b.safetensors",
+      "gib": 7.49,
+      "tensors": 398,
+      "keys_sample": [
+        "model.embed_tokens.weight",
+        "model.layers.0.input_layernorm.weight",
+        "model.layers.0.mlp.down_proj.weight"
+      ],
+      "heads": [],
+      "embeddings": [
+        [
+          "model.embed_tokens.weight",
+          [
+            151936,
+            2560
+          ]
+        ]
+      ]
+    },
+    {
+      "path": "text_encoders\\qwen_3_4b_fp8_mixed.safetensors",
+      "gib": 5.25,
+      "tensors": 788,
+      "keys_sample": [
+        "model.layers.0.mlp.down_proj.weight_scale",
+        "model.layers.0.mlp.gate_proj.weight_scale",
+        "model.layers.0.mlp.up_proj.weight_scale"
+      ],
+      "heads": [],
+      "embeddings": [
+        [
+          "model.embed_tokens.weight",
+          [
+            151936,
+            2560
+          ]
+        ]
+      ]
+    },
+    {
+      "path": "text_encoders\\qwen_3_8b_fp8mixed.safetensors",
+      "gib": 8.07,
+      "tensors": 935,
+      "keys_sample": [
+        "model.layers.0.mlp.gate_proj.weight_scale",
+        "model.layers.0.mlp.up_proj.weight_scale",
+        "model.layers.0.self_attn.k_proj.weight_scale"
+      ],
+      "heads": [],
+      "embeddings": [
+        [
+          "model.embed_tokens.weight",
+          [
+            151936,
+            4096
+          ]
+        ]
+      ]
+    },
+    {
+      "path": "vae\\ae.safetensors",
+      "gib": 0.31
+    },
+    {
+      "path": "vae\\flux2-vae.safetensors",
+      "gib": 0.31
+    },
+    {
+      "path": "vae\\full_encoder_small_decoder.safetensors",
+      "gib": 0.23
+    },
+    {
+      "path": "vae\\ltx-2.5-audio-vae-bf16.safetensors",
+      "gib": 0.34
+    },
+    {
+      "path": "vae\\ltx-2.5-video-vae-bf16.safetensors",
+      "gib": 1.37
+    },
+    {
+      "path": "vae\\ltx-2.5-video-vae-conv-bf16.safetensors",
+      "gib": 1.35
+    },
+    {
+      "path": "vae\\minimax_h3_audio_vae_fp32.safetensors",
+      "gib": 0.56
+    },
+    {
+      "path": "vae\\minimax_h3_video_vae_fp16.safetensors",
+      "gib": 4.85
+    },
+    {
+      "path": "vae\\minimax_music3_dav.safetensors",
+      "gib": 0.2
+    },
+    {
+      "path": "vae\\qwen_image_vae.safetensors",
+      "gib": 0.24
+    },
+    {
+      "path": "vae_approx\\taef1_decoder.safetensors",
+      "gib": 0.0
+    },
+    {
+      "path": "vae_approx\\taef1_encoder.safetensors",
+      "gib": 0.0
+    },
+    {
+      "path": "vae_approx\\taesd3_decoder.safetensors",
+      "gib": 0.0
+    },
+    {
+      "path": "vae_approx\\taesd3_encoder.safetensors",
+      "gib": 0.0
+    },
+    {
+      "path": "vae_approx\\taesd_decoder.safetensors",
+      "gib": 0.0
+    },
+    {
+      "path": "vae_approx\\taesd_encoder.safetensors",
+      "gib": 0.0
+    },
+    {
+      "path": "vae_approx\\taesdxl_decoder.safetensors",
+      "gib": 0.0
+    },
+    {
+      "path": "vae_approx\\taesdxl_encoder.safetensors",
+      "gib": 0.0
+    }
+  ],
+  "ollama": {
+    "models": [
+      {
+        "name": "thinkingcap-qwen36-27b:latest",
+        "model": "thinkingcap-qwen36-27b:latest",
+        "modified_at": "2026-08-10T15:08:42.3446488+03:00",
+        "size": 16810713456,
+        "digest": "d3912745176e2d9a430560e4ec6a4e08f04b3b2a287bd75432b4730fd7652fa4",
+        "details": {
+          "parent_model": "",
+          "format": "gguf",
+          "family": "qwen35",
+          "families": [
+            "qwen35"
+          ],
+          "parameter_size": "27.3B",
+          "quantization_level": "Q4_K_M",
+          "context_length": 262144,
+          "embedding_length": 5120
+        },
+        "capabilities": [
+          "completion"
+        ]
+      },
+      {
+        "name": "qwen3.5:4b-q8_0",
+        "model": "qwen3.5:4b-q8_0",
+        "modified_at": "2026-08-01T17:08:35.1331245+03:00",
+        "size": 5279294453,
+        "digest": "8722f47c2791e6554c3244d2444b433c6241eed92d2093b53ef105626a6dcb36",
+        "details": {
+          "parent_model": "",
+          "format": "gguf",
+          "family": "qwen35",
+          "families": [
+            "qwen35"
+          ],
+          "parameter_size": "4.7B",
+          "quantization_level": "Q8_0",
+          "context_length": 262144,
+          "embedding_length": 2560
+        },
+        "capabilities": [
+          "vision",
+          "completion",
+          "tools",
+          "thinking"
+        ]
+      },
+      {
+        "name": "qwen3-embedding:0.6b",
+        "model": "qwen3-embedding:0.6b",
+        "modified_at": "2026-08-01T16:48:37.9509126+03:00",
+        "size": 639150858,
+        "digest": "ac6da0dfba84a81fdbfbaf330198c33cd77c4cdfc53e8bc50eb581914a15621d",
+        "details": {
+          "parent_model": "/Users/ollama/.ollama/models/blobs/sha256-06507c7b42688469c4e7298b0a1e16deff06caf291cf0a5b278c308249c3e439",
+          "format": "gguf",
+          "family": "qwen3",
+          "families": [
+            "qwen3"
+          ],
+          "parameter_size": "595.78M",
+          "quantization_level": "Q8_0",
+          "context_length": 32768,
+          "embedding_length": 1024
+        },
+        "capabilities": [
+          "embedding"
+        ]
+      },
+      {
+        "name": "gpt-oss:20b",
+        "model": "gpt-oss:20b",
+        "modified_at": "2026-08-01T16:45:54.1375347+03:00",
+        "size": 13793441244,
+        "digest": "17052f91a42e97930aa6e28a6c6c06a983e6a58dbb00434885a0cf5313e376f7",
+        "details": {
+          "parent_model": "",
+          "format": "gguf",
+          "family": "gptoss",
+          "families": [
+            "gptoss"
+          ],
+          "parameter_size": "20.9B",
+          "quantization_level": "MXFP4",
+          "context_length": 131072,
+          "embedding_length": 2880
+        },
+        "capabilities": [
+          "completion",
+          "tools",
+          "thinking"
+        ]
+      },
+      {
+        "name": "qwen3.5:9b-q4_K_M",
+        "model": "qwen3.5:9b-q4_K_M",
+        "modified_at": "2026-08-01T16:28:03.4706636+03:00",
+        "size": 6594474711,
+        "digest": "6488c96fa5faab64bb65cbd30d4289e20e6130ef535a93ef9a49f42eda893ea7",
+        "details": {
+          "parent_model": "",
+          "format": "gguf",
+          "family": "qwen35",
+          "families": [
+            "qwen35"
+          ],
+          "parameter_size": "9.7B",
+          "quantization_level": "Q4_K_M",
+          "context_length": 262144,
+          "embedding_length": 4096
+        },
+        "capabilities": [
+          "vision",
+          "completion",
+          "tools",
+          "thinking"
+        ]
+      },
+      {
+        "name": "vibethinker-3b:latest",
+        "model": "vibethinker-3b:latest",
+        "modified_at": "2026-06-21T16:56:26.7414539+03:00",
+        "size": 1929903618,
+        "digest": "b3871e2699a95fda5315ae345e793bd3ff312647fe072b94ba3229a594d23f7a",
+        "details": {
+          "parent_model": "",
+          "format": "gguf",
+          "family": "qwen2",
+          "families": [
+            "qwen2"
+          ],
+          "parameter_size": "3.1B",
+          "quantization_level": "Q4_K_M",
+          "context_length": 131072,
+          "embedding_length": 2048
+        },
+        "capabilities": [
+          "completion"
+        ]
+      },
+      {
+        "name": "qwen2.5:32b-instruct-q4_K_M",
+        "model": "qwen2.5:32b-instruct-q4_K_M",
+        "modified_at": "2026-06-17T00:47:14.7217502+03:00",
+        "size": 19851349669,
+        "digest": "9f13ba1299afea09d9a956fc6a85becc99115a6d596fae201a5487a03bdc4368",
+        "details": {
+          "parent_model": "",
+          "format": "gguf",
+          "family": "qwen2",
+          "families": [
+            "qwen2"
+          ],
+          "parameter_size": "32.8B",
+          "quantization_level": "Q4_K_M",
+          "context_length": 32768,
+          "embedding_length": 5120
+        },
+        "capabilities": [
+          "completion",
+          "tools"
+        ]
+      },
+      {
+        "name": "llama3.1:8b-instruct-q4_K_M",
+        "model": "llama3.1:8b-instruct-q4_K_M",
+        "modified_at": "2026-06-17T00:29:26.6324244+03:00",
+        "size": 4920753328,
+        "digest": "46e0c10c039e019119339687c3c1757cc81b9da49709a3b3924863ba87ca666e",
+        "details": {
+          "parent_model": "",
+          "format": "gguf",
+          "family": "llama",
+          "families": [
+            "llama"
+          ],
+          "parameter_size": "8.0B",
+          "quantization_level": "Q4_K_M",
+          "context_length": 131072,
+          "embedding_length": 4096
+        },
+        "capabilities": [
+          "completion",
+          "tools"
+        ]
+      },
+      {
+        "name": "gemma2:9b",
+        "model": "gemma2:9b",
+        "modified_at": "2026-06-17T00:20:58.9145818+03:00",
+        "size": 5443152417,
+        "digest": "ff02c3702f322b9e075e9568332d96c0a7028002f1a5a056e0a6784320a4db0b",
+        "details": {
+          "parent_model": "",
+          "format": "gguf",
+          "family": "gemma2",
+          "families": [
+            "gemma2"
+          ],
+          "parameter_size": "9.2B",
+          "quantization_level": "Q4_0",
+          "context_length": 8192,
+          "embedding_length": 3584
+        },
+        "capabilities": [
+          "completion"
+        ]
+      },
+      {
+        "name": "bge-m3:latest",
+        "model": "bge-m3:latest",
+        "modified_at": "2026-06-11T22:49:21.8572862+03:00",
+        "size": 1157672605,
+        "digest": "7907646426070047a77226ac3e684fbbe8410524f7b4a74d02837e43f2146bab",
+        "details": {
+          "parent_model": "",
+          "format": "gguf",
+          "family": "bert",
+          "families": [
+            "bert"
+          ],
+          "parameter_size": "566.70M",
+          "quantization_level": "F16",
+          "context_length": 8192,
+          "embedding_length": 1024
+        },
+        "capabilities": [
+          "embedding"
+        ]
+      },
+      {
+        "name": "qwen2.5:14b-instruct-q4_K_M",
+        "model": "qwen2.5:14b-instruct-q4_K_M",
+        "modified_at": "2026-06-11T22:49:20.6908291+03:00",
+        "size": 8988124069,
+        "digest": "7cdf5a0187d5c58cc5d369b255592f7841d1c4696d45a8c8a9489440385b22f6",
+        "details": {
+          "parent_model": "",
+          "format": "gguf",
+          "family": "qwen2",
+          "families": [
+            "qwen2"
+          ],
+          "parameter_size": "14.8B",
+          "quantization_level": "Q4_K_M",
+          "context_length": 32768,
+          "embedding_length": 5120
+        },
+        "capabilities": [
+          "completion",
+          "tools"
+        ]
+      },
+      {
+        "name": "gemma4:latest",
+        "model": "gemma4:latest",
+        "modified_at": "2026-06-09T23:46:23.3698038+03:00",
+        "size": 9608350718,
+        "digest": "c6eb396dbd5992bbe3f5cdb947e8bbc0ee413d7c17e2beaae69f5d569cf982eb",
+        "details": {
+          "parent_model": "",
+          "format": "gguf",
+          "family": "gemma4",
+          "families": [
+            "gemma4"
+          ],
+          "parameter_size": "8.0B",
+          "quantization_level": "Q4_K_M"
+        },
+        "capabilities": [
+          "completion",
+          "tools",
+          "thinking"
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,7 @@
+[
+  {"model": "qwen2.5:14b-instruct-q4_K_M"},
+  {"model": "qwen3.5:4b-q8_0", "extra_body": {"reasoning_effort": "none"}},
+  {"model": "qwen3.5:9b-q4_K_M", "extra_body": {"reasoning_effort": "none"}},
+  {"model": "gemma4:latest", "extra_body": {"reasoning_effort": "none"}},
+  {"model": "gpt-oss:20b", "extra_body": {"reasoning_effort": "low"}}
+]
