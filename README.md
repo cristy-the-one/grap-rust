@@ -7,6 +7,9 @@ grap is built for the specific workload of *storing rich text nodes* and *retrie
 Its architecture starts with [`core_graph_design.md`](./core_graph_design.md).
 The current [engine contracts and measured improvements](docs/engine-improvement-2026-09.md)
 describe the implemented behavior and where it has evolved beyond that prototype.
+The [architecture simplification report](docs/simplification-implementation-2026-09.md)
+documents the shared application service, accurate gap-check contracts, and measured
+checkpoint improvements. PageRank ranking is opt-in in Rust and Python.
 
 ## Why grap?
 

@@ -4,7 +4,6 @@ Integration-style: real workspace + real KG in a tmp dir, exercising the
 concept_hashes tamper-evidence gate added in adopt_proposed_ontology.
 """
 import hashlib
-import importlib
 
 PROPOSAL_TMPL = """\
 version: kee-candidate

@@ -2,11 +2,9 @@
 baseline, rename-aware churn + canary counting, restart rehydration, and
 opt-in PG write-back."""
 import hashlib
-import importlib
 
 from grap_mcp.governance import (DEFAULT_ADOPTION_POLICY, diff_ontology_dicts,
                                  evaluate_proposal_dict)
-from grap_mcp.kee.llm import StubProvider
 
 
 def _sha(name):
@@ -132,7 +130,6 @@ def test_restart_rehydrates_active_ontology(tmp_path, monkeypatch):
     assert s.adopt_proposed_ontology(vh, rationale="pre-restart")["status"] == "ok"
 
     from grap_mcp.application import GrapApplication
-    smod = GrapApplication()
     s2 = GrapApplication()                # simulated restart
     assert s2._state.ontology is None
     s2.get_status()                            # first workspace open
@@ -149,7 +146,6 @@ def test_rehydration_follows_rollback(tmp_path, monkeypatch):
     assert s.rollback_ontology(h1, reason="prefer v1")["status"] == "ok"
 
     from grap_mcp.application import GrapApplication
-    smod = GrapApplication()
     s2 = GrapApplication()
     s2.get_status()
     assert s2._state.ontology_version == h1    # latest event wins (rollback)
@@ -167,19 +163,6 @@ steps:
     references: ["kg:aspice.process_outcome.rv"]
 """
 
-DRAFT_OK = """\
-name: P
-version: 0.1.1
-steps:
-  - id: s1
-    operation: verify
-    references: ["kg:aspice.process_outcome.rv"]
-  - id: s2
-    operation: assure
-    references: ["kg:aspice.process_outcome.qa"]
-"""
-
-
 def _pg_setup(tmp_path, monkeypatch, write_back):
     s = _server(tmp_path, monkeypatch)
     assert s.create_knowledge_graph(str(tmp_path / "kg"))["status"] == "ok"
@@ -188,8 +171,6 @@ def _pg_setup(tmp_path, monkeypatch, write_back):
     pgf = tmp_path / "p.pg.yaml"
     pgf.write_text(PG_V1, encoding="utf-8")
     assert s.load_procedure_graph(str(pgf))["status"] == "ok"
-    monkeypatch.setattr(s, "get_provider",
-                        lambda model=None: StubProvider(default=DRAFT_OK))
     assert s.set_policy("pg_autopromote_enabled", True, rationale="on")["status"] == "ok"
     if write_back:
         assert s.set_policy("pg_write_back", True, rationale="sync file")["status"] == "ok"

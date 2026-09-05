@@ -1,6 +1,5 @@
 """Tests for the legal citation network + build_legal_graph merge."""
 
-import importlib
 import json
 
 from grap_mcp.kee import legal

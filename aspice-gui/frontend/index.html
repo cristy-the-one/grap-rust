@@ -58,7 +58,7 @@
           <span>Load ontology &amp; PG</span>
           <span>Detect gaps</span>
           <span>Publish → activate</span>
-          <span>Audit &amp; reconstruct</span>
+          <span>Audit &amp; artifacts</span>
         </div>
 
         <div class="card hero">
@@ -193,19 +193,18 @@
       <section id="panel-gaps" class="panel">
         <h2>Gap analysis</h2>
         <p class="lead">
-          Hybrid structural + lexical ASPICE gap detection. Each gap shows how confident the
-          reasoner is that the characteristic is unmet, plus the closest supporting evidence.
+          ASPICE characteristic coverage checks using evidence text. Outcome references in the
+          loaded or active Procedure Graph select the scope; results show the closest evidence matches.
         </p>
         <div class="card">
           <div class="inline-form">
             <div>
               <label for="gap-scope">Scope</label>
-              <input id="gap-scope" type="text" value="all" />
+              <input id="gap-scope" type="text" value="all" readonly title="PG outcome references select the outcomes" />
             </div>
             <div class="actions">
               <button type="button" class="btn btn-primary" id="btn-detect-gaps">Detect gaps</button>
               <button type="button" class="btn" id="btn-run-experiment">Run as experiment</button>
-              <button type="button" class="btn" id="btn-run-procedure">Run procedure</button>
             </div>
           </div>
           <p class="muted small" id="gaps-run-meta"></p>
@@ -372,7 +371,7 @@
         <h2>Runs &amp; temporal graph</h2>
         <p class="lead">
           Every detection is a tracked run in the temporal graph. Inspect run records,
-          reconstruct a past run from frozen artifacts, and query the event stream.
+          check whether a past run’s referenced artifacts are still available, and query the event stream.
         </p>
         <div class="card">
           <div class="actions">

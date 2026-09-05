@@ -267,7 +267,7 @@ function runRow(r) {
         if (rep) renderReconstruct(rep, clear(reconWrap));
       }
     },
-  }, "Reconstruct");
+  }, "Check artifacts");
 
   return el("div", { class: "trow" },
     el("div", { class: "tdot " + kindCls }),
@@ -285,14 +285,15 @@ function runRow(r) {
 }
 
 function renderReconstruct(rep, container) {
-  const ok = rep.complete;
+  const ok = rep.artifacts_available ?? rep.complete;
   container.append(el("div", { class: `recon-box ${ok ? "ok" : "warn"}` },
     el("div", { class: "recon-head" },
-      el("span", { class: `badge ${ok ? "ok" : "warn"}` }, ok ? "complete" : "incomplete"),
+      el("span", { class: `badge ${ok ? "ok" : "warn"}` }, ok ? "artifacts available" : "artifacts missing"),
       el("span", { class: "muted small" }, `${rep.explanations_present}/${rep.explanations_total} explanations present`)),
     el("dl", { class: "kv" },
       el("dt", {}, "PG version"), el("dd", {}, rep.pg_version_present ? "present" : "missing"),
-      el("dt", {}, "KG version"), el("dd", {}, rep.kg_version_present ? "present" : "missing")),
+      el("dt", {}, "Ontology version"), el("dd", {}, rep.kg_version_present ? "present" : "missing")),
+    el("p", { class: "muted small" }, "Artifact availability does not establish replayability. Evidence snapshots are not recorded."),
     (rep.missing && rep.missing.length)
       ? el("div", {}, el("span", { class: "muted small" }, "missing artifacts"),
           el("div", { class: "chips" }, rep.missing.map((m) => el("span", { class: "chip err" }, m))))
@@ -760,8 +761,7 @@ $("#btn-run-experiment").onclick = () =>
     return r;
   });
 
-$("#btn-run-procedure").onclick = () =>
-  run(() => post("/api/procedure/run", { scope: $("#gap-scope").value }), "Procedure executed");
+
 
 /* ---------- lifecycle ---------- */
 $("#btn-wizard-publish").onclick = () =>

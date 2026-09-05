@@ -4,6 +4,18 @@ import pytest
 import pygrap
 
 
+def test_centrality_is_explicitly_opt_in(tmp_path):
+    graph = pygrap.IndexedKnowledgeGraph(str(tmp_path / "graph"))
+    a = graph.add_node("alpha")
+    b = graph.add_node("alpha beta")
+    graph.add_edge(a, b, 0.9)
+    default = graph.search_and_traverse_hybrid("alpha")
+    explicit = graph.search_and_traverse_hybrid("alpha", centrality_weight=0.4)
+    assert default and explicit
+    assert all("centrality" not in dict(hit.channel_ranks) for hit in default)
+    assert all("centrality" in dict(hit.channel_ranks) for hit in explicit)
+
+
 def test_mutation_search_and_reload_agree(tmp_path):
     path = str(tmp_path / "graph")
     graph = pygrap.IndexedKnowledgeGraph(path)

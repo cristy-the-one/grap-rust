@@ -49,3 +49,20 @@ def test_reference_patch_does_not_call_provider(tmp_path, monkeypatch):
 
     monkeypatch.setattr(s, "get_provider", forbidden)
     assert s.draft_pg_patch(model="legacy-argument")["status"] == "ok"
+
+
+def test_failed_gap_check_finishes_its_run_and_rejects_unsupported_scope(tmp_path, monkeypatch):
+    s = _server(tmp_path, monkeypatch)
+    _adopt(s, ONTO_RV)
+    _load_pg(s, tmp_path)
+    assert s.run_procedure(scope="imaginary-filter")["status"] == "error"
+    assert not s._get_workspace().list_runs()
+
+    def broken(*args, **kwargs):
+        raise RuntimeError("injected reasoner failure")
+
+    monkeypatch.setattr(reasoner, "detect_gaps", broken)
+    result = s.run_procedure()
+    assert result["status"] == "error"
+    runs = s._get_workspace().list_runs()
+    assert len(runs) == 1 and runs[0].status == "failed"

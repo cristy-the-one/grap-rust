@@ -1,6 +1,5 @@
 """Phase-2 dark-factory automation: verify_graph, run_maintenance,
 run_pipeline (idempotent), get_factory_status, and the watcher fingerprint."""
-import importlib
 import json
 import time
 

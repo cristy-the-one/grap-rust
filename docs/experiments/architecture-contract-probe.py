@@ -22,7 +22,9 @@ with tempfile.TemporaryDirectory(prefix="grap-architecture-") as tmp:
     root = Path(tmp)
     os.environ["GRAP_WORKSPACE"] = str(root / "workspace")
     os.environ["GRAP_ROLE"] = "admin"
-    from grap_mcp import server as s
+    from grap_mcp.application import GrapApplication
+    from grap_mcp import reasoner
+    s = GrapApplication(root / "workspace", role="admin")
     from grap_mcp import governance
     assert s.create_knowledge_graph(str(root / "evidence"))["status"] == "ok"
     assert s.load_ontology(str(REPO_ROOT / "docs/examples/minimal-aspice-ontology.yaml"))["status"] == "ok"
@@ -32,12 +34,12 @@ with tempfile.TemporaryDirectory(prefix="grap-architecture-") as tmp:
                   "    guards: ['false']\n", encoding="utf-8")
     assert s.load_procedure_graph(str(pg))["status"] == "ok"
     s.set_weight("lexical_threshold", 0.99, "isolated architecture probe")
-    original = s.reasoner.detect_gaps
+    original = reasoner.detect_gaps
     weights_seen = []
     def spy(*args, **kwargs):
         weights_seen.append(kwargs.get("weights"))
         return original(*args, **kwargs)
-    s.reasoner.detect_gaps = spy
+    reasoner.detect_gaps = spy
     procedure = s.run_procedure()
     first = s.detect_gaps()
     s._state.kg.add_node("new evidence changes the corpus after the recorded run")

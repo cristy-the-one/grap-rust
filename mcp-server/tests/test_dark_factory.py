@@ -1,7 +1,6 @@
 """Phase-1 dark-factory loop: policy-gated auto-adoption, rollback, diffs,
 and the exception queue — integration-style against a real tmp workspace."""
 import hashlib
-import importlib
 import json
 import os
 

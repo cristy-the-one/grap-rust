@@ -107,10 +107,11 @@ class ApplicationState:
         self.extraction_workdir = None
 
     def set_kg(self, kg, path=None):
-        """Set the active KG and its on-disk path (projected_nodes is left to
-        the caller: create_* clears it, open_extraction_graph keeps it)."""
+        """Select a graph and clear state belonging to the previous graph."""
         self.kg = kg
         self.kg_path = path
+        self.extraction_workdir = None
+        self.projected_nodes = set()
 
     def set_ontology(self, ontology, version=None):
         self.ontology = ontology
@@ -121,6 +122,7 @@ class ApplicationState:
         self.kg = None
         self.kg_path = None
         self.projected_nodes = set()
+        self.extraction_workdir = None
 
     def get_role(self) -> str:
         """Effective role. GRAP_ROLE overrides for this process only (the
@@ -323,6 +325,13 @@ class GrapApplication:
         return None
 
 
+    def _require_mutable_evidence(self):
+        if self._state.extraction_workdir:
+            return {"status": "error", "message":
+                    "This is a derived extraction view. Use extend_extraction_graph "
+                    "to change durable extraction records, or load a separate evidence KG."}
+        return None
+
     def _cached_validation(self, ws, version_hash):
         """Return the cached validation report for a PG version, or None.
 
@@ -415,7 +424,7 @@ class GrapApplication:
     @operation
     def ingest_documents(self, path: str) -> dict:
         """Chunk + add .md/.txt documents under `path` into the loaded KG (real evidence)."""
-        denied = self._require("operator")
+        denied = self._require("operator") or self._require_mutable_evidence()
         if denied:
             return denied
         kg = self._state.kg
@@ -442,7 +451,7 @@ class GrapApplication:
     def reingest_documents(self, path: str) -> dict:
         """Incrementally (re)ingest .md/.txt under `path`: skip unchanged chunks,
         add new/changed ones, tombstone removed ones. Non-duplicating."""
-        denied = self._require("operator")
+        denied = self._require("operator") or self._require_mutable_evidence()
         if denied:
             return denied
         kg = self._state.kg
@@ -837,6 +846,7 @@ class GrapApplication:
                     Path(pg.source_path).write_text(raw, encoding="utf-8")
                     draft.source_path = pg.source_path
                     self._state.pg = draft
+                    self._state.pg_version = version.hash
                     self._state.current_logic_id = draft.name
                     written_back = True
                 except Exception:
@@ -1421,7 +1431,7 @@ class GrapApplication:
                     items.append({"kind": "model_disagreement", "subject": ev.subject,
                                   "ts": ev.ts,
                                   "age_s": max(0, round((now_ms - ev.ts) / 1000))})
-            # LLM-drafted PG patches: pending until a human promotes them
+            # PG reference patches: pending until promoted
             promoted_pg = {e.subject for e in (ws.query_events("version_promoted") or [])}
             for e in ws.query_events("pg_draft_result") or []:
                 kv = self._kv_subject(e.subject)
@@ -1595,7 +1605,7 @@ class GrapApplication:
         # Wall-clock per pipeline step. A batch is ~69 minutes and until now the
         # only visible number was the total, so "which part is slow" was answered by
         # reasoning rather than measurement — and the reasoning was wrong twice.
-        step_s: Dict[str, float] = {}
+        step_s: dict[str, float] = {}
         _step_t = time.time()
 
         def _mark(name: str) -> None:
@@ -1851,7 +1861,7 @@ class GrapApplication:
         relations into a navigable graph alongside any existing edges. Creates a
         fresh KG in the workspace if none is loaded.
         """
-        denied = self._require("operator")
+        denied = self._require("operator") or self._require_mutable_evidence()
         if denied:
             return denied
         relations = relations or []
@@ -1945,8 +1955,8 @@ class GrapApplication:
 
             rel_count = 0
             if with_relations:
-                provider = llm.get_provider(model=model)
-                embedder = embeddings.get_embedder()
+                provider = self.get_provider(model=model)
+                embedder = self.get_embedder()
                 r = pipeline.extract_ontology(path, provider, embedder, sim=0.8,
                                               max_files=relation_files)
                 relations = r["ontology"].get("relations", [])
@@ -2425,7 +2435,7 @@ class GrapApplication:
             result.update(
                 message="PG-scoped gap check completed; procedure operations were not executed.",
                 execution_mode="gap_check", procedure_executed=False,
-                kg_node_count=self._state.kg.node_count(), pg_step_count=len(self._state.pg.steps),
+                kg_node_count=self._state.kg.node_count(),
                 gap_summary=[f"{g['outcome_id']}:{g['missing_characteristic']}"
                              for g in result["gaps"]])
         return result
@@ -2433,10 +2443,14 @@ class GrapApplication:
 
     def _run_gap_detection(self, scope: str, kind: str, extra_summary: dict = None) -> dict:
         """Run gap detection as a tracked run (production or experiment)."""
+        if scope != "all":
+            return {"status": "error", "message":
+                    "Only scope='all' is supported. PG outcome references select the outcomes."}
         kg = self._state.kg
         ontology = self._state.ontology
         if not kg or not ontology:
             return {"status": "error", "message": "KG and ontology must be loaded first."}
+        run_id = None
         try:
             ws = self._get_workspace()
             pg = self._state.pg
@@ -2495,9 +2509,15 @@ class GrapApplication:
             return {"status": "ok", "run_id": run_id, "kind": kind, "scope": scope,
                     "gaps": gaps, "gaps_found": len(gaps),
                     "activation_id": activation_id, "execution_mode": "gap_check",
-                    "procedure_executed": False}
+                    "procedure_executed": False, "pg_step_count": len(pg.steps) if pg else 0}
         except Exception as e:
             logger.exception("gap detection failed")
+            if run_id is not None:
+                try:
+                    ws.complete_run(run_id, status="failed", gaps_found=0,
+                                    explanation_hashes=[], summary={"error": str(e)})
+                except Exception:
+                    logger.exception("could not mark failed gap run")
             return {"status": "error", "message": str(e)}
 
 
@@ -3045,6 +3065,8 @@ class GrapApplication:
 
 
     def _entity_index_path(self):
+        if self._state.extraction_workdir:
+            return str(Path(self._state.extraction_workdir) / "entities.db")
         kg_path = self._state.kg_path
         if not kg_path:
             return None
@@ -3073,7 +3095,7 @@ class GrapApplication:
     @operation
     def register_alias(self, alias: str, node_id: int, kind: str = None) -> dict:
         """Register an alias -> node-id mapping in the entity index."""
-        denied = self._require("operator")
+        denied = self._require("operator") or self._require_mutable_evidence()
         if denied:
             return denied
         path = self._entity_index_path()
@@ -3109,7 +3131,7 @@ class GrapApplication:
     def reindex_entities(self) -> dict:
         """Rebuild the entity index from the current KG: every live node's label
         becomes a resolvable alias. Returns the number indexed."""
-        denied = self._require("operator")
+        denied = self._require("operator") or self._require_mutable_evidence()
         if denied:
             return denied
         kg = self._state.kg
@@ -3146,7 +3168,7 @@ class GrapApplication:
         """Reclaim disk/RAM held by dead blobs: compact the blob store (bytes orphaned
         by node updates/merges/deletes) and vacuum deleted nodes from the text index,
         then persist. Node ids, edges, and search results are unchanged."""
-        denied = self._require("operator")
+        denied = self._require("operator") or self._require_mutable_evidence()
         if denied:
             return denied
         kg = self._state.kg

@@ -1,11 +1,9 @@
-"""Phase 4: LLM-drafted PG patches — deterministic checks, draft publication,
+"""PG reference patches — deterministic checks, draft publication,
 one-click promotion, and the pg_draft queue kinds."""
 import hashlib
-import importlib
 
 from grap_mcp import pg_patch
 from grap_mcp import procedure_graph as pg_loader
-from grap_mcp.kee.llm import StubProvider
 
 
 def _sha(name):
@@ -91,11 +89,6 @@ def _load_pg(s, tmp_path):
     assert s.load_procedure_graph(str(p))["status"] == "ok"
 
 
-def _stub_llm(s, monkeypatch, response):
-    monkeypatch.setattr(s, "get_provider",
-                        lambda model=None: StubProvider(default=response))
-
-
 # ---- pure helpers -------------------------------------------------------------
 
 def test_reference_patch_preserves_steps_and_handles_collisions():
@@ -132,7 +125,6 @@ def test_draft_publish_and_promote_clears_queue(tmp_path, monkeypatch):
     s = _server(tmp_path, monkeypatch)
     _adopt(s, ONTO_RV_QA)
     _load_pg(s, tmp_path)
-    _stub_llm(s, monkeypatch, "```yaml\n" + DRAFT_OK + "```")   # fenced on purpose
 
     out = s.draft_pg_patch()
     assert out["status"] == "ok"
@@ -146,7 +138,7 @@ def test_draft_publish_and_promote_clears_queue(tmp_path, monkeypatch):
     assert any(i["kind"] == "pg_draft_pending" for i in q["pending"])
 
     # the human's one click
-    assert s.promote_pg(h, rationale="reviewed LLM draft; covers qa")["status"] == "ok"
+    assert s.promote_pg(h, rationale="reviewed reference patch; covers qa")["status"] == "ok"
     assert not any(i["kind"] == "pg_draft_pending"
                    for i in s.list_pending_interventions()["pending"])
 
@@ -193,7 +185,6 @@ def test_pg_draft_auto_triggers_after_kept_adoption(tmp_path, monkeypatch):
     _load_pg(s, tmp_path)
     assert s.set_policy("enabled", True, rationale="on")["status"] == "ok"
     assert s.set_policy("pg_draft_enabled", True, rationale="draft PGs")["status"] == "ok"
-    _stub_llm(s, monkeypatch, DRAFT_OK)
 
     _, auto = s._publish_and_gate_proposal(ONTO_RV_QA, "test", "p", "e", 2)
     assert auto["adopted"] is True

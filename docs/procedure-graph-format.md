@@ -1,5 +1,12 @@
 # Procedure Graph Text Format (v0.1 — POC)
 
+Current execution contract: the application uses outcome `references` to select
+gap-check scope. `operation`, `inputs`, `outputs`, and `guards` are descriptive;
+there is no interpreter for them. The compatibility tool `run_procedure` performs
+the same tracked gap check as `detect_gaps`. Loading a PG does not insert its
+steps into evidence retrieval. Reference additions/removals are generated
+deterministically, then validated and subjected to promotion policy.
+
 ## Goals
 
 - Human-editable in plain text (offline friendly)

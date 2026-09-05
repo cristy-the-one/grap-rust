@@ -28,3 +28,24 @@ def test_application_import_has_no_mcp_transport():
         "assert 'grap_mcp.server' not in sys.modules; "
         "assert 'mcp.server.fastmcp' not in sys.modules"], capture_output=True, text=True)
     assert proc.returncode == 0, proc.stderr
+
+
+def test_extraction_view_has_native_aliases_and_rejects_ephemeral_edits(tmp_path):
+    from grap_mcp.kee.embeddings import HashingEmbedder
+    from grap_mcp.kee.working_graph import WorkingGraph
+    root = tmp_path / "extraction"
+    with WorkingGraph(HashingEmbedder(), workdir=str(root), merge_threshold=1.1) as wg:
+        for name in ("Removed", "Kept"):
+            wg.upsert_fragment({"outcomes": [{"name": name}]}, name)
+        wg.retract_chunk("Removed")
+        wg.save()
+    app = GrapApplication(tmp_path / "workspace", role="admin", embedder_factory=HashingEmbedder)
+    assert app.open_extraction_graph(str(root))["status"] == "ok"
+    assert app.resolve_entity("Kept")["node_ids"] == [0]
+    assert app._state.kg.get_node_text(0) == "Kept"
+    for out in (app.ingest_documents(str(tmp_path)), app.project_relations([]),
+                app.register_alias("temporary", 0), app.compact_graph(), app.reindex_entities()):
+        assert out["status"] == "error" and "derived extraction view" in out["message"]
+    assert app.create_knowledge_graph(str(tmp_path / "evidence"))["status"] == "ok"
+    assert app._state.extraction_workdir is None
+    assert app.project_relations([])["status"] == "ok"

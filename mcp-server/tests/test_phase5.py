@@ -1,7 +1,6 @@
 """Phase 5: trivial PG drafts self-promote; the pipeline carries the PG; and
 the lights-out soak — every policy on, two full pipeline runs, zero humans."""
 import hashlib
-import importlib
 import json
 
 from grap_mcp.governance import pg_draft_is_trivial
@@ -18,31 +17,6 @@ steps:
     operation: verify
     references: ["kg:aspice.process_outcome.requirement_verification"]
 """
-
-DRAFT_ADDITIVE = """\
-name: P
-version: 0.1.1
-steps:
-  - id: s1
-    operation: verify
-    references: ["kg:aspice.process_outcome.requirement_verification"]
-  - id: s2
-    operation: assure
-    references: ["kg:aspice.process_outcome.quality_assurance"]
-"""
-
-DRAFT_INTRUSIVE = """\
-name: P
-version: 0.1.1
-steps:
-  - id: s1
-    operation: verify_differently
-    references: ["kg:aspice.process_outcome.requirement_verification"]
-  - id: s2
-    operation: assure
-    references: ["kg:aspice.process_outcome.quality_assurance"]
-"""
-
 
 def _sha(name):
     return hashlib.sha256(name.encode("utf-8")).hexdigest()
@@ -91,7 +65,7 @@ def test_pg_draft_is_trivial_rule():
 
 # ---- auto-promotion --------------------------------------------------------------
 
-def _setup(tmp_path, monkeypatch, draft_yaml):
+def _setup(tmp_path, monkeypatch):
     s = _server(tmp_path, monkeypatch)
     assert s.create_knowledge_graph(str(tmp_path / "kg"))["status"] == "ok"
     vh = s._get_workspace().publish_ontology(ONTO_BOTH, metadata={}).hash
@@ -99,14 +73,12 @@ def _setup(tmp_path, monkeypatch, draft_yaml):
     p = tmp_path / "p.pg.yaml"
     p.write_text(PG_V1, encoding="utf-8")
     assert s.load_procedure_graph(str(p))["status"] == "ok"
-    monkeypatch.setattr(s, "get_provider",
-                        lambda model=None: StubProvider(default=draft_yaml))
     assert s.set_policy("pg_autopromote_enabled", True, rationale="close the loop")["status"] == "ok"
     return s
 
 
 def test_trivial_draft_auto_promotes_and_queue_stays_empty(tmp_path, monkeypatch):
-    s = _setup(tmp_path, monkeypatch, DRAFT_ADDITIVE)
+    s = _setup(tmp_path, monkeypatch)
     out = s.draft_pg_patch()
     assert out["status"] == "ok"
     assert out["auto_promoted"] is True
@@ -116,7 +88,7 @@ def test_trivial_draft_auto_promotes_and_queue_stays_empty(tmp_path, monkeypatch
 
 
 def test_intrusive_draft_stays_queued_for_a_human(tmp_path, monkeypatch):
-    s = _setup(tmp_path, monkeypatch, DRAFT_INTRUSIVE)
+    s = _setup(tmp_path, monkeypatch)
     # Removing an obsolete reference changes an existing step and needs review.
     s._state.pg.steps[0].references.append("kg:aspice.process_outcome.obsolete")
     out = s.draft_pg_patch()
@@ -129,8 +101,6 @@ def test_intrusive_draft_stays_queued_for_a_human(tmp_path, monkeypatch):
 # ---- lights-out soak ----------------------------------------------------------------
 
 def _factory_stub(system, user):
-    if "Procedure Graph" in system:                # PG drafting call
-        return DRAFT_ADDITIVE
     u = user.lower()                               # extraction call
     if "verification" in u:
         return json.dumps({"outcomes": [{"name": "Requirement Verification",

@@ -1,7 +1,6 @@
 """Phase 3: canary auto-promotion (rollback on gap regressions) and
 n-version extraction (agreement set auto-adopts, disputes queue)."""
 import hashlib
-import importlib
 import json
 
 from grap_mcp.governance import agreement_merge

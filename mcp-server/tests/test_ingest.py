@@ -83,7 +83,6 @@ import os
 def test_ingest_feeds_reasoner(tmp_path, monkeypatch):
     monkeypatch.setenv("GRAP_WORKSPACE", str(tmp_path / "ws"))
     monkeypatch.setenv("GRAP_ROLE", "operator")
-    import importlib
     from grap_mcp.application import GrapApplication
     s = GrapApplication()
 

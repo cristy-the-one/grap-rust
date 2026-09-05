@@ -57,7 +57,8 @@ os.environ["GRAP_EMBED_BASE_URL"] = "http://127.0.0.1:11434/v1"
 os.environ.pop("GRAP_LLM_STUB", None)
 
 sys.path.insert(0, str(ROOT / "mcp-server"))
-import grap_mcp.server as s  # noqa: E402
+from grap_mcp.application import GrapApplication  # noqa: E402
+s = GrapApplication(PILOT / "ws", role="admin")
 from grap_mcp.ingest import chunk_text  # noqa: E402
 from grap_mcp.kee import tabular  # noqa: E402
 from grap_mcp.kee.pipeline import _text_and_label_from_json  # noqa: E402

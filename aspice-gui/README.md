@@ -1,9 +1,11 @@
 # GRAP ASPICE Console
 
 A single-piece browser console for the **ASPICE-oriented MCP surface**
-(`mcp-server/grap_mcp`). It calls the same Python functions the MCP server
-exposes — no separate protocol layer — and renders the results as structured,
-explainable views rather than raw JSON.
+(`mcp-server/grap_mcp`). The console owns a `GrapApplication` instance and uses
+the same operations as MCP and batch runners. Selecting a workspace replaces
+that instance without changing MCP globals or process environment variables.
+The UI offers tracked gap checks and artifact-availability checks; it does not
+execute procedure operations or replay historical evidence snapshots.
 
 ## Prerequisites
 
