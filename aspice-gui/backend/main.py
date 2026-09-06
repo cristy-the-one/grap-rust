@@ -412,13 +412,14 @@ def _extraction_events(corpus: str, model: Optional[str], sim: float,
 
     # provider only; embedder is deferred to reconcile so tokens flow immediately
     yield {"type": "phase", "name": "prepare"}
-    provider = llm.get_provider(model=model or None)
+    provider = extract.configure_provider(llm.get_provider(model=model or None))
     chunks = pipeline.read_chunks(corpus, max_files=max_files)
     yield {"type": "extract_begin", "chunks": len(chunks),
            "provider": provider.name, "model": getattr(provider, "model", None)}
 
     can_stream = hasattr(provider, "stream")
     fragments = []
+    failures = []
     for i, (src, text) in enumerate(chunks):
         yield {"type": "chunk_start", "i": i + 1, "n": len(chunks), "source": src}
         parts: list[str] = []
@@ -435,12 +436,16 @@ def _extraction_events(corpus: str, model: Optional[str], sim: float,
                 parts.append(provider.complete(extract.SYSTEM_PROMPT,
                                                extract.build_user_prompt(text)))
         except Exception as exc:
+            failures.append({"source": src, "reason": "provider"})
             yield {"type": "chunk_error", "i": i + 1, "message": str(exc)}
             continue
-        obj = extract.extract_json("".join(parts))
-        frag = extract.normalize_fragment(obj, src) if obj else None
+        frag, reason = extract.parse_reply("".join(parts), src, text, provider)
+        if frag is None:
+            failures.append({"source": src, "reason": reason})
+            yield {"type": "chunk_error", "i": i + 1, "message": f"Extraction rejected: {reason}"}
+            continue
         n_out = len(frag["outcomes"]) if frag else 0
-        if frag and (frag["outcomes"] or frag["relations"]):
+        if frag:
             fragments.append(frag)
         yield {"type": "chunk_done", "i": i + 1, "n": len(chunks),
                "tokens": ntok, "outcomes": n_out}
@@ -469,6 +474,7 @@ def _extraction_events(corpus: str, model: Optional[str], sim: float,
         "status": "ok", "out_path": out_path, "version_hash": vhash,
         "provider": provider.name, "model": getattr(provider, "model", None),
         "embedder": embedder.name, "chunks": len(chunks), "fragments": len(fragments),
+        "failures": failures, "extraction_complete": not failures,
         "process_outcomes": [{"id": o["id"], "name": o["name"],
                               "characteristics": o["required_characteristics"]}
                              for o in onto["process_outcomes"]],
@@ -502,6 +508,10 @@ def _extract_events(path: Optional[str], model: Optional[str],
                 yield event
         if not extracted or extracted.get("status") == "error":
             yield {"type": "error", "message": "extraction produced no result"}
+            return
+
+        if not extracted.get("extraction_complete", True):
+            yield {"type": "error", "message": "Extraction is incomplete; review the proposed artifact before adoption."}
             return
 
         yield {"type": "phase", "name": "adopt"}

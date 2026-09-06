@@ -23,6 +23,30 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 logger = logging.getLogger("grap-mcp.kee")
 
 PROMPT_VERSION = "document-claims-v4"
+# The model proposes this shape; normalization and source checks still decide
+# what enters the graph. Schema-constrained decoding is an optional capability.
+OUTPUT_SCHEMA = {
+    "type": "object", "required": ["outcomes", "relations"], "additionalProperties": False,
+    "properties": {
+        "outcomes": {"type": "array", "items": {
+            "type": "object", "required": ["name", "requirements", "evidence"], "additionalProperties": False,
+            "properties": {"name": {"type": "string"},
+                           "requirements": {"type": "array", "items": {"type": "string"}},
+                           "evidence": {"type": "string"}}}},
+        "relations": {"type": "array", "items": {
+            "type": "object", "required": ["from", "type", "to", "evidence"], "additionalProperties": False,
+            "properties": {key: {"type": "string"} for key in ("from", "type", "to", "evidence")}}},
+    },
+}
+
+
+def configure_provider(provider):
+    """Enable structured decoding only for extraction, without changing other calls."""
+    enabled = os.environ.get("GRAP_KEE_STRUCTURED_OUTPUT", "").lower() in ("1", "true", "yes")
+    configure = getattr(provider, "with_json_schema", None)
+    return configure(OUTPUT_SCHEMA) if enabled and callable(configure) else provider
+
+
 SYSTEM_PROMPT = (
     "You are an information-extraction system. Propose a graph of the named "
     "concepts in the source document: practices, work products, organizations, "
@@ -392,10 +416,16 @@ def extract_chunk(provider, source: str, text: str, context=None
     """
     user = build_user_prompt_with_context(text, context) if context is not None else build_user_prompt(text)
     try:
+        provider = configure_provider(provider)
         raw = provider.complete(SYSTEM_PROMPT, user)
     except Exception as exc:
         logger.warning("extractor: provider failed on %s: %s", source, exc)
         return None, "provider"
+    return parse_reply(raw, source, text, provider)
+
+
+def parse_reply(raw, source: str, text: str, provider) -> Tuple[Optional[dict], Optional[str]]:
+    """Validate a complete reply, including replies assembled by a streaming UI."""
     if not isinstance(raw, str):
         return None, "unparsed"
     obj = extract_json(raw)
@@ -415,6 +445,10 @@ def extract_chunk(provider, source: str, text: str, context=None
     frag["extraction"] = {"source_text": text, "prompt_version": PROMPT_VERSION,
                           "provider": getattr(provider, "name", type(provider).__qualname__),
                           "model": getattr(provider, "model", None)}
+    response_format = getattr(provider, "extra_body", {}).get("response_format")
+    if response_format:
+        # Receipts identify the mode without repeating the entire schema per chunk.
+        frag["extraction"]["response_format"] = response_format.get("type")
     return frag, None
 
 

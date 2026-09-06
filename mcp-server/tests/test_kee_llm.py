@@ -61,6 +61,31 @@ def test_openai_compat_request_shaping(monkeypatch):
     assert captured["body"]["temperature"] == 0.0
 
 
+def test_structured_extraction_does_not_change_shared_provider(monkeypatch):
+    from grap_mcp.kee import extract
+    payloads = []
+
+    def reply(req, timeout=None):
+        payloads.append(json.loads(req.data))
+        return _FakeResp(json.dumps({"choices": [{"finish_reason": "stop", "message": {
+            "content": '{"outcomes":[],"relations":[]}'}}]}).encode())
+
+    monkeypatch.setattr(llm.urllib.request, "urlopen", reply)
+    monkeypatch.setenv("GRAP_KEE_STRUCTURED_OUTPUT", "1")
+    provider = llm.OpenAICompatProvider(base_url="http://x/v1", model="m",
+                                      extra_body={"reasoning_effort": "none"})
+    frag, reason = extract.extract_chunk(provider, "s", "Nothing to extract.")
+    assert reason is None
+    assert payloads[0]["response_format"]["json_schema"]["schema"] == extract.OUTPUT_SCHEMA
+    assert payloads[0]["reasoning_effort"] == "none"
+    assert frag["extraction"]["response_format"] == "json_schema"
+    provider.complete("An unrelated task", "Reply freely")
+    assert "response_format" not in payloads[1]
+    monkeypatch.delenv("GRAP_KEE_STRUCTURED_OUTPUT")
+    extract.extract_chunk(provider, "s", "Nothing to extract.")
+    assert "response_format" not in payloads[2]
+
+
 def test_openai_compat_bad_shape_raises(monkeypatch):
     monkeypatch.setattr(llm.urllib.request, "urlopen",
                         lambda req, timeout=None: _FakeResp(b'{"nope": 1}'))

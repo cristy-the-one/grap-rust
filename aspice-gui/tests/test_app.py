@@ -3,6 +3,7 @@ import os
 import sys
 import tempfile
 from pathlib import Path
+import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 os.environ["GRAP_WORKSPACE"] = tempfile.mkdtemp(prefix="gui-test-ws-")
@@ -12,6 +13,57 @@ from fastapi.testclient import TestClient  # noqa: E402
 from backend.main import app  # noqa: E402
 
 client = TestClient(app)
+
+
+def test_streamed_extraction_keeps_checked_source_evidence(tmp_path, monkeypatch):
+    import yaml
+    from grap_mcp.kee import llm, embeddings
+    source = "The Council issues Order 17."
+    (tmp_path / "act.txt").write_text(source, encoding="utf-8")
+    provider = llm.StubProvider(default=json.dumps({"outcomes": [], "relations": [
+        {"from": "Council", "type": "issues", "to": "Order 17", "evidence": source},
+        {"from": "Ghost", "type": "approves", "to": "Order 17", "evidence": "invented quote"}]}))
+    monkeypatch.setattr(llm, "get_provider", lambda **kw: provider)
+    monkeypatch.setattr(embeddings, "get_embedder", lambda: embeddings.HashingEmbedder())
+    r = client.post("/api/extract/stream", json={"path": str(tmp_path)})
+    result = [json.loads(line) for line in r.text.splitlines()][-1]["extracted"]
+    assert result["extraction_complete"]
+    saved = yaml.safe_load(Path(result["out_path"]).read_text(encoding="utf-8"))
+    assert len(saved["relations"]) == 1
+    assert saved["relations"][0]["from"] == "Council"
+    evidence = saved["extraction_evidence"]["act#0"]
+    assert evidence["relations"][0]["evidence"]["quote"] == source
+    assert "source_text" not in evidence
+
+
+@pytest.mark.parametrize("truncated", [False, True])
+def test_wizard_does_not_adopt_incomplete_stream(tmp_path, monkeypatch, truncated):
+    from backend import bridge
+    from grap_mcp.kee import llm, embeddings
+    (tmp_path / "plan.txt").write_text("Plan shall record coverage.", encoding="utf-8")
+
+    class BrokenProvider(llm.StubProvider):
+        def stream(self, system, user):
+            if truncated:
+                yield '{"outcomes":[],"relations":[]}'
+                raise RuntimeError("finish_reason='length'")
+            yield "{}"  # malformed schema must also prevent adoption
+
+    monkeypatch.setattr(llm, "get_provider", lambda **kw: BrokenProvider())
+    monkeypatch.setattr(embeddings, "get_embedder", lambda: embeddings.HashingEmbedder())
+    operations = []
+    call = bridge.call
+
+    def record(operation, **kwargs):
+        operations.append(operation)
+        return call(operation, **kwargs)
+
+    monkeypatch.setattr(bridge, "call", record)
+    r = client.post("/api/wizard/extract/stream", json={"path": str(tmp_path)})
+    events = [json.loads(line) for line in r.text.splitlines()]
+    assert events[-1]["type"] == "error"
+    assert "incomplete" in events[-1]["message"]
+    assert "load_ontology" not in operations
 
 
 def test_health():

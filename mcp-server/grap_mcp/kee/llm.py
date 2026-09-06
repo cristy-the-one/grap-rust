@@ -10,6 +10,7 @@ the backend is purely a matter of GRAP_LLM_BASE_URL / GRAP_LLM_MODEL env vars.
 
 from __future__ import annotations
 
+import copy
 import json
 import os
 import time
@@ -143,6 +144,14 @@ class OpenAICompatProvider:
         except ValueError:
             self.retry_backoff = 2.0
 
+    def with_json_schema(self, schema: dict) -> OpenAICompatProvider:
+        """A request-scoped configuration; the shared provider remains unchanged."""
+        configured = copy.copy(self)
+        configured.extra_body = {**self.extra_body, "response_format": {
+            "type": "json_schema", "json_schema": {
+                "name": "document_claims", "strict": True, "schema": schema}}}
+        return configured
+
     def _payload(self, system: str, user: str, stream: bool) -> dict:
         payload = {
             "model": self.model,
@@ -261,5 +270,5 @@ def get_provider(model: Optional[str] = None) -> LLMProvider:
     explicit `model` overrides GRAP_LLM_MODEL (lets the UI pick a model).
     """
     if os.environ.get("GRAP_LLM_STUB"):
-        return StubProvider()
+        return StubProvider(default='{"outcomes":[],"relations":[]}')
     return OpenAICompatProvider(model=model or None)
