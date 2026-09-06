@@ -139,10 +139,10 @@ def test_graph_neighbors_expand_uses_real_ids(tmp_path):
     corpus.mkdir()
     (corpus / "1.json").write_text(json.dumps(
         {"id": "1", "tip_act": "LEGE", "numar": "166", "data_vigoare": "1999-11-09",
-         "titlu": "Lege A", "text_complet": "x"}), encoding="utf-8")
+         "titlu": "LEGE nr. 166 din 9 noiembrie 1999", "text_complet": "x"}), encoding="utf-8")
     (corpus / "2.json").write_text(json.dumps(
         {"id": "2", "tip_act": "HOTARARE", "numar": "671", "data_vigoare": "2000-08-17",
-         "titlu": "HG B", "text_complet": "In temeiul LEGEA nr. 166 din 9 noiembrie 1999"}),
+         "titlu": "HOTARARE nr. 671 din 17 august 2000", "text_complet": "In temeiul LEGEA nr. 166 din 9 noiembrie 1999"}),
         encoding="utf-8")
     b = client.post("/api/legal-graph/build",
                     json={"path": str(corpus), "max_files": 10, "with_relations": False}).json()

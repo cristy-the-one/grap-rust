@@ -2002,13 +2002,14 @@ class GrapApplication:
             id_to_node: dict = {}     # act id -> node_id
             for a in acts:
                 label = f"act-{a['id']}"
-                nid = kg.add_node(text=(a["title"] or label)[:2000], label=label)
+                nid = kg.add_node(text=(a["title"] + "\n\n" + a["text"]).strip() or label, label=label)
                 id_to_node[a["id"]] = nid
                 node_info[nid] = {"id": nid, "label": label, "kind": "act",
                                   "title": (a["title"] or label)[:140]}
 
             edges: list = []
-            for s, t in legal.citation_pairs(acts):
+            citations = legal.citation_report(acts)
+            for s, t in citations["pairs"]:
                 if s in id_to_node and t in id_to_node:
                     kg.add_edge(id_to_node[s], id_to_node[t], 0.8, {"relation_type": "cites"})
                     edges.append({"source": id_to_node[s], "target": id_to_node[t], "type": "cites"})
@@ -2051,6 +2052,13 @@ class GrapApplication:
                             edges.append({"source": an, "target": fn, "type": "mentions"})
 
             kg.save_to_dir(kgp)
+            # Citation offsets refer to the original body, retained in the graph.
+            # Keep source identity and unresolved references alongside native storage.
+            citation_path = Path(kgp) / "citation-report.json"
+            citation_path.write_text(json.dumps(citations, ensure_ascii=False, indent=2), encoding="utf-8")
+            (Path(kgp) / "legal-sources.json").write_text(json.dumps(
+                [{key:value for key,value in a.items() if key != "text"} for a in acts],
+                ensure_ascii=False, indent=2), encoding="utf-8")
             try:
                 self._get_workspace().record_event("legal_graph_built", path,
                                               details={"acts": str(len(acts)),
@@ -2082,6 +2090,10 @@ class GrapApplication:
                 "nodes": connected,
                 "edges": shown_edges,
                 "edge_types": all_types,   # all types (incl. mentions/relations) for expand
+                "citation_report": str(citation_path),
+                "coverage": {"missing_references": sum(r["status"] == "missing" for r in citations["references"]),
+                             "ambiguous_references": sum(r["status"] == "ambiguous" for r in citations["references"]),
+                             "unidentified_acts": len(citations["unidentified_acts"])},
                 "counts": {
                     "acts": len(acts),
                     "cites": sum(1 for e in edges if e["type"] == "cites"),
