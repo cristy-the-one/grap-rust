@@ -10,6 +10,7 @@ import json
 import os
 from pathlib import Path
 import sqlite3
+import uuid
 from datetime import datetime, timezone
 
 from .legal import parse_act
@@ -169,7 +170,7 @@ class LegalClaimStore:
             CREATE TABLE IF NOT EXISTS sources (
                 source_id TEXT PRIMARY KEY, source_file TEXT NOT NULL,
                 observed_hash TEXT, accepted_revision TEXT,
-                status TEXT NOT NULL, error TEXT);
+                status TEXT NOT NULL, error TEXT, attempt_id TEXT);
             CREATE TABLE IF NOT EXISTS revisions (
                 revision_id TEXT PRIMARY KEY, source_id TEXT NOT NULL REFERENCES sources,
                 source_hash TEXT NOT NULL, record TEXT NOT NULL);
@@ -178,6 +179,9 @@ class LegalClaimStore:
                 kind TEXT NOT NULL, record TEXT NOT NULL);
             CREATE INDEX IF NOT EXISTS legal_claim_revision ON claims(revision_id, kind);
         """)
+        # Additive migration for stores created before in-flight attempt ownership.
+        if "attempt_id" not in {row[1] for row in self.db.execute("PRAGMA table_info(sources)")}:
+            self.db.execute("ALTER TABLE sources ADD COLUMN attempt_id TEXT")
 
     def __enter__(self):
         return self
@@ -185,16 +189,24 @@ class LegalClaimStore:
     def __exit__(self, *_):
         self.db.close()
 
-    def _observe(self, source_id, source_file, digest, status, error=None):
-        self._observe_many([(source_id, source_file, digest, status, error)])
+    def _observe(self, source_id, source_file, digest, status, error=None, attempt_id=None):
+        self._observe_many([(source_id, source_file, digest, status, error, attempt_id)])
 
     def _observe_many(self, rows):
         with self.db:
-            self.db.executemany("""INSERT INTO sources VALUES (?, ?, ?, NULL, ?, ?)
+            self.db.executemany("""INSERT INTO sources
+                (source_id, source_file, observed_hash, status, error, attempt_id) VALUES (?, ?, ?, ?, ?, ?)
                 ON CONFLICT(source_id) DO UPDATE SET observed_hash=excluded.observed_hash,
-                status=excluded.status, error=excluded.error
+                status=excluded.status, error=excluded.error, attempt_id=excluded.attempt_id
                 WHERE sources.observed_hash IS NOT excluded.observed_hash
-                   OR sources.status IS NOT excluded.status OR sources.error IS NOT excluded.error""", rows)
+                   OR sources.status IS NOT excluded.status OR sources.error IS NOT excluded.error
+                   OR sources.attempt_id IS NOT excluded.attempt_id""", rows)
+
+    def _fail_attempt(self, source_id, attempt_id, digest, reason):
+        with self.db:
+            return self.db.execute("""UPDATE sources SET observed_hash=?, status='failed', error=?,
+                attempt_id=NULL WHERE source_id=? AND attempt_id=? AND status='pending'""",
+                (digest, reason, source_id, attempt_id)).rowcount == 1
 
     def ingest_folder(self, path, provider, *, max_files=3, max_chars=8000, refresh=False) -> dict:
         """Scan all JSON sources; attempt at most max_files whole-document extractions.
@@ -209,7 +221,7 @@ class LegalClaimStore:
         if not root.exists():
             raise ValueError(f"source path does not exist: {root}")
         files = [root] if root.is_file() else sorted(root.rglob("*.json"))
-        counts = dict.fromkeys(("scanned", "attempted", "ready", "unchanged", "deferred", "failed", "missing"), 0)
+        counts = dict.fromkeys(("scanned", "attempted", "ready", "unchanged", "deferred", "failed", "missing", "superseded"), 0)
         observed_ids = set()
         observations = []
 
@@ -219,7 +231,7 @@ class LegalClaimStore:
                 observations.clear()
 
         def observe_later(*row):
-            observations.append(row)
+            observations.append((*row, None))
             if len(observations) >= 256:
                 flush()
 
@@ -270,13 +282,23 @@ class LegalClaimStore:
                 continue
             # Persist pending BEFORE generation: a process interruption cannot look complete.
             flush()
-            self._observe(source_id, source_file, digest, "pending", "extraction in progress or interrupted")
+            attempt_id = uuid.uuid4().hex
+            self._observe(source_id, source_file, digest, "pending", "extraction in progress or interrupted", attempt_id)
             counts["attempted"] += 1
             try:
                 receipt = extract_claims(provider, text)
             except Exception as exc:
-                self._observe(source_id, source_file, digest, "failed", str(exc))
-                counts["failed"] += 1
+                owned = self._fail_attempt(source_id, attempt_id, digest, str(exc))
+                counts["failed" if owned else "superseded"] += 1
+                continue
+            try:
+                observed_digest = hashlib.sha256(file.read_bytes()).hexdigest()
+            except OSError:
+                observed_digest = None
+            if observed_digest != digest:
+                owned = self._fail_attempt(source_id, attempt_id, observed_digest,
+                                           "source changed during extraction; refresh this file")
+                counts["failed" if owned else "superseded"] += 1
                 continue
             receipt.update(source_id=source_id, source_file=source_file, source_sha256=digest,
                            source_text=text, metadata=act)
@@ -288,12 +310,14 @@ class LegalClaimStore:
             receipt["claim_count"] = len(claim_rows)
             receipt["recorded_at"] = datetime.now(timezone.utc).isoformat()
             with self.db:
-                self.db.execute("INSERT OR IGNORE INTO revisions VALUES (?, ?, ?, ?)",
-                                (revision_id, source_id, digest, _json(receipt)))
-                self.db.executemany("INSERT OR IGNORE INTO claims VALUES (?, ?, ?, ?)", claim_rows)
-                self.db.execute("UPDATE sources SET accepted_revision=?, status='ready', error=NULL WHERE source_id=?",
-                                (revision_id, source_id))
-            counts["ready"] += 1
+                owned = self.db.execute("""UPDATE sources SET accepted_revision=?, status='ready',
+                    error=NULL, attempt_id=NULL WHERE source_id=? AND attempt_id=? AND status='pending'""",
+                    (revision_id, source_id, attempt_id)).rowcount == 1
+                if owned:
+                    self.db.execute("INSERT OR IGNORE INTO revisions VALUES (?, ?, ?, ?)",
+                                    (revision_id, source_id, digest, _json(receipt)))
+                    self.db.executemany("INSERT OR IGNORE INTO claims VALUES (?, ?, ?, ?)", claim_rows)
+            counts["ready" if owned else "superseded"] += 1
         # A full folder scan can detect absent previously observed paths without
         # deleting their history. Do not infer absence outside this scan's scope.
         if root.is_dir():

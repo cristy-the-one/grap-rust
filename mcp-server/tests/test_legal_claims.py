@@ -139,7 +139,7 @@ def test_budget_and_resume_count_calls_not_unchanged_files_and_no_identity_mergi
     with LegalClaimStore(tmp_path / "claims.sqlite") as store:
         first = store.ingest_folder(folder, p, max_files=1, max_chars=500)
         assert first["counts"] == {"scanned": 5, "attempted": 1, "ready": 1,
-                                    "unchanged": 0, "deferred": 3, "failed": 1, "missing": 0}
+                                    "unchanged": 0, "deferred": 3, "failed": 1, "missing": 0, "superseded": 0}
         second = store.ingest_folder(folder, p, max_files=1, max_chars=500)
         assert second["counts"]["attempted"] == 1 and second["counts"]["unchanged"] == 1
         rows = store.read()["claims"]
@@ -185,6 +185,68 @@ def test_folder_absence_marks_stale_without_affecting_other_folders(tmp_path):
         assert result["counts"]["missing"] == 1
         assert store.read()["total"] == 1
         assert store.read(include_stale=True)["total"] == 2
+
+
+def test_file_change_during_generation_does_not_publish_an_outdated_result(tmp_path):
+    file = source(tmp_path / "a.json")
+    with LegalClaimStore(tmp_path / "claims.sqlite") as store:
+        store.ingest_folder(file, provider(claim()))
+        old = store.read()["claims"][0]
+        def changed(*_):
+            source(file, "New source body.")
+            return json.dumps({"claims": [claim()]}, ensure_ascii=False)
+        result = store.ingest_folder(file, StubProvider(handler=changed), refresh=True)
+        assert result["counts"]["failed"] == 1
+        assert store.read()["total"] == 0
+        assert store.read(include_stale=True)["claims"][0]["claim_id"] == old["claim_id"]
+        assert "changed during extraction" in store.sources()["sources"][0]["error"]
+
+
+def test_late_generation_cannot_replace_a_newer_source_result(tmp_path):
+    file = source(tmp_path / "a.json")
+    db = tmp_path / "claims.sqlite"
+    with LegalClaimStore(db) as store:
+        def overtaken(*_):
+            source(file, "No applicable claims.")
+            with LegalClaimStore(db) as newer:
+                newer.ingest_folder(file, provider())
+            return json.dumps({"claims": [claim()]}, ensure_ascii=False)
+        result = store.ingest_folder(file, StubProvider(handler=overtaken))
+        assert result["counts"]["superseded"] == 1
+        assert store.read()["total"] == 0
+        status = store.sources()["sources"][0]
+        assert status["status"] == "ready"
+        assert store.receipt(status["accepted_revision"])["source_text"] == "No applicable claims."
+
+
+@pytest.mark.parametrize("late_error", [False, True])
+def test_attempt_ownership_also_protects_same_hash_refresh(tmp_path, late_error):
+    file = source(tmp_path / "a.json")
+    db = tmp_path / "claims.sqlite"
+    with LegalClaimStore(db) as store:
+        def overtaken(*_):
+            with LegalClaimStore(db) as newer:
+                newer.ingest_folder(file, provider())
+            if late_error:
+                raise RuntimeError("late provider error")
+            return json.dumps({"claims": [claim()]}, ensure_ascii=False)
+        result = store.ingest_folder(file, StubProvider(handler=overtaken))
+        assert result["counts"]["superseded"] == 1
+        assert store.sources()["sources"][0]["status"] == "ready"
+        assert store.read()["total"] == 0
+
+
+def test_pre_attempt_store_migrates_without_losing_source_status(tmp_path):
+    import sqlite3
+    db = tmp_path / "claims.sqlite"
+    with sqlite3.connect(db) as old:
+        old.execute("""CREATE TABLE sources (source_id TEXT PRIMARY KEY, source_file TEXT NOT NULL,
+            observed_hash TEXT, accepted_revision TEXT, status TEXT NOT NULL, error TEXT)""")
+        old.execute("INSERT INTO sources VALUES ('old', 'old.json', 'digest', NULL, 'deferred', 'budget')")
+    with LegalClaimStore(db) as migrated:
+        row = migrated.sources()["sources"][0]
+        assert row["source_id"] == "old" and row["observed_hash"] == "digest"
+        assert row["error"] == "budget" and row["attempt_id"] is None
 
 
 def test_application_interface_is_workspace_owned_and_registered(tmp_path):

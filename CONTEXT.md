@@ -45,6 +45,10 @@ abbreviation supports an alias in that scope, without establishing global identi
 A retained state of a particular source document. It records what was supplied,
 without establishing the legal act's version or current validity.
 
+**Extraction receipt**:
+A record of the claims proposed from a specified source revision, with their
+supporting passages. Re-extracting the same source can produce a different receipt.
+
 **Amendment**:
 A stated change to a particular act or provision. Its scope and date are part of
 the claim; a citation alone does not establish an amendment.

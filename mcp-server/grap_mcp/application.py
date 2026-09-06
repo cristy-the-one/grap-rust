@@ -2015,7 +2015,7 @@ class GrapApplication:
 
     @operation
     def get_legal_sources(self, source_id: str = None, limit: int = 20, offset: int = 0) -> dict:
-        """List observed files, including failures/deferrals, or one source's revision history."""
+        """List observed files, including failures/deferrals, or one source's extraction history."""
         from .kee.legal_claims import LegalClaimStore
         try:
             with LegalClaimStore(Path(self._resolve_ws_root()) / "legal-claims.sqlite") as store:

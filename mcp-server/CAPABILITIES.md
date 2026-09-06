@@ -1,9 +1,23 @@
 # grap-mcp-server — Capability Surface
 
-POC MCP capability taxonomy. Auth is **deferred** (no authentication/authorization yet).
-Every mutating capability emits a Workspace audit event (see `get_audit_log`).
+MCP capability taxonomy. Application role checks enforce the configured role;
+identity authentication is not provided by those checks. Most lifecycle mutations
+emit Workspace audit events (see `get_audit_log`); legal claim receipts and source
+status are retained in their workspace-owned SQLite ledger.
 
 ## Knowledge
+
+The full tier also includes a separate [Romanian legal claim path](../docs/legal-claims-2026-09.md):
+
+- **extract_legal_claims(path, max_files=3, max_chars=8000, refresh=False, model=None)**:
+  bounded whole-document extraction of typed proposals with conditions, exceptions,
+  dates and literal evidence. Zero `max_files` scans coverage without extraction.
+- **get_legal_claims(kind=None, source_id=None, revision_id=None, include_stale=False,
+  limit=20, offset=0)**: latest stored claims, or an exact historical source receipt.
+- **get_legal_sources(source_id=None, limit=20, offset=0)**: source status and extraction history.
+- **export_legal_claim_graph()**: a new Rust snapshot of qualified claim nodes linked
+  to source receipts. It does not alter the active graph or adopt claims as legal truth.
+
 - **load_knowledge_graph(path)** → `{status, node_count}`. Load an on-disk grap KG. Emits `kg_loaded`.
 - **create_knowledge_graph(path)** → `{status, node_count}`. Create a fresh on-disk KG. Emits `kg_created`.
 - **ingest_documents(path)** → `{status, files, nodes_added, embedded}`. Chunk + add .md/.txt docs

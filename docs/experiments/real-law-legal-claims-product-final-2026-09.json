@@ -1,0 +1,127 @@
+{
+  "mode": "saved real-model replies; no new generation",
+  "runs": [
+    {
+      "status": "ok",
+      "counts": {
+        "scanned": 1,
+        "attempted": 1,
+        "ready": 1,
+        "unchanged": 0,
+        "deferred": 0,
+        "failed": 0,
+        "missing": 0,
+        "superseded": 0
+      },
+      "coverage": {
+        "sources": 1,
+        "statuses": {
+          "ready": 1
+        },
+        "sources_with_retained_claims": 0,
+        "meaning": "Extraction status for observed files; not legal validity or folder completeness."
+      },
+      "store": "C:\\dev\\grap-rust\\.logs\\legal-claims-product-final\\legal-claims.sqlite"
+    },
+    {
+      "status": "ok",
+      "counts": {
+        "scanned": 1,
+        "attempted": 1,
+        "ready": 1,
+        "unchanged": 0,
+        "deferred": 0,
+        "failed": 0,
+        "missing": 0,
+        "superseded": 0
+      },
+      "coverage": {
+        "sources": 2,
+        "statuses": {
+          "ready": 2
+        },
+        "sources_with_retained_claims": 0,
+        "meaning": "Extraction status for observed files; not legal validity or folder completeness."
+      },
+      "store": "C:\\dev\\grap-rust\\.logs\\legal-claims-product-final\\legal-claims.sqlite"
+    }
+  ],
+  "corpus_scan": {
+    "status": "ok",
+    "counts": {
+      "scanned": 2092,
+      "attempted": 0,
+      "ready": 0,
+      "unchanged": 2,
+      "deferred": 2090,
+      "failed": 0,
+      "missing": 0,
+      "superseded": 0
+    },
+    "coverage": {
+      "sources": 2092,
+      "statuses": {
+        "deferred": 2090,
+        "ready": 2
+      },
+      "sources_with_retained_claims": 0,
+      "meaning": "Extraction status for observed files; not legal validity or folder completeness."
+    },
+    "store": "C:\\dev\\grap-rust\\.logs\\legal-claims-product-final\\legal-claims.sqlite",
+    "seconds": 0.676
+  },
+  "snapshot": {
+    "status": "ok",
+    "graph_path": "C:\\dev\\grap-rust\\.logs\\legal-claims-product-final\\legal-claim-snapshots\\cab023c6dcf54c6c93083d213c5c9b67\\graph",
+    "claims": 3,
+    "sources": 2,
+    "created_at": "2026-09-06T16:02:56.385946+00:00",
+    "coverage": {
+      "sources": 2092,
+      "statuses": {
+        "deferred": 2090,
+        "ready": 2
+      },
+      "sources_with_retained_claims": 0,
+      "meaning": "Extraction status for observed files; not legal validity or folder completeness."
+    },
+    "meaning": "Snapshot of proposed claims; does not establish current law. Re-export after ingestion."
+  },
+  "reopened_search_hits": 2,
+  "native_nodes": 5,
+  "native_edges": 3,
+  "right": {
+    "conditions": [],
+    "dates": [
+      "lunar"
+    ],
+    "evidence": [
+      {
+        "end": 1307,
+        "quote": "Articolul 1 Membrii Academiei Române primesc lunar o indemnizație determinata în raport cu salariul de baza, corespunzător coeficientului mediu de multiplicare de 3,562, indexat, stabilit pentru funcția de cercetator științific principal gradul I, conform anexei VII/3 la Legea nr. 154/1998 , după cum urmează: a) membrii titulari b) membrii corespondenti c) membrii de onoare din România, Republica Moldova și Ucraina 80% 60% 60%",
+        "start": 877
+      }
+    ],
+    "exceptions": [],
+    "kind": "right",
+    "object": "conform anexei VII/3 la Legea nr. 154/1998",
+    "predicate": "primesc lunar o indemnizație determinata în raport cu salariul de baza, corespunzător coeficientului mediu de multiplicare de 3,562, indexat, stabilit pentru funcția de cercetator științific principal gradul I",
+    "provision": "",
+    "provision_evidence": null,
+    "review_status": "proposed",
+    "scope": [
+      "a) membrii titulari",
+      "b) membrii corespondenti",
+      "c) membrii de onoare din România, Republica Moldova și Ucraina"
+    ],
+    "scope_resolution": "unresolved",
+    "subject": "Membrii Academiei Române",
+    "claim_id": "848244b2d5d74bbcb46df36657dd16e38043d8ab54e9bb565ea54e0f1d33f00d",
+    "revision_id": "074fd4f5d7f84ce18805c4c8d291546cb8d2f3b47485b63c551c2c2322062c7d",
+    "source_id": "114702faa9dab2cc304df2ba37b5fc4ff9c9c1b1b2ad04e2ef033137b9ed16d1",
+    "source_file": "C:\\dev\\grap-rust\\real-data-law-ro\\16955.json",
+    "source_status": "ready",
+    "stale": false,
+    "source_error": null
+  }
+}
