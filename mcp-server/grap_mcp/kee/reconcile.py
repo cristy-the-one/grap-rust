@@ -58,7 +58,35 @@ def cosine(a: Sequence[float], b: Sequence[float]) -> float:
     return dot / (na * nb)
 
 
-def greedy_cluster(vectors: Sequence[Sequence[float]], threshold: float) -> List[List[int]]:
+def merge_compatible(a: str, b: str) -> bool:
+    """Veto explicit identity conflicts; similarity alone never overrides these.
+
+    This is not an identity matcher. Equal numbers do not prove the same act,
+    and unknown kinds still require the caller's similarity/evidence decision.
+    """
+    a, b = fold(a), fold(b)
+    numbers_a, numbers_b = re.findall(r"\d+", a), re.findall(r"\d+", b)
+    if numbers_a and numbers_b and numbers_a != numbers_b:
+        return False
+    kinds = (
+        (r"minister(?:ul|ului|e|elor)?\b", "ministry"),
+        (r"ministr(?:u|ul|ului|i|ilor)\b", "minister"),
+        (r"(?:lege|legea|legii|law)\b", "law"),
+        (r"(?:norma|norme|normele|normelor)\b", "norm"),
+        (r"ordonant\w* de urgent\w*\b", "emergency-ordinance"),
+        (r"ordonant\w*\b", "ordinance"),
+        (r"(?:ordin|ordinul|ordinului|order)\b", "order"),
+        (r"hotarar\w*\b", "decision"),
+        (r"regulament\w*\b", "regulation"),
+        (r"(?:articol\w*|article)\b", "article"),
+    )
+    kind_a = next((kind for pattern, kind in kinds if re.match(pattern, a)), None)
+    kind_b = next((kind for pattern, kind in kinds if re.match(pattern, b)), None)
+    return not (kind_a and kind_b and kind_a != kind_b)
+
+
+def greedy_cluster(vectors: Sequence[Sequence[float]], threshold: float,
+                   *, names: Sequence[str] | None = None) -> List[List[int]]:
     """Deterministic single-pass clustering: each item joins the first existing
     cluster whose representative it is >= threshold similar to, else starts a new
     one. Returns clusters as lists of input indices (first member is the rep)."""
@@ -67,7 +95,8 @@ def greedy_cluster(vectors: Sequence[Sequence[float]], threshold: float) -> List
     for i, v in enumerate(vectors):
         placed = False
         for c, rep in enumerate(reps):
-            if cosine(v, rep) >= threshold:
+            if (cosine(v, rep) >= threshold and
+                    (names is None or all(merge_compatible(names[i], names[j]) for j in clusters[c]))):
                 clusters[c].append(i)
                 placed = True
                 break
@@ -83,7 +112,7 @@ def _dedup_strings(strings: List[str], embedder, threshold: float) -> List[Tuple
     if not strings:
         return []
     vecs = embedder.embed(strings)
-    clusters = greedy_cluster(vecs, threshold)
+    clusters = greedy_cluster(vecs, threshold, names=strings)
     out: List[Tuple[str, List[str]]] = []
     for cl in clusters:
         members = [strings[i] for i in cl]

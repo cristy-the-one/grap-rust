@@ -208,6 +208,13 @@ class WorkingGraph:
             lst.append(alias)
 
     # ---- resolution ----
+    def _compatible_matches(self, name, vec):
+        # Inspect a bounded candidate set, then enforce identity against every
+        # registered alias so a generic canonical name cannot bridge two acts.
+        return [(node, score) for node, score in self._vector_concepts(vec, 8)
+                if all(rc.merge_compatible(name, alias) for alias in
+                       [self.canonical[node], *self.aliases_by_node.get(node, [])])]
+
     def _resolve_outcome(self, name: str) -> _Resolution:
         hits = self._alias_concepts(name)
         if hits:
@@ -223,7 +230,7 @@ class WorkingGraph:
                 return _Resolution(node, False)
 
         vec = self._embed_one(name)
-        matches = self._vector_concepts(vec, 2)
+        matches = self._compatible_matches(name, vec)
         if matches and matches[0][1] >= self.merge_threshold:
             node = matches[0][0]
             ambiguous = len(matches) > 1 and matches[1][1] >= self.merge_threshold
@@ -452,7 +459,7 @@ class WorkingGraph:
         if hits:
             return hits[0]
         vec = self._embed_one(name)
-        matches = self._vector_concepts(vec, 1)
+        matches = self._compatible_matches(name, vec)
         if matches and matches[0][1] >= self.merge_threshold:
             self._register_alias(name, matches[0][0])
             return matches[0][0]
