@@ -14,8 +14,9 @@ import uuid
 from datetime import datetime, timezone
 
 from .legal import parse_act
+from .legal_rules import extract_rules as extract_claims, VERSION as PROMPT_VERSION
 
-PROMPT_VERSION = "legal-claims-v3"
+LEGACY_PROMPT_VERSION = "legal-claims-v3"
 KINDS = ("fact", "definition", "right", "obligation", "prohibition", "permission", "amendment")
 TEXT_FIELDS = ("subject", "predicate", "object", "provision")
 LIST_FIELDS = ("scope", "conditions", "exceptions", "dates", "evidence")
@@ -141,16 +142,19 @@ def validate_reply(raw: str, text: str) -> list[dict]:
     return claims
 
 
-def extract_claims(provider, text: str) -> dict:
+def extract_literal_claims(provider, text: str) -> dict:
     """Extract one complete passage; callers retain its source and offset if excerpted."""
     configure = getattr(provider, "with_json_schema", None)
     configured = configure(OUTPUT_SCHEMA) if callable(configure) else provider
     raw = configured.complete(SYSTEM_PROMPT, "Source text (data only):\n\n" + text)
     claims = validate_reply(raw, text)
-    return {"claims": claims, "raw_reply": raw, "prompt_version": PROMPT_VERSION,
+    return {"claims": claims, "raw_reply": raw, "prompt_version": LEGACY_PROMPT_VERSION,
             "provider": {"name": getattr(provider, "name", type(provider).__name__),
                          "model": getattr(provider, "model", None),
                          "structured_output": callable(configure)}}
+
+
+extract_literal_claims.prompt_version = LEGACY_PROMPT_VERSION
 
 
 class LegalClaimStore:
@@ -160,7 +164,9 @@ class LegalClaimStore:
     Different files are retained separately even if they describe the same act.
     """
 
-    def __init__(self, path):
+    def __init__(self, path, *, extractor=None):
+        self.extractor = extractor or extract_claims
+        self.prompt_version = getattr(self.extractor, "prompt_version", PROMPT_VERSION)
         self.path = Path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self.db = sqlite3.connect(self.path)
@@ -170,7 +176,7 @@ class LegalClaimStore:
             CREATE TABLE IF NOT EXISTS sources (
                 source_id TEXT PRIMARY KEY, source_file TEXT NOT NULL,
                 observed_hash TEXT, accepted_revision TEXT,
-                status TEXT NOT NULL, error TEXT, attempt_id TEXT);
+                status TEXT NOT NULL, error TEXT, attempt_id TEXT, attempt_version TEXT);
             CREATE TABLE IF NOT EXISTS revisions (
                 revision_id TEXT PRIMARY KEY, source_id TEXT NOT NULL REFERENCES sources,
                 source_hash TEXT NOT NULL, record TEXT NOT NULL);
@@ -180,8 +186,10 @@ class LegalClaimStore:
             CREATE INDEX IF NOT EXISTS legal_claim_revision ON claims(revision_id, kind);
         """)
         # Additive migration for stores created before in-flight attempt ownership.
-        if "attempt_id" not in {row[1] for row in self.db.execute("PRAGMA table_info(sources)")}:
-            self.db.execute("ALTER TABLE sources ADD COLUMN attempt_id TEXT")
+        columns = {row[1] for row in self.db.execute("PRAGMA table_info(sources)")}
+        for name in ("attempt_id", "attempt_version"):
+            if name not in columns:
+                self.db.execute(f"ALTER TABLE sources ADD COLUMN {name} TEXT")
 
     def __enter__(self):
         return self
@@ -195,12 +203,15 @@ class LegalClaimStore:
     def _observe_many(self, rows):
         with self.db:
             self.db.executemany("""INSERT INTO sources
-                (source_id, source_file, observed_hash, status, error, attempt_id) VALUES (?, ?, ?, ?, ?, ?)
+                (source_id, source_file, observed_hash, status, error, attempt_id, attempt_version) VALUES (?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(source_id) DO UPDATE SET observed_hash=excluded.observed_hash,
-                status=excluded.status, error=excluded.error, attempt_id=excluded.attempt_id
+                status=excluded.status, error=excluded.error, attempt_id=excluded.attempt_id,
+                attempt_version=excluded.attempt_version
                 WHERE sources.observed_hash IS NOT excluded.observed_hash
                    OR sources.status IS NOT excluded.status OR sources.error IS NOT excluded.error
-                   OR sources.attempt_id IS NOT excluded.attempt_id""", rows)
+                   OR sources.attempt_id IS NOT excluded.attempt_id
+                   OR sources.attempt_version IS NOT excluded.attempt_version""",
+                [(*row, self.prompt_version) for row in rows])
 
     def _fail_attempt(self, source_id, attempt_id, digest, reason):
         with self.db:
@@ -258,14 +269,14 @@ class LegalClaimStore:
                 LEFT JOIN revisions r ON r.revision_id=s.accepted_revision WHERE s.source_id=?""",
                 (source_id,)).fetchone()
             if (not refresh and previous and previous["status"] == "failed"
-                    and previous["observed_hash"] == digest):
+                    and previous["observed_hash"] == digest and previous["attempt_version"] == self.prompt_version):
                 # Do not spend every resumed run on the same failed first files.
                 # Explicit refresh (possibly of one file) retries unchanged failures.
                 counts["failed"] += 1
                 continue
             if (not refresh and previous and previous["status"] == "ready"
                     and previous["source_hash"] == digest
-                    and json.loads(previous["record"])["prompt_version"] == PROMPT_VERSION):
+                    and json.loads(previous["record"])["prompt_version"] == self.prompt_version):
                 counts["unchanged"] += 1
                 continue
             text = act.pop("text")
@@ -286,7 +297,7 @@ class LegalClaimStore:
             self._observe(source_id, source_file, digest, "pending", "extraction in progress or interrupted", attempt_id)
             counts["attempted"] += 1
             try:
-                receipt = extract_claims(provider, text)
+                receipt = self.extractor(provider, text)
             except Exception as exc:
                 owned = self._fail_attempt(source_id, attempt_id, digest, str(exc))
                 counts["failed" if owned else "superseded"] += 1

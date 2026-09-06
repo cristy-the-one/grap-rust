@@ -7,7 +7,7 @@ from pathlib import Path
 import re
 import time
 
-from grap_mcp.kee.legal_claims import extract_claims, validate_reply, OUTPUT_SCHEMA, SYSTEM_PROMPT, PROMPT_VERSION
+from grap_mcp.kee.legal_claims import extract_literal_claims as extract_claims, validate_reply, OUTPUT_SCHEMA, SYSTEM_PROMPT, LEGACY_PROMPT_VERSION as PROMPT_VERSION
 from grap_mcp.kee.llm import OpenAICompatProvider
 
 
@@ -60,12 +60,14 @@ def main():
     parser.add_argument("--model", default="gemma4:latest")
     parser.add_argument("--output", required=True)
     parser.add_argument("--evidence-spans", action="store_true")
+    parser.add_argument("--rules", action="store_true")
+    parser.add_argument("--cases", default="docs/experiments/real-law-extraction-cases.json")
     args = parser.parse_args()
     out = Path(args.output)
     if out.exists():
         raise SystemExit("Choose a new output path; preserved results are not overwritten.")
     root = Path(__file__).resolve().parents[2]
-    cases = json.loads((root / "docs/experiments/real-law-extraction-cases.json").read_text(encoding="utf-8"))
+    cases = json.loads((root / args.cases).read_text(encoding="utf-8"))
     # Check frozen passages against original bytes BEFORE making any model calls.
     for case in cases:
         raw = (root / case["source_file"]).read_bytes()
@@ -82,9 +84,11 @@ def main():
     provider = RecordingProvider(model=args.model, timeout=120, extra_body={"reasoning_effort": "none"})
     provider.max_tokens = 4096
     provider.retries = 0
-    result = {"model": args.model, "prompt_version": PROMPT_VERSION,
+    from grap_mcp.kee.legal_rules import extract_rules, PROMPT as RULE_PROMPT, VERSION as RULE_VERSION
+    result = {"model": args.model, "prompt_version": RULE_VERSION if args.rules else PROMPT_VERSION,
+              "rule_strategy": args.rules,
               "strategy": "passage-ids-experiment" if args.evidence_spans else "literal-quotes",
-              "prompt": SYSTEM_PROMPT + (SPAN_INSTRUCTION if args.evidence_spans else ""),
+              "prompt": RULE_PROMPT if args.rules else SYSTEM_PROMPT + (SPAN_INSTRUCTION if args.evidence_spans else ""),
               "schema": OUTPUT_SCHEMA, "max_tokens": provider.max_tokens, "temperature": 0,
               "extra_body": provider.extra_body, "cases": []}
     out.parent.mkdir(parents=True, exist_ok=True)
@@ -94,7 +98,8 @@ def main():
         row = {"id": case["id"], "source_file": case["source_file"], "source_sha256": case["source_sha256"],
                "start": case["start"], "end": case["end"], "text": case["text"]}
         try:
-            row["receipt"] = (extract_with_spans(provider, case["text"]) if args.evidence_spans else
+            row["receipt"] = (extract_rules(provider, case["text"]) if args.rules else
+                              extract_with_spans(provider, case["text"]) if args.evidence_spans else
                               extract_claims(provider, case["text"]))
         except Exception as exc:
             row["error"] = str(exc)

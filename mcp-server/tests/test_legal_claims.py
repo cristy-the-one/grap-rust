@@ -1,14 +1,19 @@
 """Legal proposal contracts through the extraction/store/application interfaces."""
 import json
+from functools import partial
 
 import pytest
 
 from grap_mcp.application import GrapApplication
-from grap_mcp.kee.legal_claims import LegalClaimStore, extract_claims
+from grap_mcp.kee.legal_claims import LegalClaimStore as ClaimStore, extract_literal_claims as extract_claims
 from grap_mcp.kee.llm import StubProvider, OpenAICompatProvider
 
 
 TEXT = "Membrii Academiei primesc lunar o indemnizație. Plata se face până la 30 aprilie 2000."
+
+# Retain the literal-extraction compatibility checks and exercise the same ledger
+# invariants independently of the new classifier. Its production path has its own tests.
+LegalClaimStore = partial(ClaimStore, extractor=extract_claims)
 
 
 def claim(**changes):
@@ -249,7 +254,8 @@ def test_pre_attempt_store_migrates_without_losing_source_status(tmp_path):
         assert row["error"] == "budget" and row["attempt_id"] is None
 
 
-def test_application_interface_is_workspace_owned_and_registered(tmp_path):
+def test_application_interface_is_workspace_owned_and_registered(tmp_path, monkeypatch):
+    monkeypatch.setattr("grap_mcp.kee.legal_claims.extract_claims", extract_claims)
     file = source(tmp_path / "a.json")
     app = GrapApplication(tmp_path / "workspace", role="operator", provider_factory=lambda **_: provider(claim()))
     assert app.extract_legal_claims(str(file))["counts"]["ready"] == 1

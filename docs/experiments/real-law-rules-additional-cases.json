@@ -1,0 +1,74 @@
+[
+  {
+    "id": "additional-109831",
+    "text": "(3) Convocarea trebuie să cuprindă data, locul și ora ținerii adunării generale a acționarilor, ordinea de zi, cu menționarea explicită a tuturor problemelor care vor fi puse în discuție, și, dacă este cazul, textul integral al propunerilor referitoare la modificarea statutului.",
+    "source_file": "real-data-law-ro/109831.json",
+    "source_sha256": "9e832b5890b93eee84d58aad2c905b66ff283693eb03f139b029f3e899a2a468",
+    "field": "text_complet",
+    "start": 11747,
+    "end": 12026
+  },
+  {
+    "id": "additional-116303",
+    "text": "(1) Se interzice amplasarea de unităţi cu profil alimentar în spaţiile de locuit. ...",
+    "source_file": "real-data-law-ro/116303.json",
+    "source_sha256": "f0e4ab90339b514863b7fa441a8077ebcede0bfd01a07f49cc4624eb070164c2",
+    "field": "text_complet",
+    "start": 1231,
+    "end": 1316
+  },
+  {
+    "id": "additional-123376",
+    "text": "(1) Contribuabilii, persoane juridice, sunt obligaţi să se conecteze prin INTERNET sau sa folosească suportul magnetic (dischete) pentru a transmite în baza de date a Institutului de Management şi Informatica datele privind plăţile restante mai vechi de 30 de zile, cu o valoare mai mare de 100 milioane lei.",
+    "source_file": "real-data-law-ro/123376.json",
+    "source_sha256": "b84b2c533124084e85c67faf55608de03a0284001fd98a89291a3718a4b953e0",
+    "field": "text_complet",
+    "start": 851,
+    "end": 1159
+  },
+  {
+    "id": "additional-123377",
+    "text": "Toate datele furnizate de persoanele juridice trebuie să fie corecte, în caz contrar atragand răspunderea civilă şi penală potrivit legii.",
+    "source_file": "real-data-law-ro/123377.json",
+    "source_sha256": "0c34351e8346360de4bb00781141484648c84f57f58bdd187c2c0b117d4f9f24",
+    "field": "text_complet",
+    "start": 8636,
+    "end": 8774
+  },
+  {
+    "id": "additional-123774",
+    "text": "Activitatea de informare trebuie să contribuie la armonizarea legislaţiei române cu cea a statelor membre ale Uniunii Europene, la aderarea României la instrumentele juridice ale Consiliului Europei, la lărgirea cadrului juridic bi- şi multilateral, la asigurarea dreptului cetăţenilor români la tratament egal cu cetăţenii altor state, inclusiv la libera circulaţie.",
+    "source_file": "real-data-law-ro/123774.json",
+    "source_sha256": "baa664d68d05a1d8aec2abf6ad864bacf358df079beda14d959cd001b5bbc8e7",
+    "field": "text_complet",
+    "start": 11320,
+    "end": 11687
+  },
+  {
+    "id": "additional-15543",
+    "text": "(2) În exercitarea atribuţiilor de control personalul împuternicit din cadrul Agenţiei Naţionale a Medicamentului sau din unităţile teritoriale ale acesteia are dreptul să solicite,",
+    "source_file": "real-data-law-ro/15543.json",
+    "source_sha256": "8d6a87245869b9d29c3b02bec101d1b4f4fefcc998c2a7d4ce712a6266276df7",
+    "field": "text_complet",
+    "start": 16073,
+    "end": 16254
+  },
+  {
+    "id": "additional-158079",
+    "text": "(2) În cazul persoanelor fizice sau juridice străine, actele menționate la art. 9 , respectiv la art. 10 , trebuie să fie traduse în limba română și legalizate de către un notar public din România.",
+    "source_file": "real-data-law-ro/158079.json",
+    "source_sha256": "de31da8e61a980f751b5e5e198a99b44323901c1b713e3e5ee18a8e1176d120a",
+    "field": "text_complet",
+    "start": 10515,
+    "end": 10712
+  },
+  {
+    "id": "additional-15967",
+    "text": "Operaţiunile de alocare şi de virare la bugetele locale a cotelor cuvenite din impozitul pe venit se efectueaza de Ministerul Finanţelor Publice prin serviciile publice descentralizate. ... (3^1) Platitorii de impozite şi taxe care au organizate puncte de lucru stabile sunt obligati să solicite inregistrarea fiscala a acestora, ca platitori de impozit pe venituri din salarii, la organul fiscal în a cărui raza teritoriala se afla punctul de lucru. (3^2) Solicitarea se face în termen de 15 zile de la data infiintarii, pentru punctele de lucru nou-înfiinţate,",
+    "source_file": "real-data-law-ro/15967.json",
+    "source_sha256": "3125616eafb112b0683a96aafd5fd127db632630fd6542b1f0fc617f4b6cfc08",
+    "field": "text_complet",
+    "start": 16526,
+    "end": 17088
+  }
+]
