@@ -22,6 +22,11 @@ An assertion extracted from a particular source, with its supporting passage.
 A claim is a proposal about the source's meaning, not a guarantee of legal truth.
 _Avoid_: Verified fact, ground truth
 
+**Source statement**:
+A passage retained in the source's own words, together with the surrounding text
+needed to interpret it. Its proposed classification and subject may remain uncertain
+even when the wording is preserved exactly.
+
 **Obligation**:
 A duty imposed on a specified subject, including its conditions, exceptions,
 limits and relevant dates. It is distinct from a description or a permission.

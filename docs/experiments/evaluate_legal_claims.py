@@ -59,8 +59,9 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--model", default="gemma4:latest")
     parser.add_argument("--output", required=True)
-    parser.add_argument("--evidence-spans", action="store_true")
-    parser.add_argument("--rules", action="store_true")
+    strategy = parser.add_mutually_exclusive_group()
+    strategy.add_argument("--evidence-spans", action="store_true")
+    strategy.add_argument("--rules", action="store_true")
     parser.add_argument("--cases", default="docs/experiments/real-law-extraction-cases.json")
     args = parser.parse_args()
     out = Path(args.output)
@@ -86,10 +87,13 @@ def main():
     provider.retries = 0
     from grap_mcp.kee.legal_rules import extract_rules, PROMPT as RULE_PROMPT, VERSION as RULE_VERSION
     result = {"model": args.model, "prompt_version": RULE_VERSION if args.rules else PROMPT_VERSION,
+              "extractor_sha256": hashlib.sha256((root / "mcp-server/grap_mcp/kee" /
+                  ("legal_rules.py" if args.rules else "legal_claims.py")).read_bytes()).hexdigest(),
               "rule_strategy": args.rules,
-              "strategy": "passage-ids-experiment" if args.evidence_spans else "literal-quotes",
+              "strategy": "source-statements" if args.rules else "passage-ids-experiment" if args.evidence_spans else "literal-quotes",
               "prompt": RULE_PROMPT if args.rules else SYSTEM_PROMPT + (SPAN_INSTRUCTION if args.evidence_spans else ""),
-              "schema": OUTPUT_SCHEMA, "max_tokens": provider.max_tokens, "temperature": 0,
+              "schema": "per-batch unit classification schema in legal_rules.py" if args.rules else OUTPUT_SCHEMA,
+              "max_tokens": provider.max_tokens, "temperature": 0,
               "extra_body": provider.extra_body, "cases": []}
     out.parent.mkdir(parents=True, exist_ok=True)
     for case in cases:

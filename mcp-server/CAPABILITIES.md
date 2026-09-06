@@ -7,14 +7,17 @@ status are retained in their workspace-owned SQLite ledger.
 
 ## Knowledge
 
-The full tier also includes a separate [Romanian legal claim path](../docs/legal-claims-2026-09.md):
+The full tier also includes a separate [Romanian legal statement path](../docs/legal-rules-2026-09.md):
 
 - **extract_legal_claims(path, max_files=3, max_chars=8000, refresh=False, model=None)**:
-  bounded whole-document extraction of typed proposals with conditions, exceptions,
-  dates and literal evidence. Zero `max_files` scans coverage without extraction.
+  bounded whole-document extraction of source statements with proposed kinds and
+  grounded subjects. Explicit definitions are parsed directly; ordinary rules keep
+  their full statement and context. Zero `max_files` scans coverage without extraction.
 - **get_legal_claims(kind=None, source_id=None, revision_id=None, include_stale=False,
   limit=20, offset=0)**: latest stored claims, or an exact historical source receipt.
 - **get_legal_sources(source_id=None, limit=20, offset=0)**: source status and extraction history.
+- **resolve_legal_term(term, source_id)**: explicit definitions within one source;
+  dotted abbreviations are recognized and conflicting meanings remain ambiguous.
 - **export_legal_claim_graph()**: a new Rust snapshot of qualified claim nodes linked
   to source receipts. It does not alter the active graph or adopt claims as legal truth.
 

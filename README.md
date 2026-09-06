@@ -10,9 +10,10 @@ describe the implemented behavior and where it has evolved beyond that prototype
 The [architecture simplification report](docs/simplification-implementation-2026-09.md)
 documents the shared application service, accurate gap-check contracts, and measured
 checkpoint improvements. PageRank ranking is opt-in in Rust and Python.
-The [Romanian legal claim path](docs/legal-claims-2026-09.md) adds qualified,
-source-backed proposals, revision receipts and Rust graph snapshots, with explicit
-coverage reporting and measured local-model limitations.
+The [Romanian legal statement path](docs/legal-rules-2026-09.md) preserves source
+wording and context, uses LLMs for classification, resolves explicit definitions
+within each source, and exports receipt-backed Rust graph snapshots. The report
+includes complete-document trials and remaining semantic limitations.
 
 ## Why grap?
 

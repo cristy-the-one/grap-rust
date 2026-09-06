@@ -1,5 +1,11 @@
 # Qualified legal claims: implementation and real-source evaluation
 
+**Historical baseline:** the literal-field extractor described below has been
+superseded by [source statements and scoped definitions](legal-rules-2026-09.md).
+The stored experiments and replay script retain this earlier contract for comparison.
+Current ordinary rules use `statement`, with empty predicate/object fields; the
+current API also exposes `resolve_legal_term(term, source_id)`.
+
 The Romanian-law path now stores qualified legal proposals independently of ASPICE
 assessment requirements. A right is not converted into a beneficiary's obligation;
 an amendment is distinct from a citation. Claims can be inspected with their source

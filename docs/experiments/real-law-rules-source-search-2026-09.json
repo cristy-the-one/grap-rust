@@ -1,0 +1,36 @@
+{
+  "mode": "re-export existing live receipts; no model calls",
+  "snapshot": {
+    "status": "ok",
+    "graph_path": "C:\\dev\\grap-rust\\.logs\\legal-rules-live-final\\legal-claim-snapshots\\b67be19ea0a24a01bcf81b06c430f65f\\graph",
+    "claims": 80,
+    "sources": 8,
+    "created_at": "2026-09-06T19:33:51.585624+00:00",
+    "coverage": {
+      "sources": 2092,
+      "statuses": {
+        "deferred": 2084,
+        "ready": 8
+      },
+      "sources_with_retained_claims": 0,
+      "meaning": "Extraction status for observed files; not legal validity or folder completeness."
+    },
+    "meaning": "Snapshot of proposed claims; does not establish current law. Re-export after ingestion."
+  },
+  "query": "Documentaţia",
+  "expected_source": "real-data-law-ro/17754.json",
+  "expected_source_node": 57,
+  "source_hit_verified": true,
+  "hits": [
+    {
+      "node": 60,
+      "text_score": 3.89013934135437
+    },
+    {
+      "node": 57,
+      "text_score": 2.20531964302063
+    }
+  ],
+  "native_nodes": 88,
+  "native_edges": 80
+}

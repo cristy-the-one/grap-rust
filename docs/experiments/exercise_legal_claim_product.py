@@ -4,10 +4,11 @@ import hashlib
 import json
 from pathlib import Path
 import time
+from unittest.mock import patch
 
 import pygrap
 from grap_mcp.application import GrapApplication
-from grap_mcp.kee.legal_claims import PROMPT_VERSION
+from grap_mcp.kee.legal_claims import LEGACY_PROMPT_VERSION as PROMPT_VERSION, extract_literal_claims
 from grap_mcp.kee.llm import StubProvider
 
 
@@ -66,4 +67,7 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    # This historical replay deliberately exercises the extractor that produced
+    # the saved replies; new live trials use the application's current default.
+    with patch("grap_mcp.kee.legal_claims.extract_claims", extract_literal_claims):
+        main()
