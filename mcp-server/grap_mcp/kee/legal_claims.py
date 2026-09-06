@@ -8,6 +8,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 from pathlib import Path
 import sqlite3
 import uuid
@@ -398,6 +399,33 @@ class LegalClaimStore:
         return {"sources": rows, "total": total,
                 "next_offset": offset + len(rows) if offset + len(rows) < total else None}
 
+    def resolve_term(self, term: str, source_id: str) -> dict:
+        """Look up explicit definitions within ONE source, never globally merge acronyms."""
+        if not term.strip():
+            raise ValueError("term must be nonempty")
+        source = self.db.execute("SELECT * FROM sources WHERE source_id=?", (source_id,)).fetchone()
+        if source is None:
+            raise ValueError("unknown source_id")
+        matches = []
+        if source["status"] == "ready":
+            for row in self.db.execute("SELECT claim_id, record FROM claims WHERE revision_id=? AND kind='definition'",
+                                       (source["accepted_revision"],)):
+                claim = json.loads(row["record"])
+                if claim.get("extraction_method") != "explicit-definition":
+                    continue
+                defined = claim["subject"]
+                wanted = term.strip()
+                if defined.isupper() and re.fullmatch(r"[A-Z. ]{2,30}", defined):
+                    defined = defined.replace(".", "").replace(" ", "")
+                    wanted = wanted.replace(".", "").replace(" ", "")
+                if defined.casefold() == wanted.casefold():
+                    matches.append({**claim, "claim_id": row["claim_id"]})
+        meanings = {m["object"] for m in matches}
+        return {"term": term, "source_id": source_id, "source_status": source["status"],
+                "revision_id": source["accepted_revision"], "matches": matches,
+                "resolution": "ambiguous" if len(meanings) > 1 else "unique_definition" if matches else "missing",
+                "note": "Source-scoped definition proposals; no global entity merge or legal-validity determination."}
+
     def receipt(self, revision_id: str) -> dict:
         row = self.db.execute("SELECT record FROM revisions WHERE revision_id=?", (revision_id,)).fetchone()
         if row is None:
@@ -410,6 +438,8 @@ class LegalClaimStore:
         """Create an explicit, immutable-by-convention Rust search/traversal snapshot.
 
         Each claim is a node with all qualifications, linked to its source revision.
+        Complete accepted source bodies remain searchable even when no claim was
+        extracted. A single joined read keeps sources and claims in one snapshot.
         There are no unqualified actor-to-object edges or similarity-based merges.
         The index is built once per requested export, never on ingestion checkpoints.
         """
@@ -419,18 +449,24 @@ class LegalClaimStore:
         path.mkdir(parents=True, exist_ok=False)
         kg = pygrap.IndexedKnowledgeGraph.with_merge_policy(str(path / "graph"), 2)
         sources, manifest = {}, []
-        rows = self.db.execute("""SELECT c.*, s.source_id, s.source_file FROM claims c
-            JOIN sources s ON s.accepted_revision=c.revision_id WHERE s.status='ready'
-            ORDER BY c.revision_id, c.claim_id""")
+        rows = self.db.execute("""SELECT r.revision_id, r.record AS receipt_record,
+            c.claim_id, c.record AS claim_record, s.source_id, s.source_file
+            FROM sources s JOIN revisions r ON s.accepted_revision=r.revision_id
+            LEFT JOIN claims c ON c.revision_id=r.revision_id WHERE s.status='ready'
+            ORDER BY r.revision_id, c.claim_id""")
         receipts = {}
         for row in rows:
             revision_id = row["revision_id"]
             if revision_id not in sources:
-                receipt = self.receipt(revision_id)
-                receipts[revision_id] = {k: v for k, v in receipt.items() if k not in ("claims", "raw_reply")}
-                sources[revision_id] = kg.add_node(text=receipt["metadata"]["title"] or row["source_file"],
+                receipt = json.loads(row["receipt_record"])
+                title = receipt["metadata"]["title"] or row["source_file"]
+                sources[revision_id] = kg.add_node(text=title + "\n\n" + receipt["source_text"],
                                                    label="legal-source:" + revision_id)
-            claim = json.loads(row["record"])
+                receipts[revision_id] = {k: v for k, v in receipt.items() if k != "raw_reply"} | {
+                    "revision_id": revision_id, "source_node_id": sources[revision_id]}
+            if row["claim_id"] is None:
+                continue
+            claim = json.loads(row["claim_record"])
             nid = kg.add_node(text=_json(claim), label="legal-claim:" + row["claim_id"])
             kg.add_edge(nid, sources[revision_id], 1.0, {"relation_type": "claimed_in",
                                                         "review_status": "proposed"})

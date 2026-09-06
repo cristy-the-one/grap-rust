@@ -44,6 +44,7 @@ _TIERS = {
     "get_telemetry": "full", "build_legal_graph": "full", "legal_graph_from_relations": "full",
     "extract_legal_claims": "full", "get_legal_claims": "full", "get_legal_sources": "full",
     "export_legal_claim_graph": "full",
+    "resolve_legal_term": "full",
 }
 
 class ApplicationState:
@@ -2025,6 +2026,16 @@ class GrapApplication:
             return {"status": "error", "message": str(exc)}
 
     @operation
+    def resolve_legal_term(self, term: str, source_id: str) -> dict:
+        """Resolve an explicit definition within one source; conflicting definitions stay ambiguous."""
+        from .kee.legal_claims import LegalClaimStore
+        try:
+            with LegalClaimStore(Path(self._resolve_ws_root()) / "legal-claims.sqlite") as store:
+                return {"status": "ok", **store.resolve_term(term, source_id)}
+        except Exception as exc:
+            return {"status": "error", "message": str(exc)}
+
+    @operation
     def export_legal_claim_graph(self) -> dict:
         """Export accepted legal proposals as a new Rust graph snapshot with source receipts.
 
@@ -3356,6 +3367,7 @@ class GrapApplication:
                               "build_legal_graph", "legal_graph_from_relations",
                               "extract_legal_claims", "get_legal_claims", "get_legal_sources",
                               "export_legal_claim_graph",
+                              "resolve_legal_term",
                               "graph_neighbors", "load_ontology",
                               "get_blast_radius", "find_cycles", "find_orphans", "kg_health",
                               "get_context_bundle",

@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 
 import pytest
 
@@ -53,6 +54,32 @@ def test_inline_definition_retains_calculation_context():
     assert_anchored(text, out["claims"])
 
 
+def test_mixed_nested_definitions_are_disjoint_and_last_entry_is_preserved():
+    text = ("+ Articolul 2 Termenii au următoarele semnificații: . OSP - Oficiul piețelor; "
+            ". administrarea riscului - Controlul riscurilor. Riscurile sunt: "
+            ". riscul creditului - Neplata obligațiilor; . riscul de lichiditate - Lipsa fondurilor. "
+            "+ Articolul 3 Instituția funcționează.")
+    units, definitions = source_units(text)
+    assert [(d["subject"], d["object"]) for d in definitions] == [
+        ("OSP", "Oficiul piețelor"), ("administrarea riscului", "Controlul riscurilor."),
+        ("riscul creditului", "Neplata obligațiilor"), ("riscul de lichiditate", "Lipsa fondurilor.")]
+    for definition in definitions:
+        span = definition["evidence"][0]
+        assert all(u["evidence"][0]["end"] <= span["start"] or
+                   u["evidence"][0]["start"] >= span["end"] for u in units)
+    assert any("Instituția funcționează" in u["statement"] for u in units)
+    assert_anchored(text, definitions)
+
+
+def test_uppercase_article_marker_and_flattened_paragraph_keep_their_scope():
+    text = "+ Articolul 6 Firma există. ART.7 (1) Instituția - Bugetul de stat (2) Literele D și F se modifică."
+    units, _ = source_units(text)
+    assert len(units) == 3
+    assert units[-1]["statement"] == "(2) Literele D și F se modifică."
+    assert units[-1]["provision"] == "ART.7"
+    assert_anchored(text, units)
+
+
 def test_does_not_split_statutory_citation_parentheses_or_decimal_numbers():
     text = "Potrivit art. 26 alin. (2), Banca aplică limita de 3,562. Firma trebuie să plătească."
     units, _ = source_units(text)
@@ -93,6 +120,25 @@ def test_all_units_must_be_accounted_for():
 def test_does_not_turn_absence_of_duty_into_positive_duty():
     out = extract_rules(labels(u0=("fact", 0, 0)), "Firma nu este obligată să depună cererea.")
     assert out["claims"][0]["kind"] == "fact"
+    assert out["claims"][0]["subject"] == "Firma"
+
+
+def test_negative_future_description_does_not_force_a_prohibition():
+    claim = extract_rules(labels(u0=("fact", 0, 0)), "Datele nu vor exista în sistem după migrare.")["claims"][0]
+    assert claim["kind"] == "fact"
+
+
+@pytest.mark.parametrize("text,first,last", [
+    ("(1) Se interzice amplasarea magazinelor.", 0, 1),
+    ("Din producția europeană cel puțin 40% va fi producție locală.", 0, 2),
+    ("Din producția europeană cel puțin 40% va fi producție locală.", 6, 9),
+    ("În exercitarea atribuțiilor personalul are dreptul să solicite documentele.", 5, 5),
+])
+def test_model_fragments_stay_unresolved(text, first, last):
+    claim = extract_rules(labels(u0=("fact", first, last)), text)["claims"][0]
+    assert claim["subject"] == ""
+    assert claim["statement"] == text
+    assert "subject unresolved" in claim["review_issues"]
 
 
 def test_mixed_right_and_duty_keep_shared_sentence_context():
@@ -136,3 +182,46 @@ def test_failed_old_pipeline_is_retried_after_upgrade(tmp_path):
         assert store.ingest_folder(file, StubProvider())["counts"]["failed"] == 1
     with LegalClaimStore(tmp_path / "ledger.sqlite") as store:
         assert store.ingest_folder(file, labels(u0=("obligation", 0, 0)))["counts"]["ready"] == 1
+
+
+def test_rust_search_preserves_source_text_even_when_model_extracts_no_claims(tmp_path):
+    import pygrap
+
+    file = tmp_path / "act.json"
+    body = "Documentația pentru recapitalizare include certificatul."
+    file.write_text(json.dumps({"id": "act", "titlu": "Norme", "text_complet": body}), encoding="utf-8")
+    app = GrapApplication(tmp_path / "workspace", role="operator",
+                          provider_factory=lambda **_: labels(u0=("other", -1, -1)))
+    assert app.extract_legal_claims(str(file))["counts"]["ready"] == 1
+    assert app.get_legal_claims()["total"] == 0
+    snapshot = app.export_legal_claim_graph()
+    assert snapshot["sources"] == 1 and snapshot["claims"] == 0
+    graph = pygrap.IndexedKnowledgeGraph.with_merge_policy(snapshot["graph_path"], 2)
+    assert graph.node_count() == 1 and graph.edge_count() == 0
+    hits = graph.search_and_traverse("recapitalizare", max_seeds=5, required_properties=[],
+        min_strength=0., max_depth=0, max_results=5, text_weight=1., graph_weight=0.)
+    assert hits
+    manifest = json.loads((Path(snapshot["graph_path"]).parent / "legal-claims.json").read_text(encoding="utf-8"))
+    source = next(iter(manifest["revisions"].values()))
+    assert source["source_text"] == body and "source_node_id" in source
+
+
+def test_definition_resolution_is_scoped_and_conflicts_are_not_guessed(tmp_path):
+    folder = tmp_path / "sources"
+    folder.mkdir()
+    for identity, tail in (("one", "OSP - Oficiul piețelor;"), ("two", "OSP - Oficiul serviciilor publice;"),
+                           ("ambiguous", "OSP - Primul oficiu; OSP - Al doilea oficiu;"),
+                           ("dotted", "C.N.V.M. - Comisia Valorilor Mobiliare;")):
+        (folder / f"{identity}.json").write_text(json.dumps({"id": identity, "titlu": "Regulament",
+            "text_complet": "În acest regulament, termenii au următoarele semnificații: " + tail}), encoding="utf-8")
+    p = StubProvider(default="no calls expected")
+    app = GrapApplication(tmp_path / "workspace", role="operator", provider_factory=lambda **_: p)
+    assert app.extract_legal_claims(str(folder), max_files=4)["counts"]["ready"] == 4
+    assert not p.calls
+    by_name = {Path(s['source_file']).stem: s['source_id'] for s in app.get_legal_sources()['sources']}
+    one = app.resolve_legal_term("OSP", by_name["one"])
+    two = app.resolve_legal_term("OSP", by_name["two"])
+    assert one["matches"][0]["object"] != two["matches"][0]["object"]
+    assert one["resolution"] == two["resolution"] == "unique_definition"
+    assert app.resolve_legal_term("OSP", by_name["ambiguous"])["resolution"] == "ambiguous"
+    assert app.resolve_legal_term("cnvm", by_name["dotted"])["resolution"] == "unique_definition"
