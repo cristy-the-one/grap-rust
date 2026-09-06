@@ -185,10 +185,17 @@ class LegalClaimStore:
                 claim_id TEXT PRIMARY KEY, revision_id TEXT NOT NULL REFERENCES revisions,
                 kind TEXT NOT NULL, record TEXT NOT NULL);
             CREATE INDEX IF NOT EXISTS legal_claim_revision ON claims(revision_id, kind);
+            CREATE TABLE IF NOT EXISTS legal_work (
+                work_id TEXT PRIMARY KEY, source_id TEXT NOT NULL REFERENCES sources,
+                source_hash TEXT NOT NULL, prompt_version TEXT NOT NULL,
+                provider_key TEXT NOT NULL, total_batches INTEGER NOT NULL);
+            CREATE TABLE IF NOT EXISTS legal_batches (
+                work_id TEXT NOT NULL REFERENCES legal_work, batch_index INTEGER NOT NULL,
+                record TEXT NOT NULL, PRIMARY KEY(work_id, batch_index));
         """)
         # Additive migration for stores created before in-flight attempt ownership.
         columns = {row[1] for row in self.db.execute("PRAGMA table_info(sources)")}
-        for name in ("attempt_id", "attempt_version"):
+        for name in ("attempt_id", "attempt_version", "work_id"):
             if name not in columns:
                 self.db.execute(f"ALTER TABLE sources ADD COLUMN {name} TEXT")
 
@@ -220,7 +227,88 @@ class LegalClaimStore:
                 attempt_id=NULL WHERE source_id=? AND attempt_id=? AND status='pending'""",
                 (digest, reason, source_id, attempt_id)).rowcount == 1
 
-    def ingest_folder(self, path, provider, *, max_files=3, max_chars=8000, refresh=False) -> dict:
+    def _resume_rules(self, source_id, attempt_id, digest, file, text, provider, budget, refresh):
+        from .legal_rules import plan_rules, extract_batches
+
+        batches, definitions = plan_rules(text)
+        # Persist only a hash of generation configuration, never credentials.
+        provider_key = _hash(_json({"provider": {key: getattr(provider, key, None) for key in
+            ("name", "model", "base_url", "temperature", "max_tokens", "extra_body")},
+            "plan": [[(unit["id"], unit["evidence"][0]["start"], unit["evidence"][0]["end"])
+                      for unit in batch] for batch in batches]}))
+        work = self.db.execute("""SELECT w.* FROM legal_work w JOIN sources s ON s.work_id=w.work_id
+            WHERE s.source_id=?""", (source_id,)).fetchone()
+        if (refresh or work is None or work["source_hash"] != digest
+                or work["prompt_version"] != self.prompt_version or work["provider_key"] != provider_key
+                or work["total_batches"] != len(batches)):
+            work_id = uuid.uuid4().hex
+            with self.db:
+                owned = self.db.execute("""UPDATE sources SET work_id=?
+                    WHERE source_id=? AND attempt_id=? AND status='pending'""",
+                    (work_id, source_id, attempt_id)).rowcount == 1
+                if not owned:
+                    raise RuntimeError("extraction superseded before planning")
+                self.db.execute("INSERT INTO legal_work VALUES (?, ?, ?, ?, ?, ?)",
+                    (work_id, source_id, digest, self.prompt_version, provider_key, len(batches)))
+        else:
+            work_id = work["work_id"]
+        saved = {row["batch_index"]: json.loads(row["record"]) for row in self.db.execute(
+            "SELECT batch_index, record FROM legal_batches WHERE work_id=?", (work_id,))}
+        parts = []
+        for index, batch in enumerate(batches):
+            if index in saved:
+                budget["reused"] += 1
+                parts.append(saved[index])
+                continue
+            if budget["attempted"] >= budget["limit"]:
+                break
+            if not self.db.execute("SELECT 1 FROM sources WHERE source_id=? AND attempt_id=? AND status='pending'",
+                                   (source_id, attempt_id)).fetchone():
+                raise RuntimeError("extraction superseded before batch")
+            budget["attempted"] += 1
+            part = extract_batches(provider, text, [batch])
+            if hashlib.sha256(file.read_bytes()).hexdigest() != digest:
+                raise ValueError("source changed during extraction; resume the new source")
+            with self.db:
+                # Conditional write both acquires the SQLite write lock and checks
+                # ownership. No transaction is held across model generation.
+                owned = self.db.execute("""UPDATE sources SET work_id=work_id
+                    WHERE source_id=? AND attempt_id=? AND status='pending' AND work_id=?""",
+                    (source_id, attempt_id, work_id)).rowcount == 1
+                if not owned:
+                    raise RuntimeError("extraction superseded before checkpoint")
+                self.db.execute("INSERT INTO legal_batches VALUES (?, ?, ?)", (work_id, index, _json(part)))
+            budget["completed"] += 1
+            parts.append(part)
+        if hashlib.sha256(file.read_bytes()).hexdigest() != digest:
+            raise ValueError("source changed during extraction; resume the new source")
+        if len(parts) < len(batches):
+            with self.db:
+                owned = self.db.execute("""UPDATE sources SET status='partial', attempt_id=NULL, error=?
+                    WHERE source_id=? AND attempt_id=? AND status='pending'""",
+                    (f"{len(parts)}/{len(batches)} batches complete; resume extraction", source_id, attempt_id)).rowcount == 1
+                if not owned:
+                    raise RuntimeError("extraction superseded before pause")
+            return None
+        receipt = extract_batches(provider, text, [], definitions)
+        receipt["claims"].extend(claim for part in parts for claim in part["claims"])
+        receipt["units"] = [unit for part in parts for unit in part["units"]]
+        receipt["raw_reply"] = _json([request for part in parts for request in json.loads(part["raw_reply"])])
+        receipt["model_calls"] = len(parts)
+        receipt["completion"] = {"strategy": "statement-batches-v1", "work_id": work_id,
+            "source_sha256": digest, "total_batches": len(batches), "completed_batches": len(parts)}
+        return receipt
+
+    def work_progress(self, source_id):
+        row = self.db.execute("""SELECT w.*, s.observed_hash,
+            (SELECT count(*) FROM legal_batches b WHERE b.work_id=w.work_id) AS completed_batches
+            FROM sources s JOIN legal_work w ON s.work_id=w.work_id WHERE s.source_id=?""", (source_id,)).fetchone()
+        if row is None:
+            return None
+        return {**{key: row[key] for key in row.keys() if key not in ("provider_key", "observed_hash")},
+                "matches_observed_source": row["source_hash"] == row["observed_hash"]}
+
+    def ingest_folder(self, path, provider, *, max_files=3, max_chars=8000, refresh=False, max_batches=None) -> dict:
         """Scan all JSON sources; attempt at most max_files whole-document extractions.
 
         Oversized/missing/invalid sources remain visible. No arbitrary truncation,
@@ -229,11 +317,20 @@ class LegalClaimStore:
         """
         if max_files < 0 or max_chars < 1:
             raise ValueError("max_files must be nonnegative and max_chars positive")
+        if max_batches is not None:
+            from .legal_rules import extract_rules
+            if type(max_batches) is not int or max_batches < 0:
+                raise ValueError("max_batches must be a nonnegative integer or None")
+            if self.extractor is not extract_rules:
+                raise ValueError("resumable batches require the source-statement extractor")
+        budget = {"limit": max_batches, "attempted": 0, "completed": 0, "reused": 0}
         root = Path(path).resolve()
         if not root.exists():
             raise ValueError(f"source path does not exist: {root}")
         files = [root] if root.is_file() else sorted(root.rglob("*.json"))
         counts = dict.fromkeys(("scanned", "attempted", "ready", "unchanged", "deferred", "failed", "missing", "superseded"), 0)
+        if max_batches is not None:
+            counts["partial"] = 0
         observed_ids = set()
         observations = []
 
@@ -269,10 +366,11 @@ class LegalClaimStore:
             previous = self.db.execute("""SELECT s.*, r.source_hash, r.record FROM sources s
                 LEFT JOIN revisions r ON r.revision_id=s.accepted_revision WHERE s.source_id=?""",
                 (source_id,)).fetchone()
-            if (not refresh and previous and previous["status"] == "failed"
+            if ((max_batches is None or root.is_dir()) and not refresh and previous and previous["status"] == "failed"
                     and previous["observed_hash"] == digest and previous["attempt_version"] == self.prompt_version):
                 # Do not spend every resumed run on the same failed first files.
-                # Explicit refresh (possibly of one file) retries unchanged failures.
+                # Targeting one file in resumable mode retries with checkpoints;
+                # explicit refresh starts fresh work instead.
                 counts["failed"] += 1
                 continue
             if (not refresh and previous and previous["status"] == "ready"
@@ -288,8 +386,14 @@ class LegalClaimStore:
                 reason = f"whole source exceeds max_chars ({len(text)} > {max_chars}); needs scoped extraction"
             elif counts["attempted"] >= max_files:
                 reason = "model-call budget exhausted"
+            elif max_batches is not None and budget["attempted"] >= max_batches:
+                reason = "batch budget exhausted"
             if reason:
-                observe_later(source_id, source_file, digest, "deferred", reason)
+                # A scan or spent budget must not cancel matching in-flight work
+                # or erase its visible partial/failed state.
+                if not (previous and previous["observed_hash"] == digest and previous["work_id"]
+                        and previous["status"] in ("partial", "pending", "failed")):
+                    observe_later(source_id, source_file, digest, "deferred", reason)
                 counts["deferred"] += 1
                 continue
             # Persist pending BEFORE generation: a process interruption cannot look complete.
@@ -298,9 +402,22 @@ class LegalClaimStore:
             self._observe(source_id, source_file, digest, "pending", "extraction in progress or interrupted", attempt_id)
             counts["attempted"] += 1
             try:
-                receipt = self.extractor(provider, text)
+                if max_batches is not None:
+                    receipt = self._resume_rules(source_id, attempt_id, digest, file, text, provider, budget, refresh)
+                    if receipt is None:
+                        counts["partial"] += 1
+                        continue
+                else:
+                    with self.db:
+                        self.db.execute("UPDATE sources SET work_id=NULL WHERE source_id=? AND attempt_id=?",
+                                        (source_id, attempt_id))
+                    receipt = self.extractor(provider, text)
             except Exception as exc:
-                owned = self._fail_attempt(source_id, attempt_id, digest, str(exc))
+                try:
+                    observed_digest = hashlib.sha256(file.read_bytes()).hexdigest()
+                except OSError:
+                    observed_digest = None
+                owned = self._fail_attempt(source_id, attempt_id, observed_digest, str(exc))
                 counts["failed" if owned else "superseded"] += 1
                 continue
             try:
@@ -338,7 +455,8 @@ class LegalClaimStore:
                     observe_later(row["source_id"], row["source_file"], None, "missing", "source absent from folder scan")
                     counts["missing"] += 1
         flush()
-        return {"status": "ok", "counts": counts, "coverage": self.coverage(), "store": str(self.path)}
+        return {"status": "ok", "counts": counts, "coverage": self.coverage(), "store": str(self.path),
+                **({"batches": budget} if max_batches is not None else {})}
 
     def coverage(self) -> dict:
         statuses = {row[0]: row[1] for row in self.db.execute("SELECT status, count(*) FROM sources GROUP BY status")}
@@ -387,7 +505,7 @@ class LegalClaimStore:
             receipt = json.loads(row["record"])
             revisions.append({k: v for k, v in receipt.items() if k not in ("source_text", "raw_reply")}
                              | {"revision_id": row["revision_id"]})
-        return {"source": dict(source), "revisions": revisions}
+        return {"source": dict(source), "revisions": revisions, "work": self.work_progress(source_id)}
 
     def sources(self, *, limit=20, offset=0) -> dict:
         """Include deferred and failed files even when they have no claims to retrieve."""

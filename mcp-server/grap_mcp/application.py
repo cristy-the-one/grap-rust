@@ -1974,13 +1974,16 @@ class GrapApplication:
 
     @operation
     def extract_legal_claims(self, path: str, max_files: int = 3, max_chars: int = 8000,
-                             refresh: bool = False, model: str = None) -> dict:
+                             refresh: bool = False, model: str = None, max_batches: int = None) -> dict:
         """Extract qualified legal proposals from a JSON file or folder into this workspace.
 
         max_files limits document attempts, not the coverage scan or transport retries. Only whole documents
         within max_chars are extracted; oversized sources are explicitly deferred.
         Unchanged successful or failed sources are skipped unless refresh is set. Prior
         revisions survive failed refreshes. Claims remain unreviewed proposals.
+        max_batches enables durable, statement-aligned checkpoints and bounds new
+        labeling calls across this invocation. Resume with the same arguments and
+        refresh=False. Raise max_chars explicitly for larger complete documents.
         """
         denied = self._require("operator")
         if denied:
@@ -1989,7 +1992,7 @@ class GrapApplication:
         try:
             with LegalClaimStore(Path(self._resolve_ws_root()) / "legal-claims.sqlite") as store:
                 return store.ingest_folder(path, self.get_provider(model=model), max_files=max_files,
-                                           max_chars=max_chars, refresh=refresh)
+                                           max_chars=max_chars, refresh=refresh, max_batches=max_batches)
         except Exception as exc:
             logger.exception("extract_legal_claims failed")
             return {"status": "error", "message": str(exc)}

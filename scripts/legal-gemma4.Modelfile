@@ -1,0 +1,4 @@
+# Local extraction profile. Reuses installed weights; leaves gemma4:latest unchanged.
+# Create with: ollama create grap-legal-gemma4 -f scripts/legal-gemma4.Modelfile
+FROM gemma4:latest
+PARAMETER num_ctx 16384

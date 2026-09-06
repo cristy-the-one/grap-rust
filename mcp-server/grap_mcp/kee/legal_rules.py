@@ -202,23 +202,42 @@ def _invalid_subject(subject):
 
 def extract_rules(provider, text):
     """Bounded labeling calls, exact token-backed subjects and lossless rule statements."""
+    batches, definitions = plan_rules(text)
+    return extract_batches(provider, text, batches, definitions)
+
+
+def plan_rules(text):
+    """Stable statement-aligned batches with full-source offsets and provision context."""
     if not text.strip() or text.strip().casefold().rstrip(".") == "act în curs de procesare":
-        return {"claims": [], "prompt_version": VERSION, "raw_reply": "", "units": [], "model_calls": 0}
-    units, claims = source_units(text)
-    requests, classifications = [], []
+        return [], []
+    units, definitions = source_units(text)
     # Keep both source and output bounded; no truncation of an individual statement.
-    batches, batch, words = [], [], 0
+    batches, batch, words, rendered_bytes = [], [], 0, 0
     for unit in units:
         size = len(unit["tokens"])
-        if size > 1200:
-            raise ValueError("source statement exceeds 1200 tokens; requires explicit scoped processing")
-        if batch and (words + size > 1200 or len(batch) >= 12):
+        wire_size = len((unit["id"] + ": " + " ".join(
+            f"{i}:{text[a:b]}" for i, (a, b) in enumerate(unit["tokens"])) + "\n\n").encode("utf-8"))
+        if size > 1200 or wire_size > 12000:
+            span = unit["evidence"][0]
+            raise ValueError(f"source statement exceeds 1200 tokens or 12000 rendered bytes "
+                             f"({size} tokens, {wire_size} bytes) at characters "
+                             f"{span['start']}:{span['end']} in {unit['provision']!r}; "
+                             "requires explicit scoped processing")
+        if batch and (words + size > 1200 or rendered_bytes + wire_size > 12000 or len(batch) >= 12):
             batches.append(batch)
-            batch, words = [], 0
+            batch, words, rendered_bytes = [], 0, 0
         batch.append(unit)
         words += size
+        rendered_bytes += wire_size
     if batch:
         batches.append(batch)
+    return batches, definitions
+
+
+def extract_batches(provider, text, batches, definitions=()):
+    """Extract a planned subset without changing offsets or losing parent context."""
+    claims = list(definitions)
+    requests, classifications = [], []
     for batch in batches:
         properties = {}
         rendered = []
