@@ -1,0 +1,22 @@
+{
+  "probe": "same failed batch, max_tokens raised to 4096; context still exhausted",
+  "model": "gemma4:latest",
+  "finish_reason": "length",
+  "usage": {
+    "prompt_tokens": 3887,
+    "prompt_tokens_details": {
+      "cached_tokens": 3886
+    },
+    "completion_tokens": 209,
+    "total_tokens": 4096
+  },
+  "loaded_profile": [
+    {
+      "name": "grap-legal-gemma4:latest",
+      "context_length": 16384,
+      "size_vram": 3384698469
+    }
+  ],
+  "documentation": "https://docs.ollama.com/api/openai-compatibility",
+  "profile_file": "scripts/legal-gemma4.Modelfile"
+}

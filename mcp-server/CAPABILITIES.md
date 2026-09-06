@@ -9,10 +9,14 @@ status are retained in their workspace-owned SQLite ledger.
 
 The full tier also includes a separate [Romanian legal statement path](../docs/legal-rules-2026-09.md):
 
-- **extract_legal_claims(path, max_files=3, max_chars=8000, refresh=False, model=None)**:
+- **extract_legal_claims(path, max_files=3, max_chars=8000, refresh=False, model=None, max_batches=None)**:
   bounded whole-document extraction of source statements with proposed kinds and
   grounded subjects. Explicit definitions are parsed directly; ordinary rules keep
   their full statement and context. Zero `max_files` scans coverage without extraction.
+  Set `max_batches` to checkpoint validated batches and cap new labeling calls across
+  the invocation. Raise `max_chars` explicitly for larger acts. Incomplete work is
+  visible through source history and is excluded from current claims and snapshots.
+  See [resumption and local context setup](../docs/legal-resume-2026-09.md).
 - **get_legal_claims(kind=None, source_id=None, revision_id=None, include_stale=False,
   limit=20, offset=0)**: latest stored claims, or an exact historical source receipt.
 - **get_legal_sources(source_id=None, limit=20, offset=0)**: source status and extraction history.

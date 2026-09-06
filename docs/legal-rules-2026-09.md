@@ -6,6 +6,11 @@ Explicit definition lists and inline definitions are parsed directly. This repla
 the fragile request for a model to rewrite every rule into ten literal fields.
 The earlier [literal-field evaluation](legal-claims-2026-09.md) remains available.
 
+**Subsequent implementation:** [large-act resumption and context sizing](legal-resume-2026-09.md)
+adds durable batch checkpoints and a tested 16K-context Gemma profile. The larger
+trial exposed a 4,096-token serving limit; the earlier small-document measurements
+below should not be used to assume the original profile can handle larger inputs.
+
 The gain is reliable preservation and much better extraction availability. It is
 **not a demonstrated legal-accuracy rate**. Some subject ranges and labels remain
 wrong, and some substantive passages are labeled `other`. The original text stays
@@ -160,9 +165,9 @@ set covering actors, duties/rights, exceptions, scope and negative cases. Use it
 measure omissions and incorrect role assignments separately from source preservation,
 and to choose targeted second-model review rather than running two models everywhere.
 
-Larger acts need resumable provision-level extraction with a document completion
-receipt; raising a character cap alone does not solve cross-provision scope. After
-that, explicit amendment-target and effective-date resolution can connect historical
+Resumable statement-aligned extraction with a document completion receipt is now
+implemented in the follow-up above; cross-provision scope remains unresolved.
+Explicit amendment-target and effective-date resolution can connect historical
 versions without treating a citation as a modification. Those steps matter more to
 an encompassing law knowledge system than a larger graph or automatic semantic merges.
 

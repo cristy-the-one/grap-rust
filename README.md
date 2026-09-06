@@ -14,6 +14,8 @@ The [Romanian legal statement path](docs/legal-rules-2026-09.md) preserves sourc
 wording and context, uses LLMs for classification, resolves explicit definitions
 within each source, and exports receipt-backed Rust graph snapshots. The report
 includes complete-document trials and remaining semantic limitations.
+[Large-act extraction now resumes from durable batch checkpoints](docs/legal-resume-2026-09.md),
+with a complete-document publication gate and a tested local model context profile.
 
 ## Why grap?
 
