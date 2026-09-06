@@ -1,0 +1,213 @@
+[
+  {
+    "id": "office-subordination",
+    "text": "+ Articolul 1 Se înființează Oficiul Național al Burselor de Studii în Străinătate, instituție publică cu personalitate juridică, ca organ de specialitate în subordinea Ministerului Educației Naționale, cu sediul în municipiul București, str. Spiru Haret nr. 12, sectorul 1.",
+    "source_file": "real-data-law-ro/16678.json",
+    "source_sha256": "d8adf5c1acab2c2b92c8819833c7742cf5ede10ad6445937858b4a2d32196232",
+    "field": "text_complet",
+    "start": 268,
+    "end": 543,
+    "source_url": "http://legislatie.just.ro/Public/DetaliiDocument/16678",
+    "relations": [
+      [
+        "Oficiul Național al Burselor de Studii în Străinătate",
+        "subordonat",
+        "Ministerului Educației Naționale"
+      ]
+    ]
+  },
+  {
+    "id": "bank-register-fields",
+    "text": "+ Articolul 2 Registrul bancar va cuprinde următoarele rubrici: a) numărul şi data înmatriculării în registrul bancar; ... b) denumirea băncii (însoţită de forma juridică sau, după caz, de menţiunea \"sucursala\"); ... c) adresa sediului social; ... d) numărul şi data înmatriculării în registrul comerţului; ... e) data autorizării funcţionarii băncii de către Banca Naţionala a României*); ... f) seria, numărul şi data autorizaţiei emise de Banca Naţionala a României; ... g) data radierii înregistrării; ... h) observaţii. ...",
+    "source_file": "real-data-law-ro/16694.json",
+    "source_sha256": "dd3f0d02af197bc56106b93fc814537f160d69cd6776d0dece3ce2e0207dd9d2",
+    "field": "text_complet",
+    "start": 1051,
+    "end": 1580,
+    "source_url": "http://legislatie.just.ro/Public/DetaliiDocument/16694",
+    "requirements": [
+      [
+        "Registrul bancar",
+        "denumirea"
+      ],
+      [
+        "Registrul bancar",
+        "adresa"
+      ]
+    ]
+  },
+  {
+    "id": "shareholder-payment",
+    "text": "+ Articolul 2 La înfiinţarea unei bănci vărsămintele în contul capitalului social trebuie efectuate în forma bănească, în totalitate, în momentul constituirii, într-un cont deschis la o banca, persoana juridică română, sau la o sucursala a unei bănci străine, autorizata sa funcţioneze pe teritoriul României. Fiecare acţionar va vărsa integral valoarea acţiunilor subscrise.",
+    "source_file": "real-data-law-ro/17754.json",
+    "source_sha256": "2d16f4c3ad92bed563a372d78dcaec088fafde1bd9234710eb2d632af1cece40",
+    "field": "text_complet",
+    "start": 520,
+    "end": 896,
+    "source_url": "http://legislatie.just.ro/Public/DetaliiDocument/17754",
+    "requirements": [
+      [
+        "acţionar",
+        "integral"
+      ]
+    ]
+  },
+  {
+    "id": "bank-capital-deadline",
+    "text": "+ Articolul 4 Băncile autorizate de Banca Naţionala a României, precum şi cele care, la data intrării în vigoare a prezentelor norme, sunt în posesia aprobării de constituire trebuie să dispună, până la data de 30 aprilie 2000, de un capital social cel puţin la nivelul limitei stabilite la art. 1. Cererile de autorizare a unor noi bănci, depuse la Banca Naţionala a României înainte de data intrării în vigoare a prezentelor norme şi aflate în etapa de aprobare a constituirii acestora, se supun prevederilor art. 1 şi 2.",
+    "source_file": "real-data-law-ro/17754.json",
+    "source_sha256": "2d16f4c3ad92bed563a372d78dcaec088fafde1bd9234710eb2d632af1cece40",
+    "field": "text_complet",
+    "start": 1571,
+    "end": 2095,
+    "source_url": "http://legislatie.just.ro/Public/DetaliiDocument/17754",
+    "requirements": [
+      [
+        "Băncile",
+        "30 aprilie 2000"
+      ]
+    ]
+  },
+  {
+    "id": "agent-prohibitions",
+    "text": "+ Articolul 1 I se interzice agentului de valori mobiliare autorizat sa preia spre executare un ordin de vânzare altfel decât direct şi personal de la proprietarul de valori mobiliare. + Articolul 2 Agentul de valori mobiliare este obligat sa preia numai ordine de vânzare la care proprietarul de valori mobiliare anexează certificatul de acţionar sau extrasul de cont ca dovada a deţinerii în proprietate a respectivelor valori mobiliare, precum şi o copie de pe buletinul/cartea de identitate care atesta propria semnatura. S.V.M., prin agenţii săi autorizaţi, nu va primi ordine de vânzare decât după verificarea dovezilor privind deţinerea în proprietate a valorilor mobiliare.",
+    "source_file": "real-data-law-ro/17984.json",
+    "source_sha256": "770475076fbd5130f16516374c88365a9401fddfcedc713d794ddb0aa8a227eb",
+    "field": "text_complet",
+    "start": 1041,
+    "end": 1723,
+    "source_url": "http://legislatie.just.ro/Public/DetaliiDocument/17984",
+    "requirements": [
+      [
+        "agentul de valori mobiliare",
+        "personal"
+      ],
+      [
+        "S.V.M.",
+        "verificarea"
+      ]
+    ]
+  },
+  {
+    "id": "exception-preservation",
+    "text": "+ Articolul 4 Ordinele de vânzare prin procura autentică nu vor fi acceptate spre executare decât în cazuri excepţionale de către societăţile înregistrate ca formatori de piaţa şi numai cu acordul expres al preşedintelui sau, după caz, al directorului general al societăţii. Cazurile excepţionale se referă la imposibilitatea dovedită a proprietarului de valori mobiliare de a se prezenta personal pentru depunerea ordinului de vânzare (de exemplu: în caz de boala, absenta din ţara etc.).",
+    "source_file": "real-data-law-ro/17984.json",
+    "source_sha256": "770475076fbd5130f16516374c88365a9401fddfcedc713d794ddb0aa8a227eb",
+    "field": "text_complet",
+    "start": 2073,
+    "end": 2563,
+    "source_url": "http://legislatie.just.ro/Public/DetaliiDocument/17984",
+    "requirements": [
+      [
+        "Ordinele de vânzare prin procura autentică",
+        "excepţionale"
+      ],
+      [
+        "Ordinele de vânzare prin procura autentică",
+        "acordul"
+      ]
+    ]
+  },
+  {
+    "id": "explicit-abbreviations",
+    "text": "+ Articolul 2 În înţelesul prezentului regulament, termenii şi expresiile de mai jos au următoarele semnificatii: . C.N.V.M. - Comisia Naţionala a Valorilor Mobiliare; . OSP - Oficiul de supraveghere a pieţelor reglementate de valori mobiliare;",
+    "source_file": "real-data-law-ro/18185.json",
+    "source_sha256": "cb180e37eb8324afafad85b70c04fe6f8b5c5bb467cf29ad5afc910fa7280036",
+    "field": "text_complet",
+    "start": 494,
+    "end": 739,
+    "source_url": "http://legislatie.just.ro/Public/DetaliiDocument/18185",
+    "required_entities": [
+      "C.N.V.M.",
+      "Comisia Naţionala a Valorilor Mobiliare",
+      "OSP",
+      "Oficiul de supraveghere a pieţelor reglementate de valori mobiliare"
+    ],
+    "no_requirements": [
+      "C.N.V.M.",
+      "OSP"
+    ]
+  },
+  {
+    "id": "confidential-information",
+    "text": "+ Articolul 7 Informaţiile existente în cadrul OSP au caracter strict secret şi se supun regimului legal corespunzător de protecţie. + Articolul 8 Activitatea OSP se desfăşoară într-un spaţiu dedicat, cu grad corespunzător de securitate. Accesul în spaţiul dedicat şi la informaţiile gestionate sunt strict limitate şi se avizează prin ordin al preşedintelui C.N.V.M.",
+    "source_file": "real-data-law-ro/18185.json",
+    "source_sha256": "cb180e37eb8324afafad85b70c04fe6f8b5c5bb467cf29ad5afc910fa7280036",
+    "field": "text_complet",
+    "start": 3717,
+    "end": 4085,
+    "source_url": "http://legislatie.just.ro/Public/DetaliiDocument/18185",
+    "review_checks": [
+      "Preserve strict secrecy and restricted access; do not convert them into unconditional access."
+    ]
+  },
+  {
+    "id": "broadcast-exclusions",
+    "text": "+ Articolul 1 Legea audiovizualului nr. 48/1992 , publicată în Monitorul Oficial al României, Partea I, nr. 104 din 25 mai 1992, se modifica şi se completează după cum urmează: După articolul 2 se introduce articolul 2^1 cu următorul cuprins: \"Art. 2^1. - (1) Posturile de televiziune, persoane juridice, vor asigura până la data de 1 ianuarie 2003, în mod progresiv, în măsura posibilului şi prin mijloacele corespunzătoare creaţiilor audiovizuale europene, un procentaj majoritar al timpului de emisie, în calculul căruia nu vor intra emisiunile informative şi sportive, jocurile, publicitatea şi serviciile de teletext. (2) În sensul prezentei legi, prin creatii audiovizuale europene se înţelege operele care îşi au originea în statele membre ale Consiliului Europei, precum şi operele realizate, în totalitate sau majoritar, de producători, autori şi lucrători care îşi au domiciliul în unul sau mai multe state membre ale Consiliului Europei. ... (3) Din creaţia audiovizuala europeană difuzată cel puţin 40% va fi creaţie audiovizuala românească. ... (4) Prin creatii româneşti se înţelege operele care îşi au originea în România sau care sunt realizate, în totalitate sau majoritar, de producători, autori şi lucrători care îşi au domiciliul în România. ... (5) Posturile de televiziune, persoane juridice române, vor rezerva, în condiţiile alineatelor precedente, 10% din timpul lor de emisie creaţiilor realizate de producători independenţi de posturile de difuzare respective. ... (6) Aplicarea alin. (1) şi (5) se va face treptat, pe baza unor norme obligatorii elaborate de Consiliul Naţional al Audiovizualului.\" ...",
+    "source_file": "real-data-law-ro/16686.json",
+    "source_sha256": "8f1237516625f3efbf4f13485de4493eeddd18700ba372c52bde818d94e28971",
+    "field": "text_complet",
+    "start": 222,
+    "end": 1853,
+    "source_url": "http://legislatie.just.ro/Public/DetaliiDocument/16686",
+    "requirements": [
+      [
+        "Posturile de televiziune",
+        "40%"
+      ],
+      [
+        "Posturile de televiziune",
+        "10%"
+      ]
+    ],
+    "review_checks": [
+      "The majority calculation excludes news, sports, games, advertising and teletext.",
+      "40% refers to the European content already broadcast, not all airtime."
+    ]
+  },
+  {
+    "id": "banking-act-identities",
+    "text": "NORMA nr. 6 din 16 aprilie 1999 pentru modificarea Normelor nr. 2/1999 privind autorizarea băncilor EMITENT BANCA NAŢIONALA A ROMÂNIEI Publicat în MONITORUL OFICIAL nr. 182 din 28 aprilie 1999 În temeiul prevederilor art. 26 alin. (2) lit. a) şi ale art. 50 alin. (1) din Legea nr. 101/1998 privind Statutul Băncii Naţionale a României, precum şi ale art. 38 alin. (1) din Legea bancară nr. 58/1998 , Banca Naţionala a României emite prezentele norme. + Articolul UNIC Normele nr. 2/1999 privind autorizarea băncilor, publicate în Monitorul Oficial al României, Partea I, nr. 58 din 10 februarie 1999, se modifica după cum urmează: - Paragraful 2 liniuţa a zecea din anexa nr. 1 şi paragraful 2 liniuţa a noua din anexa nr. 8 vor avea următorul cuprins: \"- curriculum vitae, copie legalizată de pe actul care atesta licenta în profesie, certificat de cazier judiciar pentru fiecare conducător;\" PREŞEDINTELE CONSILIULUI DE ADMINISTRAŢIE AL BĂNCII NAŢIONALE A ROMÂNIEI, MUGUR ISARESCU, GUVERNATOR --------",
+    "source_file": "real-data-law-ro/17994.json",
+    "source_sha256": "114b453958cdbef5199694137349d2a94ea16ad1cb0d53511bc0c9a72828eae4",
+    "field": "text_complet",
+    "start": 0,
+    "end": 1004,
+    "source_url": "http://legislatie.just.ro/Public/DetaliiDocument/17994",
+    "required_entities": [
+      "Legea nr. 101/1998",
+      "Legea bancară nr. 58/1998",
+      "Normele nr. 2/1999"
+    ]
+  },
+  {
+    "id": "nested-amendment-identities",
+    "text": "ORDONANȚA DE URGENȚĂ nr. 5 din 12 februarie 1999 pentru modificarea art. 1 din Legea nr. 2/1992 privind acordarea de indemnizații membrilor Academiei Române EMITENT GUVERNUL Publicat în MONITORUL OFICIAL nr. 64 din 16 februarie 1999 În temeiul prevederilor art. 114 alin. (4) din Constituția României , Guvernul României emite următoarea ordonanța de urgență: + Articolul UNIC Articolul 1 din Legea nr. 2/1992 privind acordarea de indemnizații membrilor Academiei Române, publicată în Monitorul Oficial al României, Partea I, nr. 4 din 20 ianuarie 1992, modificată și completată prin Ordonanța de urgenta a Guvernului nr. 78/1997 , publicată în Monitorul Oficial al României, Partea I, nr. 356 din 15 decembrie 1997, aprobată prin Legea nr. 17/1999 , publicată în Monitorul Oficial al României, Partea I, nr. 8 din 15 ianuarie 1999, se modifica și va avea următorul cuprins: + Articolul 1 Membrii Academiei Române primesc lunar o indemnizație determinata în raport cu salariul de baza, corespunzător coeficientului mediu de multiplicare de 3,562, indexat, stabilit pentru funcția de cercetator științific principal gradul I, conform anexei VII/3 la Legea nr. 154/1998 , după cum urmează: a) membrii titulari b) membrii corespondenti c) membrii de onoare din România, Republica Moldova și Ucraina 80% 60% 60% .\" PRIM-MINISTRU RADU VASILE Contrasemnează: Președintele Academiei Române, Eugen Simion p. Ministrul culturii, Kelemen Hunor, secretar de stat p. Ministrul finanțelor, Iosefina Morosan, secretar de stat p. Ministrul muncii și protecției sociale, Norica Nicolai, secretar de stat ------------",
+    "source_file": "real-data-law-ro/16955.json",
+    "source_sha256": "40537559812941d5a087a97029e8b1ef4cf20e372bd664f1f3e3b1ccdd65b3d9",
+    "field": "text_complet",
+    "start": 0,
+    "end": 1600,
+    "source_url": "http://legislatie.just.ro/Public/DetaliiDocument/16955",
+    "required_entities": [
+      "Legea nr. 2/1992",
+      "Legea nr. 17/1999",
+      "Legea nr. 154/1998"
+    ],
+    "review_checks": [
+      "Keep Law 2/1992, Law 17/1999 and Law 154/1998 distinct.",
+      "Do not flatten historical amendment/approval chains into the current act's actions."
+    ]
+  },
+  {
+    "id": "missing-body",
+    "text": "Act în curs de procesare.",
+    "source_file": "real-data-law-ro/109203.json",
+    "source_sha256": "9b03e54e2112d4328f3415f95c592754c073cf37216df7d4556007fea1d7eaa1",
+    "field": "text_complet",
+    "start": 0,
+    "end": 25,
+    "source_url": "http://legislatie.just.ro/Public/DetaliiDocument/109203",
+    "empty": true
+  }
+]

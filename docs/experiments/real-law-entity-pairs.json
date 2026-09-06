@@ -1,0 +1,142 @@
+[
+  {
+    "a": "Banca Naţionala a României",
+    "b": "Băncii Naţionale a României",
+    "same": true,
+    "source_file": "real-data-law-ro/16694.json",
+    "reason": "Nominative/genitive of the same bank"
+  },
+  {
+    "a": "C.N.V.M.",
+    "b": "Comisia Naţionala a Valorilor Mobiliare",
+    "same": true,
+    "source_file": "real-data-law-ro/18185.json",
+    "reason": "Explicit abbreviation definition"
+  },
+  {
+    "a": "OSP",
+    "b": "Oficiul de supraveghere a pieţelor reglementate de valori mobiliare",
+    "same": true,
+    "source_file": "real-data-law-ro/18185.json",
+    "reason": "Explicit abbreviation definition"
+  },
+  {
+    "a": "S.V.M.",
+    "b": "societate de valori mobiliare",
+    "same": true,
+    "source_file": "real-data-law-ro/17984.json",
+    "reason": "Explicit abbreviation definition"
+  },
+  {
+    "a": "Legea bancară nr. 58/1998",
+    "b": "Legea nr. 58/1998",
+    "same": true,
+    "source_file": "real-data-law-ro/16694.json",
+    "reason": "Same act number and year; omitted descriptive title"
+  },
+  {
+    "a": "Normelor nr. 2/1999",
+    "b": "Normele nr. 2/1999",
+    "same": true,
+    "source_file": "real-data-law-ro/17994.json",
+    "reason": "Inflection of same act reference"
+  },
+  {
+    "a": "Ministerului Educației Naționale",
+    "b": "Ministerul Educației Naționale",
+    "same": true,
+    "source_file": "real-data-law-ro/16678.json",
+    "reason": "Genitive/nominative of same ministry"
+  },
+  {
+    "a": "Oficiul Național al Burselor de Studii în Străinătate",
+    "b": "Oficiului Național al Burselor de Studii în Străinătate",
+    "same": true,
+    "source_file": "real-data-law-ro/16678.json",
+    "reason": "Inflection of same office"
+  },
+  {
+    "a": "Legea nr. 101/1998",
+    "b": "Legea nr. 58/1998",
+    "same": false,
+    "source_file": "real-data-law-ro/17994.json",
+    "reason": "Different law numbers"
+  },
+  {
+    "a": "Legea nr. 2/1992",
+    "b": "Legea nr. 17/1999",
+    "same": false,
+    "source_file": "real-data-law-ro/16955.json",
+    "reason": "Different acts in the amendment chain"
+  },
+  {
+    "a": "Legea nr. 17/1999",
+    "b": "Legea nr. 154/1998",
+    "same": false,
+    "source_file": "real-data-law-ro/16955.json",
+    "reason": "Different acts"
+  },
+  {
+    "a": "Normele Băncii Naţionale a României nr. 3/1999",
+    "b": "Normele Băncii Naţionale a României nr. 4/1998",
+    "same": false,
+    "source_file": "real-data-law-ro/17754.json",
+    "reason": "Different numbered norms"
+  },
+  {
+    "a": "Normele nr. 2/1999",
+    "b": "Legea nr. 101/1998",
+    "same": false,
+    "source_file": "real-data-law-ro/17994.json",
+    "reason": "Different act kinds and identifiers"
+  },
+  {
+    "a": "Banca Comercială Română - S.A.",
+    "b": "Banca Română de Comerţ Exterior - S.A.",
+    "same": false,
+    "source_file": "real-data-law-ro/16694.json",
+    "reason": "Distinct banks in the source footnote; names inflected to nominative"
+  },
+  {
+    "a": "Băncii Agricole - S.A.",
+    "b": "Băncii Române pentru Dezvoltare - S.A.",
+    "same": false,
+    "source_file": "real-data-law-ro/16694.json",
+    "reason": "Distinct named banks"
+  },
+  {
+    "a": "registrul bancar",
+    "b": "registrul comerţului",
+    "same": false,
+    "source_file": "real-data-law-ro/16694.json",
+    "reason": "Distinct registers"
+  },
+  {
+    "a": "Ministerului Educației Naționale",
+    "b": "ministrului educației naționale",
+    "same": false,
+    "source_file": "real-data-law-ro/16678.json",
+    "reason": "Ministry institution versus minister office/person"
+  },
+  {
+    "a": "Consiliului Europei",
+    "b": "Consiliul Naţional al Audiovizualului",
+    "same": false,
+    "source_file": "real-data-law-ro/16686.json",
+    "reason": "Distinct councils"
+  },
+  {
+    "a": "riscul creditului",
+    "b": "riscul de piaţa",
+    "same": false,
+    "source_file": "real-data-law-ro/18185.json",
+    "reason": "Distinct risk categories explicitly defined"
+  },
+  {
+    "a": "Bursa de Valori Bucureşti",
+    "b": "Piaţa RASDAQ",
+    "same": false,
+    "source_file": "real-data-law-ro/18185.json",
+    "reason": "Distinct markets"
+  }
+]
