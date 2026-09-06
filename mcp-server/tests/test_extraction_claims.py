@@ -1,4 +1,5 @@
 import hashlib
+import io
 import json
 
 import pytest
@@ -11,7 +12,7 @@ from grap_mcp.kee import pipeline
 from grap_mcp.kee.embeddings import HashingEmbedder
 from grap_mcp.kee.graph_extract import extend_graph_ontology
 from grap_mcp.kee.graph_store import GraphStore
-from grap_mcp.kee.llm import StubProvider
+from grap_mcp.kee.llm import OpenAICompatProvider, StubProvider
 from grap_mcp.kee.working_graph import WorkingGraph
 
 
@@ -110,6 +111,29 @@ def test_failed_refresh_preserves_previous_claims_and_source_receipt(tmp_path):
     assert state.chars == {0: ["ownership"]}
     assert state.extractions["plan#0"]["outcomes"][0]["evidence"]["status"] == "quoted"
     assert not state.chunk_failures
+
+
+@pytest.mark.parametrize("finish_reason", ["length", "content_filter"])
+def test_incomplete_http_reply_cannot_retract_previous_claims(tmp_path, monkeypatch, finish_reason):
+    path = document(tmp_path)
+    run(tmp_path, StubProvider(default=response(evidence=path.read_text())))
+    old_hash = hashlib.sha256(path.read_bytes()).hexdigest()
+    path.write_text("The Test Plan now records ownership.", encoding="utf-8")
+    calls = []
+
+    def incomplete(req, timeout=None):
+        calls.append(req)
+        # Even syntactically valid empty JSON must not commit an incomplete refresh.
+        return io.BytesIO(json.dumps({"choices": [{"finish_reason": finish_reason,
+            "message": {"content": '{"outcomes":[],"relations":[]}'}}]}).encode())
+
+    monkeypatch.setattr("grap_mcp.kee.llm.urllib.request.urlopen", incomplete)
+    out = run(tmp_path, OpenAICompatProvider(base_url="http://unused/v1", model="m"))
+    assert out["pending_chunks"] == ["plan#0"]
+    assert out["ontology"]["process_outcomes"][0]["required_characteristics"] == ["coverage"]
+    with GraphStore(str(tmp_path / "graph" / "graph_store.db")) as store:
+        assert store.load().extractions["plan#0"]["content_hash"] == old_hash
+    assert len(calls) == 1  # repeating the same token cap is not a transport retry
 
 
 def test_empty_success_retracts_old_claims_and_is_not_retried(tmp_path):

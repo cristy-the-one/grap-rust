@@ -2,6 +2,7 @@
 
 import io
 import json
+import pytest
 
 import grap_mcp.kee.llm as llm
 
@@ -174,6 +175,18 @@ def test_openai_compat_stream_parses_sse_deltas(monkeypatch):
     assert "".join(p.stream("s", "u")) == "Hello"
     # the request asked the server to stream
     # (verified indirectly: deltas were parsed from SSE frames)
+
+
+def test_stream_reports_truncation_after_partial_content(monkeypatch):
+    sse = ('data: {"choices":[{"delta":{"content":"partial"}}]}\n'
+           'data: {"choices":[{"delta":{},"finish_reason":"length"}]}\n'
+           'data: [DONE]\n')
+    monkeypatch.setattr(llm.urllib.request, "urlopen",
+                        lambda req, timeout=None: _FakeResp(sse.encode()))
+    pieces = llm.OpenAICompatProvider(base_url="http://x/v1", model="m").stream("s", "u")
+    assert next(pieces) == "partial"
+    with pytest.raises(RuntimeError, match="finish_reason='length'"):
+        next(pieces)
 
 
 def test_extra_body_env_merges_into_payload(monkeypatch):

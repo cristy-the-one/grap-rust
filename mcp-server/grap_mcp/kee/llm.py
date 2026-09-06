@@ -86,6 +86,16 @@ def _extra_body_from_env() -> dict:
     return obj if isinstance(obj, dict) else {}
 
 
+def _check_finish_reason(choice: dict) -> None:
+    # Some compatible servers omit this field. Honor explicit failure signals:
+    # valid-looking partial JSON must never replace previously extracted claims.
+    reason = choice.get("finish_reason")
+    if reason is not None and reason != "stop":
+        raise RuntimeError(f"LLM completion is incomplete (finish_reason={reason!r}); "
+                           "no extraction should be committed. For length limits, "
+                           "reduce the source chunk or increase GRAP_LLM_MAX_TOKENS.")
+
+
 class OpenAICompatProvider:
     """Talks to any OpenAI-compatible /chat/completions server via urllib."""
 
@@ -162,7 +172,12 @@ class OpenAICompatProvider:
             try:
                 with urllib.request.urlopen(req, timeout=self.timeout) as resp:
                     body = json.loads(resp.read().decode("utf-8"))
-                return body["choices"][0]["message"]["content"]
+                choice = body["choices"][0]
+                _check_finish_reason(choice)
+                content = choice["message"]["content"]
+                if not isinstance(content, str):
+                    raise TypeError("completion content must be text")
+                return content
             except urllib.error.HTTPError as exc:
                 last_exc = exc
                 if exc.code < 500:          # client error: retrying won't help
@@ -217,6 +232,7 @@ class OpenAICompatProvider:
                 choices = obj.get("choices") or []
                 if not choices:
                     continue
+                _check_finish_reason(choices[0])
                 delta = (choices[0].get("delta") or {}).get("content")
                 if delta:
                     yield delta
