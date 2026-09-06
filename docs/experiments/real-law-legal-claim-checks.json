@@ -1,0 +1,17 @@
+{
+  "purpose": "Frozen semantic review criteria for legal-claims-v1; literal grounding alone is not accuracy.",
+  "cases": {
+    "office-subordination": ["fact: office is subordinate to the ministry, not a duty imposed on either"],
+    "bank-register-fields": ["obligation: register must contain the listed fields, including name and address"],
+    "shareholder-payment": ["obligation: each shareholder pays the full subscribed value", "retain monetary form, full payment and constitution timing for capital payments"],
+    "bank-capital-deadline": ["obligation: authorized banks and banks with constitution approval are the subject", "retain deadline 30 aprilie 2000 and minimum reference to art. 1"],
+    "agent-prohibitions": ["prohibition: taking orders otherwise than directly and personally from the owner", "obligation: owner supplies ownership and identity documents", "S.V.M. prohibition is conditional on verification, not a blanket ban on orders"],
+    "exception-preservation": ["keep exceptional circumstances AND express president/director approval on the same restricted-conduct claim", "retain the explanation of exceptional circumstances"],
+    "explicit-abbreviations": ["definition: C.N.V.M. expansion", "definition: OSP expansion", "definitions retain local regulation scope and are not obligations"],
+    "confidential-information": ["preserve secrecy and security requirements", "access is limited and requires president's order, not unconditionally permitted"],
+    "broadcast-exclusions": ["majority calculation excludes news, sports, games, advertising and teletext", "40% is of European content broadcast, not all airtime", "10% independent production retains reference to preceding paragraphs", "quoted replacement rules retain amendment context"],
+    "banking-act-identities": ["amendment targets Normele nr. 2/1999 with both affected annex paragraphs", "laws 101/1998 and 58/1998 are legal bases, not amendment targets"],
+    "nested-amendment-identities": ["amendment of Article 1 in Law 2/1992", "right: Academy members receive indemnity, not beneficiary obligation", "historical approval concerns OUG 78/1997 approved by Law 17/1999", "replacement article is not identified as Article 1 of the amending act"],
+    "missing-body": ["empty claims; runtime folder ingestion should defer this unavailable body"]
+  }
+}

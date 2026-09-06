@@ -26,6 +26,25 @@ _Avoid_: Verified fact, ground truth
 A duty imposed on a specified subject, including its conditions, exceptions,
 limits and relevant dates. It is distinct from a description or a permission.
 
+**Right**:
+An entitlement attributed to a beneficiary. Receiving a benefit does not itself
+impose a duty on that beneficiary.
+
+**Prohibition**:
+A restriction on conduct, including the circumstances and exceptions that limit
+it. A conditional prohibition is not a blanket ban.
+
+**Permission**:
+Conduct that the source allows, subject to its stated qualifications.
+
+**Definition**:
+A meaning explicitly assigned to a term within a stated scope. A definition of an
+abbreviation supports an alias in that scope, without establishing global identity.
+
+**Source revision**:
+A retained state of a particular source document. It records what was supplied,
+without establishing the legal act's version or current validity.
+
 **Amendment**:
 A stated change to a particular act or provision. Its scope and date are part of
 the claim; a citation alone does not establish an amendment.

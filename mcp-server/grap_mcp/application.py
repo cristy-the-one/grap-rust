@@ -42,6 +42,7 @@ _TIERS = {
     "run_maintenance": "full",
     "enforce_retention": "full", "get_audit_log": "full", "reconstruct_run": "full",
     "get_telemetry": "full", "build_legal_graph": "full", "legal_graph_from_relations": "full",
+    "extract_legal_claims": "full", "get_legal_claims": "full", "get_legal_sources": "full",
 }
 
 class ApplicationState:
@@ -1968,6 +1969,59 @@ class GrapApplication:
             logger.exception("project_relations failed")
             return {"status": "error", "message": str(e)}
 
+
+    @operation
+    def extract_legal_claims(self, path: str, max_files: int = 3, max_chars: int = 8000,
+                             refresh: bool = False, model: str = None) -> dict:
+        """Extract qualified legal proposals from a JSON file or folder into this workspace.
+
+        max_files limits model calls, not the coverage scan. Only whole documents
+        within max_chars are extracted; oversized sources are explicitly deferred.
+        Unchanged successful sources are skipped unless refresh is set. Prior
+        revisions survive failed refreshes. Claims remain unreviewed proposals.
+        """
+        denied = self._require("operator")
+        if denied:
+            return denied
+        from .kee.legal_claims import LegalClaimStore
+        try:
+            with LegalClaimStore(Path(self._resolve_ws_root()) / "legal-claims.sqlite") as store:
+                return store.ingest_folder(path, self.get_provider(model=model), max_files=max_files,
+                                           max_chars=max_chars, refresh=refresh)
+        except Exception as exc:
+            logger.exception("extract_legal_claims failed")
+            return {"status": "error", "message": str(exc)}
+
+    @operation
+    def get_legal_claims(self, kind: str = None, source_id: str = None,
+                         revision_id: str = None, include_stale: bool = False,
+                         limit: int = 20, offset: int = 0) -> dict:
+        """Read typed legal proposals, or an exact revision's full source/evidence receipt.
+
+        kind is fact, definition, right, obligation, prohibition, permission or
+        amendment. Stale sources are excluded by default. revision_id requests
+        historical evidence explicitly and ignores the other filters.
+        """
+        from .kee.legal_claims import LegalClaimStore
+        try:
+            with LegalClaimStore(Path(self._resolve_ws_root()) / "legal-claims.sqlite") as store:
+                result = (store.receipt(revision_id) if revision_id else
+                          store.read(kind=kind, source_id=source_id, include_stale=include_stale,
+                                     limit=limit, offset=offset))
+                return {"status": "ok", **result}
+        except Exception as exc:
+            return {"status": "error", "message": str(exc)}
+
+    @operation
+    def get_legal_sources(self, source_id: str = None, limit: int = 20, offset: int = 0) -> dict:
+        """List observed files, including failures/deferrals, or one source's revision history."""
+        from .kee.legal_claims import LegalClaimStore
+        try:
+            with LegalClaimStore(Path(self._resolve_ws_root()) / "legal-claims.sqlite") as store:
+                result = store.source_history(source_id) if source_id else store.sources(limit=limit, offset=offset)
+                return {"status": "ok", **result}
+        except Exception as exc:
+            return {"status": "error", "message": str(exc)}
 
     @operation
     def build_legal_graph(self, path: str, max_files: int = 400, with_relations: bool = False,
