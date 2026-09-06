@@ -1,5 +1,9 @@
 # Installed models and extraction performance — September 2026
 
+Follow-up: the [real Romanian corpus evaluation](real-law-evaluation-2026-09.md)
+exposes semantic failures that the synthetic cases below did not. Treat the
+model recommendation here as a development baseline, not production accuracy.
+
 Inspected `D:\ComfyUI_windows_portable\ComfyUI\models` (the supplied path had
 different separators) and the already-running local Ollama installation. Hardware:
 RTX 5080 Laptop GPU, 16,303 MiB VRAM; approximately 63.4 GiB usable system RAM.

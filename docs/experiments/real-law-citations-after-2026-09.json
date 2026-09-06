@@ -1,0 +1,1894 @@
+{
+  "acts": 2092,
+  "resolved_pairs": 978,
+  "reference_statuses": {
+    "resolved": 1730,
+    "missing": 12276,
+    "ambiguous": 68
+  },
+  "ambiguous_keys": [
+    {
+      "key": [
+        "DECIZIE",
+        "172",
+        "1998"
+      ],
+      "targets": [
+        "16661",
+        "16975"
+      ]
+    },
+    {
+      "key": [
+        "DECIZIE",
+        "14",
+        "1999"
+      ],
+      "targets": [
+        "16690",
+        "17063",
+        "17174",
+        "19232"
+      ]
+    },
+    {
+      "key": [
+        "HOTARARE",
+        "13",
+        "1999"
+      ],
+      "targets": [
+        "16701",
+        "17442",
+        "18005",
+        "19229",
+        "20212"
+      ]
+    },
+    {
+      "key": [
+        "DECIZIE",
+        "15",
+        "1999"
+      ],
+      "targets": [
+        "16720",
+        "17200",
+        "18831"
+      ]
+    },
+    {
+      "key": [
+        "HOTARARE",
+        "17",
+        "1999"
+      ],
+      "targets": [
+        "16721",
+        "18055",
+        "18460"
+      ]
+    },
+    {
+      "key": [
+        "DECIZIE",
+        "1",
+        "1999"
+      ],
+      "targets": [
+        "16725",
+        "17357",
+        "18190"
+      ]
+    },
+    {
+      "key": [
+        "HOTARARE",
+        "21",
+        "1999"
+      ],
+      "targets": [
+        "16727",
+        "18382",
+        "19552"
+      ]
+    },
+    {
+      "key": [
+        "HOTARARE",
+        "10",
+        "1999"
+      ],
+      "targets": [
+        "16730",
+        "16989",
+        "17181",
+        "18396"
+      ]
+    },
+    {
+      "key": [
+        "HOTARARE",
+        "11",
+        "1999"
+      ],
+      "targets": [
+        "16731",
+        "16990",
+        "17752",
+        "18506"
+      ]
+    },
+    {
+      "key": [
+        "HOTARARE",
+        "12",
+        "1999"
+      ],
+      "targets": [
+        "16732",
+        "17142",
+        "18004",
+        "18651"
+      ]
+    },
+    {
+      "key": [
+        "HOTARARE",
+        "16",
+        "1999"
+      ],
+      "targets": [
+        "16733",
+        "18054",
+        "18153",
+        "19266"
+      ]
+    },
+    {
+      "key": [
+        "HOTARARE",
+        "18",
+        "1999"
+      ],
+      "targets": [
+        "16734",
+        "18254",
+        "18461"
+      ]
+    },
+    {
+      "key": [
+        "HOTARARE",
+        "9",
+        "1999"
+      ],
+      "targets": [
+        "16736",
+        "16988",
+        "17172",
+        "18372",
+        "18933"
+      ]
+    },
+    {
+      "key": [
+        "HOTARARE",
+        "15",
+        "1999"
+      ],
+      "targets": [
+        "16737",
+        "18024",
+        "18152",
+        "19231"
+      ]
+    },
+    {
+      "key": [
+        "HOTARARE",
+        "6",
+        "1999"
+      ],
+      "targets": [
+        "16742",
+        "16980",
+        "17180",
+        "20363"
+      ]
+    },
+    {
+      "key": [
+        "HOTARARE",
+        "7",
+        "1999"
+      ],
+      "targets": [
+        "16743",
+        "16981",
+        "17078",
+        "17235"
+      ]
+    },
+    {
+      "key": [
+        "HOTARARE",
+        "4",
+        "1999"
+      ],
+      "targets": [
+        "16744",
+        "16895",
+        "16928",
+        "16978",
+        "18051"
+      ]
+    },
+    {
+      "key": [
+        "HOTARARE",
+        "5",
+        "1999"
+      ],
+      "targets": [
+        "16745",
+        "16896",
+        "16929",
+        "16979"
+      ]
+    },
+    {
+      "key": [
+        "HOTARARE",
+        "25",
+        "1999"
+      ],
+      "targets": [
+        "16746",
+        "18545",
+        "19152",
+        "20471"
+      ]
+    },
+    {
+      "key": [
+        "HOTARARE",
+        "27",
+        "1999"
+      ],
+      "targets": [
+        "16748",
+        "18587",
+        "19259",
+        "20473"
+      ]
+    },
+    {
+      "key": [
+        "HOTARARE",
+        "30",
+        "1999"
+      ],
+      "targets": [
+        "16750",
+        "19226"
+      ]
+    },
+    {
+      "key": [
+        "HOTARARE",
+        "35",
+        "1999"
+      ],
+      "targets": [
+        "16751",
+        "19352",
+        "19929"
+      ]
+    },
+    {
+      "key": [
+        "HOTARARE",
+        "19",
+        "1999"
+      ],
+      "targets": [
+        "16762",
+        "18255",
+        "18462",
+        "19550"
+      ]
+    },
+    {
+      "key": [
+        "HOTARARE",
+        "20",
+        "1999"
+      ],
+      "targets": [
+        "16763",
+        "19551"
+      ]
+    },
+    {
+      "key": [
+        "HOTARARE",
+        "23",
+        "1999"
+      ],
+      "targets": [
+        "16765",
+        "18543",
+        "19854"
+      ]
+    },
+    {
+      "key": [
+        "HOTARARE",
+        "24",
+        "1999"
+      ],
+      "targets": [
+        "16766",
+        "18544",
+        "19905"
+      ]
+    },
+    {
+      "key": [
+        "HOTARARE",
+        "28",
+        "1999"
+      ],
+      "targets": [
+        "16767",
+        "18588",
+        "19303",
+        "20474"
+      ]
+    },
+    {
+      "key": [
+        "HOTARARE",
+        "1",
+        "1999"
+      ],
+      "targets": [
+        "16770",
+        "16892",
+        "17032",
+        "19350"
+      ]
+    },
+    {
+      "key": [
+        "HOTARARE",
+        "38",
+        "1999"
+      ],
+      "targets": [
+        "16773",
+        "19524",
+        "20350"
+      ]
+    },
+    {
+      "key": [
+        "HOTARARE",
+        "37",
+        "1999"
+      ],
+      "targets": [
+        "16774",
+        "19523",
+        "20364"
+      ]
+    },
+    {
+      "key": [
+        "HOTARARE",
+        "22",
+        "1999"
+      ],
+      "targets": [
+        "16776",
+        "18373",
+        "18542",
+        "19743"
+      ]
+    },
+    {
+      "key": [
+        "HOTARARE",
+        "29",
+        "1999"
+      ],
+      "targets": [
+        "16777",
+        "18645",
+        "19610"
+      ]
+    },
+    {
+      "key": [
+        "HOTARARE",
+        "31",
+        "1999"
+      ],
+      "targets": [
+        "16778",
+        "19227",
+        "19711"
+      ]
+    },
+    {
+      "key": [
+        "HOTARARE",
+        "32",
+        "1999"
+      ],
+      "targets": [
+        "16779",
+        "19228",
+        "19790"
+      ]
+    },
+    {
+      "key": [
+        "HOTARARE",
+        "33",
+        "1999"
+      ],
+      "targets": [
+        "16780",
+        "19249"
+      ]
+    },
+    {
+      "key": [
+        "HOTARARE",
+        "34",
+        "1999"
+      ],
+      "targets": [
+        "16781",
+        "19265",
+        "19796"
+      ]
+    },
+    {
+      "key": [
+        "DECIZIE",
+        "171",
+        "1998"
+      ],
+      "targets": [
+        "16785",
+        "16811"
+      ]
+    },
+    {
+      "key": [
+        "HOTARARE",
+        "8",
+        "1999"
+      ],
+      "targets": [
+        "16786",
+        "16987",
+        "17171",
+        "17393",
+        "18511"
+      ]
+    },
+    {
+      "key": [
+        "DECIZIE",
+        "85",
+        "1999"
+      ],
+      "targets": [
+        "16788",
+        "18744"
+      ]
+    },
+    {
+      "key": [
+        "DECIZIE",
+        "2",
+        "1999"
+      ],
+      "targets": [
+        "16792",
+        "17019",
+        "18732"
+      ]
+    },
+    {
+      "key": [
+        "DECIZIE",
+        "3",
+        "1999"
+      ],
+      "targets": [
+        "16793",
+        "17114"
+      ]
+    },
+    {
+      "key": [
+        "HOTARARE",
+        "40",
+        "1999"
+      ],
+      "targets": [
+        "16859",
+        "19709"
+      ]
+    },
+    {
+      "key": [
+        "HOTARARE",
+        "41",
+        "1999"
+      ],
+      "targets": [
+        "16860",
+        "19710"
+      ]
+    },
+    {
+      "key": [
+        "HOTARARE",
+        "55",
+        "1999"
+      ],
+      "targets": [
+        "16861",
+        "20318"
+      ]
+    },
+    {
+      "key": [
+        "HOTARARE",
+        "39",
+        "1999"
+      ],
+      "targets": [
+        "16871",
+        "19629"
+      ]
+    },
+    {
+      "key": [
+        "HOTARARE",
+        "43",
+        "1999"
+      ],
+      "targets": [
+        "16872",
+        "19895"
+      ]
+    },
+    {
+      "key": [
+        "HOTARARE",
+        "45",
+        "1999"
+      ],
+      "targets": [
+        "16873",
+        "19897"
+      ]
+    },
+    {
+      "key": [
+        "HOTARARE",
+        "48",
+        "1999"
+      ],
+      "targets": [
+        "16874",
+        "19998"
+      ]
+    },
+    {
+      "key": [
+        "HOTARARE",
+        "51",
+        "1999"
+      ],
+      "targets": [
+        "16875",
+        "20092"
+      ]
+    },
+    {
+      "key": [
+        "HOTARARE",
+        "54",
+        "1999"
+      ],
+      "targets": [
+        "16876",
+        "20317"
+      ]
+    },
+    {
+      "key": [
+        "HOTARARE",
+        "47",
+        "1999"
+      ],
+      "targets": [
+        "16883",
+        "19997"
+      ]
+    },
+    {
+      "key": [
+        "HOTARARE",
+        "49",
+        "1999"
+      ],
+      "targets": [
+        "16884",
+        "20062"
+      ]
+    },
+    {
+      "key": [
+        "HOTARARE",
+        "56",
+        "1999"
+      ],
+      "targets": [
+        "16885",
+        "20319"
+      ]
+    },
+    {
+      "key": [
+        "HOTARARE",
+        "2",
+        "1999"
+      ],
+      "targets": [
+        "16893",
+        "16926"
+      ]
+    },
+    {
+      "key": [
+        "HOTARARE",
+        "3",
+        "1999"
+      ],
+      "targets": [
+        "16894",
+        "16901",
+        "16927"
+      ]
+    },
+    {
+      "key": [
+        "HOTARARE",
+        "42",
+        "1999"
+      ],
+      "targets": [
+        "16905",
+        "19789"
+      ]
+    },
+    {
+      "key": [
+        "HOTARARE",
+        "46",
+        "1999"
+      ],
+      "targets": [
+        "16906",
+        "19996"
+      ]
+    },
+    {
+      "key": [
+        "HOTARARE",
+        "50",
+        "1999"
+      ],
+      "targets": [
+        "16907",
+        "20091"
+      ]
+    },
+    {
+      "key": [
+        "HOTARARE",
+        "57",
+        "1999"
+      ],
+      "targets": [
+        "16913",
+        "19922",
+        "20292"
+      ]
+    },
+    {
+      "key": [
+        "HOTARARE",
+        "58",
+        "1999"
+      ],
+      "targets": [
+        "16918",
+        "20320"
+      ]
+    },
+    {
+      "key": [
+        "DECIZIE",
+        "6",
+        "1999"
+      ],
+      "targets": [
+        "16985",
+        "17070",
+        "17182",
+        "18577",
+        "20373"
+      ]
+    },
+    {
+      "key": [
+        "DECIZIE",
+        "5",
+        "1999"
+      ],
+      "targets": [
+        "16999",
+        "17089",
+        "18927",
+        "20367"
+      ]
+    },
+    {
+      "key": [
+        "HOTARARE",
+        "99/24",
+        "1999"
+      ],
+      "targets": [
+        "17005",
+        "17560"
+      ]
+    },
+    {
+      "key": [
+        "HOTARARE",
+        "44",
+        "1999"
+      ],
+      "targets": [
+        "17020",
+        "19896"
+      ]
+    },
+    {
+      "key": [
+        "HOTARARE",
+        "53",
+        "1999"
+      ],
+      "targets": [
+        "17025",
+        "17178",
+        "20227"
+      ]
+    },
+    {
+      "key": [
+        "DECIZIE",
+        "7",
+        "1999"
+      ],
+      "targets": [
+        "17104",
+        "17193",
+        "19000",
+        "20374"
+      ]
+    },
+    {
+      "key": [
+        "DECIZIE",
+        "4",
+        "1999"
+      ],
+      "targets": [
+        "17115",
+        "20366"
+      ]
+    },
+    {
+      "key": [
+        "DECIZIE",
+        "12",
+        "1999"
+      ],
+      "targets": [
+        "17132",
+        "18228",
+        "18960"
+      ]
+    },
+    {
+      "key": [
+        "DECIZIE",
+        "21",
+        "1999"
+      ],
+      "targets": [
+        "17175",
+        "18157"
+      ]
+    },
+    {
+      "key": [
+        "DECIZIE",
+        "27",
+        "1999"
+      ],
+      "targets": [
+        "17208",
+        "18366"
+      ]
+    },
+    {
+      "key": [
+        "DECIZIE",
+        "23",
+        "1999"
+      ],
+      "targets": [
+        "17217",
+        "17550"
+      ]
+    },
+    {
+      "key": [
+        "DECIZIE",
+        "10",
+        "1999"
+      ],
+      "targets": [
+        "17281",
+        "18609"
+      ]
+    },
+    {
+      "key": [
+        "DECIZIE",
+        "19",
+        "1999"
+      ],
+      "targets": [
+        "17430",
+        "17775",
+        "20168"
+      ]
+    },
+    {
+      "key": [
+        "DECIZIE",
+        "11",
+        "1999"
+      ],
+      "targets": [
+        "17548",
+        "18220",
+        "18578"
+      ]
+    },
+    {
+      "key": [
+        "DECIZIE",
+        "16",
+        "1999"
+      ],
+      "targets": [
+        "17549",
+        "18838",
+        "19807"
+      ]
+    },
+    {
+      "key": [
+        "DECIZIE",
+        "8",
+        "1999"
+      ],
+      "targets": [
+        "17774",
+        "17992",
+        "19099",
+        "20380"
+      ]
+    },
+    {
+      "key": [
+        "DECIZIE",
+        "35",
+        "1999"
+      ],
+      "targets": [
+        "17776",
+        "19609"
+      ]
+    },
+    {
+      "key": [
+        "HOTARARE",
+        "14",
+        "1999"
+      ],
+      "targets": [
+        "17966",
+        "18006",
+        "19230"
+      ]
+    },
+    {
+      "key": [
+        "DECIZIE",
+        "31",
+        "1999"
+      ],
+      "targets": [
+        "17995",
+        "18063"
+      ]
+    },
+    {
+      "key": [
+        "DECIZIE",
+        "46",
+        "1999"
+      ],
+      "targets": [
+        "18019",
+        "18248",
+        "20023"
+      ]
+    },
+    {
+      "key": [
+        "DECIZIE",
+        "33",
+        "1999"
+      ],
+      "targets": [
+        "18088",
+        "19607"
+      ]
+    },
+    {
+      "key": [
+        "DECIZIE",
+        "44",
+        "1999"
+      ],
+      "targets": [
+        "18091",
+        "18268",
+        "19392"
+      ]
+    },
+    {
+      "key": [
+        "DECIZIE",
+        "57",
+        "1999"
+      ],
+      "targets": [
+        "18192",
+        "20330"
+      ]
+    },
+    {
+      "key": [
+        "DECIZIE",
+        "48",
+        "1999"
+      ],
+      "targets": [
+        "18250",
+        "18679"
+      ]
+    },
+    {
+      "key": [
+        "DECIZIE",
+        "29",
+        "1999"
+      ],
+      "targets": [
+        "18367",
+        "19016"
+      ]
+    },
+    {
+      "key": [
+        "DECIZIE",
+        "52",
+        "1999"
+      ],
+      "targets": [
+        "18376",
+        "20024"
+      ]
+    },
+    {
+      "key": [
+        "HOTARARE",
+        "26",
+        "1999"
+      ],
+      "targets": [
+        "18546",
+        "18822",
+        "19200",
+        "20472"
+      ]
+    },
+    {
+      "key": [
+        "DECIZIE",
+        "53",
+        "1999"
+      ],
+      "targets": [
+        "18597",
+        "20025"
+      ]
+    },
+    {
+      "key": [
+        "DECIZIE",
+        "66",
+        "1999"
+      ],
+      "targets": [
+        "18601",
+        "20026"
+      ]
+    },
+    {
+      "key": [
+        "DECIZIE",
+        "34",
+        "1999"
+      ],
+      "targets": [
+        "18648",
+        "19608"
+      ]
+    },
+    {
+      "key": [
+        "DECIZIE",
+        "89",
+        "1999"
+      ],
+      "targets": [
+        "18674",
+        "18702"
+      ]
+    },
+    {
+      "key": [
+        "DECIZIE",
+        "90",
+        "1999"
+      ],
+      "targets": [
+        "18736",
+        "19448"
+      ]
+    },
+    {
+      "key": [
+        "DECIZIE",
+        "17",
+        "1999"
+      ],
+      "targets": [
+        "18832",
+        "19954"
+      ]
+    },
+    {
+      "key": [
+        "DECIZIE",
+        "18",
+        "1999"
+      ],
+      "targets": [
+        "18833",
+        "20113"
+      ]
+    },
+    {
+      "key": [
+        "DECIZIE",
+        "106",
+        "1999"
+      ],
+      "targets": [
+        "18858",
+        "19079"
+      ]
+    },
+    {
+      "key": [
+        "DECIZIE",
+        "71",
+        "1999"
+      ],
+      "targets": [
+        "18869",
+        "20343"
+      ]
+    },
+    {
+      "key": [
+        "DECIZIE",
+        "100",
+        "1999"
+      ],
+      "targets": [
+        "18879",
+        "19198"
+      ]
+    },
+    {
+      "key": [
+        "DECIZIE",
+        "101",
+        "1999"
+      ],
+      "targets": [
+        "18880",
+        "19051"
+      ]
+    },
+    {
+      "key": [
+        "DECIZIE",
+        "103",
+        "1999"
+      ],
+      "targets": [
+        "18881",
+        "19070"
+      ]
+    },
+    {
+      "key": [
+        "DECIZIE",
+        "115",
+        "1999"
+      ],
+      "targets": [
+        "18922",
+        "19684"
+      ]
+    },
+    {
+      "key": [
+        "DECIZIE",
+        "107",
+        "1999"
+      ],
+      "targets": [
+        "19041",
+        "19080"
+      ]
+    },
+    {
+      "key": [
+        "DECIZIE",
+        "125",
+        "1999"
+      ],
+      "targets": [
+        "19081",
+        "19918"
+      ]
+    },
+    {
+      "key": [
+        "DECIZIE",
+        "111",
+        "1999"
+      ],
+      "targets": [
+        "19088",
+        "19600"
+      ]
+    },
+    {
+      "key": [
+        "DECIZIE",
+        "120",
+        "1999"
+      ],
+      "targets": [
+        "19191",
+        "19753"
+      ]
+    },
+    {
+      "key": [
+        "DECIZIE",
+        "117",
+        "1999"
+      ],
+      "targets": [
+        "19213",
+        "19752"
+      ]
+    },
+    {
+      "key": [
+        "DECIZIE",
+        "121",
+        "1999"
+      ],
+      "targets": [
+        "19391",
+        "19785"
+      ]
+    },
+    {
+      "key": [
+        "HOTARARE",
+        "36",
+        "1999"
+      ],
+      "targets": [
+        "19522",
+        "19930"
+      ]
+    },
+    {
+      "key": [
+        "DECIZIE",
+        "203",
+        "1999"
+      ],
+      "targets": [
+        "19662",
+        "20210"
+      ]
+    }
+  ],
+  "unidentified_acts": [
+    "109203",
+    "109831",
+    "116303",
+    "123376",
+    "123377",
+    "123774",
+    "158079",
+    "16702",
+    "17101",
+    "17186",
+    "184252",
+    "19024",
+    "19440",
+    "19828",
+    "19924",
+    "19939",
+    "19960",
+    "19961",
+    "19970",
+    "19982",
+    "19985",
+    "20015",
+    "20019",
+    "20021",
+    "20169",
+    "20192",
+    "20263",
+    "20271",
+    "20277",
+    "20307",
+    "20372",
+    "20389",
+    "20447",
+    "20462",
+    "20467",
+    "20468",
+    "20498",
+    "20501",
+    "20502",
+    "20513",
+    "205877",
+    "230022",
+    "23812",
+    "26336",
+    "28782",
+    "34489",
+    "34676",
+    "36196",
+    "36533",
+    "36556",
+    "36668",
+    "40293",
+    "41730",
+    "47972",
+    "47976",
+    "50738",
+    "50956",
+    "53505",
+    "53610",
+    "58615",
+    "64722",
+    "69608",
+    "75421",
+    "75422",
+    "76389",
+    "76506",
+    "76617",
+    "76618",
+    "79836",
+    "81862",
+    "82584",
+    "82595",
+    "83487",
+    "83496",
+    "83497",
+    "83906",
+    "92125",
+    "92216",
+    "92217",
+    "92218",
+    "92220",
+    "92221",
+    "92226",
+    "92227",
+    "92228",
+    "92247",
+    "92712"
+  ],
+  "heading_effective_year_differences": 218,
+  "in_force_fields": {
+    "None": 1301,
+    "True": 677,
+    "False": 114
+  },
+  "sample_references": [
+    {
+      "source": "109831",
+      "target": "19663",
+      "key": [
+        "ORDONANTA DE URGENTA",
+        "159",
+        "1999"
+      ],
+      "status": "resolved",
+      "start": 176,
+      "end": 226,
+      "quote": "ORDONANȚA DE URGENȚĂ nr. 159 din 21 octombrie 1999"
+    },
+    {
+      "source": "109831",
+      "target": null,
+      "key": [
+        "ORDONANTA DE URGENTA",
+        "202",
+        "2005"
+      ],
+      "status": "missing",
+      "start": 5774,
+      "end": 5825,
+      "quote": "ORDONANȚEI DE URGENȚĂ nr. 202 din 22 decembrie 2005"
+    },
+    {
+      "source": "109831",
+      "target": null,
+      "key": [
+        "LEGE",
+        "252",
+        "2006"
+      ],
+      "status": "missing",
+      "start": 5938,
+      "end": 5969,
+      "quote": "LEGEA nr. 252 din 23 iunie 2006"
+    },
+    {
+      "source": "109831",
+      "target": null,
+      "key": [
+        "ORDONANTA DE URGENTA",
+        "1",
+        "2017"
+      ],
+      "status": "missing",
+      "start": 6311,
+      "end": 6357,
+      "quote": "ORDONANȚA DE URGENȚĂ nr. 1 din 4 ianuarie 2017"
+    },
+    {
+      "source": "109831",
+      "target": null,
+      "key": [
+        "ORDONANTA DE URGENTA",
+        "1",
+        "2017"
+      ],
+      "status": "missing",
+      "start": 6419,
+      "end": 6465,
+      "quote": "ORDONANȚA DE URGENȚĂ nr. 1 din 4 ianuarie 2017"
+    },
+    {
+      "source": "109831",
+      "target": null,
+      "key": [
+        "ORDONANTA DE URGENTA",
+        "68",
+        "2019"
+      ],
+      "status": "missing",
+      "start": 6587,
+      "end": 6635,
+      "quote": "ORDONANȚA DE URGENȚĂ nr. 68 din 6 noiembrie 2019"
+    },
+    {
+      "source": "109831",
+      "target": null,
+      "key": [
+        "ORDONANTA DE URGENTA",
+        "1",
+        "2017"
+      ],
+      "status": "missing",
+      "start": 6960,
+      "end": 7006,
+      "quote": "ORDONANȚA DE URGENȚĂ nr. 1 din 4 ianuarie 2017"
+    },
+    {
+      "source": "109831",
+      "target": null,
+      "key": [
+        "ORDONANTA DE URGENTA",
+        "1",
+        "2017"
+      ],
+      "status": "missing",
+      "start": 7068,
+      "end": 7114,
+      "quote": "ORDONANȚA DE URGENȚĂ nr. 1 din 4 ianuarie 2017"
+    },
+    {
+      "source": "109831",
+      "target": null,
+      "key": [
+        "ORDONANTA DE URGENTA",
+        "68",
+        "2019"
+      ],
+      "status": "missing",
+      "start": 7236,
+      "end": 7284,
+      "quote": "ORDONANȚA DE URGENȚĂ nr. 68 din 6 noiembrie 2019"
+    },
+    {
+      "source": "109831",
+      "target": null,
+      "key": [
+        "ORDONANTA DE URGENTA",
+        "40",
+        "2016"
+      ],
+      "status": "missing",
+      "start": 7926,
+      "end": 7971,
+      "quote": "ORDONANȚĂ DE URGENȚĂ nr. 40 din 28 iunie 2016"
+    },
+    {
+      "source": "109831",
+      "target": null,
+      "key": [
+        "ORDONANTA DE URGENTA",
+        "1",
+        "2017"
+      ],
+      "status": "missing",
+      "start": 12348,
+      "end": 12394,
+      "quote": "ORDONANȚA DE URGENȚĂ nr. 1 din 4 ianuarie 2017"
+    },
+    {
+      "source": "109831",
+      "target": null,
+      "key": [
+        "ORDONANTA DE URGENTA",
+        "1",
+        "2017"
+      ],
+      "status": "missing",
+      "start": 12456,
+      "end": 12502,
+      "quote": "ORDONANȚA DE URGENȚĂ nr. 1 din 4 ianuarie 2017"
+    },
+    {
+      "source": "109831",
+      "target": null,
+      "key": [
+        "ORDONANTA DE URGENTA",
+        "68",
+        "2019"
+      ],
+      "status": "missing",
+      "start": 12624,
+      "end": 12672,
+      "quote": "ORDONANȚA DE URGENȚĂ nr. 68 din 6 noiembrie 2019"
+    },
+    {
+      "source": "109831",
+      "target": null,
+      "key": [
+        "ORDONANTA DE URGENTA",
+        "40",
+        "2016"
+      ],
+      "status": "missing",
+      "start": 15158,
+      "end": 15203,
+      "quote": "ORDONANȚĂ DE URGENȚĂ nr. 40 din 28 iunie 2016"
+    },
+    {
+      "source": "109831",
+      "target": null,
+      "key": [
+        "ORDONANTA DE URGENTA",
+        "1",
+        "2017"
+      ],
+      "status": "missing",
+      "start": 17588,
+      "end": 17634,
+      "quote": "ORDONANȚA DE URGENȚĂ nr. 1 din 4 ianuarie 2017"
+    },
+    {
+      "source": "109831",
+      "target": null,
+      "key": [
+        "ORDONANTA DE URGENTA",
+        "1",
+        "2017"
+      ],
+      "status": "missing",
+      "start": 17696,
+      "end": 17742,
+      "quote": "ORDONANȚA DE URGENȚĂ nr. 1 din 4 ianuarie 2017"
+    },
+    {
+      "source": "109831",
+      "target": null,
+      "key": [
+        "ORDONANTA DE URGENTA",
+        "68",
+        "2019"
+      ],
+      "status": "missing",
+      "start": 17864,
+      "end": 17912,
+      "quote": "ORDONANȚA DE URGENȚĂ nr. 68 din 6 noiembrie 2019"
+    },
+    {
+      "source": "109831",
+      "target": null,
+      "key": [
+        "LEGE",
+        "288",
+        "2001"
+      ],
+      "status": "missing",
+      "start": 23622,
+      "end": 23652,
+      "quote": "LEGEA nr. 288 din 5 iunie 2001"
+    },
+    {
+      "source": "109831",
+      "target": null,
+      "key": [
+        "LEGE",
+        "288",
+        "2001"
+      ],
+      "status": "missing",
+      "start": 24403,
+      "end": 24433,
+      "quote": "LEGEA nr. 288 din 5 iunie 2001"
+    },
+    {
+      "source": "116303",
+      "target": null,
+      "key": [
+        "HOTARARE",
+        "1198",
+        "2002"
+      ],
+      "status": "missing",
+      "start": 1954,
+      "end": 1995,
+      "quote": "HOTĂRÂREA nr. 1.198 din 24 octombrie 2002"
+    },
+    {
+      "source": "116303",
+      "target": null,
+      "key": [
+        "HOTARARE",
+        "1198",
+        "2002"
+      ],
+      "status": "missing",
+      "start": 3023,
+      "end": 3064,
+      "quote": "HOTĂRÂREA nr. 1.198 din 24 octombrie 2002"
+    },
+    {
+      "source": "116303",
+      "target": null,
+      "key": [
+        "HOTARARE",
+        "1198",
+        "2002"
+      ],
+      "status": "missing",
+      "start": 3205,
+      "end": 3246,
+      "quote": "HOTĂRÂREA nr. 1.198 din 24 octombrie 2002"
+    },
+    {
+      "source": "116303",
+      "target": null,
+      "key": [
+        "HOTARARE",
+        "1198",
+        "2002"
+      ],
+      "status": "missing",
+      "start": 3784,
+      "end": 3825,
+      "quote": "HOTĂRÂREA nr. 1.198 din 24 octombrie 2002"
+    },
+    {
+      "source": "116303",
+      "target": null,
+      "key": [
+        "HOTARARE",
+        "1198",
+        "2002"
+      ],
+      "status": "missing",
+      "start": 3966,
+      "end": 4007,
+      "quote": "HOTĂRÂREA nr. 1.198 din 24 octombrie 2002"
+    },
+    {
+      "source": "116303",
+      "target": null,
+      "key": [
+        "HOTARARE",
+        "1198",
+        "2002"
+      ],
+      "status": "missing",
+      "start": 5058,
+      "end": 5099,
+      "quote": "HOTĂRÂREA nr. 1.198 din 24 octombrie 2002"
+    },
+    {
+      "source": "116303",
+      "target": null,
+      "key": [
+        "HOTARARE",
+        "1198",
+        "2002"
+      ],
+      "status": "missing",
+      "start": 5463,
+      "end": 5504,
+      "quote": "HOTĂRÂREA nr. 1.198 din 24 octombrie 2002"
+    },
+    {
+      "source": "116303",
+      "target": null,
+      "key": [
+        "HOTARARE",
+        "1198",
+        "2002"
+      ],
+      "status": "missing",
+      "start": 5647,
+      "end": 5688,
+      "quote": "HOTĂRÂREA nr. 1.198 din 24 octombrie 2002"
+    },
+    {
+      "source": "116303",
+      "target": null,
+      "key": [
+        "HOTARARE",
+        "1198",
+        "2002"
+      ],
+      "status": "missing",
+      "start": 6138,
+      "end": 6179,
+      "quote": "HOTĂRÂREA nr. 1.198 din 24 octombrie 2002"
+    },
+    {
+      "source": "116303",
+      "target": null,
+      "key": [
+        "HOTARARE",
+        "1198",
+        "2002"
+      ],
+      "status": "missing",
+      "start": 6664,
+      "end": 6705,
+      "quote": "HOTĂRÂREA nr. 1.198 din 24 octombrie 2002"
+    },
+    {
+      "source": "116303",
+      "target": null,
+      "key": [
+        "HOTARARE",
+        "1198",
+        "2002"
+      ],
+      "status": "missing",
+      "start": 7828,
+      "end": 7869,
+      "quote": "HOTĂRÂREA nr. 1.198 din 24 octombrie 2002"
+    },
+    {
+      "source": "116303",
+      "target": null,
+      "key": [
+        "HOTARARE",
+        "1198",
+        "2002"
+      ],
+      "status": "missing",
+      "start": 9742,
+      "end": 9783,
+      "quote": "HOTĂRÂREA nr. 1.198 din 24 octombrie 2002"
+    },
+    {
+      "source": "116303",
+      "target": null,
+      "key": [
+        "HOTARARE",
+        "1198",
+        "2002"
+      ],
+      "status": "missing",
+      "start": 10114,
+      "end": 10155,
+      "quote": "HOTĂRÂREA nr. 1.198 din 24 octombrie 2002"
+    },
+    {
+      "source": "116303",
+      "target": null,
+      "key": [
+        "HOTARARE",
+        "1198",
+        "2002"
+      ],
+      "status": "missing",
+      "start": 11913,
+      "end": 11954,
+      "quote": "HOTĂRÂREA nr. 1.198 din 24 octombrie 2002"
+    },
+    {
+      "source": "116303",
+      "target": null,
+      "key": [
+        "HOTARARE",
+        "1198",
+        "2002"
+      ],
+      "status": "missing",
+      "start": 19212,
+      "end": 19253,
+      "quote": "HOTĂRÂREA nr. 1.198 din 24 octombrie 2002"
+    },
+    {
+      "source": "116303",
+      "target": null,
+      "key": [
+        "HOTARARE",
+        "1198",
+        "2002"
+      ],
+      "status": "missing",
+      "start": 19710,
+      "end": 19751,
+      "quote": "HOTĂRÂREA nr. 1.198 din 24 octombrie 2002"
+    },
+    {
+      "source": "116303",
+      "target": null,
+      "key": [
+        "HOTARARE",
+        "1198",
+        "2002"
+      ],
+      "status": "missing",
+      "start": 19892,
+      "end": 19933,
+      "quote": "HOTĂRÂREA nr. 1.198 din 24 octombrie 2002"
+    },
+    {
+      "source": "116303",
+      "target": null,
+      "key": [
+        "HOTARARE",
+        "1198",
+        "2002"
+      ],
+      "status": "missing",
+      "start": 23048,
+      "end": 23089,
+      "quote": "HOTĂRÂREA nr. 1.198 din 24 octombrie 2002"
+    },
+    {
+      "source": "116303",
+      "target": null,
+      "key": [
+        "HOTARARE",
+        "1198",
+        "2002"
+      ],
+      "status": "missing",
+      "start": 32829,
+      "end": 32870,
+      "quote": "HOTĂRÂREA nr. 1.198 din 24 octombrie 2002"
+    },
+    {
+      "source": "116303",
+      "target": null,
+      "key": [
+        "HOTARARE",
+        "1198",
+        "2002"
+      ],
+      "status": "missing",
+      "start": 33006,
+      "end": 33047,
+      "quote": "HOTĂRÂREA nr. 1.198 din 24 octombrie 2002"
+    },
+    {
+      "source": "116303",
+      "target": null,
+      "key": [
+        "HOTARARE",
+        "1198",
+        "2002"
+      ],
+      "status": "missing",
+      "start": 44084,
+      "end": 44125,
+      "quote": "HOTĂRÂREA nr. 1.198 din 24 octombrie 2002"
+    }
+  ]
+}

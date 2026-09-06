@@ -171,6 +171,9 @@ development loop, run `cargo test -p grap` and
 For local LLM ontology extraction, see the [installed-model comparison and
 measured configuration](docs/local-models-and-performance-2026-09.md), including
 optional structured generation, source evidence, and incremental refresh behavior.
+The [real Romanian-law evaluation](docs/real-law-evaluation-2026-09.md) records the
+full-corpus citation graph, identity fixes, semantic limitations and legal-knowledge
+product direction.
 
 ### 1. `KnowledgeGraph` (always available)
 

@@ -1,0 +1,79 @@
+[
+  {
+    "model": "gemma4:latest",
+    "timeout": 90,
+    "extra_body": {
+      "reasoning_effort": "none",
+      "response_format": {
+        "type": "json_schema",
+        "json_schema": {
+          "name": "document_claims",
+          "strict": true,
+          "schema": {
+            "type": "object",
+            "required": [
+              "outcomes",
+              "relations"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "outcomes": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "name",
+                    "requirements",
+                    "evidence"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "requirements": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "evidence": {
+                      "type": "string"
+                    }
+                  }
+                }
+              },
+              "relations": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "from",
+                    "type",
+                    "to",
+                    "evidence"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "from": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "type": "string"
+                    },
+                    "to": {
+                      "type": "string"
+                    },
+                    "evidence": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+]

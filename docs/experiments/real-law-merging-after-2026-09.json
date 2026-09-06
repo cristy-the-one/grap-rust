@@ -1,0 +1,3656 @@
+{
+  "pairs": [
+    {
+      "a": "Banca Naţionala a României",
+      "b": "Băncii Naţionale a României",
+      "same": true,
+      "source_file": "real-data-law-ro/16694.json",
+      "reason": "Nominative/genitive of the same bank"
+    },
+    {
+      "a": "C.N.V.M.",
+      "b": "Comisia Naţionala a Valorilor Mobiliare",
+      "same": true,
+      "source_file": "real-data-law-ro/18185.json",
+      "reason": "Explicit abbreviation definition"
+    },
+    {
+      "a": "OSP",
+      "b": "Oficiul de supraveghere a pieţelor reglementate de valori mobiliare",
+      "same": true,
+      "source_file": "real-data-law-ro/18185.json",
+      "reason": "Explicit abbreviation definition"
+    },
+    {
+      "a": "S.V.M.",
+      "b": "societate de valori mobiliare",
+      "same": true,
+      "source_file": "real-data-law-ro/17984.json",
+      "reason": "Explicit abbreviation definition"
+    },
+    {
+      "a": "Legea bancară nr. 58/1998",
+      "b": "Legea nr. 58/1998",
+      "same": true,
+      "source_file": "real-data-law-ro/16694.json",
+      "reason": "Same act number and year; omitted descriptive title"
+    },
+    {
+      "a": "Normelor nr. 2/1999",
+      "b": "Normele nr. 2/1999",
+      "same": true,
+      "source_file": "real-data-law-ro/17994.json",
+      "reason": "Inflection of same act reference"
+    },
+    {
+      "a": "Ministerului Educației Naționale",
+      "b": "Ministerul Educației Naționale",
+      "same": true,
+      "source_file": "real-data-law-ro/16678.json",
+      "reason": "Genitive/nominative of same ministry"
+    },
+    {
+      "a": "Oficiul Național al Burselor de Studii în Străinătate",
+      "b": "Oficiului Național al Burselor de Studii în Străinătate",
+      "same": true,
+      "source_file": "real-data-law-ro/16678.json",
+      "reason": "Inflection of same office"
+    },
+    {
+      "a": "Legea nr. 101/1998",
+      "b": "Legea nr. 58/1998",
+      "same": false,
+      "source_file": "real-data-law-ro/17994.json",
+      "reason": "Different law numbers"
+    },
+    {
+      "a": "Legea nr. 2/1992",
+      "b": "Legea nr. 17/1999",
+      "same": false,
+      "source_file": "real-data-law-ro/16955.json",
+      "reason": "Different acts in the amendment chain"
+    },
+    {
+      "a": "Legea nr. 17/1999",
+      "b": "Legea nr. 154/1998",
+      "same": false,
+      "source_file": "real-data-law-ro/16955.json",
+      "reason": "Different acts"
+    },
+    {
+      "a": "Normele Băncii Naţionale a României nr. 3/1999",
+      "b": "Normele Băncii Naţionale a României nr. 4/1998",
+      "same": false,
+      "source_file": "real-data-law-ro/17754.json",
+      "reason": "Different numbered norms"
+    },
+    {
+      "a": "Normele nr. 2/1999",
+      "b": "Legea nr. 101/1998",
+      "same": false,
+      "source_file": "real-data-law-ro/17994.json",
+      "reason": "Different act kinds and identifiers"
+    },
+    {
+      "a": "Banca Comercială Română - S.A.",
+      "b": "Banca Română de Comerţ Exterior - S.A.",
+      "same": false,
+      "source_file": "real-data-law-ro/16694.json",
+      "reason": "Distinct banks in the source footnote; names inflected to nominative"
+    },
+    {
+      "a": "Băncii Agricole - S.A.",
+      "b": "Băncii Române pentru Dezvoltare - S.A.",
+      "same": false,
+      "source_file": "real-data-law-ro/16694.json",
+      "reason": "Distinct named banks"
+    },
+    {
+      "a": "registrul bancar",
+      "b": "registrul comerţului",
+      "same": false,
+      "source_file": "real-data-law-ro/16694.json",
+      "reason": "Distinct registers"
+    },
+    {
+      "a": "Ministerului Educației Naționale",
+      "b": "ministrului educației naționale",
+      "same": false,
+      "source_file": "real-data-law-ro/16678.json",
+      "reason": "Ministry institution versus minister office/person"
+    },
+    {
+      "a": "Consiliului Europei",
+      "b": "Consiliul Naţional al Audiovizualului",
+      "same": false,
+      "source_file": "real-data-law-ro/16686.json",
+      "reason": "Distinct councils"
+    },
+    {
+      "a": "riscul creditului",
+      "b": "riscul de piaţa",
+      "same": false,
+      "source_file": "real-data-law-ro/18185.json",
+      "reason": "Distinct risk categories explicitly defined"
+    },
+    {
+      "a": "Bursa de Valori Bucureşti",
+      "b": "Piaţa RASDAQ",
+      "same": false,
+      "source_file": "real-data-law-ro/18185.json",
+      "reason": "Distinct markets"
+    }
+  ],
+  "runs": [
+    {
+      "model": "hashing",
+      "threshold": 0.8,
+      "embedding_batch_seconds": 0.001,
+      "dimensions": 256,
+      "summary": {
+        "false_merges": 0,
+        "missed_aliases": 5,
+        "distinct_pairs": 12,
+        "alias_pairs": 8
+      },
+      "rows": [
+        {
+          "a": "Banca Naţionala a României",
+          "b": "Băncii Naţionale a României",
+          "same": true,
+          "source_file": "real-data-law-ro/16694.json",
+          "reason": "Nominative/genitive of the same bank",
+          "cosine": 0.6172133998483676,
+          "merged": false,
+          "correct": false,
+          "relations_retained": 1
+        },
+        {
+          "a": "C.N.V.M.",
+          "b": "Comisia Naţionala a Valorilor Mobiliare",
+          "same": true,
+          "source_file": "real-data-law-ro/18185.json",
+          "reason": "Explicit abbreviation definition",
+          "cosine": -0.20412414523193154,
+          "merged": false,
+          "correct": false,
+          "relations_retained": 1
+        },
+        {
+          "a": "OSP",
+          "b": "Oficiul de supraveghere a pieţelor reglementate de valori mobiliare",
+          "same": true,
+          "source_file": "real-data-law-ro/18185.json",
+          "reason": "Explicit abbreviation definition",
+          "cosine": -0.2886751345948129,
+          "merged": false,
+          "correct": false,
+          "relations_retained": 1
+        },
+        {
+          "a": "S.V.M.",
+          "b": "societate de valori mobiliare",
+          "same": true,
+          "source_file": "real-data-law-ro/17984.json",
+          "reason": "Explicit abbreviation definition",
+          "cosine": 0.0,
+          "merged": false,
+          "correct": false,
+          "relations_retained": 1
+        },
+        {
+          "a": "Legea bancară nr. 58/1998",
+          "b": "Legea nr. 58/1998",
+          "same": true,
+          "source_file": "real-data-law-ro/16694.json",
+          "reason": "Same act number and year; omitted descriptive title",
+          "cosine": 0.8944271909999159,
+          "merged": true,
+          "correct": true,
+          "relations_retained": 0
+        },
+        {
+          "a": "Normelor nr. 2/1999",
+          "b": "Normele nr. 2/1999",
+          "same": true,
+          "source_file": "real-data-law-ro/17994.json",
+          "reason": "Inflection of same act reference",
+          "cosine": 0.75,
+          "merged": false,
+          "correct": false,
+          "relations_retained": 1
+        },
+        {
+          "a": "Ministerului Educației Naționale",
+          "b": "Ministerul Educației Naționale",
+          "same": true,
+          "source_file": "real-data-law-ro/16678.json",
+          "reason": "Genitive/nominative of same ministry",
+          "cosine": 0.7999999999999999,
+          "merged": true,
+          "correct": true,
+          "relations_retained": 0
+        },
+        {
+          "a": "Oficiul Național al Burselor de Studii în Străinătate",
+          "b": "Oficiului Național al Burselor de Studii în Străinătate",
+          "same": true,
+          "source_file": "real-data-law-ro/16678.json",
+          "reason": "Inflection of same office",
+          "cosine": 0.9230769230769231,
+          "merged": true,
+          "correct": true,
+          "relations_retained": 0
+        },
+        {
+          "a": "Legea nr. 101/1998",
+          "b": "Legea nr. 58/1998",
+          "same": false,
+          "source_file": "real-data-law-ro/17994.json",
+          "reason": "Different law numbers",
+          "cosine": 0.75,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Legea nr. 2/1992",
+          "b": "Legea nr. 17/1999",
+          "same": false,
+          "source_file": "real-data-law-ro/16955.json",
+          "reason": "Different acts in the amendment chain",
+          "cosine": 0.5,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Legea nr. 17/1999",
+          "b": "Legea nr. 154/1998",
+          "same": false,
+          "source_file": "real-data-law-ro/16955.json",
+          "reason": "Different acts",
+          "cosine": 0.5,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Normele Băncii Naţionale a României nr. 3/1999",
+          "b": "Normele Băncii Naţionale a României nr. 4/1998",
+          "same": false,
+          "source_file": "real-data-law-ro/17754.json",
+          "reason": "Different numbered norms",
+          "cosine": 0.8181818181818182,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Normele nr. 2/1999",
+          "b": "Legea nr. 101/1998",
+          "same": false,
+          "source_file": "real-data-law-ro/17994.json",
+          "reason": "Different act kinds and identifiers",
+          "cosine": 0.25,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Banca Comercială Română - S.A.",
+          "b": "Banca Română de Comerţ Exterior - S.A.",
+          "same": false,
+          "source_file": "real-data-law-ro/16694.json",
+          "reason": "Distinct banks in the source footnote; names inflected to nominative",
+          "cosine": 0.7216878364870323,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Băncii Agricole - S.A.",
+          "b": "Băncii Române pentru Dezvoltare - S.A.",
+          "same": false,
+          "source_file": "real-data-law-ro/16694.json",
+          "reason": "Distinct named banks",
+          "cosine": 0.565685424949238,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "registrul bancar",
+          "b": "registrul comerţului",
+          "same": false,
+          "source_file": "real-data-law-ro/16694.json",
+          "reason": "Distinct registers",
+          "cosine": 0.408248290463863,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Ministerului Educației Naționale",
+          "b": "ministrului educației naționale",
+          "same": false,
+          "source_file": "real-data-law-ro/16678.json",
+          "reason": "Ministry institution versus minister office/person",
+          "cosine": 0.7999999999999999,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Consiliului Europei",
+          "b": "Consiliul Naţional al Audiovizualului",
+          "same": false,
+          "source_file": "real-data-law-ro/16686.json",
+          "reason": "Distinct councils",
+          "cosine": 0.0,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "riscul creditului",
+          "b": "riscul de piaţa",
+          "same": false,
+          "source_file": "real-data-law-ro/18185.json",
+          "reason": "Distinct risk categories explicitly defined",
+          "cosine": 0.35355339059327373,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Bursa de Valori Bucureşti",
+          "b": "Piaţa RASDAQ",
+          "same": false,
+          "source_file": "real-data-law-ro/18185.json",
+          "reason": "Distinct markets",
+          "cosine": 0.0,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        }
+      ]
+    },
+    {
+      "model": "hashing",
+      "threshold": 0.86,
+      "embedding_batch_seconds": 0.001,
+      "dimensions": 256,
+      "summary": {
+        "false_merges": 0,
+        "missed_aliases": 6,
+        "distinct_pairs": 12,
+        "alias_pairs": 8
+      },
+      "rows": [
+        {
+          "a": "Banca Naţionala a României",
+          "b": "Băncii Naţionale a României",
+          "same": true,
+          "source_file": "real-data-law-ro/16694.json",
+          "reason": "Nominative/genitive of the same bank",
+          "cosine": 0.6172133998483676,
+          "merged": false,
+          "correct": false,
+          "relations_retained": 1
+        },
+        {
+          "a": "C.N.V.M.",
+          "b": "Comisia Naţionala a Valorilor Mobiliare",
+          "same": true,
+          "source_file": "real-data-law-ro/18185.json",
+          "reason": "Explicit abbreviation definition",
+          "cosine": -0.20412414523193154,
+          "merged": false,
+          "correct": false,
+          "relations_retained": 1
+        },
+        {
+          "a": "OSP",
+          "b": "Oficiul de supraveghere a pieţelor reglementate de valori mobiliare",
+          "same": true,
+          "source_file": "real-data-law-ro/18185.json",
+          "reason": "Explicit abbreviation definition",
+          "cosine": -0.2886751345948129,
+          "merged": false,
+          "correct": false,
+          "relations_retained": 1
+        },
+        {
+          "a": "S.V.M.",
+          "b": "societate de valori mobiliare",
+          "same": true,
+          "source_file": "real-data-law-ro/17984.json",
+          "reason": "Explicit abbreviation definition",
+          "cosine": 0.0,
+          "merged": false,
+          "correct": false,
+          "relations_retained": 1
+        },
+        {
+          "a": "Legea bancară nr. 58/1998",
+          "b": "Legea nr. 58/1998",
+          "same": true,
+          "source_file": "real-data-law-ro/16694.json",
+          "reason": "Same act number and year; omitted descriptive title",
+          "cosine": 0.8944271909999159,
+          "merged": true,
+          "correct": true,
+          "relations_retained": 0
+        },
+        {
+          "a": "Normelor nr. 2/1999",
+          "b": "Normele nr. 2/1999",
+          "same": true,
+          "source_file": "real-data-law-ro/17994.json",
+          "reason": "Inflection of same act reference",
+          "cosine": 0.75,
+          "merged": false,
+          "correct": false,
+          "relations_retained": 1
+        },
+        {
+          "a": "Ministerului Educației Naționale",
+          "b": "Ministerul Educației Naționale",
+          "same": true,
+          "source_file": "real-data-law-ro/16678.json",
+          "reason": "Genitive/nominative of same ministry",
+          "cosine": 0.7999999999999999,
+          "merged": false,
+          "correct": false,
+          "relations_retained": 1
+        },
+        {
+          "a": "Oficiul Național al Burselor de Studii în Străinătate",
+          "b": "Oficiului Național al Burselor de Studii în Străinătate",
+          "same": true,
+          "source_file": "real-data-law-ro/16678.json",
+          "reason": "Inflection of same office",
+          "cosine": 0.9230769230769231,
+          "merged": true,
+          "correct": true,
+          "relations_retained": 0
+        },
+        {
+          "a": "Legea nr. 101/1998",
+          "b": "Legea nr. 58/1998",
+          "same": false,
+          "source_file": "real-data-law-ro/17994.json",
+          "reason": "Different law numbers",
+          "cosine": 0.75,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Legea nr. 2/1992",
+          "b": "Legea nr. 17/1999",
+          "same": false,
+          "source_file": "real-data-law-ro/16955.json",
+          "reason": "Different acts in the amendment chain",
+          "cosine": 0.5,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Legea nr. 17/1999",
+          "b": "Legea nr. 154/1998",
+          "same": false,
+          "source_file": "real-data-law-ro/16955.json",
+          "reason": "Different acts",
+          "cosine": 0.5,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Normele Băncii Naţionale a României nr. 3/1999",
+          "b": "Normele Băncii Naţionale a României nr. 4/1998",
+          "same": false,
+          "source_file": "real-data-law-ro/17754.json",
+          "reason": "Different numbered norms",
+          "cosine": 0.8181818181818182,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Normele nr. 2/1999",
+          "b": "Legea nr. 101/1998",
+          "same": false,
+          "source_file": "real-data-law-ro/17994.json",
+          "reason": "Different act kinds and identifiers",
+          "cosine": 0.25,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Banca Comercială Română - S.A.",
+          "b": "Banca Română de Comerţ Exterior - S.A.",
+          "same": false,
+          "source_file": "real-data-law-ro/16694.json",
+          "reason": "Distinct banks in the source footnote; names inflected to nominative",
+          "cosine": 0.7216878364870323,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Băncii Agricole - S.A.",
+          "b": "Băncii Române pentru Dezvoltare - S.A.",
+          "same": false,
+          "source_file": "real-data-law-ro/16694.json",
+          "reason": "Distinct named banks",
+          "cosine": 0.565685424949238,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "registrul bancar",
+          "b": "registrul comerţului",
+          "same": false,
+          "source_file": "real-data-law-ro/16694.json",
+          "reason": "Distinct registers",
+          "cosine": 0.408248290463863,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Ministerului Educației Naționale",
+          "b": "ministrului educației naționale",
+          "same": false,
+          "source_file": "real-data-law-ro/16678.json",
+          "reason": "Ministry institution versus minister office/person",
+          "cosine": 0.7999999999999999,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Consiliului Europei",
+          "b": "Consiliul Naţional al Audiovizualului",
+          "same": false,
+          "source_file": "real-data-law-ro/16686.json",
+          "reason": "Distinct councils",
+          "cosine": 0.0,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "riscul creditului",
+          "b": "riscul de piaţa",
+          "same": false,
+          "source_file": "real-data-law-ro/18185.json",
+          "reason": "Distinct risk categories explicitly defined",
+          "cosine": 0.35355339059327373,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Bursa de Valori Bucureşti",
+          "b": "Piaţa RASDAQ",
+          "same": false,
+          "source_file": "real-data-law-ro/18185.json",
+          "reason": "Distinct markets",
+          "cosine": 0.0,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        }
+      ]
+    },
+    {
+      "model": "hashing",
+      "threshold": 0.9,
+      "embedding_batch_seconds": 0.001,
+      "dimensions": 256,
+      "summary": {
+        "false_merges": 0,
+        "missed_aliases": 7,
+        "distinct_pairs": 12,
+        "alias_pairs": 8
+      },
+      "rows": [
+        {
+          "a": "Banca Naţionala a României",
+          "b": "Băncii Naţionale a României",
+          "same": true,
+          "source_file": "real-data-law-ro/16694.json",
+          "reason": "Nominative/genitive of the same bank",
+          "cosine": 0.6172133998483676,
+          "merged": false,
+          "correct": false,
+          "relations_retained": 1
+        },
+        {
+          "a": "C.N.V.M.",
+          "b": "Comisia Naţionala a Valorilor Mobiliare",
+          "same": true,
+          "source_file": "real-data-law-ro/18185.json",
+          "reason": "Explicit abbreviation definition",
+          "cosine": -0.20412414523193154,
+          "merged": false,
+          "correct": false,
+          "relations_retained": 1
+        },
+        {
+          "a": "OSP",
+          "b": "Oficiul de supraveghere a pieţelor reglementate de valori mobiliare",
+          "same": true,
+          "source_file": "real-data-law-ro/18185.json",
+          "reason": "Explicit abbreviation definition",
+          "cosine": -0.2886751345948129,
+          "merged": false,
+          "correct": false,
+          "relations_retained": 1
+        },
+        {
+          "a": "S.V.M.",
+          "b": "societate de valori mobiliare",
+          "same": true,
+          "source_file": "real-data-law-ro/17984.json",
+          "reason": "Explicit abbreviation definition",
+          "cosine": 0.0,
+          "merged": false,
+          "correct": false,
+          "relations_retained": 1
+        },
+        {
+          "a": "Legea bancară nr. 58/1998",
+          "b": "Legea nr. 58/1998",
+          "same": true,
+          "source_file": "real-data-law-ro/16694.json",
+          "reason": "Same act number and year; omitted descriptive title",
+          "cosine": 0.8944271909999159,
+          "merged": false,
+          "correct": false,
+          "relations_retained": 1
+        },
+        {
+          "a": "Normelor nr. 2/1999",
+          "b": "Normele nr. 2/1999",
+          "same": true,
+          "source_file": "real-data-law-ro/17994.json",
+          "reason": "Inflection of same act reference",
+          "cosine": 0.75,
+          "merged": false,
+          "correct": false,
+          "relations_retained": 1
+        },
+        {
+          "a": "Ministerului Educației Naționale",
+          "b": "Ministerul Educației Naționale",
+          "same": true,
+          "source_file": "real-data-law-ro/16678.json",
+          "reason": "Genitive/nominative of same ministry",
+          "cosine": 0.7999999999999999,
+          "merged": false,
+          "correct": false,
+          "relations_retained": 1
+        },
+        {
+          "a": "Oficiul Național al Burselor de Studii în Străinătate",
+          "b": "Oficiului Național al Burselor de Studii în Străinătate",
+          "same": true,
+          "source_file": "real-data-law-ro/16678.json",
+          "reason": "Inflection of same office",
+          "cosine": 0.9230769230769231,
+          "merged": true,
+          "correct": true,
+          "relations_retained": 0
+        },
+        {
+          "a": "Legea nr. 101/1998",
+          "b": "Legea nr. 58/1998",
+          "same": false,
+          "source_file": "real-data-law-ro/17994.json",
+          "reason": "Different law numbers",
+          "cosine": 0.75,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Legea nr. 2/1992",
+          "b": "Legea nr. 17/1999",
+          "same": false,
+          "source_file": "real-data-law-ro/16955.json",
+          "reason": "Different acts in the amendment chain",
+          "cosine": 0.5,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Legea nr. 17/1999",
+          "b": "Legea nr. 154/1998",
+          "same": false,
+          "source_file": "real-data-law-ro/16955.json",
+          "reason": "Different acts",
+          "cosine": 0.5,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Normele Băncii Naţionale a României nr. 3/1999",
+          "b": "Normele Băncii Naţionale a României nr. 4/1998",
+          "same": false,
+          "source_file": "real-data-law-ro/17754.json",
+          "reason": "Different numbered norms",
+          "cosine": 0.8181818181818182,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Normele nr. 2/1999",
+          "b": "Legea nr. 101/1998",
+          "same": false,
+          "source_file": "real-data-law-ro/17994.json",
+          "reason": "Different act kinds and identifiers",
+          "cosine": 0.25,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Banca Comercială Română - S.A.",
+          "b": "Banca Română de Comerţ Exterior - S.A.",
+          "same": false,
+          "source_file": "real-data-law-ro/16694.json",
+          "reason": "Distinct banks in the source footnote; names inflected to nominative",
+          "cosine": 0.7216878364870323,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Băncii Agricole - S.A.",
+          "b": "Băncii Române pentru Dezvoltare - S.A.",
+          "same": false,
+          "source_file": "real-data-law-ro/16694.json",
+          "reason": "Distinct named banks",
+          "cosine": 0.565685424949238,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "registrul bancar",
+          "b": "registrul comerţului",
+          "same": false,
+          "source_file": "real-data-law-ro/16694.json",
+          "reason": "Distinct registers",
+          "cosine": 0.408248290463863,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Ministerului Educației Naționale",
+          "b": "ministrului educației naționale",
+          "same": false,
+          "source_file": "real-data-law-ro/16678.json",
+          "reason": "Ministry institution versus minister office/person",
+          "cosine": 0.7999999999999999,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Consiliului Europei",
+          "b": "Consiliul Naţional al Audiovizualului",
+          "same": false,
+          "source_file": "real-data-law-ro/16686.json",
+          "reason": "Distinct councils",
+          "cosine": 0.0,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "riscul creditului",
+          "b": "riscul de piaţa",
+          "same": false,
+          "source_file": "real-data-law-ro/18185.json",
+          "reason": "Distinct risk categories explicitly defined",
+          "cosine": 0.35355339059327373,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Bursa de Valori Bucureşti",
+          "b": "Piaţa RASDAQ",
+          "same": false,
+          "source_file": "real-data-law-ro/18185.json",
+          "reason": "Distinct markets",
+          "cosine": 0.0,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        }
+      ]
+    },
+    {
+      "model": "hashing",
+      "threshold": 0.95,
+      "embedding_batch_seconds": 0.001,
+      "dimensions": 256,
+      "summary": {
+        "false_merges": 0,
+        "missed_aliases": 8,
+        "distinct_pairs": 12,
+        "alias_pairs": 8
+      },
+      "rows": [
+        {
+          "a": "Banca Naţionala a României",
+          "b": "Băncii Naţionale a României",
+          "same": true,
+          "source_file": "real-data-law-ro/16694.json",
+          "reason": "Nominative/genitive of the same bank",
+          "cosine": 0.6172133998483676,
+          "merged": false,
+          "correct": false,
+          "relations_retained": 1
+        },
+        {
+          "a": "C.N.V.M.",
+          "b": "Comisia Naţionala a Valorilor Mobiliare",
+          "same": true,
+          "source_file": "real-data-law-ro/18185.json",
+          "reason": "Explicit abbreviation definition",
+          "cosine": -0.20412414523193154,
+          "merged": false,
+          "correct": false,
+          "relations_retained": 1
+        },
+        {
+          "a": "OSP",
+          "b": "Oficiul de supraveghere a pieţelor reglementate de valori mobiliare",
+          "same": true,
+          "source_file": "real-data-law-ro/18185.json",
+          "reason": "Explicit abbreviation definition",
+          "cosine": -0.2886751345948129,
+          "merged": false,
+          "correct": false,
+          "relations_retained": 1
+        },
+        {
+          "a": "S.V.M.",
+          "b": "societate de valori mobiliare",
+          "same": true,
+          "source_file": "real-data-law-ro/17984.json",
+          "reason": "Explicit abbreviation definition",
+          "cosine": 0.0,
+          "merged": false,
+          "correct": false,
+          "relations_retained": 1
+        },
+        {
+          "a": "Legea bancară nr. 58/1998",
+          "b": "Legea nr. 58/1998",
+          "same": true,
+          "source_file": "real-data-law-ro/16694.json",
+          "reason": "Same act number and year; omitted descriptive title",
+          "cosine": 0.8944271909999159,
+          "merged": false,
+          "correct": false,
+          "relations_retained": 1
+        },
+        {
+          "a": "Normelor nr. 2/1999",
+          "b": "Normele nr. 2/1999",
+          "same": true,
+          "source_file": "real-data-law-ro/17994.json",
+          "reason": "Inflection of same act reference",
+          "cosine": 0.75,
+          "merged": false,
+          "correct": false,
+          "relations_retained": 1
+        },
+        {
+          "a": "Ministerului Educației Naționale",
+          "b": "Ministerul Educației Naționale",
+          "same": true,
+          "source_file": "real-data-law-ro/16678.json",
+          "reason": "Genitive/nominative of same ministry",
+          "cosine": 0.7999999999999999,
+          "merged": false,
+          "correct": false,
+          "relations_retained": 1
+        },
+        {
+          "a": "Oficiul Național al Burselor de Studii în Străinătate",
+          "b": "Oficiului Național al Burselor de Studii în Străinătate",
+          "same": true,
+          "source_file": "real-data-law-ro/16678.json",
+          "reason": "Inflection of same office",
+          "cosine": 0.9230769230769231,
+          "merged": false,
+          "correct": false,
+          "relations_retained": 1
+        },
+        {
+          "a": "Legea nr. 101/1998",
+          "b": "Legea nr. 58/1998",
+          "same": false,
+          "source_file": "real-data-law-ro/17994.json",
+          "reason": "Different law numbers",
+          "cosine": 0.75,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Legea nr. 2/1992",
+          "b": "Legea nr. 17/1999",
+          "same": false,
+          "source_file": "real-data-law-ro/16955.json",
+          "reason": "Different acts in the amendment chain",
+          "cosine": 0.5,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Legea nr. 17/1999",
+          "b": "Legea nr. 154/1998",
+          "same": false,
+          "source_file": "real-data-law-ro/16955.json",
+          "reason": "Different acts",
+          "cosine": 0.5,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Normele Băncii Naţionale a României nr. 3/1999",
+          "b": "Normele Băncii Naţionale a României nr. 4/1998",
+          "same": false,
+          "source_file": "real-data-law-ro/17754.json",
+          "reason": "Different numbered norms",
+          "cosine": 0.8181818181818182,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Normele nr. 2/1999",
+          "b": "Legea nr. 101/1998",
+          "same": false,
+          "source_file": "real-data-law-ro/17994.json",
+          "reason": "Different act kinds and identifiers",
+          "cosine": 0.25,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Banca Comercială Română - S.A.",
+          "b": "Banca Română de Comerţ Exterior - S.A.",
+          "same": false,
+          "source_file": "real-data-law-ro/16694.json",
+          "reason": "Distinct banks in the source footnote; names inflected to nominative",
+          "cosine": 0.7216878364870323,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Băncii Agricole - S.A.",
+          "b": "Băncii Române pentru Dezvoltare - S.A.",
+          "same": false,
+          "source_file": "real-data-law-ro/16694.json",
+          "reason": "Distinct named banks",
+          "cosine": 0.565685424949238,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "registrul bancar",
+          "b": "registrul comerţului",
+          "same": false,
+          "source_file": "real-data-law-ro/16694.json",
+          "reason": "Distinct registers",
+          "cosine": 0.408248290463863,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Ministerului Educației Naționale",
+          "b": "ministrului educației naționale",
+          "same": false,
+          "source_file": "real-data-law-ro/16678.json",
+          "reason": "Ministry institution versus minister office/person",
+          "cosine": 0.7999999999999999,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Consiliului Europei",
+          "b": "Consiliul Naţional al Audiovizualului",
+          "same": false,
+          "source_file": "real-data-law-ro/16686.json",
+          "reason": "Distinct councils",
+          "cosine": 0.0,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "riscul creditului",
+          "b": "riscul de piaţa",
+          "same": false,
+          "source_file": "real-data-law-ro/18185.json",
+          "reason": "Distinct risk categories explicitly defined",
+          "cosine": 0.35355339059327373,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Bursa de Valori Bucureşti",
+          "b": "Piaţa RASDAQ",
+          "same": false,
+          "source_file": "real-data-law-ro/18185.json",
+          "reason": "Distinct markets",
+          "cosine": 0.0,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        }
+      ]
+    },
+    {
+      "model": "hashing",
+      "threshold": 1.1,
+      "embedding_batch_seconds": 0.001,
+      "dimensions": 256,
+      "summary": {
+        "false_merges": 0,
+        "missed_aliases": 8,
+        "distinct_pairs": 12,
+        "alias_pairs": 8
+      },
+      "rows": [
+        {
+          "a": "Banca Naţionala a României",
+          "b": "Băncii Naţionale a României",
+          "same": true,
+          "source_file": "real-data-law-ro/16694.json",
+          "reason": "Nominative/genitive of the same bank",
+          "cosine": 0.6172133998483676,
+          "merged": false,
+          "correct": false,
+          "relations_retained": 1
+        },
+        {
+          "a": "C.N.V.M.",
+          "b": "Comisia Naţionala a Valorilor Mobiliare",
+          "same": true,
+          "source_file": "real-data-law-ro/18185.json",
+          "reason": "Explicit abbreviation definition",
+          "cosine": -0.20412414523193154,
+          "merged": false,
+          "correct": false,
+          "relations_retained": 1
+        },
+        {
+          "a": "OSP",
+          "b": "Oficiul de supraveghere a pieţelor reglementate de valori mobiliare",
+          "same": true,
+          "source_file": "real-data-law-ro/18185.json",
+          "reason": "Explicit abbreviation definition",
+          "cosine": -0.2886751345948129,
+          "merged": false,
+          "correct": false,
+          "relations_retained": 1
+        },
+        {
+          "a": "S.V.M.",
+          "b": "societate de valori mobiliare",
+          "same": true,
+          "source_file": "real-data-law-ro/17984.json",
+          "reason": "Explicit abbreviation definition",
+          "cosine": 0.0,
+          "merged": false,
+          "correct": false,
+          "relations_retained": 1
+        },
+        {
+          "a": "Legea bancară nr. 58/1998",
+          "b": "Legea nr. 58/1998",
+          "same": true,
+          "source_file": "real-data-law-ro/16694.json",
+          "reason": "Same act number and year; omitted descriptive title",
+          "cosine": 0.8944271909999159,
+          "merged": false,
+          "correct": false,
+          "relations_retained": 1
+        },
+        {
+          "a": "Normelor nr. 2/1999",
+          "b": "Normele nr. 2/1999",
+          "same": true,
+          "source_file": "real-data-law-ro/17994.json",
+          "reason": "Inflection of same act reference",
+          "cosine": 0.75,
+          "merged": false,
+          "correct": false,
+          "relations_retained": 1
+        },
+        {
+          "a": "Ministerului Educației Naționale",
+          "b": "Ministerul Educației Naționale",
+          "same": true,
+          "source_file": "real-data-law-ro/16678.json",
+          "reason": "Genitive/nominative of same ministry",
+          "cosine": 0.7999999999999999,
+          "merged": false,
+          "correct": false,
+          "relations_retained": 1
+        },
+        {
+          "a": "Oficiul Național al Burselor de Studii în Străinătate",
+          "b": "Oficiului Național al Burselor de Studii în Străinătate",
+          "same": true,
+          "source_file": "real-data-law-ro/16678.json",
+          "reason": "Inflection of same office",
+          "cosine": 0.9230769230769231,
+          "merged": false,
+          "correct": false,
+          "relations_retained": 1
+        },
+        {
+          "a": "Legea nr. 101/1998",
+          "b": "Legea nr. 58/1998",
+          "same": false,
+          "source_file": "real-data-law-ro/17994.json",
+          "reason": "Different law numbers",
+          "cosine": 0.75,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Legea nr. 2/1992",
+          "b": "Legea nr. 17/1999",
+          "same": false,
+          "source_file": "real-data-law-ro/16955.json",
+          "reason": "Different acts in the amendment chain",
+          "cosine": 0.5,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Legea nr. 17/1999",
+          "b": "Legea nr. 154/1998",
+          "same": false,
+          "source_file": "real-data-law-ro/16955.json",
+          "reason": "Different acts",
+          "cosine": 0.5,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Normele Băncii Naţionale a României nr. 3/1999",
+          "b": "Normele Băncii Naţionale a României nr. 4/1998",
+          "same": false,
+          "source_file": "real-data-law-ro/17754.json",
+          "reason": "Different numbered norms",
+          "cosine": 0.8181818181818182,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Normele nr. 2/1999",
+          "b": "Legea nr. 101/1998",
+          "same": false,
+          "source_file": "real-data-law-ro/17994.json",
+          "reason": "Different act kinds and identifiers",
+          "cosine": 0.25,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Banca Comercială Română - S.A.",
+          "b": "Banca Română de Comerţ Exterior - S.A.",
+          "same": false,
+          "source_file": "real-data-law-ro/16694.json",
+          "reason": "Distinct banks in the source footnote; names inflected to nominative",
+          "cosine": 0.7216878364870323,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Băncii Agricole - S.A.",
+          "b": "Băncii Române pentru Dezvoltare - S.A.",
+          "same": false,
+          "source_file": "real-data-law-ro/16694.json",
+          "reason": "Distinct named banks",
+          "cosine": 0.565685424949238,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "registrul bancar",
+          "b": "registrul comerţului",
+          "same": false,
+          "source_file": "real-data-law-ro/16694.json",
+          "reason": "Distinct registers",
+          "cosine": 0.408248290463863,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Ministerului Educației Naționale",
+          "b": "ministrului educației naționale",
+          "same": false,
+          "source_file": "real-data-law-ro/16678.json",
+          "reason": "Ministry institution versus minister office/person",
+          "cosine": 0.7999999999999999,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Consiliului Europei",
+          "b": "Consiliul Naţional al Audiovizualului",
+          "same": false,
+          "source_file": "real-data-law-ro/16686.json",
+          "reason": "Distinct councils",
+          "cosine": 0.0,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "riscul creditului",
+          "b": "riscul de piaţa",
+          "same": false,
+          "source_file": "real-data-law-ro/18185.json",
+          "reason": "Distinct risk categories explicitly defined",
+          "cosine": 0.35355339059327373,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Bursa de Valori Bucureşti",
+          "b": "Piaţa RASDAQ",
+          "same": false,
+          "source_file": "real-data-law-ro/18185.json",
+          "reason": "Distinct markets",
+          "cosine": 0.0,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        }
+      ]
+    },
+    {
+      "model": "bge-m3:latest",
+      "threshold": 0.8,
+      "embedding_batch_seconds": 3.703,
+      "dimensions": 1024,
+      "summary": {
+        "false_merges": 1,
+        "missed_aliases": 3,
+        "distinct_pairs": 12,
+        "alias_pairs": 8
+      },
+      "rows": [
+        {
+          "a": "Banca Naţionala a României",
+          "b": "Băncii Naţionale a României",
+          "same": true,
+          "source_file": "real-data-law-ro/16694.json",
+          "reason": "Nominative/genitive of the same bank",
+          "cosine": 0.8732384381611936,
+          "merged": true,
+          "correct": true,
+          "relations_retained": 0
+        },
+        {
+          "a": "C.N.V.M.",
+          "b": "Comisia Naţionala a Valorilor Mobiliare",
+          "same": true,
+          "source_file": "real-data-law-ro/18185.json",
+          "reason": "Explicit abbreviation definition",
+          "cosine": 0.5104472635470331,
+          "merged": false,
+          "correct": false,
+          "relations_retained": 1
+        },
+        {
+          "a": "OSP",
+          "b": "Oficiul de supraveghere a pieţelor reglementate de valori mobiliare",
+          "same": true,
+          "source_file": "real-data-law-ro/18185.json",
+          "reason": "Explicit abbreviation definition",
+          "cosine": 0.4084445718781189,
+          "merged": false,
+          "correct": false,
+          "relations_retained": 1
+        },
+        {
+          "a": "S.V.M.",
+          "b": "societate de valori mobiliare",
+          "same": true,
+          "source_file": "real-data-law-ro/17984.json",
+          "reason": "Explicit abbreviation definition",
+          "cosine": 0.47822811377662455,
+          "merged": false,
+          "correct": false,
+          "relations_retained": 1
+        },
+        {
+          "a": "Legea bancară nr. 58/1998",
+          "b": "Legea nr. 58/1998",
+          "same": true,
+          "source_file": "real-data-law-ro/16694.json",
+          "reason": "Same act number and year; omitted descriptive title",
+          "cosine": 0.8717891096821295,
+          "merged": true,
+          "correct": true,
+          "relations_retained": 0
+        },
+        {
+          "a": "Normelor nr. 2/1999",
+          "b": "Normele nr. 2/1999",
+          "same": true,
+          "source_file": "real-data-law-ro/17994.json",
+          "reason": "Inflection of same act reference",
+          "cosine": 0.9703088111493209,
+          "merged": true,
+          "correct": true,
+          "relations_retained": 0
+        },
+        {
+          "a": "Ministerului Educației Naționale",
+          "b": "Ministerul Educației Naționale",
+          "same": true,
+          "source_file": "real-data-law-ro/16678.json",
+          "reason": "Genitive/nominative of same ministry",
+          "cosine": 0.9650634044070912,
+          "merged": true,
+          "correct": true,
+          "relations_retained": 0
+        },
+        {
+          "a": "Oficiul Național al Burselor de Studii în Străinătate",
+          "b": "Oficiului Național al Burselor de Studii în Străinătate",
+          "same": true,
+          "source_file": "real-data-law-ro/16678.json",
+          "reason": "Inflection of same office",
+          "cosine": 0.9895916938790004,
+          "merged": true,
+          "correct": true,
+          "relations_retained": 0
+        },
+        {
+          "a": "Legea nr. 101/1998",
+          "b": "Legea nr. 58/1998",
+          "same": false,
+          "source_file": "real-data-law-ro/17994.json",
+          "reason": "Different law numbers",
+          "cosine": 0.8183237467233558,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Legea nr. 2/1992",
+          "b": "Legea nr. 17/1999",
+          "same": false,
+          "source_file": "real-data-law-ro/16955.json",
+          "reason": "Different acts in the amendment chain",
+          "cosine": 0.6548724217285219,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Legea nr. 17/1999",
+          "b": "Legea nr. 154/1998",
+          "same": false,
+          "source_file": "real-data-law-ro/16955.json",
+          "reason": "Different acts",
+          "cosine": 0.748376665768893,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Normele Băncii Naţionale a României nr. 3/1999",
+          "b": "Normele Băncii Naţionale a României nr. 4/1998",
+          "same": false,
+          "source_file": "real-data-law-ro/17754.json",
+          "reason": "Different numbered norms",
+          "cosine": 0.7585395441377718,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Normele nr. 2/1999",
+          "b": "Legea nr. 101/1998",
+          "same": false,
+          "source_file": "real-data-law-ro/17994.json",
+          "reason": "Different act kinds and identifiers",
+          "cosine": 0.5829249123208673,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Banca Comercială Română - S.A.",
+          "b": "Banca Română de Comerţ Exterior - S.A.",
+          "same": false,
+          "source_file": "real-data-law-ro/16694.json",
+          "reason": "Distinct banks in the source footnote; names inflected to nominative",
+          "cosine": 0.8493923906684206,
+          "merged": true,
+          "correct": false,
+          "relations_retained": 0
+        },
+        {
+          "a": "Băncii Agricole - S.A.",
+          "b": "Băncii Române pentru Dezvoltare - S.A.",
+          "same": false,
+          "source_file": "real-data-law-ro/16694.json",
+          "reason": "Distinct named banks",
+          "cosine": 0.7354651071868582,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "registrul bancar",
+          "b": "registrul comerţului",
+          "same": false,
+          "source_file": "real-data-law-ro/16694.json",
+          "reason": "Distinct registers",
+          "cosine": 0.7509157417981831,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Ministerului Educației Naționale",
+          "b": "ministrului educației naționale",
+          "same": false,
+          "source_file": "real-data-law-ro/16678.json",
+          "reason": "Ministry institution versus minister office/person",
+          "cosine": 0.8025604237884316,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Consiliului Europei",
+          "b": "Consiliul Naţional al Audiovizualului",
+          "same": false,
+          "source_file": "real-data-law-ro/16686.json",
+          "reason": "Distinct councils",
+          "cosine": 0.5995375523548803,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "riscul creditului",
+          "b": "riscul de piaţa",
+          "same": false,
+          "source_file": "real-data-law-ro/18185.json",
+          "reason": "Distinct risk categories explicitly defined",
+          "cosine": 0.7324947104679463,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Bursa de Valori Bucureşti",
+          "b": "Piaţa RASDAQ",
+          "same": false,
+          "source_file": "real-data-law-ro/18185.json",
+          "reason": "Distinct markets",
+          "cosine": 0.4353768537434581,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        }
+      ]
+    },
+    {
+      "model": "bge-m3:latest",
+      "threshold": 0.86,
+      "embedding_batch_seconds": 3.703,
+      "dimensions": 1024,
+      "summary": {
+        "false_merges": 0,
+        "missed_aliases": 3,
+        "distinct_pairs": 12,
+        "alias_pairs": 8
+      },
+      "rows": [
+        {
+          "a": "Banca Naţionala a României",
+          "b": "Băncii Naţionale a României",
+          "same": true,
+          "source_file": "real-data-law-ro/16694.json",
+          "reason": "Nominative/genitive of the same bank",
+          "cosine": 0.8732384381611936,
+          "merged": true,
+          "correct": true,
+          "relations_retained": 0
+        },
+        {
+          "a": "C.N.V.M.",
+          "b": "Comisia Naţionala a Valorilor Mobiliare",
+          "same": true,
+          "source_file": "real-data-law-ro/18185.json",
+          "reason": "Explicit abbreviation definition",
+          "cosine": 0.5104472635470331,
+          "merged": false,
+          "correct": false,
+          "relations_retained": 1
+        },
+        {
+          "a": "OSP",
+          "b": "Oficiul de supraveghere a pieţelor reglementate de valori mobiliare",
+          "same": true,
+          "source_file": "real-data-law-ro/18185.json",
+          "reason": "Explicit abbreviation definition",
+          "cosine": 0.4084445718781189,
+          "merged": false,
+          "correct": false,
+          "relations_retained": 1
+        },
+        {
+          "a": "S.V.M.",
+          "b": "societate de valori mobiliare",
+          "same": true,
+          "source_file": "real-data-law-ro/17984.json",
+          "reason": "Explicit abbreviation definition",
+          "cosine": 0.47822811377662455,
+          "merged": false,
+          "correct": false,
+          "relations_retained": 1
+        },
+        {
+          "a": "Legea bancară nr. 58/1998",
+          "b": "Legea nr. 58/1998",
+          "same": true,
+          "source_file": "real-data-law-ro/16694.json",
+          "reason": "Same act number and year; omitted descriptive title",
+          "cosine": 0.8717891096821295,
+          "merged": true,
+          "correct": true,
+          "relations_retained": 0
+        },
+        {
+          "a": "Normelor nr. 2/1999",
+          "b": "Normele nr. 2/1999",
+          "same": true,
+          "source_file": "real-data-law-ro/17994.json",
+          "reason": "Inflection of same act reference",
+          "cosine": 0.9703088111493209,
+          "merged": true,
+          "correct": true,
+          "relations_retained": 0
+        },
+        {
+          "a": "Ministerului Educației Naționale",
+          "b": "Ministerul Educației Naționale",
+          "same": true,
+          "source_file": "real-data-law-ro/16678.json",
+          "reason": "Genitive/nominative of same ministry",
+          "cosine": 0.9650634044070912,
+          "merged": true,
+          "correct": true,
+          "relations_retained": 0
+        },
+        {
+          "a": "Oficiul Național al Burselor de Studii în Străinătate",
+          "b": "Oficiului Național al Burselor de Studii în Străinătate",
+          "same": true,
+          "source_file": "real-data-law-ro/16678.json",
+          "reason": "Inflection of same office",
+          "cosine": 0.9895916938790004,
+          "merged": true,
+          "correct": true,
+          "relations_retained": 0
+        },
+        {
+          "a": "Legea nr. 101/1998",
+          "b": "Legea nr. 58/1998",
+          "same": false,
+          "source_file": "real-data-law-ro/17994.json",
+          "reason": "Different law numbers",
+          "cosine": 0.8183237467233558,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Legea nr. 2/1992",
+          "b": "Legea nr. 17/1999",
+          "same": false,
+          "source_file": "real-data-law-ro/16955.json",
+          "reason": "Different acts in the amendment chain",
+          "cosine": 0.6548724217285219,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Legea nr. 17/1999",
+          "b": "Legea nr. 154/1998",
+          "same": false,
+          "source_file": "real-data-law-ro/16955.json",
+          "reason": "Different acts",
+          "cosine": 0.748376665768893,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Normele Băncii Naţionale a României nr. 3/1999",
+          "b": "Normele Băncii Naţionale a României nr. 4/1998",
+          "same": false,
+          "source_file": "real-data-law-ro/17754.json",
+          "reason": "Different numbered norms",
+          "cosine": 0.7585395441377718,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Normele nr. 2/1999",
+          "b": "Legea nr. 101/1998",
+          "same": false,
+          "source_file": "real-data-law-ro/17994.json",
+          "reason": "Different act kinds and identifiers",
+          "cosine": 0.5829249123208673,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Banca Comercială Română - S.A.",
+          "b": "Banca Română de Comerţ Exterior - S.A.",
+          "same": false,
+          "source_file": "real-data-law-ro/16694.json",
+          "reason": "Distinct banks in the source footnote; names inflected to nominative",
+          "cosine": 0.8493923906684206,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Băncii Agricole - S.A.",
+          "b": "Băncii Române pentru Dezvoltare - S.A.",
+          "same": false,
+          "source_file": "real-data-law-ro/16694.json",
+          "reason": "Distinct named banks",
+          "cosine": 0.7354651071868582,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "registrul bancar",
+          "b": "registrul comerţului",
+          "same": false,
+          "source_file": "real-data-law-ro/16694.json",
+          "reason": "Distinct registers",
+          "cosine": 0.7509157417981831,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Ministerului Educației Naționale",
+          "b": "ministrului educației naționale",
+          "same": false,
+          "source_file": "real-data-law-ro/16678.json",
+          "reason": "Ministry institution versus minister office/person",
+          "cosine": 0.8025604237884316,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Consiliului Europei",
+          "b": "Consiliul Naţional al Audiovizualului",
+          "same": false,
+          "source_file": "real-data-law-ro/16686.json",
+          "reason": "Distinct councils",
+          "cosine": 0.5995375523548803,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "riscul creditului",
+          "b": "riscul de piaţa",
+          "same": false,
+          "source_file": "real-data-law-ro/18185.json",
+          "reason": "Distinct risk categories explicitly defined",
+          "cosine": 0.7324947104679463,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Bursa de Valori Bucureşti",
+          "b": "Piaţa RASDAQ",
+          "same": false,
+          "source_file": "real-data-law-ro/18185.json",
+          "reason": "Distinct markets",
+          "cosine": 0.4353768537434581,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        }
+      ]
+    },
+    {
+      "model": "bge-m3:latest",
+      "threshold": 0.9,
+      "embedding_batch_seconds": 3.703,
+      "dimensions": 1024,
+      "summary": {
+        "false_merges": 0,
+        "missed_aliases": 5,
+        "distinct_pairs": 12,
+        "alias_pairs": 8
+      },
+      "rows": [
+        {
+          "a": "Banca Naţionala a României",
+          "b": "Băncii Naţionale a României",
+          "same": true,
+          "source_file": "real-data-law-ro/16694.json",
+          "reason": "Nominative/genitive of the same bank",
+          "cosine": 0.8732384381611936,
+          "merged": false,
+          "correct": false,
+          "relations_retained": 1
+        },
+        {
+          "a": "C.N.V.M.",
+          "b": "Comisia Naţionala a Valorilor Mobiliare",
+          "same": true,
+          "source_file": "real-data-law-ro/18185.json",
+          "reason": "Explicit abbreviation definition",
+          "cosine": 0.5104472635470331,
+          "merged": false,
+          "correct": false,
+          "relations_retained": 1
+        },
+        {
+          "a": "OSP",
+          "b": "Oficiul de supraveghere a pieţelor reglementate de valori mobiliare",
+          "same": true,
+          "source_file": "real-data-law-ro/18185.json",
+          "reason": "Explicit abbreviation definition",
+          "cosine": 0.4084445718781189,
+          "merged": false,
+          "correct": false,
+          "relations_retained": 1
+        },
+        {
+          "a": "S.V.M.",
+          "b": "societate de valori mobiliare",
+          "same": true,
+          "source_file": "real-data-law-ro/17984.json",
+          "reason": "Explicit abbreviation definition",
+          "cosine": 0.47822811377662455,
+          "merged": false,
+          "correct": false,
+          "relations_retained": 1
+        },
+        {
+          "a": "Legea bancară nr. 58/1998",
+          "b": "Legea nr. 58/1998",
+          "same": true,
+          "source_file": "real-data-law-ro/16694.json",
+          "reason": "Same act number and year; omitted descriptive title",
+          "cosine": 0.8717891096821295,
+          "merged": false,
+          "correct": false,
+          "relations_retained": 1
+        },
+        {
+          "a": "Normelor nr. 2/1999",
+          "b": "Normele nr. 2/1999",
+          "same": true,
+          "source_file": "real-data-law-ro/17994.json",
+          "reason": "Inflection of same act reference",
+          "cosine": 0.9703088111493209,
+          "merged": true,
+          "correct": true,
+          "relations_retained": 0
+        },
+        {
+          "a": "Ministerului Educației Naționale",
+          "b": "Ministerul Educației Naționale",
+          "same": true,
+          "source_file": "real-data-law-ro/16678.json",
+          "reason": "Genitive/nominative of same ministry",
+          "cosine": 0.9650634044070912,
+          "merged": true,
+          "correct": true,
+          "relations_retained": 0
+        },
+        {
+          "a": "Oficiul Național al Burselor de Studii în Străinătate",
+          "b": "Oficiului Național al Burselor de Studii în Străinătate",
+          "same": true,
+          "source_file": "real-data-law-ro/16678.json",
+          "reason": "Inflection of same office",
+          "cosine": 0.9895916938790004,
+          "merged": true,
+          "correct": true,
+          "relations_retained": 0
+        },
+        {
+          "a": "Legea nr. 101/1998",
+          "b": "Legea nr. 58/1998",
+          "same": false,
+          "source_file": "real-data-law-ro/17994.json",
+          "reason": "Different law numbers",
+          "cosine": 0.8183237467233558,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Legea nr. 2/1992",
+          "b": "Legea nr. 17/1999",
+          "same": false,
+          "source_file": "real-data-law-ro/16955.json",
+          "reason": "Different acts in the amendment chain",
+          "cosine": 0.6548724217285219,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Legea nr. 17/1999",
+          "b": "Legea nr. 154/1998",
+          "same": false,
+          "source_file": "real-data-law-ro/16955.json",
+          "reason": "Different acts",
+          "cosine": 0.748376665768893,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Normele Băncii Naţionale a României nr. 3/1999",
+          "b": "Normele Băncii Naţionale a României nr. 4/1998",
+          "same": false,
+          "source_file": "real-data-law-ro/17754.json",
+          "reason": "Different numbered norms",
+          "cosine": 0.7585395441377718,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Normele nr. 2/1999",
+          "b": "Legea nr. 101/1998",
+          "same": false,
+          "source_file": "real-data-law-ro/17994.json",
+          "reason": "Different act kinds and identifiers",
+          "cosine": 0.5829249123208673,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Banca Comercială Română - S.A.",
+          "b": "Banca Română de Comerţ Exterior - S.A.",
+          "same": false,
+          "source_file": "real-data-law-ro/16694.json",
+          "reason": "Distinct banks in the source footnote; names inflected to nominative",
+          "cosine": 0.8493923906684206,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Băncii Agricole - S.A.",
+          "b": "Băncii Române pentru Dezvoltare - S.A.",
+          "same": false,
+          "source_file": "real-data-law-ro/16694.json",
+          "reason": "Distinct named banks",
+          "cosine": 0.7354651071868582,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "registrul bancar",
+          "b": "registrul comerţului",
+          "same": false,
+          "source_file": "real-data-law-ro/16694.json",
+          "reason": "Distinct registers",
+          "cosine": 0.7509157417981831,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Ministerului Educației Naționale",
+          "b": "ministrului educației naționale",
+          "same": false,
+          "source_file": "real-data-law-ro/16678.json",
+          "reason": "Ministry institution versus minister office/person",
+          "cosine": 0.8025604237884316,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Consiliului Europei",
+          "b": "Consiliul Naţional al Audiovizualului",
+          "same": false,
+          "source_file": "real-data-law-ro/16686.json",
+          "reason": "Distinct councils",
+          "cosine": 0.5995375523548803,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "riscul creditului",
+          "b": "riscul de piaţa",
+          "same": false,
+          "source_file": "real-data-law-ro/18185.json",
+          "reason": "Distinct risk categories explicitly defined",
+          "cosine": 0.7324947104679463,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Bursa de Valori Bucureşti",
+          "b": "Piaţa RASDAQ",
+          "same": false,
+          "source_file": "real-data-law-ro/18185.json",
+          "reason": "Distinct markets",
+          "cosine": 0.4353768537434581,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        }
+      ]
+    },
+    {
+      "model": "bge-m3:latest",
+      "threshold": 0.95,
+      "embedding_batch_seconds": 3.703,
+      "dimensions": 1024,
+      "summary": {
+        "false_merges": 0,
+        "missed_aliases": 5,
+        "distinct_pairs": 12,
+        "alias_pairs": 8
+      },
+      "rows": [
+        {
+          "a": "Banca Naţionala a României",
+          "b": "Băncii Naţionale a României",
+          "same": true,
+          "source_file": "real-data-law-ro/16694.json",
+          "reason": "Nominative/genitive of the same bank",
+          "cosine": 0.8732384381611936,
+          "merged": false,
+          "correct": false,
+          "relations_retained": 1
+        },
+        {
+          "a": "C.N.V.M.",
+          "b": "Comisia Naţionala a Valorilor Mobiliare",
+          "same": true,
+          "source_file": "real-data-law-ro/18185.json",
+          "reason": "Explicit abbreviation definition",
+          "cosine": 0.5104472635470331,
+          "merged": false,
+          "correct": false,
+          "relations_retained": 1
+        },
+        {
+          "a": "OSP",
+          "b": "Oficiul de supraveghere a pieţelor reglementate de valori mobiliare",
+          "same": true,
+          "source_file": "real-data-law-ro/18185.json",
+          "reason": "Explicit abbreviation definition",
+          "cosine": 0.4084445718781189,
+          "merged": false,
+          "correct": false,
+          "relations_retained": 1
+        },
+        {
+          "a": "S.V.M.",
+          "b": "societate de valori mobiliare",
+          "same": true,
+          "source_file": "real-data-law-ro/17984.json",
+          "reason": "Explicit abbreviation definition",
+          "cosine": 0.47822811377662455,
+          "merged": false,
+          "correct": false,
+          "relations_retained": 1
+        },
+        {
+          "a": "Legea bancară nr. 58/1998",
+          "b": "Legea nr. 58/1998",
+          "same": true,
+          "source_file": "real-data-law-ro/16694.json",
+          "reason": "Same act number and year; omitted descriptive title",
+          "cosine": 0.8717891096821295,
+          "merged": false,
+          "correct": false,
+          "relations_retained": 1
+        },
+        {
+          "a": "Normelor nr. 2/1999",
+          "b": "Normele nr. 2/1999",
+          "same": true,
+          "source_file": "real-data-law-ro/17994.json",
+          "reason": "Inflection of same act reference",
+          "cosine": 0.9703088111493209,
+          "merged": true,
+          "correct": true,
+          "relations_retained": 0
+        },
+        {
+          "a": "Ministerului Educației Naționale",
+          "b": "Ministerul Educației Naționale",
+          "same": true,
+          "source_file": "real-data-law-ro/16678.json",
+          "reason": "Genitive/nominative of same ministry",
+          "cosine": 0.9650634044070912,
+          "merged": true,
+          "correct": true,
+          "relations_retained": 0
+        },
+        {
+          "a": "Oficiul Național al Burselor de Studii în Străinătate",
+          "b": "Oficiului Național al Burselor de Studii în Străinătate",
+          "same": true,
+          "source_file": "real-data-law-ro/16678.json",
+          "reason": "Inflection of same office",
+          "cosine": 0.9895916938790004,
+          "merged": true,
+          "correct": true,
+          "relations_retained": 0
+        },
+        {
+          "a": "Legea nr. 101/1998",
+          "b": "Legea nr. 58/1998",
+          "same": false,
+          "source_file": "real-data-law-ro/17994.json",
+          "reason": "Different law numbers",
+          "cosine": 0.8183237467233558,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Legea nr. 2/1992",
+          "b": "Legea nr. 17/1999",
+          "same": false,
+          "source_file": "real-data-law-ro/16955.json",
+          "reason": "Different acts in the amendment chain",
+          "cosine": 0.6548724217285219,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Legea nr. 17/1999",
+          "b": "Legea nr. 154/1998",
+          "same": false,
+          "source_file": "real-data-law-ro/16955.json",
+          "reason": "Different acts",
+          "cosine": 0.748376665768893,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Normele Băncii Naţionale a României nr. 3/1999",
+          "b": "Normele Băncii Naţionale a României nr. 4/1998",
+          "same": false,
+          "source_file": "real-data-law-ro/17754.json",
+          "reason": "Different numbered norms",
+          "cosine": 0.7585395441377718,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Normele nr. 2/1999",
+          "b": "Legea nr. 101/1998",
+          "same": false,
+          "source_file": "real-data-law-ro/17994.json",
+          "reason": "Different act kinds and identifiers",
+          "cosine": 0.5829249123208673,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Banca Comercială Română - S.A.",
+          "b": "Banca Română de Comerţ Exterior - S.A.",
+          "same": false,
+          "source_file": "real-data-law-ro/16694.json",
+          "reason": "Distinct banks in the source footnote; names inflected to nominative",
+          "cosine": 0.8493923906684206,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Băncii Agricole - S.A.",
+          "b": "Băncii Române pentru Dezvoltare - S.A.",
+          "same": false,
+          "source_file": "real-data-law-ro/16694.json",
+          "reason": "Distinct named banks",
+          "cosine": 0.7354651071868582,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "registrul bancar",
+          "b": "registrul comerţului",
+          "same": false,
+          "source_file": "real-data-law-ro/16694.json",
+          "reason": "Distinct registers",
+          "cosine": 0.7509157417981831,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Ministerului Educației Naționale",
+          "b": "ministrului educației naționale",
+          "same": false,
+          "source_file": "real-data-law-ro/16678.json",
+          "reason": "Ministry institution versus minister office/person",
+          "cosine": 0.8025604237884316,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Consiliului Europei",
+          "b": "Consiliul Naţional al Audiovizualului",
+          "same": false,
+          "source_file": "real-data-law-ro/16686.json",
+          "reason": "Distinct councils",
+          "cosine": 0.5995375523548803,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "riscul creditului",
+          "b": "riscul de piaţa",
+          "same": false,
+          "source_file": "real-data-law-ro/18185.json",
+          "reason": "Distinct risk categories explicitly defined",
+          "cosine": 0.7324947104679463,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Bursa de Valori Bucureşti",
+          "b": "Piaţa RASDAQ",
+          "same": false,
+          "source_file": "real-data-law-ro/18185.json",
+          "reason": "Distinct markets",
+          "cosine": 0.4353768537434581,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        }
+      ]
+    },
+    {
+      "model": "bge-m3:latest",
+      "threshold": 1.1,
+      "embedding_batch_seconds": 3.703,
+      "dimensions": 1024,
+      "summary": {
+        "false_merges": 0,
+        "missed_aliases": 8,
+        "distinct_pairs": 12,
+        "alias_pairs": 8
+      },
+      "rows": [
+        {
+          "a": "Banca Naţionala a României",
+          "b": "Băncii Naţionale a României",
+          "same": true,
+          "source_file": "real-data-law-ro/16694.json",
+          "reason": "Nominative/genitive of the same bank",
+          "cosine": 0.8732384381611936,
+          "merged": false,
+          "correct": false,
+          "relations_retained": 1
+        },
+        {
+          "a": "C.N.V.M.",
+          "b": "Comisia Naţionala a Valorilor Mobiliare",
+          "same": true,
+          "source_file": "real-data-law-ro/18185.json",
+          "reason": "Explicit abbreviation definition",
+          "cosine": 0.5104472635470331,
+          "merged": false,
+          "correct": false,
+          "relations_retained": 1
+        },
+        {
+          "a": "OSP",
+          "b": "Oficiul de supraveghere a pieţelor reglementate de valori mobiliare",
+          "same": true,
+          "source_file": "real-data-law-ro/18185.json",
+          "reason": "Explicit abbreviation definition",
+          "cosine": 0.4084445718781189,
+          "merged": false,
+          "correct": false,
+          "relations_retained": 1
+        },
+        {
+          "a": "S.V.M.",
+          "b": "societate de valori mobiliare",
+          "same": true,
+          "source_file": "real-data-law-ro/17984.json",
+          "reason": "Explicit abbreviation definition",
+          "cosine": 0.47822811377662455,
+          "merged": false,
+          "correct": false,
+          "relations_retained": 1
+        },
+        {
+          "a": "Legea bancară nr. 58/1998",
+          "b": "Legea nr. 58/1998",
+          "same": true,
+          "source_file": "real-data-law-ro/16694.json",
+          "reason": "Same act number and year; omitted descriptive title",
+          "cosine": 0.8717891096821295,
+          "merged": false,
+          "correct": false,
+          "relations_retained": 1
+        },
+        {
+          "a": "Normelor nr. 2/1999",
+          "b": "Normele nr. 2/1999",
+          "same": true,
+          "source_file": "real-data-law-ro/17994.json",
+          "reason": "Inflection of same act reference",
+          "cosine": 0.9703088111493209,
+          "merged": false,
+          "correct": false,
+          "relations_retained": 1
+        },
+        {
+          "a": "Ministerului Educației Naționale",
+          "b": "Ministerul Educației Naționale",
+          "same": true,
+          "source_file": "real-data-law-ro/16678.json",
+          "reason": "Genitive/nominative of same ministry",
+          "cosine": 0.9650634044070912,
+          "merged": false,
+          "correct": false,
+          "relations_retained": 1
+        },
+        {
+          "a": "Oficiul Național al Burselor de Studii în Străinătate",
+          "b": "Oficiului Național al Burselor de Studii în Străinătate",
+          "same": true,
+          "source_file": "real-data-law-ro/16678.json",
+          "reason": "Inflection of same office",
+          "cosine": 0.9895916938790004,
+          "merged": false,
+          "correct": false,
+          "relations_retained": 1
+        },
+        {
+          "a": "Legea nr. 101/1998",
+          "b": "Legea nr. 58/1998",
+          "same": false,
+          "source_file": "real-data-law-ro/17994.json",
+          "reason": "Different law numbers",
+          "cosine": 0.8183237467233558,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Legea nr. 2/1992",
+          "b": "Legea nr. 17/1999",
+          "same": false,
+          "source_file": "real-data-law-ro/16955.json",
+          "reason": "Different acts in the amendment chain",
+          "cosine": 0.6548724217285219,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Legea nr. 17/1999",
+          "b": "Legea nr. 154/1998",
+          "same": false,
+          "source_file": "real-data-law-ro/16955.json",
+          "reason": "Different acts",
+          "cosine": 0.748376665768893,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Normele Băncii Naţionale a României nr. 3/1999",
+          "b": "Normele Băncii Naţionale a României nr. 4/1998",
+          "same": false,
+          "source_file": "real-data-law-ro/17754.json",
+          "reason": "Different numbered norms",
+          "cosine": 0.7585395441377718,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Normele nr. 2/1999",
+          "b": "Legea nr. 101/1998",
+          "same": false,
+          "source_file": "real-data-law-ro/17994.json",
+          "reason": "Different act kinds and identifiers",
+          "cosine": 0.5829249123208673,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Banca Comercială Română - S.A.",
+          "b": "Banca Română de Comerţ Exterior - S.A.",
+          "same": false,
+          "source_file": "real-data-law-ro/16694.json",
+          "reason": "Distinct banks in the source footnote; names inflected to nominative",
+          "cosine": 0.8493923906684206,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Băncii Agricole - S.A.",
+          "b": "Băncii Române pentru Dezvoltare - S.A.",
+          "same": false,
+          "source_file": "real-data-law-ro/16694.json",
+          "reason": "Distinct named banks",
+          "cosine": 0.7354651071868582,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "registrul bancar",
+          "b": "registrul comerţului",
+          "same": false,
+          "source_file": "real-data-law-ro/16694.json",
+          "reason": "Distinct registers",
+          "cosine": 0.7509157417981831,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Ministerului Educației Naționale",
+          "b": "ministrului educației naționale",
+          "same": false,
+          "source_file": "real-data-law-ro/16678.json",
+          "reason": "Ministry institution versus minister office/person",
+          "cosine": 0.8025604237884316,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Consiliului Europei",
+          "b": "Consiliul Naţional al Audiovizualului",
+          "same": false,
+          "source_file": "real-data-law-ro/16686.json",
+          "reason": "Distinct councils",
+          "cosine": 0.5995375523548803,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "riscul creditului",
+          "b": "riscul de piaţa",
+          "same": false,
+          "source_file": "real-data-law-ro/18185.json",
+          "reason": "Distinct risk categories explicitly defined",
+          "cosine": 0.7324947104679463,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Bursa de Valori Bucureşti",
+          "b": "Piaţa RASDAQ",
+          "same": false,
+          "source_file": "real-data-law-ro/18185.json",
+          "reason": "Distinct markets",
+          "cosine": 0.4353768537434581,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        }
+      ]
+    },
+    {
+      "model": "qwen3-embedding:0.6b",
+      "threshold": 0.8,
+      "embedding_batch_seconds": 7.509,
+      "dimensions": 1024,
+      "summary": {
+        "false_merges": 3,
+        "missed_aliases": 3,
+        "distinct_pairs": 12,
+        "alias_pairs": 8
+      },
+      "rows": [
+        {
+          "a": "Banca Naţionala a României",
+          "b": "Băncii Naţionale a României",
+          "same": true,
+          "source_file": "real-data-law-ro/16694.json",
+          "reason": "Nominative/genitive of the same bank",
+          "cosine": 0.9718853047126731,
+          "merged": true,
+          "correct": true,
+          "relations_retained": 0
+        },
+        {
+          "a": "C.N.V.M.",
+          "b": "Comisia Naţionala a Valorilor Mobiliare",
+          "same": true,
+          "source_file": "real-data-law-ro/18185.json",
+          "reason": "Explicit abbreviation definition",
+          "cosine": 0.692003202774185,
+          "merged": false,
+          "correct": false,
+          "relations_retained": 1
+        },
+        {
+          "a": "OSP",
+          "b": "Oficiul de supraveghere a pieţelor reglementate de valori mobiliare",
+          "same": true,
+          "source_file": "real-data-law-ro/18185.json",
+          "reason": "Explicit abbreviation definition",
+          "cosine": 0.40288629347707006,
+          "merged": false,
+          "correct": false,
+          "relations_retained": 1
+        },
+        {
+          "a": "S.V.M.",
+          "b": "societate de valori mobiliare",
+          "same": true,
+          "source_file": "real-data-law-ro/17984.json",
+          "reason": "Explicit abbreviation definition",
+          "cosine": 0.6212648960193018,
+          "merged": false,
+          "correct": false,
+          "relations_retained": 1
+        },
+        {
+          "a": "Legea bancară nr. 58/1998",
+          "b": "Legea nr. 58/1998",
+          "same": true,
+          "source_file": "real-data-law-ro/16694.json",
+          "reason": "Same act number and year; omitted descriptive title",
+          "cosine": 0.8814086752548221,
+          "merged": true,
+          "correct": true,
+          "relations_retained": 0
+        },
+        {
+          "a": "Normelor nr. 2/1999",
+          "b": "Normele nr. 2/1999",
+          "same": true,
+          "source_file": "real-data-law-ro/17994.json",
+          "reason": "Inflection of same act reference",
+          "cosine": 0.8959128511698613,
+          "merged": true,
+          "correct": true,
+          "relations_retained": 0
+        },
+        {
+          "a": "Ministerului Educației Naționale",
+          "b": "Ministerul Educației Naționale",
+          "same": true,
+          "source_file": "real-data-law-ro/16678.json",
+          "reason": "Genitive/nominative of same ministry",
+          "cosine": 0.9884479245913373,
+          "merged": true,
+          "correct": true,
+          "relations_retained": 0
+        },
+        {
+          "a": "Oficiul Național al Burselor de Studii în Străinătate",
+          "b": "Oficiului Național al Burselor de Studii în Străinătate",
+          "same": true,
+          "source_file": "real-data-law-ro/16678.json",
+          "reason": "Inflection of same office",
+          "cosine": 0.995147486742854,
+          "merged": true,
+          "correct": true,
+          "relations_retained": 0
+        },
+        {
+          "a": "Legea nr. 101/1998",
+          "b": "Legea nr. 58/1998",
+          "same": false,
+          "source_file": "real-data-law-ro/17994.json",
+          "reason": "Different law numbers",
+          "cosine": 0.9548666497312503,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Legea nr. 2/1992",
+          "b": "Legea nr. 17/1999",
+          "same": false,
+          "source_file": "real-data-law-ro/16955.json",
+          "reason": "Different acts in the amendment chain",
+          "cosine": 0.9217017746372481,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Legea nr. 17/1999",
+          "b": "Legea nr. 154/1998",
+          "same": false,
+          "source_file": "real-data-law-ro/16955.json",
+          "reason": "Different acts",
+          "cosine": 0.9203518211340348,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Normele Băncii Naţionale a României nr. 3/1999",
+          "b": "Normele Băncii Naţionale a României nr. 4/1998",
+          "same": false,
+          "source_file": "real-data-law-ro/17754.json",
+          "reason": "Different numbered norms",
+          "cosine": 0.9489360845407445,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Normele nr. 2/1999",
+          "b": "Legea nr. 101/1998",
+          "same": false,
+          "source_file": "real-data-law-ro/17994.json",
+          "reason": "Different act kinds and identifiers",
+          "cosine": 0.7461176171613636,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Banca Comercială Română - S.A.",
+          "b": "Banca Română de Comerţ Exterior - S.A.",
+          "same": false,
+          "source_file": "real-data-law-ro/16694.json",
+          "reason": "Distinct banks in the source footnote; names inflected to nominative",
+          "cosine": 0.8521728211604503,
+          "merged": true,
+          "correct": false,
+          "relations_retained": 0
+        },
+        {
+          "a": "Băncii Agricole - S.A.",
+          "b": "Băncii Române pentru Dezvoltare - S.A.",
+          "same": false,
+          "source_file": "real-data-law-ro/16694.json",
+          "reason": "Distinct named banks",
+          "cosine": 0.6293938199102879,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "registrul bancar",
+          "b": "registrul comerţului",
+          "same": false,
+          "source_file": "real-data-law-ro/16694.json",
+          "reason": "Distinct registers",
+          "cosine": 0.7898685416865319,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Ministerului Educației Naționale",
+          "b": "ministrului educației naționale",
+          "same": false,
+          "source_file": "real-data-law-ro/16678.json",
+          "reason": "Ministry institution versus minister office/person",
+          "cosine": 0.9680742933078784,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Consiliului Europei",
+          "b": "Consiliul Naţional al Audiovizualului",
+          "same": false,
+          "source_file": "real-data-law-ro/16686.json",
+          "reason": "Distinct councils",
+          "cosine": 0.8037572269974786,
+          "merged": true,
+          "correct": false,
+          "relations_retained": 0
+        },
+        {
+          "a": "riscul creditului",
+          "b": "riscul de piaţa",
+          "same": false,
+          "source_file": "real-data-law-ro/18185.json",
+          "reason": "Distinct risk categories explicitly defined",
+          "cosine": 0.8207459743826391,
+          "merged": true,
+          "correct": false,
+          "relations_retained": 0
+        },
+        {
+          "a": "Bursa de Valori Bucureşti",
+          "b": "Piaţa RASDAQ",
+          "same": false,
+          "source_file": "real-data-law-ro/18185.json",
+          "reason": "Distinct markets",
+          "cosine": 0.7485881050442219,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        }
+      ]
+    },
+    {
+      "model": "qwen3-embedding:0.6b",
+      "threshold": 0.86,
+      "embedding_batch_seconds": 7.509,
+      "dimensions": 1024,
+      "summary": {
+        "false_merges": 0,
+        "missed_aliases": 3,
+        "distinct_pairs": 12,
+        "alias_pairs": 8
+      },
+      "rows": [
+        {
+          "a": "Banca Naţionala a României",
+          "b": "Băncii Naţionale a României",
+          "same": true,
+          "source_file": "real-data-law-ro/16694.json",
+          "reason": "Nominative/genitive of the same bank",
+          "cosine": 0.9718853047126731,
+          "merged": true,
+          "correct": true,
+          "relations_retained": 0
+        },
+        {
+          "a": "C.N.V.M.",
+          "b": "Comisia Naţionala a Valorilor Mobiliare",
+          "same": true,
+          "source_file": "real-data-law-ro/18185.json",
+          "reason": "Explicit abbreviation definition",
+          "cosine": 0.692003202774185,
+          "merged": false,
+          "correct": false,
+          "relations_retained": 1
+        },
+        {
+          "a": "OSP",
+          "b": "Oficiul de supraveghere a pieţelor reglementate de valori mobiliare",
+          "same": true,
+          "source_file": "real-data-law-ro/18185.json",
+          "reason": "Explicit abbreviation definition",
+          "cosine": 0.40288629347707006,
+          "merged": false,
+          "correct": false,
+          "relations_retained": 1
+        },
+        {
+          "a": "S.V.M.",
+          "b": "societate de valori mobiliare",
+          "same": true,
+          "source_file": "real-data-law-ro/17984.json",
+          "reason": "Explicit abbreviation definition",
+          "cosine": 0.6212648960193018,
+          "merged": false,
+          "correct": false,
+          "relations_retained": 1
+        },
+        {
+          "a": "Legea bancară nr. 58/1998",
+          "b": "Legea nr. 58/1998",
+          "same": true,
+          "source_file": "real-data-law-ro/16694.json",
+          "reason": "Same act number and year; omitted descriptive title",
+          "cosine": 0.8814086752548221,
+          "merged": true,
+          "correct": true,
+          "relations_retained": 0
+        },
+        {
+          "a": "Normelor nr. 2/1999",
+          "b": "Normele nr. 2/1999",
+          "same": true,
+          "source_file": "real-data-law-ro/17994.json",
+          "reason": "Inflection of same act reference",
+          "cosine": 0.8959128511698613,
+          "merged": true,
+          "correct": true,
+          "relations_retained": 0
+        },
+        {
+          "a": "Ministerului Educației Naționale",
+          "b": "Ministerul Educației Naționale",
+          "same": true,
+          "source_file": "real-data-law-ro/16678.json",
+          "reason": "Genitive/nominative of same ministry",
+          "cosine": 0.9884479245913373,
+          "merged": true,
+          "correct": true,
+          "relations_retained": 0
+        },
+        {
+          "a": "Oficiul Național al Burselor de Studii în Străinătate",
+          "b": "Oficiului Național al Burselor de Studii în Străinătate",
+          "same": true,
+          "source_file": "real-data-law-ro/16678.json",
+          "reason": "Inflection of same office",
+          "cosine": 0.995147486742854,
+          "merged": true,
+          "correct": true,
+          "relations_retained": 0
+        },
+        {
+          "a": "Legea nr. 101/1998",
+          "b": "Legea nr. 58/1998",
+          "same": false,
+          "source_file": "real-data-law-ro/17994.json",
+          "reason": "Different law numbers",
+          "cosine": 0.9548666497312503,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Legea nr. 2/1992",
+          "b": "Legea nr. 17/1999",
+          "same": false,
+          "source_file": "real-data-law-ro/16955.json",
+          "reason": "Different acts in the amendment chain",
+          "cosine": 0.9217017746372481,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Legea nr. 17/1999",
+          "b": "Legea nr. 154/1998",
+          "same": false,
+          "source_file": "real-data-law-ro/16955.json",
+          "reason": "Different acts",
+          "cosine": 0.9203518211340348,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Normele Băncii Naţionale a României nr. 3/1999",
+          "b": "Normele Băncii Naţionale a României nr. 4/1998",
+          "same": false,
+          "source_file": "real-data-law-ro/17754.json",
+          "reason": "Different numbered norms",
+          "cosine": 0.9489360845407445,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Normele nr. 2/1999",
+          "b": "Legea nr. 101/1998",
+          "same": false,
+          "source_file": "real-data-law-ro/17994.json",
+          "reason": "Different act kinds and identifiers",
+          "cosine": 0.7461176171613636,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Banca Comercială Română - S.A.",
+          "b": "Banca Română de Comerţ Exterior - S.A.",
+          "same": false,
+          "source_file": "real-data-law-ro/16694.json",
+          "reason": "Distinct banks in the source footnote; names inflected to nominative",
+          "cosine": 0.8521728211604503,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Băncii Agricole - S.A.",
+          "b": "Băncii Române pentru Dezvoltare - S.A.",
+          "same": false,
+          "source_file": "real-data-law-ro/16694.json",
+          "reason": "Distinct named banks",
+          "cosine": 0.6293938199102879,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "registrul bancar",
+          "b": "registrul comerţului",
+          "same": false,
+          "source_file": "real-data-law-ro/16694.json",
+          "reason": "Distinct registers",
+          "cosine": 0.7898685416865319,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Ministerului Educației Naționale",
+          "b": "ministrului educației naționale",
+          "same": false,
+          "source_file": "real-data-law-ro/16678.json",
+          "reason": "Ministry institution versus minister office/person",
+          "cosine": 0.9680742933078784,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Consiliului Europei",
+          "b": "Consiliul Naţional al Audiovizualului",
+          "same": false,
+          "source_file": "real-data-law-ro/16686.json",
+          "reason": "Distinct councils",
+          "cosine": 0.8037572269974786,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "riscul creditului",
+          "b": "riscul de piaţa",
+          "same": false,
+          "source_file": "real-data-law-ro/18185.json",
+          "reason": "Distinct risk categories explicitly defined",
+          "cosine": 0.8207459743826391,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Bursa de Valori Bucureşti",
+          "b": "Piaţa RASDAQ",
+          "same": false,
+          "source_file": "real-data-law-ro/18185.json",
+          "reason": "Distinct markets",
+          "cosine": 0.7485881050442219,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        }
+      ]
+    },
+    {
+      "model": "qwen3-embedding:0.6b",
+      "threshold": 0.9,
+      "embedding_batch_seconds": 7.509,
+      "dimensions": 1024,
+      "summary": {
+        "false_merges": 0,
+        "missed_aliases": 5,
+        "distinct_pairs": 12,
+        "alias_pairs": 8
+      },
+      "rows": [
+        {
+          "a": "Banca Naţionala a României",
+          "b": "Băncii Naţionale a României",
+          "same": true,
+          "source_file": "real-data-law-ro/16694.json",
+          "reason": "Nominative/genitive of the same bank",
+          "cosine": 0.9718853047126731,
+          "merged": true,
+          "correct": true,
+          "relations_retained": 0
+        },
+        {
+          "a": "C.N.V.M.",
+          "b": "Comisia Naţionala a Valorilor Mobiliare",
+          "same": true,
+          "source_file": "real-data-law-ro/18185.json",
+          "reason": "Explicit abbreviation definition",
+          "cosine": 0.692003202774185,
+          "merged": false,
+          "correct": false,
+          "relations_retained": 1
+        },
+        {
+          "a": "OSP",
+          "b": "Oficiul de supraveghere a pieţelor reglementate de valori mobiliare",
+          "same": true,
+          "source_file": "real-data-law-ro/18185.json",
+          "reason": "Explicit abbreviation definition",
+          "cosine": 0.40288629347707006,
+          "merged": false,
+          "correct": false,
+          "relations_retained": 1
+        },
+        {
+          "a": "S.V.M.",
+          "b": "societate de valori mobiliare",
+          "same": true,
+          "source_file": "real-data-law-ro/17984.json",
+          "reason": "Explicit abbreviation definition",
+          "cosine": 0.6212648960193018,
+          "merged": false,
+          "correct": false,
+          "relations_retained": 1
+        },
+        {
+          "a": "Legea bancară nr. 58/1998",
+          "b": "Legea nr. 58/1998",
+          "same": true,
+          "source_file": "real-data-law-ro/16694.json",
+          "reason": "Same act number and year; omitted descriptive title",
+          "cosine": 0.8814086752548221,
+          "merged": false,
+          "correct": false,
+          "relations_retained": 1
+        },
+        {
+          "a": "Normelor nr. 2/1999",
+          "b": "Normele nr. 2/1999",
+          "same": true,
+          "source_file": "real-data-law-ro/17994.json",
+          "reason": "Inflection of same act reference",
+          "cosine": 0.8959128511698613,
+          "merged": false,
+          "correct": false,
+          "relations_retained": 1
+        },
+        {
+          "a": "Ministerului Educației Naționale",
+          "b": "Ministerul Educației Naționale",
+          "same": true,
+          "source_file": "real-data-law-ro/16678.json",
+          "reason": "Genitive/nominative of same ministry",
+          "cosine": 0.9884479245913373,
+          "merged": true,
+          "correct": true,
+          "relations_retained": 0
+        },
+        {
+          "a": "Oficiul Național al Burselor de Studii în Străinătate",
+          "b": "Oficiului Național al Burselor de Studii în Străinătate",
+          "same": true,
+          "source_file": "real-data-law-ro/16678.json",
+          "reason": "Inflection of same office",
+          "cosine": 0.995147486742854,
+          "merged": true,
+          "correct": true,
+          "relations_retained": 0
+        },
+        {
+          "a": "Legea nr. 101/1998",
+          "b": "Legea nr. 58/1998",
+          "same": false,
+          "source_file": "real-data-law-ro/17994.json",
+          "reason": "Different law numbers",
+          "cosine": 0.9548666497312503,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Legea nr. 2/1992",
+          "b": "Legea nr. 17/1999",
+          "same": false,
+          "source_file": "real-data-law-ro/16955.json",
+          "reason": "Different acts in the amendment chain",
+          "cosine": 0.9217017746372481,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Legea nr. 17/1999",
+          "b": "Legea nr. 154/1998",
+          "same": false,
+          "source_file": "real-data-law-ro/16955.json",
+          "reason": "Different acts",
+          "cosine": 0.9203518211340348,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Normele Băncii Naţionale a României nr. 3/1999",
+          "b": "Normele Băncii Naţionale a României nr. 4/1998",
+          "same": false,
+          "source_file": "real-data-law-ro/17754.json",
+          "reason": "Different numbered norms",
+          "cosine": 0.9489360845407445,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Normele nr. 2/1999",
+          "b": "Legea nr. 101/1998",
+          "same": false,
+          "source_file": "real-data-law-ro/17994.json",
+          "reason": "Different act kinds and identifiers",
+          "cosine": 0.7461176171613636,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Banca Comercială Română - S.A.",
+          "b": "Banca Română de Comerţ Exterior - S.A.",
+          "same": false,
+          "source_file": "real-data-law-ro/16694.json",
+          "reason": "Distinct banks in the source footnote; names inflected to nominative",
+          "cosine": 0.8521728211604503,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Băncii Agricole - S.A.",
+          "b": "Băncii Române pentru Dezvoltare - S.A.",
+          "same": false,
+          "source_file": "real-data-law-ro/16694.json",
+          "reason": "Distinct named banks",
+          "cosine": 0.6293938199102879,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "registrul bancar",
+          "b": "registrul comerţului",
+          "same": false,
+          "source_file": "real-data-law-ro/16694.json",
+          "reason": "Distinct registers",
+          "cosine": 0.7898685416865319,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Ministerului Educației Naționale",
+          "b": "ministrului educației naționale",
+          "same": false,
+          "source_file": "real-data-law-ro/16678.json",
+          "reason": "Ministry institution versus minister office/person",
+          "cosine": 0.9680742933078784,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Consiliului Europei",
+          "b": "Consiliul Naţional al Audiovizualului",
+          "same": false,
+          "source_file": "real-data-law-ro/16686.json",
+          "reason": "Distinct councils",
+          "cosine": 0.8037572269974786,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "riscul creditului",
+          "b": "riscul de piaţa",
+          "same": false,
+          "source_file": "real-data-law-ro/18185.json",
+          "reason": "Distinct risk categories explicitly defined",
+          "cosine": 0.8207459743826391,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Bursa de Valori Bucureşti",
+          "b": "Piaţa RASDAQ",
+          "same": false,
+          "source_file": "real-data-law-ro/18185.json",
+          "reason": "Distinct markets",
+          "cosine": 0.7485881050442219,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        }
+      ]
+    },
+    {
+      "model": "qwen3-embedding:0.6b",
+      "threshold": 0.95,
+      "embedding_batch_seconds": 7.509,
+      "dimensions": 1024,
+      "summary": {
+        "false_merges": 0,
+        "missed_aliases": 5,
+        "distinct_pairs": 12,
+        "alias_pairs": 8
+      },
+      "rows": [
+        {
+          "a": "Banca Naţionala a României",
+          "b": "Băncii Naţionale a României",
+          "same": true,
+          "source_file": "real-data-law-ro/16694.json",
+          "reason": "Nominative/genitive of the same bank",
+          "cosine": 0.9718853047126731,
+          "merged": true,
+          "correct": true,
+          "relations_retained": 0
+        },
+        {
+          "a": "C.N.V.M.",
+          "b": "Comisia Naţionala a Valorilor Mobiliare",
+          "same": true,
+          "source_file": "real-data-law-ro/18185.json",
+          "reason": "Explicit abbreviation definition",
+          "cosine": 0.692003202774185,
+          "merged": false,
+          "correct": false,
+          "relations_retained": 1
+        },
+        {
+          "a": "OSP",
+          "b": "Oficiul de supraveghere a pieţelor reglementate de valori mobiliare",
+          "same": true,
+          "source_file": "real-data-law-ro/18185.json",
+          "reason": "Explicit abbreviation definition",
+          "cosine": 0.40288629347707006,
+          "merged": false,
+          "correct": false,
+          "relations_retained": 1
+        },
+        {
+          "a": "S.V.M.",
+          "b": "societate de valori mobiliare",
+          "same": true,
+          "source_file": "real-data-law-ro/17984.json",
+          "reason": "Explicit abbreviation definition",
+          "cosine": 0.6212648960193018,
+          "merged": false,
+          "correct": false,
+          "relations_retained": 1
+        },
+        {
+          "a": "Legea bancară nr. 58/1998",
+          "b": "Legea nr. 58/1998",
+          "same": true,
+          "source_file": "real-data-law-ro/16694.json",
+          "reason": "Same act number and year; omitted descriptive title",
+          "cosine": 0.8814086752548221,
+          "merged": false,
+          "correct": false,
+          "relations_retained": 1
+        },
+        {
+          "a": "Normelor nr. 2/1999",
+          "b": "Normele nr. 2/1999",
+          "same": true,
+          "source_file": "real-data-law-ro/17994.json",
+          "reason": "Inflection of same act reference",
+          "cosine": 0.8959128511698613,
+          "merged": false,
+          "correct": false,
+          "relations_retained": 1
+        },
+        {
+          "a": "Ministerului Educației Naționale",
+          "b": "Ministerul Educației Naționale",
+          "same": true,
+          "source_file": "real-data-law-ro/16678.json",
+          "reason": "Genitive/nominative of same ministry",
+          "cosine": 0.9884479245913373,
+          "merged": true,
+          "correct": true,
+          "relations_retained": 0
+        },
+        {
+          "a": "Oficiul Național al Burselor de Studii în Străinătate",
+          "b": "Oficiului Național al Burselor de Studii în Străinătate",
+          "same": true,
+          "source_file": "real-data-law-ro/16678.json",
+          "reason": "Inflection of same office",
+          "cosine": 0.995147486742854,
+          "merged": true,
+          "correct": true,
+          "relations_retained": 0
+        },
+        {
+          "a": "Legea nr. 101/1998",
+          "b": "Legea nr. 58/1998",
+          "same": false,
+          "source_file": "real-data-law-ro/17994.json",
+          "reason": "Different law numbers",
+          "cosine": 0.9548666497312503,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Legea nr. 2/1992",
+          "b": "Legea nr. 17/1999",
+          "same": false,
+          "source_file": "real-data-law-ro/16955.json",
+          "reason": "Different acts in the amendment chain",
+          "cosine": 0.9217017746372481,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Legea nr. 17/1999",
+          "b": "Legea nr. 154/1998",
+          "same": false,
+          "source_file": "real-data-law-ro/16955.json",
+          "reason": "Different acts",
+          "cosine": 0.9203518211340348,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Normele Băncii Naţionale a României nr. 3/1999",
+          "b": "Normele Băncii Naţionale a României nr. 4/1998",
+          "same": false,
+          "source_file": "real-data-law-ro/17754.json",
+          "reason": "Different numbered norms",
+          "cosine": 0.9489360845407445,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Normele nr. 2/1999",
+          "b": "Legea nr. 101/1998",
+          "same": false,
+          "source_file": "real-data-law-ro/17994.json",
+          "reason": "Different act kinds and identifiers",
+          "cosine": 0.7461176171613636,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Banca Comercială Română - S.A.",
+          "b": "Banca Română de Comerţ Exterior - S.A.",
+          "same": false,
+          "source_file": "real-data-law-ro/16694.json",
+          "reason": "Distinct banks in the source footnote; names inflected to nominative",
+          "cosine": 0.8521728211604503,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Băncii Agricole - S.A.",
+          "b": "Băncii Române pentru Dezvoltare - S.A.",
+          "same": false,
+          "source_file": "real-data-law-ro/16694.json",
+          "reason": "Distinct named banks",
+          "cosine": 0.6293938199102879,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "registrul bancar",
+          "b": "registrul comerţului",
+          "same": false,
+          "source_file": "real-data-law-ro/16694.json",
+          "reason": "Distinct registers",
+          "cosine": 0.7898685416865319,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Ministerului Educației Naționale",
+          "b": "ministrului educației naționale",
+          "same": false,
+          "source_file": "real-data-law-ro/16678.json",
+          "reason": "Ministry institution versus minister office/person",
+          "cosine": 0.9680742933078784,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Consiliului Europei",
+          "b": "Consiliul Naţional al Audiovizualului",
+          "same": false,
+          "source_file": "real-data-law-ro/16686.json",
+          "reason": "Distinct councils",
+          "cosine": 0.8037572269974786,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "riscul creditului",
+          "b": "riscul de piaţa",
+          "same": false,
+          "source_file": "real-data-law-ro/18185.json",
+          "reason": "Distinct risk categories explicitly defined",
+          "cosine": 0.8207459743826391,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Bursa de Valori Bucureşti",
+          "b": "Piaţa RASDAQ",
+          "same": false,
+          "source_file": "real-data-law-ro/18185.json",
+          "reason": "Distinct markets",
+          "cosine": 0.7485881050442219,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        }
+      ]
+    },
+    {
+      "model": "qwen3-embedding:0.6b",
+      "threshold": 1.1,
+      "embedding_batch_seconds": 7.509,
+      "dimensions": 1024,
+      "summary": {
+        "false_merges": 0,
+        "missed_aliases": 8,
+        "distinct_pairs": 12,
+        "alias_pairs": 8
+      },
+      "rows": [
+        {
+          "a": "Banca Naţionala a României",
+          "b": "Băncii Naţionale a României",
+          "same": true,
+          "source_file": "real-data-law-ro/16694.json",
+          "reason": "Nominative/genitive of the same bank",
+          "cosine": 0.9718853047126731,
+          "merged": false,
+          "correct": false,
+          "relations_retained": 1
+        },
+        {
+          "a": "C.N.V.M.",
+          "b": "Comisia Naţionala a Valorilor Mobiliare",
+          "same": true,
+          "source_file": "real-data-law-ro/18185.json",
+          "reason": "Explicit abbreviation definition",
+          "cosine": 0.692003202774185,
+          "merged": false,
+          "correct": false,
+          "relations_retained": 1
+        },
+        {
+          "a": "OSP",
+          "b": "Oficiul de supraveghere a pieţelor reglementate de valori mobiliare",
+          "same": true,
+          "source_file": "real-data-law-ro/18185.json",
+          "reason": "Explicit abbreviation definition",
+          "cosine": 0.40288629347707006,
+          "merged": false,
+          "correct": false,
+          "relations_retained": 1
+        },
+        {
+          "a": "S.V.M.",
+          "b": "societate de valori mobiliare",
+          "same": true,
+          "source_file": "real-data-law-ro/17984.json",
+          "reason": "Explicit abbreviation definition",
+          "cosine": 0.6212648960193018,
+          "merged": false,
+          "correct": false,
+          "relations_retained": 1
+        },
+        {
+          "a": "Legea bancară nr. 58/1998",
+          "b": "Legea nr. 58/1998",
+          "same": true,
+          "source_file": "real-data-law-ro/16694.json",
+          "reason": "Same act number and year; omitted descriptive title",
+          "cosine": 0.8814086752548221,
+          "merged": false,
+          "correct": false,
+          "relations_retained": 1
+        },
+        {
+          "a": "Normelor nr. 2/1999",
+          "b": "Normele nr. 2/1999",
+          "same": true,
+          "source_file": "real-data-law-ro/17994.json",
+          "reason": "Inflection of same act reference",
+          "cosine": 0.8959128511698613,
+          "merged": false,
+          "correct": false,
+          "relations_retained": 1
+        },
+        {
+          "a": "Ministerului Educației Naționale",
+          "b": "Ministerul Educației Naționale",
+          "same": true,
+          "source_file": "real-data-law-ro/16678.json",
+          "reason": "Genitive/nominative of same ministry",
+          "cosine": 0.9884479245913373,
+          "merged": false,
+          "correct": false,
+          "relations_retained": 1
+        },
+        {
+          "a": "Oficiul Național al Burselor de Studii în Străinătate",
+          "b": "Oficiului Național al Burselor de Studii în Străinătate",
+          "same": true,
+          "source_file": "real-data-law-ro/16678.json",
+          "reason": "Inflection of same office",
+          "cosine": 0.995147486742854,
+          "merged": false,
+          "correct": false,
+          "relations_retained": 1
+        },
+        {
+          "a": "Legea nr. 101/1998",
+          "b": "Legea nr. 58/1998",
+          "same": false,
+          "source_file": "real-data-law-ro/17994.json",
+          "reason": "Different law numbers",
+          "cosine": 0.9548666497312503,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Legea nr. 2/1992",
+          "b": "Legea nr. 17/1999",
+          "same": false,
+          "source_file": "real-data-law-ro/16955.json",
+          "reason": "Different acts in the amendment chain",
+          "cosine": 0.9217017746372481,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Legea nr. 17/1999",
+          "b": "Legea nr. 154/1998",
+          "same": false,
+          "source_file": "real-data-law-ro/16955.json",
+          "reason": "Different acts",
+          "cosine": 0.9203518211340348,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Normele Băncii Naţionale a României nr. 3/1999",
+          "b": "Normele Băncii Naţionale a României nr. 4/1998",
+          "same": false,
+          "source_file": "real-data-law-ro/17754.json",
+          "reason": "Different numbered norms",
+          "cosine": 0.9489360845407445,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Normele nr. 2/1999",
+          "b": "Legea nr. 101/1998",
+          "same": false,
+          "source_file": "real-data-law-ro/17994.json",
+          "reason": "Different act kinds and identifiers",
+          "cosine": 0.7461176171613636,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Banca Comercială Română - S.A.",
+          "b": "Banca Română de Comerţ Exterior - S.A.",
+          "same": false,
+          "source_file": "real-data-law-ro/16694.json",
+          "reason": "Distinct banks in the source footnote; names inflected to nominative",
+          "cosine": 0.8521728211604503,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Băncii Agricole - S.A.",
+          "b": "Băncii Române pentru Dezvoltare - S.A.",
+          "same": false,
+          "source_file": "real-data-law-ro/16694.json",
+          "reason": "Distinct named banks",
+          "cosine": 0.6293938199102879,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "registrul bancar",
+          "b": "registrul comerţului",
+          "same": false,
+          "source_file": "real-data-law-ro/16694.json",
+          "reason": "Distinct registers",
+          "cosine": 0.7898685416865319,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Ministerului Educației Naționale",
+          "b": "ministrului educației naționale",
+          "same": false,
+          "source_file": "real-data-law-ro/16678.json",
+          "reason": "Ministry institution versus minister office/person",
+          "cosine": 0.9680742933078784,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Consiliului Europei",
+          "b": "Consiliul Naţional al Audiovizualului",
+          "same": false,
+          "source_file": "real-data-law-ro/16686.json",
+          "reason": "Distinct councils",
+          "cosine": 0.8037572269974786,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "riscul creditului",
+          "b": "riscul de piaţa",
+          "same": false,
+          "source_file": "real-data-law-ro/18185.json",
+          "reason": "Distinct risk categories explicitly defined",
+          "cosine": 0.8207459743826391,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        },
+        {
+          "a": "Bursa de Valori Bucureşti",
+          "b": "Piaţa RASDAQ",
+          "same": false,
+          "source_file": "real-data-law-ro/18185.json",
+          "reason": "Distinct markets",
+          "cosine": 0.7485881050442219,
+          "merged": false,
+          "correct": true,
+          "relations_retained": 1
+        }
+      ]
+    }
+  ]
+}

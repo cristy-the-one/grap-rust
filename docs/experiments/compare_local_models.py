@@ -59,13 +59,16 @@ def main():
     parser.add_argument("--models-config", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--resume", action="store_true", help="Continue saved settings/cases without repeating completed requests")
+    parser.add_argument("--prompt-file", type=Path, help="Experimental prompt; does not change the application default")
     parser.add_argument("--cases", type=Path, nargs="+", default=[
         Path(__file__).with_name("extraction-cases.json"),
         Path(__file__).with_name("extraction-requirement-cases.json")])
     args = parser.parse_args()
     cases = [case for path in args.cases for case in json.loads(path.read_text(encoding="utf-8"))]
     config = json.loads(args.models_config.read_text(encoding="utf-8"))
-    report = {"prompt_version": extract.PROMPT_VERSION, "system_prompt": extract.SYSTEM_PROMPT,
+    system_prompt = args.prompt_file.read_text(encoding="utf-8") if args.prompt_file else extract.SYSTEM_PROMPT
+    prompt_version = "experimental:" + args.prompt_file.name if args.prompt_file else extract.PROMPT_VERSION
+    report = {"prompt_version": prompt_version, "system_prompt": system_prompt,
               "cases": cases, "config": config, "runs": []}
     if len({case["id"] for case in cases}) != len(cases):
         parser.error("case ids must be unique")
@@ -105,7 +108,7 @@ def main():
         for case in pending:
             started = time.perf_counter()
             try:
-                reply = complete(provider, extract.SYSTEM_PROMPT, extract.build_user_prompt(case["text"]))
+                reply = complete(provider, system_prompt, extract.build_user_prompt(case["text"]))
             except Exception as exc:
                 reply = {"raw": "", "seconds": round(time.perf_counter() - started, 3), "error": str(exc)}
             row = {"case": case["id"], **reply, **score(case, "" if "incomplete" in reply else reply["raw"])}

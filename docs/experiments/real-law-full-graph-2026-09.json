@@ -1,0 +1,1633 @@
+{
+  "status": "ok",
+  "nodes": [
+    {
+      "id": 2048,
+      "label": "act-39584",
+      "kind": "act",
+      "title": "﻿   HOTĂRÂRE nr. 290 din 20 aprilie 1991    privind exceptarea de la plata taxelor vamale pentru importul unor produse alimentare      EMITE"
+    },
+    {
+      "id": 1,
+      "label": "act-109831",
+      "kind": "act",
+      "title": "﻿   STATUTUL din 21 octombrie 1999    Companiei Naţionale \"Loteria Română\" - S.A.      EMITENT:        GUVERNUL        PUBLICAT ÎN:    MONIT"
+    },
+    {
+      "id": 2049,
+      "label": "act-39585",
+      "kind": "act",
+      "title": "﻿   HOTĂRÂRE nr. 386 din 1 iunie 1991    privind plata personalului agenţilor economici din industria chimica şi petrochimică a căror activi"
+    },
+    {
+      "id": 3,
+      "label": "act-123376",
+      "kind": "act",
+      "title": "﻿   NORMĂ din 23 august 1999    privind monitorizarea datoriilor nerambursate la scadenţă ale contribuabililor, persoane juridice, în vedere"
+    },
+    {
+      "id": 4,
+      "label": "act-123377",
+      "kind": "act",
+      "title": "﻿   REGULAMENT DE COMPENSARE din 23 august 1999    a datoriilor nerambursate la scadenţă ale contribuabililor, persoane juridice      EMITEN"
+    },
+    {
+      "id": 2050,
+      "label": "act-39586",
+      "kind": "act",
+      "title": "﻿   HOTĂRÂRE nr. 536 din 1 august 1991    privind Registrul agricol      EMITENT:        GUVERNUL      Nepublicat"
+    },
+    {
+      "id": 2054,
+      "label": "act-39590",
+      "kind": "act",
+      "title": "﻿   HOTĂRÂRE nr. 643 din 31 mai 1990    privind reînfiinţarea Întreprinderii de magazine \"PRODAS\" Bucureşti în subordinea Ministerului Agric"
+    },
+    {
+      "id": 7,
+      "label": "act-158079",
+      "kind": "act",
+      "title": "﻿   NORME METODOLOGICE din 10 mai 1999    privind încheierea contractelor de administrare a companiilor/societăţilor naţionale, a societăţil"
+    },
+    {
+      "id": 8,
+      "label": "act-15967",
+      "kind": "act",
+      "title": "﻿   LEGE nr. 189 din 14 octombrie 1998    privind finanţele publice locale      EMITENT:        PARLAMENTUL        PUBLICAT ÎN:    MONITORUL"
+    },
+    {
+      "id": 9,
+      "label": "act-16209",
+      "kind": "act",
+      "title": "﻿   LEGE nr. 213 din 17 noiembrie 1998    privind proprietatea publică şi regimul juridic al acesteia      EMITENT:        PARLAMENT        "
+    },
+    {
+      "id": 10,
+      "label": "act-16279",
+      "kind": "act",
+      "title": "﻿   LEGE nr. 219 din 25 noiembrie 1998    privind regimul concesiunilor      EMITENT:        PARLAMENTUL        PUBLICAT ÎN:    MONITORUL OF"
+    },
+    {
+      "id": 11,
+      "label": "act-16551",
+      "kind": "act",
+      "title": "﻿   ORDONANŢA DE URGENTA nr. 69 din 29 decembrie 1998    privind regimul de autorizare a activităţilor din domeniul jocurilor de noroc      "
+    },
+    {
+      "id": 12,
+      "label": "act-16560",
+      "kind": "act",
+      "title": "﻿   ORDONANŢA DE URGENTA nr. 63 din 28 decembrie 1998    privind energia electrică şi termica      EMITENT:        GUVERNUL        PUBLICAT "
+    },
+    {
+      "id": 13,
+      "label": "act-16578",
+      "kind": "act",
+      "title": "﻿   ORDONANŢA DE URGENTA nr. 62 din 28 decembrie 1998    pentru modificarea şi completarea  Legii nr. 27/1994  privind impozitele şi taxele "
+    },
+    {
+      "id": 14,
+      "label": "act-16612",
+      "kind": "act",
+      "title": "﻿   HOTĂRÂRE nr. 958 din 23 decembrie 1998    pentru înfiinţarea, organizarea şi funcţionarea Agenţiei Române pentru Evenimente Internaţiona"
+    },
+    {
+      "id": 15,
+      "label": "act-16618",
+      "kind": "act",
+      "title": "﻿   ORDONANŢA DE URGENTA nr. 72 din 30 decembrie 1998    pentru modificarea şi completarea  Legii asigurărilor sociale de sănătate nr. 145/1"
+    },
+    {
+      "id": 2058,
+      "label": "act-47976",
+      "kind": "act",
+      "title": "﻿   NORME METODOLOGICE din 16 august 1999    de aplicare a dispoziţiilor  Ordonanţei de urgenta a Guvernului nr. 118/1999  privind înfiinţar"
+    },
+    {
+      "id": 17,
+      "label": "act-16651",
+      "kind": "act",
+      "title": "﻿   HOTĂRÂRE nr. 964 din 23 decembrie 1998    pentru aprobarea clasificaţiei şi a duratelor normale de funcţionare a mijloacelor fixe      E"
+    },
+    {
+      "id": 18,
+      "label": "act-16653",
+      "kind": "act",
+      "title": "﻿   ORDONANŢA nr. 1 din 12 ianuarie 1999    pentru modificarea  Ordonanţei de urgenţă a Guvernului nr. 82/1997  privind regimul accizelor şi"
+    },
+    {
+      "id": 19,
+      "label": "act-16655",
+      "kind": "act",
+      "title": "﻿   HOTĂRÂRE nr. 890 din 11 decembrie 1998    de modificare şi completare a Regulamentului pentru aplicarea  Decretului nr. 328/1966  privin"
+    },
+    {
+      "id": 2059,
+      "label": "act-50738",
+      "kind": "act",
+      "title": "ANEXĂ din 10 iunie 1999    la  Hotărârea Guvernului nr. 467/1999  privind produsele strategice supuse regimului de control la export şi impo"
+    },
+    {
+      "id": 2060,
+      "label": "act-50956",
+      "kind": "act",
+      "title": "﻿   REGULAMENT din 30 septembrie 1999    pentru organizarea şi funcţionarea Arhivei Electronice de Garanţii Reale Mobiliare      EMITENT:   "
+    },
+    {
+      "id": 22,
+      "label": "act-16659",
+      "kind": "act",
+      "title": "﻿   LEGE nr. 1 din 7 ianuarie 1999    pentru aprobarea  Ordonanţei de urgenţă a Guvernului nr. 26/1998  privind unele măsuri de protecţie so"
+    },
+    {
+      "id": 2064,
+      "label": "act-64722",
+      "kind": "act",
+      "title": "﻿   REGULAMENT din 15 iulie 1999    pentru acordarea licenţelor şi autorizaţiilor în sectorul energiei electrice şi termice      EMITENT:   "
+    },
+    {
+      "id": 24,
+      "label": "act-16668",
+      "kind": "act",
+      "title": "﻿   LEGE nr. 17 din 13 ianuarie 1999    privind aprobarea  Ordonanţei de urgenţă a Guvernului nr. 78/1997  pentru completarea articolului 1 "
+    },
+    {
+      "id": 2067,
+      "label": "act-75422",
+      "kind": "act",
+      "title": "﻿   REGULAMENT din 26 august 1999    de constatare, notificare şi sancţionare a abaterilor de la reglementările emise în domeniul energiei e"
+    },
+    {
+      "id": 2074,
+      "label": "act-81862",
+      "kind": "act",
+      "title": "STATUT din 24 iunie 1982    Conferinţei Europene Permanente de Probaţiune (C.E.P.)*)      EMITENT:        ACT INTERNAŢIONAL        PUBLICAT "
+    },
+    {
+      "id": 2077,
+      "label": "act-83487",
+      "kind": "act",
+      "title": "﻿   NORMĂ din 13 august 1999    de aplicare a Contractului-cadru privind condiţiile acordării asistentei medicale în cadrul sistemului asigu"
+    },
+    {
+      "id": 30,
+      "label": "act-16681",
+      "kind": "act",
+      "title": "﻿   DECIZIE nr. 157 din 10 noiembrie 1998    privind excepţia de neconstituţionalitate a  art. IV pct. 7 din Ordonanţa Guvernului nr. 18/199"
+    },
+    {
+      "id": 31,
+      "label": "act-16682",
+      "kind": "act",
+      "title": "﻿   DECIZIE nr. 161 din 10 noiembrie 1998    privind excepţia de neconstituţionalitate a  art. IV pct. 7 din Ordonanţa Guvernului nr. 18/199"
+    },
+    {
+      "id": 32,
+      "label": "act-16686",
+      "kind": "act",
+      "title": "﻿   LEGE nr. 19 din 14 ianuarie 1999    pentru modificarea şi completarea  Legii audiovizualului nr. 48/1992       EMITENT:        PARLAMENT"
+    },
+    {
+      "id": 33,
+      "label": "act-16688",
+      "kind": "act",
+      "title": "﻿   LEGE nr. 20 din 15 ianuarie 1999    pentru aprobarea  Ordonanţei de urgenţă a Guvernului nr. 24/1998  privind regimul zonelor defavoriza"
+    },
+    {
+      "id": 2079,
+      "label": "act-83497",
+      "kind": "act",
+      "title": "﻿   NORMĂ din 13 august 1999    de aplicare a Contractului-cadru privind condiţiile acordării asistentei medicale în cadrul sistemului asigu"
+    },
+    {
+      "id": 35,
+      "label": "act-16694",
+      "kind": "act",
+      "title": "﻿   NORME nr. 1 din 7 ianuarie 1999    privind registrul bancar      EMITENT:        BANCA NAŢIONALĂ A ROMÂNIEI        PUBLICAT ÎN:    MONIT"
+    },
+    {
+      "id": 38,
+      "label": "act-16702",
+      "kind": "act",
+      "title": "﻿   REGULAMENT din 18 ianuarie 1999    de organizare şi funcţionare a Curţii Supreme de Justiţie      EMITENT:        CURTEA SUPREMĂ DE JUST"
+    },
+    {
+      "id": 2086,
+      "label": "act-92221",
+      "kind": "act",
+      "title": "﻿   REGULAMENT din 12 mai 1999    pentru acreditarea consumatorilor eligibili de energie electrică      EMITENT:        AUTORITATEA NAŢIONAL"
+    },
+    {
+      "id": 2087,
+      "label": "act-92226",
+      "kind": "act",
+      "title": "﻿   METODOLOGIE din 19 august 1999    privind actualizarea trimestriala a băncii de date cuprinzând lucrările publice şi construcţiile      "
+    },
+    {
+      "id": 2090,
+      "label": "act-92247",
+      "kind": "act",
+      "title": "﻿   METODOLOGIE din 19 august 1999    privind actualizarea trimestriala a băncii de date cuprinzând lucrările publice şi construcţiile      "
+    },
+    {
+      "id": 48,
+      "label": "act-16721",
+      "kind": "act",
+      "title": "﻿   HOTĂRÂRE nr. 17 din 18 ianuarie 1999    privind închiderea definitivă şi conservarea unor mine şi cariere, etapa a II-a      EMITENT:   "
+    },
+    {
+      "id": 51,
+      "label": "act-16726",
+      "kind": "act",
+      "title": "﻿   ORDONANŢA nr. 2 din 21 ianuarie 1999    pentru aprobarea Rezoluţiei nr. 53/2 din 30 ianuarie 1998, adoptată la Washington de Consiliul G"
+    },
+    {
+      "id": 67,
+      "label": "act-16748",
+      "kind": "act",
+      "title": "﻿   HOTĂRÂRE nr. 27 din 21 ianuarie 1999    privind aprobarea cifrei de şcolarizare pentru anul universitar 1999/2000      EMITENT:        G"
+    },
+    {
+      "id": 70,
+      "label": "act-16752",
+      "kind": "act",
+      "title": "﻿   LEGE nr. 22 din 18 ianuarie 1999    pentru aprobarea  Ordonanţei de urgenţă a Guvernului nr. 67/1997  privind înfiinţarea, organizarea ş"
+    },
+    {
+      "id": 73,
+      "label": "act-16764",
+      "kind": "act",
+      "title": "﻿   ORDONANŢA nr. 3 din 25 ianuarie 1999    pentru ratificarea Acordului dintre Guvernul României şi Guvernul Statelor Unite ale Americii pr"
+    },
+    {
+      "id": 77,
+      "label": "act-16769",
+      "kind": "act",
+      "title": "﻿   LEGE nr. 66 din 3 iulie 1996 (*republicată*)    privind reorganizarea Casei de Economii şi Consemnaţiuni din România în societate bancar"
+    },
+    {
+      "id": 2051,
+      "label": "act-39587",
+      "kind": "act",
+      "title": "﻿   HOTĂRÂRE nr. 560 din 13 august 1991    privind plata personalului agenţilor economici a căror activitate se întrerupe temporar, datorită"
+    },
+    {
+      "id": 81,
+      "label": "act-16774",
+      "kind": "act",
+      "title": "﻿   HOTĂRÂRE nr. 37 din 25 ianuarie 1999    privind organizarea şi desfăşurarea doctoratului      EMITENT:        GUVERNUL        PUBLICAT Î"
+    },
+    {
+      "id": 84,
+      "label": "act-16778",
+      "kind": "act",
+      "title": "﻿   HOTĂRÂRE nr. 31 din 21 ianuarie 1999    pentru aprobarea Regulamentului de organizare şi funcţionare a Comisiei de Evaluare şi Acreditar"
+    },
+    {
+      "id": 2052,
+      "label": "act-39588",
+      "kind": "act",
+      "title": "﻿   HOTĂRÂRE nr. 622 din 20 august 1991    privind unele măsuri referitoare la asigurarea tehnico-materială a Sectorului de apărare şi ordin"
+    },
+    {
+      "id": 87,
+      "label": "act-16781",
+      "kind": "act",
+      "title": "﻿   HOTĂRÂRE nr. 34 din 21 ianuarie 1999    privind înfiinţarea Institutului Limbii Române      EMITENT:        GUVERNUL        PUBLICAT ÎN:"
+    },
+    {
+      "id": 2053,
+      "label": "act-39589",
+      "kind": "act",
+      "title": "﻿   HOTĂRÂRE nr. 787 din 25 noiembrie 1991    privind plata personalului Societăţii Comerciale \"ROMSEH\" - S.A. - Focşani, a carei activitate"
+    },
+    {
+      "id": 94,
+      "label": "act-16800",
+      "kind": "act",
+      "title": "﻿   LEGE nr. 28 din 26 ianuarie 1999    pentru aprobarea  Ordonanţei Guvernului nr. 50/1998  privind aprobarea primei de 200 lei/kg la cumpă"
+    },
+    {
+      "id": 95,
+      "label": "act-16802",
+      "kind": "act",
+      "title": "﻿   LEGE nr. 29 din 26 ianuarie 1999    privind aprobarea  Ordonanţei Guvernului nr. 78/1998  pentru modificarea şi completarea  Ordonanţei "
+    },
+    {
+      "id": 104,
+      "label": "act-16821",
+      "kind": "act",
+      "title": "﻿   ORDONANŢA nr. 8 din 28 ianuarie 1999    pentru ratificarea Acordului dintre guvernele statelor participante la Cooperarea Economică a Ma"
+    },
+    {
+      "id": 106,
+      "label": "act-16823",
+      "kind": "act",
+      "title": "﻿   ORDONANŢA nr. 19 din 28 ianuarie 1999    privind acordarea unor facilităţi agenţilor economici din domeniul transporturilor, la scoatere"
+    },
+    {
+      "id": 110,
+      "label": "act-16827",
+      "kind": "act",
+      "title": "﻿   ORDONANŢA nr. 14 din 28 ianuarie 1999    privind unele măsuri specifice pentru asigurarea resurselor Fondului special al drumurilor publ"
+    },
+    {
+      "id": 111,
+      "label": "act-16829",
+      "kind": "act",
+      "title": "﻿   ORDONANŢA nr. 4 din 28 ianuarie 1999    pentru ratificarea Acordului de împrumut dintre România şi Banca Internaţională pentru Reconstru"
+    },
+    {
+      "id": 112,
+      "label": "act-16831",
+      "kind": "act",
+      "title": "ORDONANȚA nr. 31 din 29 ianuarie 1999  privind aprobarea primei de export la grâu şi porumb boabe      EMITENT      Guvernul       PUBLICAT "
+    },
+    {
+      "id": 113,
+      "label": "act-16832",
+      "kind": "act",
+      "title": "ORDONANȚA nr. 32 din 29 ianuarie 1999  privind instituirea sistemului de cupoane pentru agricultori în anul 1999      EMITENT      Guvernul "
+    },
+    {
+      "id": 114,
+      "label": "act-16833",
+      "kind": "act",
+      "title": "﻿   ORDONANŢA nr. 33 din 29 ianuarie 1999    pentru completarea  Ordonanţei Guvernului nr. 42/1995  privind producţia de produse alimentare "
+    },
+    {
+      "id": 115,
+      "label": "act-16834",
+      "kind": "act",
+      "title": "﻿   ORDONANŢA nr. 34 din 29 ianuarie 1999    pentru modificarea  Legii nr. 165/1998  privind constituirea la dispoziţia Ministerului Agricul"
+    },
+    {
+      "id": 116,
+      "label": "act-16836",
+      "kind": "act",
+      "title": "﻿   ORDONANŢA nr. 35 din 29 ianuarie 1999    pentru prelungirea termenului de aplicare a prevederilor  Ordonanţei Guvernului nr. 50/1998  pr"
+    },
+    {
+      "id": 120,
+      "label": "act-16850",
+      "kind": "act",
+      "title": "﻿   ORDONANŢA nr. 25 din 29 ianuarie 1999    privind scoaterea din funcţiune a unor mijloace fixe uzate fizic sau moral, neamortizate, aparţ"
+    },
+    {
+      "id": 121,
+      "label": "act-16851",
+      "kind": "act",
+      "title": "﻿   ORDONANŢA nr. 26 din 29 ianuarie 1999    pentru modificarea şi completarea  Ordonanţei Guvernului nr. 29/1994  privind constituirea şi u"
+    },
+    {
+      "id": 123,
+      "label": "act-16853",
+      "kind": "act",
+      "title": "﻿   ORDONANŢA nr. 7 din 28 ianuarie 1999    pentru ratificarea Acordului de împrumut dintre România şi Banca Europeană de Investiţii şi Admi"
+    },
+    {
+      "id": 127,
+      "label": "act-16857",
+      "kind": "act",
+      "title": "﻿   ORDONANŢA nr. 6 din 28 ianuarie 1999    pentru ratificarea Acordului de împrumut dintre România şi Banca Europeană de Investiţii şi Soci"
+    },
+    {
+      "id": 128,
+      "label": "act-16858",
+      "kind": "act",
+      "title": "﻿   ORDONANŢA nr. 28 din 29 ianuarie 1999    de ratificare a Acordului-cadru de împrumut dintre România şi Fondul de Dezvoltare Socială al C"
+    },
+    {
+      "id": 2061,
+      "label": "act-53505",
+      "kind": "act",
+      "title": "﻿   REGULAMENT din 20 septembrie 1999    de organizare şi funcţionare a Inspecţiei Muncii      EMITENT:        GUVERNUL        PUBLICAT ÎN: "
+    },
+    {
+      "id": 132,
+      "label": "act-16862",
+      "kind": "act",
+      "title": "﻿   ORDONANŢA nr. 36 din 29 ianuarie 1999    privind sprijinul acordat de stat producătorilor agricoli pentru achiziţionarea de tractoare, c"
+    },
+    {
+      "id": 133,
+      "label": "act-16863",
+      "kind": "act",
+      "title": "﻿   ORDONANŢA DE URGENTA nr. 2 din 1 februarie 1999    privind modificarea şi completarea  Decretului nr. 389/1972  cu privire la contribuţi"
+    },
+    {
+      "id": 135,
+      "label": "act-16870",
+      "kind": "act",
+      "title": "﻿   ORDONANŢA DE URGENTA nr. 3 din 1 februarie 1999    pentru completarea alin. (1) al  art. 14 din Ordonanţa de urgenţă a Guvernului nr. 88"
+    },
+    {
+      "id": 136,
+      "label": "act-16871",
+      "kind": "act",
+      "title": "﻿   HOTĂRÂRE nr. 39 din 27 ianuarie 1999    privind transmiterea unui imobil, proprietate publică a statului, din administrarea Regiei Auton"
+    },
+    {
+      "id": 142,
+      "label": "act-16882",
+      "kind": "act",
+      "title": "﻿   DECIZIE nr. 182 din 17 decembrie 1998    referitoare la excepţia de neconstituţionalitate a dispoziţiilor  art. 25 lit. B din Ordonanţa "
+    },
+    {
+      "id": 144,
+      "label": "act-16884",
+      "kind": "act",
+      "title": "﻿   HOTĂRÂRE nr. 49 din 29 ianuarie 1999    privind înfiinţarea Centrului Naţional de Recunoaştere şi Echivalare a Diplomelor      EMITENT: "
+    },
+    {
+      "id": 155,
+      "label": "act-16899",
+      "kind": "act",
+      "title": "﻿   DECIZIE nr. 170 din 10 decembrie 1998    referitoare la excepţia de neconstituţionalitate a dispoziţiilor  art. 10 alin. 2 din Ordonanţa"
+    },
+    {
+      "id": 156,
+      "label": "act-16900",
+      "kind": "act",
+      "title": "﻿   DECIZIE nr. 179 din 17 decembrie 1998    referitoare la excepţia de neconstituţionalitate a dispoziţiilor  art. 18 alin. 2 din Legea nr."
+    },
+    {
+      "id": 157,
+      "label": "act-16901",
+      "kind": "act",
+      "title": "﻿   HOTĂRÂRE nr. 3 din 2 februarie 1999    pentru modificarea  Hotărârii Camerei Deputaţilor nr. 45/1998  privind bugetul Camerei Deputaţilo"
+    },
+    {
+      "id": 158,
+      "label": "act-16903",
+      "kind": "act",
+      "title": "﻿   DECIZIE nr. 185 din 17 decembrie 1998    referitoare la excepţia de neconstituţionalitate a dispoziţiilor  art. 77 alin. (3) din Legea n"
+    },
+    {
+      "id": 159,
+      "label": "act-16904",
+      "kind": "act",
+      "title": "﻿   DECIZIE nr. 186 din 17 decembrie 1998    referitoare la excepţia de neconstituţionalitate a dispoziţiilor  art. IV pct. 7 din Ordonanţa "
+    },
+    {
+      "id": 163,
+      "label": "act-16910",
+      "kind": "act",
+      "title": "﻿   CIRCULARA nr. 1 din 27 ianuarie 1999    referitoare la ratele dobânzilor plătite la rezervele minime obligatorii în luna ianuarie 1999  "
+    },
+    {
+      "id": 167,
+      "label": "act-16916",
+      "kind": "act",
+      "title": "﻿   DECIZIE nr. 134 din 20 octombrie 1998    referitoare la excepţia de neconstituţionalitate a dispoziţiilor  Legii nr. 105/1997  pentru so"
+    },
+    {
+      "id": 168,
+      "label": "act-16917",
+      "kind": "act",
+      "title": "﻿   ORDONANŢA DE URGENTA nr. 4 din 4 februarie 1999    privind unele măsuri de protecţie pentru personalul al cărui contract individual de m"
+    },
+    {
+      "id": 169,
+      "label": "act-16918",
+      "kind": "act",
+      "title": "﻿   HOTĂRÂRE nr. 58 din 3 februarie 1999    privind aprobarea Normelor pentru aplicarea prevederilor  Ordonanţei de urgenţă a Guvernului nr."
+    },
+    {
+      "id": 172,
+      "label": "act-16922",
+      "kind": "act",
+      "title": "﻿   HOTĂRÂRE nr. 68 din 4 februarie 1999    pentru prelungirea în anul 1999 a aplicării  Hotărârii Guvernului nr. 414/1993  privind acordare"
+    },
+    {
+      "id": 173,
+      "label": "act-16924",
+      "kind": "act",
+      "title": "﻿   LEGE nr. 56 din 9 iulie 1993*) *** Republicat    privind organizarea, conducerea, funcţionarea şi competenţa Curţii Supreme de Justiţie "
+    },
+    {
+      "id": 174,
+      "label": "act-16925",
+      "kind": "act",
+      "title": "LEGE nr. 61 din 22 septembrie 1993 (*republicată*)    privind alocaţia de stat pentru copii      EMITENT:        PARLAMENTUL        PUBLICAT"
+    },
+    {
+      "id": 179,
+      "label": "act-16933",
+      "kind": "act",
+      "title": "﻿   NORMA nr. 2 din 22 ianuarie 1999    privind autorizarea băncilor      EMITENT:        BANCA NAŢIONALĂ A ROMÂNIEI        PUBLICAT ÎN:    "
+    },
+    {
+      "id": 180,
+      "label": "act-16934",
+      "kind": "act",
+      "title": "﻿   NORMA nr. 3 din 22 ianuarie 1999    privind modificările în situaţia băncilor      EMITENT:        BANCA NAŢIONALĂ A ROMÂNIEI        PUB"
+    },
+    {
+      "id": 183,
+      "label": "act-16937",
+      "kind": "act",
+      "title": "﻿   HOTĂRÂRE nr. 71 din 5 februarie 1999    privind numirea reprezentanţilor Guvernului în Consiliul Economic şi Social      EMITENT:       "
+    },
+    {
+      "id": 184,
+      "label": "act-16938",
+      "kind": "act",
+      "title": "﻿   HOTĂRÂRE nr. 73 din 5 februarie 1999    privind transmiterea unui teren din administrarea Ministerului Transporturilor în administrarea "
+    },
+    {
+      "id": 186,
+      "label": "act-16949",
+      "kind": "act",
+      "title": "﻿   DECIZIE nr. 169 din 10 decembrie 1998    cu privire la excepţia de neconstituţionalitate a prevederilor  art. 36 alin. 3 din Ordonanţa G"
+    },
+    {
+      "id": 188,
+      "label": "act-16951",
+      "kind": "act",
+      "title": "﻿   DECIZIE nr. 181 din 17 decembrie 1998    referitoare la excepţia de neconstituţionalitate a dispoziţiilor  art. 5 din Ordonanţa de urgen"
+    },
+    {
+      "id": 189,
+      "label": "act-16952",
+      "kind": "act",
+      "title": "﻿   DECIZIE nr. 187 din 17 decembrie 1998    referitoare la excepţia de neconstituţionalitate a dispoziţiilor  art. 67 alin. (6) din Legea î"
+    },
+    {
+      "id": 190,
+      "label": "act-16953",
+      "kind": "act",
+      "title": "﻿   ORDONANŢA DE URGENTA nr. 6 din 15 februarie 1999    privind finanţarea Comisiei Naţionale a Valorilor Mobiliare din venituri extrabugeta"
+    },
+    {
+      "id": 192,
+      "label": "act-16955",
+      "kind": "act",
+      "title": "﻿   ORDONANŢA DE URGENTA nr. 5 din 12 februarie 1999    pentru modificarea  art. 1 din Legea nr. 2/1992  privind acordarea de indemnizaţii m"
+    },
+    {
+      "id": 196,
+      "label": "act-16959",
+      "kind": "act",
+      "title": "﻿   DECIZIE nr. VII din 22 decembrie 1998    privind aplicarea dispoziţiilor art. 299 din Codul de procedură civilă, referitoare la hotărâri"
+    },
+    {
+      "id": 198,
+      "label": "act-16970",
+      "kind": "act",
+      "title": "﻿   ORDONANŢA DE URGENTA nr. 8 din 17 februarie 1999    privind unele măsuri pentru susţinerea Programului de restructurare prin garantarea "
+    },
+    {
+      "id": 208,
+      "label": "act-16982",
+      "kind": "act",
+      "title": "﻿   HOTĂRÂRE nr. 86 din 11 februarie 1999    privind înfiinţarea Agenţiei Naţionale a Taberelor şi Turismului Şcolar din România      EMITEN"
+    },
+    {
+      "id": 209,
+      "label": "act-16983",
+      "kind": "act",
+      "title": "﻿   HOTĂRÂRE nr. 88 din 12 februarie 1999    privind transmiterea unui imobil, proprietate publică a statului, situat în municipiul Bucureşt"
+    },
+    {
+      "id": 210,
+      "label": "act-16985",
+      "kind": "act",
+      "title": "﻿   DECIZIE nr. 6 din 26 ianuarie 1999    privind scoaterea la concurs a frecventelor pentru posturile locale de radio (putere mica) conform"
+    },
+    {
+      "id": 216,
+      "label": "act-16992",
+      "kind": "act",
+      "title": "﻿   HOTĂRÂRE nr. 84 din 11 februarie 1999    privind indexarea nivelului taxei anuale pentru folosirea terenurilor proprietate de stat în al"
+    },
+    {
+      "id": 218,
+      "label": "act-16994",
+      "kind": "act",
+      "title": "﻿   DECIZIE nr. 127 din 7 decembrie 1998    referitoare la încălcarea prevederilor  Legii concurentei nr. 21/1996       EMITENT:        CONS"
+    },
+    {
+      "id": 220,
+      "label": "act-16998",
+      "kind": "act",
+      "title": "﻿   HOTĂRÂRE nr. 103 din 19 februarie 1999    pentru stabilirea bunurilor şi serviciilor care pot fi achitate pe bază de cupoane pentru agri"
+    },
+    {
+      "id": 226,
+      "label": "act-17007",
+      "kind": "act",
+      "title": "﻿   DECIZIE nr. 167 din 10 decembrie 1998    referitoare la excepţia de neconstituţionalitate a dispoziţiilor  art. 18 din Legea nr. 87/1994"
+    },
+    {
+      "id": 227,
+      "label": "act-17008",
+      "kind": "act",
+      "title": "﻿   DECIZIE nr. 168 din 10 decembrie 1998    referitoare la excepţia de neconstituţionalitate a dispoziţiilor  art. 52^1 din Legea nr. 50/19"
+    },
+    {
+      "id": 230,
+      "label": "act-17011",
+      "kind": "act",
+      "title": "﻿   DECIZIE nr. 177 din 15 decembrie 1998    referitoare la excepţia de neconstituţionalitate a dispoziţiilor art. 213 alin. 2 din Codul pen"
+    },
+    {
+      "id": 231,
+      "label": "act-17012",
+      "kind": "act",
+      "title": "﻿   DECIZIE nr. 178 din 17 decembrie 1998    referitoare la excepţia de neconstituţionalitate a dispoziţiilor art. 145, 147, 248 şi 248^1 di"
+    },
+    {
+      "id": 233,
+      "label": "act-17014",
+      "kind": "act",
+      "title": "﻿   HOTĂRÂRE nr. 92 din 18 februarie 1999    privind acordarea de bonificaţii la decontarea energiei electrice şi termice agenţilor economic"
+    },
+    {
+      "id": 235,
+      "label": "act-17016",
+      "kind": "act",
+      "title": "﻿   HOTĂRÂRE nr. 95 din 18 februarie 1999    pentru modificarea şi completarea  Hotărârii Guvernului nr. 983/1998  privind reevaluarea clădi"
+    },
+    {
+      "id": 241,
+      "label": "act-17024",
+      "kind": "act",
+      "title": "﻿   ORDONANŢA DE URGENTA nr. 10 din 23 februarie 1999    privind prorogarea termenului prevăzut la  art. II alin. 1 din Ordonanţa Guvernului"
+    },
+    {
+      "id": 245,
+      "label": "act-17031",
+      "kind": "act",
+      "title": "﻿   NORMA nr. 350.249 din 15 februarie 1999    privind determinarea gradului de utilizare a mijloacelor fixe deţinute de agenţii economici, "
+    },
+    {
+      "id": 247,
+      "label": "act-17036",
+      "kind": "act",
+      "title": "﻿   ORDONANŢA DE URGENTA nr. 11 din 24 februarie 1999    privind acordarea de facilităţi fiscale agenţilor economici      EMITENT:        GU"
+    },
+    {
+      "id": 248,
+      "label": "act-17038",
+      "kind": "act",
+      "title": "﻿   ORDONANŢA DE URGENTA nr. 14 din 1 martie 1999    pentru modificarea  Ordonanţei de urgenţă a Guvernului nr. 82/1997  privind regimul acc"
+    },
+    {
+      "id": 252,
+      "label": "act-17048",
+      "kind": "act",
+      "title": "﻿   LEGE nr. 34 din 25 februarie 1999    privind ratificarea Acordului de împrumut dintre România şi Banca Europeană de Investiţii şi Admini"
+    },
+    {
+      "id": 256,
+      "label": "act-17053",
+      "kind": "act",
+      "title": "﻿   CIRCULARĂ nr. 2 din 17 februarie 1999    pentru modificarea  Regulamentului nr. 4/1998  privind regimul rezervelor minime obligatorii   "
+    },
+    {
+      "id": 258,
+      "label": "act-17056",
+      "kind": "act",
+      "title": "﻿   HOTĂRÂRE nr. 104 din 19 februarie 1999    privind organizarea şi funcţionarea Ministerului Apelor, Pădurilor şi Protecţiei Mediului     "
+    },
+    {
+      "id": 263,
+      "label": "act-17064",
+      "kind": "act",
+      "title": "﻿   ORDONANŢA DE URGENTA nr. 12 din 1 martie 1999    privind schimbul terenului în suprafaţa de 5.000 mp, situat în şoseaua Kiseleff, zona P"
+    },
+    {
+      "id": 264,
+      "label": "act-17065",
+      "kind": "act",
+      "title": "﻿   ORDONANŢA DE URGENTA nr. 13 din 1 martie 1999    pentru acordarea unor înlesniri la plata obligaţiilor bugetare unor agenţi economici di"
+    },
+    {
+      "id": 270,
+      "label": "act-17073",
+      "kind": "act",
+      "title": "﻿   HOTĂRÂRE nr. 120 din 1 martie 1999    privind înfiinţarea Agenţiei Sociale a Studenţilor      EMITENT:        GUVERNUL        PUBLICAT Î"
+    },
+    {
+      "id": 271,
+      "label": "act-17074",
+      "kind": "act",
+      "title": "﻿   HOTĂRÂRE nr. 126 din 1 martie 1999    privind transmiterea, cu plata, a unui imobil situat în municipiul Bistriţa, judeţul Bistriţa-Năsă"
+    },
+    {
+      "id": 273,
+      "label": "act-17081",
+      "kind": "act",
+      "title": "﻿   ORDONANŢA DE URGENTA nr. 15 din 2 martie 1999    pentru modificarea şi completarea  Legii nr. 27/1994  privind impozitele şi taxele loca"
+    },
+    {
+      "id": 276,
+      "label": "act-17084",
+      "kind": "act",
+      "title": "﻿   HOTĂRÂRE nr. 127 din 1 martie 1999    pentru aprobarea Normelor de aplicare a  Ordonanţei de urgenţă a Guvernului nr. 36/1998  privind u"
+    },
+    {
+      "id": 278,
+      "label": "act-17087",
+      "kind": "act",
+      "title": "﻿   LEGE nr. 35 din 25 februarie 1999    privind ratificarea Acordului de împrumut dintre România şi Banca Europeană de Investiţii şi Societ"
+    },
+    {
+      "id": 279,
+      "label": "act-17089",
+      "kind": "act",
+      "title": "﻿   DECIZIE nr. 5 din 4 februarie 1999    referitoare la excepţia de neconstituţionalitate a dispoziţiilor art. 214 alin. 3 din Codul penal "
+    },
+    {
+      "id": 285,
+      "label": "act-17102",
+      "kind": "act",
+      "title": "﻿   DECIZIE nr. 148 din 27 octombrie 1998    referitoare la excepţia de neconstituţionalitate a dispoziţiilor art. 146 din Codul penal      "
+    },
+    {
+      "id": 286,
+      "label": "act-17103",
+      "kind": "act",
+      "title": "﻿   DECIZIE nr. 180 din 17 decembrie 1998    referitoare la excepţia de neconstituţionalitate a dispoziţiilor  art. 5 din Ordonanţa de urgen"
+    },
+    {
+      "id": 289,
+      "label": "act-17106",
+      "kind": "act",
+      "title": "﻿   CIRCULARA nr. 4 din 25 februarie 1999    privind ratele dobânzilor plătite la rezervele minime obligatorii, aferente lunii februarie 199"
+    },
+    {
+      "id": 291,
+      "label": "act-17108",
+      "kind": "act",
+      "title": "﻿   HOTĂRÂRE nr. 130 din 2 martie 1999    pentru modificarea şi completarea  Hotărârii Guvernului nr. 977/1998  privind organizarea şi funcţ"
+    },
+    {
+      "id": 292,
+      "label": "act-17110",
+      "kind": "act",
+      "title": "﻿   REGULAMENT nr. 1 din 2 martie 1999    privind modul de încasare şi de gestionare a veniturilor extrabugetare din care se finanţează Comi"
+    },
+    {
+      "id": 293,
+      "label": "act-17114",
+      "kind": "act",
+      "title": "﻿   DECIZIE nr. 3 din 2 februarie 1999    referitoare la excepţia de neconstituţionalitate a dispoziţiilor  Ordonanţei de urgenţă a Guvernul"
+    },
+    {
+      "id": 297,
+      "label": "act-17118",
+      "kind": "act",
+      "title": "﻿   HOTĂRÂRE nr. 136 din 4 martie 1999    privind transmiterea unor imobile, proprietate a statului, din administrarea Regiei Autonome \"Admi"
+    },
+    {
+      "id": 301,
+      "label": "act-17124",
+      "kind": "act",
+      "title": "﻿   HOTĂRÂRE nr. 123 din 1 martie 1999    privind aprobarea Programului cercetărilor statistice pe anul 1999      EMITENT:        GUVERNUL  "
+    },
+    {
+      "id": 302,
+      "label": "act-17125",
+      "kind": "act",
+      "title": "﻿   HOTĂRÂRE nr. 45 din 22 decembrie 1998 *** Republicat    privind bugetul Camerei Deputaţilor pe anul 1999 şi proiecţia acestuia pentru an"
+    },
+    {
+      "id": 305,
+      "label": "act-17128",
+      "kind": "act",
+      "title": "﻿   HOTĂRÂRE nr. 137 din 4 martie 1999    privind aprobarea cifrei de şcolarizare pentru învăţământul preuniversitar de stat în anul şcolar "
+    },
+    {
+      "id": 307,
+      "label": "act-17130",
+      "kind": "act",
+      "title": "﻿   HOTĂRÂRE nr. 141 din 4 martie 1999    privind transmiterea în administrare a unor imobile, proprietate publică a statului, situate în mu"
+    },
+    {
+      "id": 309,
+      "label": "act-17132",
+      "kind": "act",
+      "title": "﻿   DECIZIE nr. 12 din 9 februarie 1999    referitoare la excepţia de neconstituţionalitate a  art. IV pct. 7 din Ordonanţa Guvernului nr. 1"
+    },
+    {
+      "id": 314,
+      "label": "act-17151",
+      "kind": "act",
+      "title": "﻿   HOTĂRÂRE nr. 160 din 11 martie 1999    privind modificarea şi completarea Normelor metodologice pentru punerea în aplicare a prevederilo"
+    },
+    {
+      "id": 317,
+      "label": "act-17154",
+      "kind": "act",
+      "title": "﻿   LEGE nr. 38 din 12 martie 1999    privind aprobarea  Ordonanţei de urgenta a Guvernului nr. 46/1998  pentru modificarea  art. 3 din Ordo"
+    },
+    {
+      "id": 321,
+      "label": "act-17164",
+      "kind": "act",
+      "title": "﻿   HOTĂRÂRE nr. 147 din 5 martie 1999    privind transmiterea unei părţi dintr-un imobil, proprietate publică a statului, situat în municip"
+    },
+    {
+      "id": 335,
+      "label": "act-17186",
+      "kind": "act",
+      "title": "﻿   STATUTUL din 15 februarie 1999    Casei Naţionale de Asigurări de Sănătate      EMITENT:        CONSILIUL DE ADMINISTRAŢIE AL CASEI NAŢI"
+    },
+    {
+      "id": 338,
+      "label": "act-17191",
+      "kind": "act",
+      "title": "﻿   NORME nr. 4 din 2 martie 1999    privind reevaluarea de către bănci a clădirilor, construcţiilor speciale şi a terenurilor      EMITENT:"
+    },
+    {
+      "id": 340,
+      "label": "act-17194",
+      "kind": "act",
+      "title": "﻿   ORDONANŢA DE URGENTA nr. 19 din 18 martie 1999    privind aprobarea primei de export la carnea de porc şi de pasare      EMITENT:       "
+    },
+    {
+      "id": 342,
+      "label": "act-17196",
+      "kind": "act",
+      "title": "﻿   HOTĂRÂRE nr. 157 din 11 martie 1999    pentru modificarea şi completarea Metodologiei de aplicare a criteriilor de stabilire a salariilo"
+    },
+    {
+      "id": 345,
+      "label": "act-17202",
+      "kind": "act",
+      "title": "﻿   HOTĂRÂRE nr. 173 din 18 martie 1999    privind transmiterea unui imobil, proprietate a statului, din administrarea Ministerului Sănătăţi"
+    },
+    {
+      "id": 349,
+      "label": "act-17206",
+      "kind": "act",
+      "title": "﻿   HOTĂRÂRE nr. 178 din 18 martie 1999    privind transmiterea unui imobil, proprietate publică a statului, situat în municipiul Bucureşti,"
+    },
+    {
+      "id": 354,
+      "label": "act-17233",
+      "kind": "act",
+      "title": "﻿   ORDONANŢA nr. 68 din 28 august 1997 *** Republicat    privind procedura de întocmire şi depunere a declaraţiilor de impozite şi taxe    "
+    },
+    {
+      "id": 355,
+      "label": "act-17234",
+      "kind": "act",
+      "title": "﻿   REGULAMENT nr. 4 din 16 iulie 1998 *** Republicat    al Băncii Naţionale a României privind regimul rezervelor minime obligatorii      E"
+    },
+    {
+      "id": 357,
+      "label": "act-17236",
+      "kind": "act",
+      "title": "﻿   ORDONANŢA DE URGENTA nr. 22 din 24 martie 1999    pentru modificarea  art. 13 alin. 3 din Ordonanţa Guvernului nr. 11/1996  privind exec"
+    },
+    {
+      "id": 361,
+      "label": "act-17240",
+      "kind": "act",
+      "title": "﻿   HOTĂRÂRE nr. 163 din 11 martie 1999    privind aprobarea indicatorilor tehnico-economici ai obiectivului de investiţii \"Dezvoltarea util"
+    },
+    {
+      "id": 371,
+      "label": "act-17255",
+      "kind": "act",
+      "title": "﻿   HOTĂRÂRE nr. 188 din 23 martie 1999    privind organizarea şi funcţionarea Ministerului Muncii şi Protecţiei Sociale      EMITENT:      "
+    },
+    {
+      "id": 374,
+      "label": "act-17285",
+      "kind": "act",
+      "title": "﻿   CIRCULARA nr. 7 din 11 martie 1999    privind ratele dobânzilor plătite la rezervele minime obligatorii, aferente lunii martie 1999 (per"
+    },
+    {
+      "id": 376,
+      "label": "act-17288",
+      "kind": "act",
+      "title": "﻿   ORDONANŢA DE URGENTA nr. 32 din 26 martie 1999    privind aplicarea prevederilor  art. 6 alin. (2) din Legea bugetului de stat pe anul 1"
+    },
+    {
+      "id": 377,
+      "label": "act-17356",
+      "kind": "act",
+      "title": "﻿   HOTĂRÂRE nr. 170 din 18 martie 1999    pentru abrogarea  Hotărârii Guvernului nr. 236/1993  privind aprobarea Regulamentului pentru furn"
+    },
+    {
+      "id": 379,
+      "label": "act-17389",
+      "kind": "act",
+      "title": "﻿   LEGE nr. 43 din 26 martie 1999    privind modificarea şi completarea  Legii nr. 54/1993  pentru organizarea instanţelor şi parchetelor m"
+    },
+    {
+      "id": 382,
+      "label": "act-17394",
+      "kind": "act",
+      "title": "﻿   ORDONANŢA DE URGENTA nr. 24 din 25 martie 1999    pentru modificarea  Legii bancare nr. 58/1998       EMITENT:        GUVERNUL        PU"
+    },
+    {
+      "id": 383,
+      "label": "act-17395",
+      "kind": "act",
+      "title": "ORDONANŢA DE URGENŢĂ nr. 25 din 25 martie 1999  pentru modificarea  art. 15 din Legea nr. 44/1994  privind veteranii de război, precum şi un"
+    },
+    {
+      "id": 384,
+      "label": "act-17396",
+      "kind": "act",
+      "title": "﻿   ORDONANŢA DE URGENTA nr. 26 din 25 martie 1999    privind unele facilităţi care se acordă Companiei Naţionale \"Poşta Română\" - S.A. pent"
+    },
+    {
+      "id": 385,
+      "label": "act-17397",
+      "kind": "act",
+      "title": "﻿   ORDONANŢA DE URGENTA nr. 27 din 25 martie 1999    pentru modificarea  art. 27 din Legea nr. 27/1994  privind impozitele şi taxele locale"
+    },
+    {
+      "id": 392,
+      "label": "act-17431",
+      "kind": "act",
+      "title": "﻿   ORDONANŢA DE URGENTA nr. 28 din 25 martie 1999    privind obligaţia agenţilor economici de a utiliza aparate de marcat electronice fisca"
+    },
+    {
+      "id": 393,
+      "label": "act-17432",
+      "kind": "act",
+      "title": "﻿   ORDONANŢA DE URGENTA nr. 29 din 25 martie 1999    privind unele măsuri legate de trecerea la anul 2000 a sistemelor informatice şi a sis"
+    },
+    {
+      "id": 396,
+      "label": "act-17435",
+      "kind": "act",
+      "title": "﻿   HOTĂRÂRE nr. 220 din 25 martie 1999    privind transmiterea unui obiectiv de investiţii, proprietate publică a statului, situat în munic"
+    },
+    {
+      "id": 398,
+      "label": "act-17438",
+      "kind": "act",
+      "title": "﻿   HOTĂRÂRE nr. 190 din 25 martie 1999    pentru aprobarea Normelor metodologice privind modul de acordare, de utilizare şi controlul utili"
+    },
+    {
+      "id": 401,
+      "label": "act-17443",
+      "kind": "act",
+      "title": "﻿   HOTĂRÂRE nr. 211 din 25 martie 1999    privind modificarea şi completarea  Hotărârii Guvernului nr. 577/1997  pentru aprobarea programul"
+    },
+    {
+      "id": 403,
+      "label": "act-17445",
+      "kind": "act",
+      "title": "﻿   HOTĂRÂRE nr. 213 din 25 martie 1999    pentru modificarea  art. 1 din Hotărârea Guvernului nr. 252/1996  privind regimul diferenţelor de"
+    },
+    {
+      "id": 404,
+      "label": "act-17446",
+      "kind": "act",
+      "title": "﻿   HOTĂRÂRE nr. 214 din 25 martie 1999    privind activităţile de natura economică pentru care se calculează amortizarea mijloacelor fixe  "
+    },
+    {
+      "id": 406,
+      "label": "act-17452",
+      "kind": "act",
+      "title": "﻿   ORDONANŢA DE URGENTA nr. 36 din 2 aprilie 1999    privind garantarea unui plasament interbancar      EMITENT:        GUVERNUL        PUB"
+    },
+    {
+      "id": 408,
+      "label": "act-17454",
+      "kind": "act",
+      "title": "﻿   ORDONANŢA DE URGENTA nr. 34 din 1 aprilie 1999    pentru modificarea  Ordonanţei Guvernului nr. 18/1996  privind angajarea de împrumutur"
+    },
+    {
+      "id": 411,
+      "label": "act-17458",
+      "kind": "act",
+      "title": "﻿   ORDONANŢA DE URGENTA nr. 33 din 30 martie 1999    pentru stabilirea unor măsuri în vederea privatizării Banc Post - S.A.      EMITENT:  "
+    },
+    {
+      "id": 413,
+      "label": "act-17460",
+      "kind": "act",
+      "title": "﻿   HOTĂRÂRE nr. 230 din 30 martie 1999    privind aprobarea mandatului comisiei de privatizare, constituită în temeiul  Hotărârii Guvernulu"
+    },
+    {
+      "id": 414,
+      "label": "act-17461",
+      "kind": "act",
+      "title": "﻿   HOTĂRÂRE nr. 252 din 1 aprilie 1999    privind autorizarea Băncii Agricole - S.A. şi a Banc Post - S.A. de a acţiona în calitate de agen"
+    },
+    {
+      "id": 415,
+      "label": "act-17518",
+      "kind": "act",
+      "title": "﻿   HOTĂRÂRE nr. 191 din 25 martie 1999    privind declararea zonei miniere Albeni, judeţul Gorj, ca zona defavorizată      EMITENT:        "
+    },
+    {
+      "id": 416,
+      "label": "act-17519",
+      "kind": "act",
+      "title": "﻿   HOTĂRÂRE nr. 192 din 25 martie 1999    privind declararea zonei miniere Schela, judeţul Gorj, ca zona defavorizată      EMITENT:        "
+    },
+    {
+      "id": 417,
+      "label": "act-17520",
+      "kind": "act",
+      "title": "﻿   HOTĂRÂRE nr. 193 din 25 martie 1999    privind declararea zonei miniere Motru-Rovinari, judeţul Gorj, ca zona defavorizată      EMITENT:"
+    },
+    {
+      "id": 418,
+      "label": "act-17521",
+      "kind": "act",
+      "title": "﻿   HOTĂRÂRE nr. 194 din 25 martie 1999    privind declararea zonei miniere Stei-Nucet, judeţul Bihor, ca zona defavorizată      EMITENT:   "
+    },
+    {
+      "id": 419,
+      "label": "act-17522",
+      "kind": "act",
+      "title": "﻿   HOTĂRÂRE nr. 195 din 25 martie 1999    privind declararea zonei miniere Borod-Şuncuiuş-Dobreşti-Vadu Crişului, judeţul Bihor, ca zona de"
+    },
+    {
+      "id": 420,
+      "label": "act-17523",
+      "kind": "act",
+      "title": "﻿   HOTĂRÂRE nr. 196 din 25 martie 1999    privind declararea zonei miniere Popeşti-Derna-Aleşd, judeţul Bihor, ca zona defavorizată      EM"
+    },
+    {
+      "id": 421,
+      "label": "act-17524",
+      "kind": "act",
+      "title": "﻿   HOTĂRÂRE nr. 197 din 25 martie 1999    privind declararea zonei miniere Rusca Montană, judeţul Caraş-Severin, ca zona defavorizată      "
+    },
+    {
+      "id": 422,
+      "label": "act-17525",
+      "kind": "act",
+      "title": "﻿   HOTĂRÂRE nr. 198 din 25 martie 1999    privind declararea zonei miniere Bocşa, judeţul Caraş-Severin, ca zona defavorizată      EMITENT:"
+    },
+    {
+      "id": 423,
+      "label": "act-17526",
+      "kind": "act",
+      "title": "﻿   HOTĂRÂRE nr. 199 din 25 martie 1999    privind declararea zonei miniere Moldova Noua-Anina, judeţul Caraş-Severin, ca zona defavorizată "
+    },
+    {
+      "id": 424,
+      "label": "act-17527",
+      "kind": "act",
+      "title": "﻿   HOTĂRÂRE nr. 200 din 25 martie 1999    privind declararea zonei miniere Ip, judeţul Sălaj, ca zona defavorizată      EMITENT:        GUV"
+    },
+    {
+      "id": 425,
+      "label": "act-17528",
+      "kind": "act",
+      "title": "﻿   HOTĂRÂRE nr. 201 din 25 martie 1999    privind declararea zonei miniere Hida-Surduc-Jibou-Balan, judeţul Sălaj, ca zona defavorizată    "
+    },
+    {
+      "id": 426,
+      "label": "act-17529",
+      "kind": "act",
+      "title": "﻿   HOTĂRÂRE nr. 202 din 25 martie 1999    privind declararea zonei miniere Sărmăşag-Chiejd-Bobota, judeţul Sălaj, ca zona defavorizată     "
+    },
+    {
+      "id": 427,
+      "label": "act-17530",
+      "kind": "act",
+      "title": "﻿   HOTĂRÂRE nr. 203 din 25 martie 1999    privind declararea zonei miniere Baia Mare, judeţul Maramureş, ca zona defavorizată      EMITENT:"
+    },
+    {
+      "id": 428,
+      "label": "act-17531",
+      "kind": "act",
+      "title": "﻿   HOTĂRÂRE nr. 204 din 25 martie 1999    privind declararea zonei miniere Borşa-Vişeu, judeţul Maramureş, ca zona defavorizată      EMITEN"
+    },
+    {
+      "id": 429,
+      "label": "act-17532",
+      "kind": "act",
+      "title": "﻿   HOTĂRÂRE nr. 205 din 25 martie 1999    privind declararea zonei miniere Filipeşti, judeţul Prahova, ca zona defavorizată      EMITENT:  "
+    },
+    {
+      "id": 430,
+      "label": "act-17534",
+      "kind": "act",
+      "title": "﻿   HOTĂRÂRE nr. 207 din 25 martie 1999    privind declararea zonei miniere Comăneşti, judeţul Bacău, ca zona defavorizată      EMITENT:    "
+    },
+    {
+      "id": 431,
+      "label": "act-17536",
+      "kind": "act",
+      "title": "﻿   HOTĂRÂRE nr. 209 din 25 martie 1999    privind declararea zonei miniere Baraolt, judeţul Covasna, ca zona defavorizată      EMITENT:    "
+    },
+    {
+      "id": 432,
+      "label": "act-17537",
+      "kind": "act",
+      "title": "﻿   HOTĂRÂRE nr. 210 din 25 martie 1999    privind declararea zonei miniere Altan Tepe, judeţul Tulcea, ca zona defavorizată      EMITENT:  "
+    },
+    {
+      "id": 434,
+      "label": "act-17542",
+      "kind": "act",
+      "title": "﻿   HOTĂRÂRE nr. 216 din 25 martie 1999    pentru aprobarea Normelor metodologice-cadru de aplicare a  Legii nr. 219/1998  privind regimul c"
+    },
+    {
+      "id": 440,
+      "label": "act-17551",
+      "kind": "act",
+      "title": "﻿   DECIZIE nr. 24 din 23 februarie 1999    referitoare la excepţia de neconstituţionalitate a art. 257 din Codul de procedură penală      E"
+    },
+    {
+      "id": 441,
+      "label": "act-17552",
+      "kind": "act",
+      "title": "﻿   DECIZIE nr. 25 din 23 februarie 1999    referitoare la excepţia de neconstituţionalitate a dispoziţiilor art. 81 alin. 3 din Codul penal"
+    },
+    {
+      "id": 468,
+      "label": "act-17706",
+      "kind": "act",
+      "title": "﻿   ORDONANŢA DE URGENTA nr. 42 din 8 aprilie 1999    pentru completarea  Legii sanitare veterinare nr. 60/1974       EMITENT:        GUVERN"
+    },
+    {
+      "id": 474,
+      "label": "act-17720",
+      "kind": "act",
+      "title": "﻿   HOTĂRÂRE nr. 247 din 1 aprilie 1999    privind schimbul de terenuri dintre Universitatea de Ştiinţe Agricole şi Medicina Veterinara din "
+    },
+    {
+      "id": 475,
+      "label": "act-17722",
+      "kind": "act",
+      "title": "﻿   HOTĂRÂRE nr. 249 din 1 aprilie 1999    privind transmiterea unui imobil, proprietate publică a statului, situat în municipiul Alba Iulia"
+    },
+    {
+      "id": 477,
+      "label": "act-17736",
+      "kind": "act",
+      "title": "﻿   HOTĂRÂRE nr. 234 din 31 martie 1999    privind emiterea autorizaţiei de mediu pentru Societatea Naţionala \"Nuclearelectrica\" - S.A. - Su"
+    },
+    {
+      "id": 479,
+      "label": "act-17738",
+      "kind": "act",
+      "title": "﻿   ORDONANŢA DE URGENTA nr. 39 din 7 aprilie 1999    privind unele măsuri pentru susţinerea programului de restructurare prin garantarea un"
+    },
+    {
+      "id": 480,
+      "label": "act-17739",
+      "kind": "act",
+      "title": "﻿   ORDONANŢA DE URGENTA nr. 40 din 8 aprilie 1999    privind protecţia chiriaşilor şi stabilirea chiriei pentru spaţiile cu destinaţia de l"
+    },
+    {
+      "id": 482,
+      "label": "act-17741",
+      "kind": "act",
+      "title": "﻿   ORDONANŢĂ DE URGENŢĂ nr. 43 din 8 aprilie 1999    privind autorizarea Fondului Proprietăţii de Stat de a contragaranta o scrisoare de ga"
+    },
+    {
+      "id": 483,
+      "label": "act-17743",
+      "kind": "act",
+      "title": "﻿   ORDONANŢA DE URGENŢĂ nr. 44 din 9 aprilie 1999    pentru modificarea şi completarea  Ordonanţei de urgenţă a Guvernului nr. 67/1998  pri"
+    },
+    {
+      "id": 485,
+      "label": "act-17746",
+      "kind": "act",
+      "title": "﻿   LEGE nr. 52 din 8 aprilie 1999    privind aprobarea  Ordonanţei Guvernului nr. 46/1998  pentru stabilirea unor măsuri în vederea îndepli"
+    },
+    {
+      "id": 487,
+      "label": "act-17754",
+      "kind": "act",
+      "title": "﻿   NORMA nr. 5 din 15 martie 1999    privind capitalul social minim al băncilor      EMITENT:        BANCA NAŢIONALĂ A ROMÂNIEI        PUBL"
+    }
+  ],
+  "edges": [
+    {
+      "source": 8,
+      "target": 354,
+      "type": "cites"
+    },
+    {
+      "source": 38,
+      "target": 173,
+      "type": "cites"
+    },
+    {
+      "source": 94,
+      "target": 392,
+      "type": "cites"
+    },
+    {
+      "source": 95,
+      "target": 354,
+      "type": "cites"
+    },
+    {
+      "source": 116,
+      "target": 94,
+      "type": "cites"
+    },
+    {
+      "source": 132,
+      "target": 17,
+      "type": "cites"
+    },
+    {
+      "source": 136,
+      "target": 9,
+      "type": "cites"
+    },
+    {
+      "source": 157,
+      "target": 302,
+      "type": "cites"
+    },
+    {
+      "source": 163,
+      "target": 355,
+      "type": "cites"
+    },
+    {
+      "source": 179,
+      "target": 382,
+      "type": "cites"
+    },
+    {
+      "source": 184,
+      "target": 9,
+      "type": "cites"
+    },
+    {
+      "source": 186,
+      "target": 354,
+      "type": "cites"
+    },
+    {
+      "source": 192,
+      "target": 24,
+      "type": "cites"
+    },
+    {
+      "source": 196,
+      "target": 173,
+      "type": "cites"
+    },
+    {
+      "source": 209,
+      "target": 9,
+      "type": "cites"
+    },
+    {
+      "source": 210,
+      "target": 32,
+      "type": "cites"
+    },
+    {
+      "source": 220,
+      "target": 113,
+      "type": "cites"
+    },
+    {
+      "source": 241,
+      "target": 18,
+      "type": "cites"
+    },
+    {
+      "source": 245,
+      "target": 17,
+      "type": "cites"
+    },
+    {
+      "source": 248,
+      "target": 18,
+      "type": "cites"
+    },
+    {
+      "source": 256,
+      "target": 355,
+      "type": "cites"
+    },
+    {
+      "source": 271,
+      "target": 9,
+      "type": "cites"
+    },
+    {
+      "source": 273,
+      "target": 13,
+      "type": "cites"
+    },
+    {
+      "source": 279,
+      "target": 230,
+      "type": "cites"
+    },
+    {
+      "source": 285,
+      "target": 30,
+      "type": "cites"
+    },
+    {
+      "source": 285,
+      "target": 31,
+      "type": "cites"
+    },
+    {
+      "source": 289,
+      "target": 355,
+      "type": "cites"
+    },
+    {
+      "source": 291,
+      "target": 14,
+      "type": "cites"
+    },
+    {
+      "source": 292,
+      "target": 190,
+      "type": "cites"
+    },
+    {
+      "source": 293,
+      "target": 188,
+      "type": "cites"
+    },
+    {
+      "source": 297,
+      "target": 9,
+      "type": "cites"
+    },
+    {
+      "source": 307,
+      "target": 9,
+      "type": "cites"
+    },
+    {
+      "source": 309,
+      "target": 31,
+      "type": "cites"
+    },
+    {
+      "source": 314,
+      "target": 8,
+      "type": "cites"
+    },
+    {
+      "source": 321,
+      "target": 9,
+      "type": "cites"
+    },
+    {
+      "source": 335,
+      "target": 15,
+      "type": "cites"
+    },
+    {
+      "source": 338,
+      "target": 235,
+      "type": "cites"
+    },
+    {
+      "source": 338,
+      "target": 17,
+      "type": "cites"
+    },
+    {
+      "source": 345,
+      "target": 9,
+      "type": "cites"
+    },
+    {
+      "source": 349,
+      "target": 9,
+      "type": "cites"
+    },
+    {
+      "source": 354,
+      "target": 95,
+      "type": "cites"
+    },
+    {
+      "source": 361,
+      "target": 8,
+      "type": "cites"
+    },
+    {
+      "source": 374,
+      "target": 355,
+      "type": "cites"
+    },
+    {
+      "source": 377,
+      "target": 12,
+      "type": "cites"
+    },
+    {
+      "source": 385,
+      "target": 13,
+      "type": "cites"
+    },
+    {
+      "source": 396,
+      "target": 9,
+      "type": "cites"
+    },
+    {
+      "source": 398,
+      "target": 132,
+      "type": "cites"
+    },
+    {
+      "source": 404,
+      "target": 8,
+      "type": "cites"
+    },
+    {
+      "source": 404,
+      "target": 9,
+      "type": "cites"
+    },
+    {
+      "source": 413,
+      "target": 411,
+      "type": "cites"
+    },
+    {
+      "source": 414,
+      "target": 408,
+      "type": "cites"
+    },
+    {
+      "source": 415,
+      "target": 33,
+      "type": "cites"
+    },
+    {
+      "source": 416,
+      "target": 33,
+      "type": "cites"
+    },
+    {
+      "source": 417,
+      "target": 33,
+      "type": "cites"
+    },
+    {
+      "source": 418,
+      "target": 33,
+      "type": "cites"
+    },
+    {
+      "source": 419,
+      "target": 33,
+      "type": "cites"
+    },
+    {
+      "source": 420,
+      "target": 33,
+      "type": "cites"
+    },
+    {
+      "source": 421,
+      "target": 33,
+      "type": "cites"
+    },
+    {
+      "source": 422,
+      "target": 33,
+      "type": "cites"
+    },
+    {
+      "source": 423,
+      "target": 33,
+      "type": "cites"
+    },
+    {
+      "source": 424,
+      "target": 33,
+      "type": "cites"
+    },
+    {
+      "source": 425,
+      "target": 33,
+      "type": "cites"
+    },
+    {
+      "source": 426,
+      "target": 33,
+      "type": "cites"
+    },
+    {
+      "source": 427,
+      "target": 33,
+      "type": "cites"
+    },
+    {
+      "source": 428,
+      "target": 33,
+      "type": "cites"
+    },
+    {
+      "source": 429,
+      "target": 33,
+      "type": "cites"
+    },
+    {
+      "source": 430,
+      "target": 33,
+      "type": "cites"
+    },
+    {
+      "source": 431,
+      "target": 33,
+      "type": "cites"
+    },
+    {
+      "source": 432,
+      "target": 33,
+      "type": "cites"
+    },
+    {
+      "source": 434,
+      "target": 10,
+      "type": "cites"
+    },
+    {
+      "source": 468,
+      "target": 10,
+      "type": "cites"
+    },
+    {
+      "source": 475,
+      "target": 9,
+      "type": "cites"
+    },
+    {
+      "source": 477,
+      "target": 258,
+      "type": "cites"
+    },
+    {
+      "source": 487,
+      "target": 180,
+      "type": "cites"
+    },
+    {
+      "source": 2058,
+      "target": 11,
+      "type": "cites"
+    },
+    {
+      "source": 2058,
+      "target": 174,
+      "type": "cites"
+    },
+    {
+      "source": 2064,
+      "target": 12,
+      "type": "cites"
+    },
+    {
+      "source": 2067,
+      "target": 12,
+      "type": "cites"
+    },
+    {
+      "source": 2086,
+      "target": 12,
+      "type": "cites"
+    },
+    {
+      "source": 2087,
+      "target": 8,
+      "type": "cites"
+    },
+    {
+      "source": 2090,
+      "target": 8,
+      "type": "cites"
+    }
+  ],
+  "edge_types": [
+    "cites"
+  ],
+  "citation_report": "C:\\dev\\grap-rust\\.logs\\real-law-product-workspace\\legal-kg\\citation-report.json",
+  "coverage": {
+    "missing_references": 12276,
+    "ambiguous_references": 68,
+    "unidentified_acts": 87
+  },
+  "counts": {
+    "acts": 2092,
+    "cites": 978,
+    "relations": 0,
+    "entities": 0,
+    "shown_nodes": 200,
+    "shown_edges": 81,
+    "node_count": 2092,
+    "edge_count": 978
+  },
+  "seconds": 2.395,
+  "reopened_body_search_hits": 3
+}
