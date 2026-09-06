@@ -43,6 +43,7 @@ _TIERS = {
     "enforce_retention": "full", "get_audit_log": "full", "reconstruct_run": "full",
     "get_telemetry": "full", "build_legal_graph": "full", "legal_graph_from_relations": "full",
     "extract_legal_claims": "full", "get_legal_claims": "full", "get_legal_sources": "full",
+    "export_legal_claim_graph": "full",
 }
 
 class ApplicationState:
@@ -1975,9 +1976,9 @@ class GrapApplication:
                              refresh: bool = False, model: str = None) -> dict:
         """Extract qualified legal proposals from a JSON file or folder into this workspace.
 
-        max_files limits model calls, not the coverage scan. Only whole documents
+        max_files limits document attempts, not the coverage scan or transport retries. Only whole documents
         within max_chars are extracted; oversized sources are explicitly deferred.
-        Unchanged successful sources are skipped unless refresh is set. Prior
+        Unchanged successful or failed sources are skipped unless refresh is set. Prior
         revisions survive failed refreshes. Claims remain unreviewed proposals.
         """
         denied = self._require("operator")
@@ -2020,6 +2021,24 @@ class GrapApplication:
             with LegalClaimStore(Path(self._resolve_ws_root()) / "legal-claims.sqlite") as store:
                 result = store.source_history(source_id) if source_id else store.sources(limit=limit, offset=offset)
                 return {"status": "ok", **result}
+        except Exception as exc:
+            return {"status": "error", "message": str(exc)}
+
+    @operation
+    def export_legal_claim_graph(self) -> dict:
+        """Export accepted legal proposals as a new Rust graph snapshot with source receipts.
+
+        Each claim remains a qualified node, linked to its source revision. Returns
+        a graph_path for load_knowledge_graph; does not change the active graph.
+        """
+        denied = self._require("operator")
+        if denied:
+            return denied
+        from .kee.legal_claims import LegalClaimStore
+        root = Path(self._resolve_ws_root())
+        try:
+            with LegalClaimStore(root / "legal-claims.sqlite") as store:
+                return {"status": "ok", **store.export_graph(root / "legal-claim-snapshots" / uuid.uuid4().hex)}
         except Exception as exc:
             return {"status": "error", "message": str(exc)}
 
@@ -3335,6 +3354,8 @@ class GrapApplication:
                               "open_extraction_graph", "extend_extraction_graph", "export_ontology",
                               "get_extraction_evidence",
                               "build_legal_graph", "legal_graph_from_relations",
+                              "extract_legal_claims", "get_legal_claims", "get_legal_sources",
+                              "export_legal_claim_graph",
                               "graph_neighbors", "load_ontology",
                               "get_blast_radius", "find_cycles", "find_orphans", "kg_health",
                               "get_context_bundle",

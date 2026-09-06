@@ -73,6 +73,16 @@ def test_conditions_exceptions_and_date_remain_attached_to_same_claim():
     assert len(out) == 1 and out[0]["conditions"] and out[0]["exceptions"] and out[0]["dates"]
 
 
+def test_unique_provision_locator_has_separate_source_anchor():
+    text = "Articolul 2. " + TEXT
+    out = extract_claims(provider(claim(provision="Articolul 2")), text)["claims"][0]
+    anchor = out["provision_evidence"]
+    assert text[anchor["start"]:anchor["end"]] == "Articolul 2"
+    assert out["scope_resolution"] == "unresolved"
+    with pytest.raises(ValueError, match="provision locator"):
+        extract_claims(provider(claim(provision="Articolul 2")), text + " Articolul 2")
+
+
 def test_structured_output_scoped_to_legal_call(monkeypatch):
     p = OpenAICompatProvider(extra_body={"reasoning_effort": "none"})
     seen = []
@@ -97,11 +107,13 @@ def test_failed_refresh_retains_old_receipt_and_successful_empty_retracts(tmp_pa
         retained = store.read(include_stale=True)["claims"][0]
         assert retained["claim_id"] == original["claim_id"] and retained["stale"]
         assert store.receipt(original["revision_id"])["source_text"] == TEXT
-        assert store.ingest_folder(file, provider())["counts"]["ready"] == 1
+        assert store.ingest_folder(file, provider(), refresh=True)["counts"]["ready"] == 1
         assert store.read(include_stale=True)["total"] == 0
         history = store.source_history(original["source_id"])
         assert len(history["revisions"]) == 2
         assert store.receipt(original["revision_id"])["claims"][0]["kind"] == "right"
+        store.ingest_folder(file, StubProvider(default="bad"), refresh=True)
+        assert store.coverage()["sources_with_retained_claims"] == 0
 
 
 def test_incomplete_provider_response_never_replaces_current_claims(tmp_path):
@@ -127,7 +139,7 @@ def test_budget_and_resume_count_calls_not_unchanged_files_and_no_identity_mergi
     with LegalClaimStore(tmp_path / "claims.sqlite") as store:
         first = store.ingest_folder(folder, p, max_files=1, max_chars=500)
         assert first["counts"] == {"scanned": 5, "attempted": 1, "ready": 1,
-                                    "unchanged": 0, "deferred": 3, "failed": 1}
+                                    "unchanged": 0, "deferred": 3, "failed": 1, "missing": 0}
         second = store.ingest_folder(folder, p, max_files=1, max_chars=500)
         assert second["counts"]["attempted"] == 1 and second["counts"]["unchanged"] == 1
         rows = store.read()["claims"]
@@ -149,6 +161,32 @@ def test_interruption_marks_pending_before_call_and_preserves_receipt(tmp_path):
         assert store.read(include_stale=True)["total"] == 1
 
 
+def test_resume_does_not_spend_budget_repeating_unchanged_failure(tmp_path):
+    folder = tmp_path / "sources"
+    source(folder / "a.json")
+    source(folder / "b.json")
+    with LegalClaimStore(tmp_path / "claims.sqlite") as store:
+        assert store.ingest_folder(folder, StubProvider(default="bad"), max_files=1)["counts"]["attempted"] == 1
+        resumed = provider(claim())
+        result = store.ingest_folder(folder, resumed, max_files=1)
+        assert result["counts"]["ready"] == 1 and result["counts"]["failed"] == 1
+        assert len(resumed.calls) == 1
+
+
+def test_folder_absence_marks_stale_without_affecting_other_folders(tmp_path):
+    folder = tmp_path / "sources"
+    file = source(folder / "a.json")
+    other = source(tmp_path / "unrelated" / "b.json")
+    with LegalClaimStore(tmp_path / "claims.sqlite") as store:
+        store.ingest_folder(file, provider(claim()))
+        store.ingest_folder(other, provider(claim()))
+        file.unlink()
+        result = store.ingest_folder(folder, provider(), max_files=0)
+        assert result["counts"]["missing"] == 1
+        assert store.read()["total"] == 1
+        assert store.read(include_stale=True)["total"] == 2
+
+
 def test_application_interface_is_workspace_owned_and_registered(tmp_path):
     file = source(tmp_path / "a.json")
     app = GrapApplication(tmp_path / "workspace", role="operator", provider_factory=lambda **_: provider(claim()))
@@ -162,3 +200,27 @@ def test_application_interface_is_workspace_owned_and_registered(tmp_path):
     reader = GrapApplication(tmp_path / "workspace", role="reader")
     assert reader.extract_legal_claims(str(file))["status"] == "error"
     assert app.get_legal_claims(kind="imagined")["status"] == "error"
+
+
+def test_rust_snapshot_preserves_qualified_claim_nodes_and_reopens_search(tmp_path):
+    import pygrap
+    file = source(tmp_path / "a.json")
+    with LegalClaimStore(tmp_path / "claims.sqlite") as store:
+        store.ingest_folder(file, provider(claim()))
+        target = tmp_path / "snapshot"
+        result = store.export_graph(target)
+        assert result["claims"] == 1 and result["sources"] == 1
+        with pytest.raises(FileExistsError):
+            store.export_graph(target)
+        # A failed replacement excludes old claims from NEW snapshots, without
+        # invalidating this explicitly dated, self-contained historical export.
+        store.ingest_folder(file, StubProvider(default="bad"), refresh=True)
+        assert store.export_graph(tmp_path / "later")["claims"] == 0
+    graph = pygrap.IndexedKnowledgeGraph.with_merge_policy(result["graph_path"], 2)
+    hits = graph.search_and_traverse("indemnizație", max_seeds=5, required_properties=[],
+        min_strength=0., max_depth=0, max_results=5, text_weight=1., graph_weight=0.)
+    assert hits and graph.node_count() == 2 and graph.edge_count() == 1
+    data = json.loads((target / "legal-claims.json").read_text(encoding="utf-8"))
+    saved = data["claims"][0]
+    assert json.loads(graph.get_node_text(saved["node_id"]))["dates"] == ["lunar"]
+    assert data["revisions"][saved["revision_id"]]["source_text"] == TEXT

@@ -51,7 +51,10 @@ def main():
         raw = path.read_bytes(); doc = json.loads(raw.decode("utf-8-sig")); body = doc["text_complet"]
         lo = body.index(start) if start else 0
         hi = body.index(end, lo + 1) if end else len(body)
-        cases.append({"id": key, "text": body[lo:hi].strip(), "source_file": path.as_posix(),
+        passage = body[lo:hi]
+        lo += len(passage) - len(passage.lstrip())
+        hi = lo + len(passage.strip())
+        cases.append({"id": key, "text": body[lo:hi], "source_file": path.as_posix(),
                       "source_sha256": hashlib.sha256(raw).hexdigest(), "field": "text_complet",
                       "start": lo, "end": hi, "source_url": doc["link"], **labels})
 

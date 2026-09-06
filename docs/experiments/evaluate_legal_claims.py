@@ -35,6 +35,13 @@ def main():
         raw = (root / case["source_file"]).read_bytes()
         assert hashlib.sha256(raw).hexdigest() == case["source_sha256"], case["id"]
         body = json.loads(raw.decode("utf-8-sig"))[case["field"]]
+        # The older frozen fixture stripped outer whitespace from the supplied
+        # passage but retained the enclosing offsets. Keep its text unchanged;
+        # correct the receipt's offsets to refer to the exact model input.
+        enclosing = body[case["start"]:case["end"]]
+        assert enclosing.strip() == case["text"], case["id"]
+        case["start"] += len(enclosing) - len(enclosing.lstrip())
+        case["end"] = case["start"] + len(case["text"])
         assert body[case["start"]:case["end"]] == case["text"], case["id"]
     provider = RecordingProvider(model=args.model, timeout=120, extra_body={"reasoning_effort": "none"})
     provider.max_tokens = 4096
