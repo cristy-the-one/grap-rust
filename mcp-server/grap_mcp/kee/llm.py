@@ -226,6 +226,7 @@ class OpenAICompatProvider:
                 f"LLM stream to {url} failed: {exc}. Is the server (e.g. Ollama) "
                 f"running and is model '{self.model}' available?") from exc
         try:
+            finished = False
             for raw in resp:                       # iterate the chunked response by line
                 line = raw.decode("utf-8", "replace").strip()
                 if not line:
@@ -233,6 +234,7 @@ class OpenAICompatProvider:
                 if line.startswith("data:"):       # SSE framing used by OpenAI/Ollama
                     line = line[len("data:"):].strip()
                 if line == "[DONE]":
+                    finished = True
                     break
                 try:
                     obj = json.loads(line)
@@ -242,9 +244,13 @@ class OpenAICompatProvider:
                 if not choices:
                     continue
                 _check_finish_reason(choices[0])
+                if choices[0].get("finish_reason") == "stop":
+                    finished = True
                 delta = (choices[0].get("delta") or {}).get("content")
                 if delta:
                     yield delta
+            if not finished:
+                raise RuntimeError("LLM stream ended without a completion marker; extraction is incomplete.")
         finally:
             resp.close()
 

@@ -1,0 +1,86 @@
+[
+  {
+    "model": "gemma4:latest",
+    "label": "gemma4:latest schema",
+    "extra_body": {
+      "reasoning_effort": "none",
+      "response_format": {
+        "type": "json_schema",
+        "json_schema": {
+          "name": "document_claims",
+          "strict": true,
+          "schema": {
+            "type": "object",
+            "properties": {
+              "outcomes": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "requirements": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "evidence": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "requirements",
+                    "evidence"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "relations": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "from": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "type": "string"
+                    },
+                    "to": {
+                      "type": "string"
+                    },
+                    "evidence": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "from",
+                    "type",
+                    "to",
+                    "evidence"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": [
+              "outcomes",
+              "relations"
+            ],
+            "additionalProperties": false
+          }
+        }
+      }
+    }
+  },
+  {
+    "model": "gemma4:latest",
+    "label": "gemma4:latest plain",
+    "extra_body": {
+      "reasoning_effort": "none"
+    }
+  }
+]

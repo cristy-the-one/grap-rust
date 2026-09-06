@@ -214,6 +214,14 @@ def test_stream_reports_truncation_after_partial_content(monkeypatch):
         next(pieces)
 
 
+def test_stream_requires_completion_marker(monkeypatch):
+    sse = 'data: {"choices":[{"delta":{"content":"partial"}}]}\n'
+    monkeypatch.setattr(llm.urllib.request, "urlopen",
+                        lambda req, timeout=None: _FakeResp(sse.encode()))
+    with pytest.raises(RuntimeError, match="without a completion marker"):
+        list(llm.OpenAICompatProvider(base_url="http://x/v1", model="m").stream("s", "u"))
+
+
 def test_extra_body_env_merges_into_payload(monkeypatch):
     # llama.cpp reasoning models (e.g. Bonsai): disable thinking per request.
     monkeypatch.setenv("GRAP_LLM_EXTRA_BODY",

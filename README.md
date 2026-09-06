@@ -168,6 +168,10 @@ those operations; extraction and lifecycle workflows build on them. For a focuse
 development loop, run `cargo test -p grap` and
 `cargo bench --bench engine_workloads`; see [benchmark notes](benches/README.md).
 
+For local LLM ontology extraction, see the [installed-model comparison and
+measured configuration](docs/local-models-and-performance-2026-09.md), including
+optional structured generation, source evidence, and incremental refresh behavior.
+
 ### 1. `KnowledgeGraph` (always available)
 
 The low-level arena-based graph.
