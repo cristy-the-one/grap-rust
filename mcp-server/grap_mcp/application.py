@@ -45,6 +45,8 @@ _TIERS = {
     "extract_legal_claims": "full", "get_legal_claims": "full", "get_legal_sources": "full",
     "export_legal_claim_graph": "full",
     "resolve_legal_term": "full",
+    "create_legal_review": "full", "get_legal_review": "full",
+    "process_legal_review": "full", "save_legal_review": "full",
 }
 
 class ApplicationState:
@@ -2057,6 +2059,55 @@ class GrapApplication:
             return {"status": "error", "message": str(exc)}
 
     @operation
+    def create_legal_review(self, path: str, sample_size: int = 24, seed: str = None,
+                            model: str = "grap-legal-gemma4", max_chars: int = 100000) -> dict:
+        """Freeze a reproducible uniform document sample, including failures, for human review."""
+        if denied := self._require("operator"):
+            return denied
+        from .kee.legal_review import LegalReviewStore
+        try:
+            with LegalReviewStore(self._resolve_ws_root()) as store:
+                return {"status": "ok", **store.create(path, sample_size, seed, model, max_chars)}
+        except Exception as exc:
+            return {"status": "error", "message": str(exc)}
+
+    @operation
+    def get_legal_review(self, campaign_id: str = None, item_id: str = None, export: bool = False) -> dict:
+        """Read campaigns, a full-source review document, or an export with manifest and history."""
+        from .kee.legal_review import LegalReviewStore
+        try:
+            with LegalReviewStore(self._resolve_ws_root()) as store:
+                return {"status": "ok", **(store.detail(campaign_id, item_id) if item_id else store.get(campaign_id, export))}
+        except Exception as exc:
+            return {"status": "error", "message": str(exc)}
+
+    @operation
+    def process_legal_review(self, campaign_id: str, item_id: str) -> dict:
+        """Process at most one resumable batch and pin the first complete source receipt."""
+        if denied := self._require("operator"):
+            return denied
+        from .kee.legal_review import LegalReviewStore
+        try:
+            with LegalReviewStore(self._resolve_ws_root()) as store:
+                return {"status": "ok", **store.process(campaign_id, item_id, self.get_provider)}
+        except Exception as exc:
+            return {"status": "error", "message": str(exc)}
+
+    @operation
+    def save_legal_review(self, campaign_id: str, item_id: str, revision_id: str, expected_version: int,
+                          reviewer: str, judgments: list, omissions: list, complete: bool = False) -> dict:
+        """Append human judgments/corrections against a pinned receipt without modifying its claims."""
+        if denied := self._require("operator"):
+            return denied
+        from .kee.legal_review import LegalReviewStore
+        try:
+            with LegalReviewStore(self._resolve_ws_root()) as store:
+                return {"status": "ok", **store.save(campaign_id, item_id, revision_id, expected_version,
+                                                   reviewer, judgments, omissions, complete)}
+        except Exception as exc:
+            return {"status": "error", "message": str(exc)}
+
+    @operation
     def build_legal_graph(self, path: str, max_files: int = 400, with_relations: bool = False,
                           relation_files: int = 3, model: str = None) -> dict:
         """Build one navigable legal KG: act nodes + citation ('cites') edges merged
@@ -3371,6 +3422,7 @@ class GrapApplication:
                               "extract_legal_claims", "get_legal_claims", "get_legal_sources",
                               "export_legal_claim_graph",
                               "resolve_legal_term",
+                              "create_legal_review", "get_legal_review", "process_legal_review", "save_legal_review",
                               "graph_neighbors", "load_ontology",
                               "get_blast_radius", "find_cycles", "find_orphans", "kg_health",
                               "get_context_bundle",

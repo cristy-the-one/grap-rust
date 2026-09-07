@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>GRAP · Legal source review</title>
+  <link rel="stylesheet" href="/assets/legal-review.css">
+  <script src="/assets/legal-review.js" defer></script>
+</head>
+<body>
+  <header><div><a href="/">GRAP</a><span class="eyebrow"> / ROMANIAN LEGAL KNOWLEDGE</span>
+    <h1>Read the source. Test the knowledge.</h1></div>
+    <div class="header-right"><label>Review campaign<select id="campaign-select"><option value="">Choose a campaign</option></select></label>
+      <button id="export" disabled>Export evidence &amp; review</button></div></header>
+  <p class="intro">Compare extraction proposals with complete source documents. Record mistakes and missed rules before using the results for inference.</p>
+  <div id="message" role="status" aria-live="polite">Connecting…</div>
+  <details id="setup"><summary>Create a reproducible corpus sample</summary>
+    <form id="create-form" class="setup-grid">
+      <label class="wide">Corpus folder<input id="corpus" required></label>
+      <label>Documents to sample<input id="sample-size" type="number" min="1" max="5000" value="24" required></label>
+      <label>Seed (blank = random)<input id="seed" placeholder="Saved with the campaign"></label>
+      <label>Local model profile<input id="model" value="grap-legal-gemma4" required></label>
+      <button type="submit" class="primary">Freeze sample</button>
+      <p class="wide muted">Every JSON file is eligible, including malformed documents. Selected files are copied into this workspace; the originals stay intact. Extraction is limited to complete documents of at most 100,000 characters; longer documents remain visibly deferred.</p>
+    </form>
+  </details>
+  <section id="overview" hidden aria-label="Campaign results">
+    <div id="metrics" class="metrics"></div>
+    <div class="toolbar"><p id="sample-label" class="muted"></p>
+      <label>Batch budget<input id="budget" type="number" min="1" max="50" value="8"></label>
+      <button id="process" class="primary">Process sample</button><button id="stop" disabled>Stop after current batch</button></div>
+    <details><summary>Human judgments and measurement limits</summary><div id="scores"></div>
+      <p class="muted">These are counts within this frozen sample, not a corpus accuracy estimate. Unreviewed and uncertain results are not successes. Read the full source to find omissions; correctly copied text alone does not establish correct meaning or current legal validity.</p></details>
+  </section>
+  <main id="workbench" hidden>
+    <aside aria-label="Sampled documents"><h2>Sample documents</h2><div id="documents"></div></aside>
+    <section class="source-pane" aria-label="Complete source document">
+      <div class="pane-head"><div><span class="eyebrow">FROZEN SOURCE</span><h2 id="source-title">Choose a document</h2></div></div>
+      <p id="source-meta" class="muted"></p>
+      <div class="source-actions"><button id="retry" disabled>Process next batch</button><button id="omit" disabled>Add selected passage as a missed rule</button></div>
+      <p class="muted small">Select text below to record an omission. “Show evidence” highlights a claim's passage in the complete document.</p>
+      <pre id="source" tabindex="0"></pre>
+    </section>
+    <section class="review-pane" aria-label="Extraction judgments">
+      <div class="pane-head"><div><span class="eyebrow">EXTRACTION PROPOSALS</span><h2 id="claim-heading">Claims to review</h2></div><span id="save-state" class="muted"></span></div>
+      <label>Reviewer name<input id="reviewer" autocomplete="name" placeholder="Your name"></label>
+      <div id="claims"></div><div id="omissions"></div>
+      <footer id="review-footer" hidden>
+        <label class="check"><input id="complete" type="checkbox">I checked the full source for missing rules and assessed every extracted claim.</label>
+        <button id="save" class="primary">Save review</button>
+        <button id="discard" disabled>Discard unsaved edits</button>
+        <p class="muted small">Saved corrections remain human annotations. They do not overwrite extraction receipts or automatically change the graph.</p>
+      </footer>
+    </section>
+  </main>
+</body></html>

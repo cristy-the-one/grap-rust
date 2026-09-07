@@ -68,6 +68,23 @@ class LegalGraphBody(BaseModel):
     model: Optional[str] = None
 
 
+class LegalReviewCreateBody(BaseModel):
+    path: str
+    sample_size: int = Field(default=24, ge=1, le=5000)
+    seed: Optional[str] = None
+    model: str = "grap-legal-gemma4"
+    max_chars: int = Field(default=100000, ge=1, le=100000)
+
+
+class LegalReviewSaveBody(BaseModel):
+    revision_id: str
+    expected_version: int = Field(ge=0)
+    reviewer: str
+    judgments: list[dict]
+    omissions: list[dict]
+    complete: bool = False
+
+
 class OntologyExtendBody(BaseModel):
     workdir: str
     corpus_path: str
@@ -246,6 +263,29 @@ def graph_neighbors_ep(body: NeighborsBody) -> dict:
 def legal_graph_from_relations_ep(body: RelationsFileBody) -> dict:
     """Load a relations JSON file (e.g. relations.curated.json) into the graph."""
     return bridge.call("legal_graph_from_relations", path=body.path, top=body.top)
+
+
+@app.get("/api/legal-review")
+def legal_reviews(campaign_id: Optional[str] = None, item_id: Optional[str] = None, export: bool = False) -> dict:
+    return bridge.call("get_legal_review", campaign_id=campaign_id, item_id=item_id, export=export)
+
+
+@app.post("/api/legal-review")
+def create_legal_review(body: LegalReviewCreateBody) -> dict:
+    return bridge.call("create_legal_review", **body.model_dump())
+
+
+@app.post("/api/legal-review/{campaign_id}/{item_id}/process")
+def process_legal_review(campaign_id: str, item_id: str) -> dict:
+    # Capture the instance for this request: switching the console's workspace
+    # while inference is running cannot redirect this operation's writes.
+    application = bridge.application
+    return application.process_legal_review(campaign_id, item_id)
+
+
+@app.post("/api/legal-review/{campaign_id}/{item_id}/save")
+def save_legal_review(campaign_id: str, item_id: str, body: LegalReviewSaveBody) -> dict:
+    return bridge.call("save_legal_review", campaign_id=campaign_id, item_id=item_id, **body.model_dump())
 
 
 @app.get("/api/models")
@@ -686,6 +726,10 @@ if FRONTEND.is_dir():
     @app.get("/")
     def index() -> FileResponse:
         return FileResponse(FRONTEND / "index.html")
+
+    @app.get("/legal-review")
+    def legal_review_page() -> FileResponse:
+        return FileResponse(FRONTEND / "legal-review.html")
 
 
 def run() -> None:
