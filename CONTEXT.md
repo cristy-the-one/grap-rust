@@ -27,6 +27,10 @@ A passage retained in the source's own words, together with the surrounding text
 needed to interpret it. Its proposed classification and subject may remain uncertain
 even when the wording is preserved exactly.
 
+**Subject**:
+The person, body, object or action governed by an assertion. The subject of a
+passive rule can differ from the actor responsible for carrying it out.
+
 **Obligation**:
 A duty imposed on a specified subject, including its conditions, exceptions,
 limits and relevant dates. It is distinct from a description or a permission.

@@ -16,6 +16,9 @@ within each source, and exports receipt-backed Rust graph snapshots. The report
 includes complete-document trials and remaining semantic limitations.
 [Large-act extraction now resumes from durable batch checkpoints](docs/legal-resume-2026-09.md),
 with a complete-document publication gate and a tested local model context profile.
+The [semantic evaluation](docs/legal-semantics-2026-09.md) measures complete subjects
+and rule types separately from exact text preservation; extraction now uses literal
+subject phrases instead of model-generated token positions.
 
 ## Why grap?
 

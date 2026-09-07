@@ -152,7 +152,7 @@ def source_units(text):
                 definitions.append(unit)
                 continue
             unit["id"] = f"u{len(units)}"
-            unit["tokens"] = [(m.start() + a, m.end() + a) for m in re.finditer(r"\S+", text[a:b])]
+            unit["word_count"] = len(unit["statement"].split())
             units.append(unit)
     return units, definitions
 
@@ -206,7 +206,7 @@ def _invalid_subject(subject):
 
 
 def extract_rules(provider, text):
-    """Bounded labeling calls, exact token-backed subjects and lossless rule statements."""
+    """Bounded labeling calls, source-backed subjects and lossless rule statements."""
     batches, definitions = plan_rules(text)
     return extract_batches(provider, text, batches, definitions)
 
@@ -219,7 +219,7 @@ def plan_rules(text):
     # Keep both source and output bounded; no truncation of an individual statement.
     batches, batch, words, rendered_bytes = [], [], 0, 0
     for unit in units:
-        size = len(unit["tokens"])
+        size = unit["word_count"]
         wire_size = len(json.dumps({unit["id"]: unit["statement"]}, ensure_ascii=False).encode("utf-8"))
         if size > 1200 or wire_size > 12000:
             span = unit["evidence"][0]
@@ -280,7 +280,7 @@ def extract_batches(provider, text, batches, definitions=()):
                                     "evidence": unit["evidence"][0]})
             if kind == "other":
                 continue
-            claim = {k: v for k, v in unit.items() if k not in ("id", "tokens")}
+            claim = {k: v for k, v in unit.items() if k not in ("id", "word_count")}
             subject = ""
             syntax = _explicit_subject(unit["statement"], kind)
             if syntax or valid_quote:

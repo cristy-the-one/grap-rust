@@ -1,0 +1,4 @@
+# Optional comparison profile; reuses installed weights without changing their model.
+# Create with: ollama create grap-legal-qwen9b -f scripts/legal-qwen9b.Modelfile
+FROM qwen3.5:9b-q4_K_M
+PARAMETER num_ctx 16384

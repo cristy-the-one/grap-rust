@@ -1,5 +1,10 @@
 # Resumable large-act extraction
 
+**Extraction update:** [legal-rules-v7](legal-semantics-2026-09.md) removes numbered
+tokens from model input and uses uniquely grounded subject phrases. The resumption
+contract below is unchanged; its 12,000-byte request bound now applies to serialized
+source statements. Older v6 work is not mixed with v7 checkpoints.
+
 `extract_legal_claims` now accepts `max_batches`. With that option, every validated
 labeling batch is committed to the existing SQLite ledger. A later call in a new
 process reuses completed batches. The authoritative document receipt and its claims

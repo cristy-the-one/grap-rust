@@ -1,5 +1,9 @@
 # Romanian law: source statements, scoped definitions and searchable evidence
 
+**Current contract:** [legal-rules-v7](legal-semantics-2026-09.md) uses literal subject
+phrases instead of token positions. The v6 measurements below remain historical
+comparison evidence. Public operations and source-statement preservation continue.
+
 The default legal extractor is now `legal-rules-v6`. It keeps source wording and
 context in code and asks the LLM to classify passages and select subject tokens.
 Explicit definition lists and inline definitions are parsed directly. This replaces
