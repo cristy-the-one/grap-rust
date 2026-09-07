@@ -4,6 +4,8 @@
 tokens from model input and uses uniquely grounded subject phrases. The resumption
 contract below is unchanged; its 12,000-byte request bound now applies to serialized
 source statements. Older v6 work is not mixed with v7 checkpoints.
+The current v8 extractor adds semantic syntax corrections with the same resumption
+contract; older-version checkpoints are likewise not reused.
 
 `extract_legal_claims` now accepts `max_batches`. With that option, every validated
 labeling batch is committed to the existing SQLite ledger. A later call in a new

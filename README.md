@@ -19,6 +19,8 @@ with a complete-document publication gate and a tested local model context profi
 The [semantic evaluation](docs/legal-semantics-2026-09.md) measures complete subjects
 and rule types separately from exact text preservation; extraction now uses literal
 subject phrases instead of model-generated token positions.
+The latest fixes distinguish applicability exclusions from prohibitions and correct
+subjects after predicates, passing all 23 targeted real-source reference cases.
 
 ## Why grap?
 

@@ -10,12 +10,15 @@ from grap_mcp.kee.llm import StubProvider
 
 DATA = Path(__file__).parent
 CASES = json.loads((DATA / "real-law-semantic-cases.json").read_text(encoding="utf-8"))["cases"]
+CASES += json.loads((DATA / "real-law-semantic-transfer-cases.json").read_text(encoding="utf-8"))["cases"]
 
 
 @pytest.mark.parametrize("case", CASES, ids=lambda c: c["id"])
 def test_recorded_gemma_subject_and_kind_regressions(case):
     """Replay the actual v7 failures and successes, independent of model availability."""
     name = "semantic-gemma-dev-v7-final.json" if case["split"] == "dev" else "semantic-gemma-holdout-v7.json"
+    if case["id"].startswith("transfer-"):
+        name = "semantic-gemma-transfer-v7.json"
     report = json.loads((DATA / name).read_text(encoding="utf-8"))
     row = next(r for r in report["cases"] if r["id"] == case["id"])
     replies = iter(call["reply"] for call in row["calls"])

@@ -1,6 +1,61 @@
 # Semantic extraction: subjects, rule types and measured limits
 
-The legal extractor now uses `legal-rules-v7`. Models copy a subject phrase rather
+## v8: the three reported failures are fixed
+
+The current extractor is `legal-rules-v8`. Narrow source-syntax checks distinguish
+applicability from prohibition, recover postposed sanctions subjects, and separate
+a prohibited action from a trailing comma-delimited condition or exception. Whole
+statements, context and exact subject offsets remain intact. Mixed operative kinds
+are not forced into facts. Conditions inside relative clauses defer to the model;
+dotted abbreviations retain their final period.
+
+The LLM prompt and request schema are unchanged from v7. An initial prompt expansion
+fixed the target errors but regressed two development cases, so it was removed.
+The saved intermediate runs make that regression visible. No retries, ensemble,
+extra inference passes or new model weights were introduced.
+
+Fresh `grap-legal-gemma4` runs with the final prompt produced:
+
+| Reference set | v7 joint correct | v8 joint correct |
+|---|---:|---:|
+| Original development | 10/11 | 11/11 |
+| Original held-out, now observed regression cases | 4/6 | 6/6 |
+| Six additional passages from four different documents | 4/6 | 6/6 |
+
+All 23 final cases have the expected primary kind and complete subject, retain the
+required qualifications in their statement, and have exact evidence spans. There
+were no missing or extra claims. This is a small, targeted, assistant-authored set,
+not expert validation or an estimate of corpus-wide accuracy. The new references
+were frozen in `92669e6` before v8 implementation or model trials; the final prompt
+was committed in `1bda4a3` before the new v8 transfer run.
+
+Evidence: [final development](experiments/semantic-gemma-dev-v8-final.json),
+[final original holdout](experiments/semantic-gemma-holdout-v8-final.json),
+[additional references](experiments/real-law-semantic-transfer-cases.json),
+[additional v7 baseline](experiments/semantic-gemma-transfer-v7.json),
+[additional v8 results](experiments/semantic-gemma-transfer-v8.json).
+The intermediate prompt runs are retained as `semantic-gemma-dev-v8.json` and
+`semantic-gemma-holdout-v8.json`.
+
+Subsequent guards for relative-clause conditions, subordinate `să`, and terminal
+abbreviations leave all 23 final live claim receipts identical when their recorded
+replies are replayed. Replaying the original v7 replies also passes all 23 references.
+This distinguishes code correction from merely hoping for a better model reply.
+
+**526 tests pass**, including a new public-application test that ingests all three
+corrected forms, checks stored evidence offsets, exports the Rust graph, reopens its
+four nodes and three source links, and searches it. Rust source is unchanged.
+The model was unloaded after evaluation. v8 deliberately invalidates older extraction
+work when selected for processing; historical receipts remain available.
+
+To run the additional set, add
+`--fixture docs/experiments/real-law-semantic-transfer-cases.json --split holdout`
+to the evaluator command below, with a fresh output path. For the v7 comparison,
+export `e5eaa14:mcp-server/grap_mcp/kee/legal_rules.py` and use `--extractor-file`.
+
+## v7 study and comparison history
+
+The v7 extractor introduced the following contract. Models copy a subject phrase rather
 than calculate token positions. Code requires the quote to occur exactly once within
 its own statement, or uses an existing explicit-syntax match. An absent, ambiguous
 or obviously invalid phrase leaves the subject unresolved. The complete source rule

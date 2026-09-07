@@ -162,7 +162,14 @@ def source_units(text):
 def _postposed_span(statement, start):
     """Keep nominal modifiers; stop only at an explicitly delimited qualification."""
     boundary = _TRAILING_QUALIFIER.search(statement, start)
-    end = boundary.start() if boundary else len(statement.rstrip(" .;:!?"))
+    # A condition inside a relative clause may identify the governed objects.
+    # In that ambiguous form, keep the model's literal subject instead of cutting it.
+    if boundary and re.search(r"\b(?:care|ce)\b", statement[start:boundary.start()], re.I):
+        return None
+    tail = statement.rstrip(" ;:!?")
+    if not re.search(r"(?:\b[A-ZĂÂÎȘŞȚŢ]\.){2,}$", tail):
+        tail = tail.rstrip(" .")
+    end = boundary.start() if boundary else len(tail)
     return _trim(statement, start, end)
 
 
@@ -210,6 +217,8 @@ def _explicit_subject(statement, kind):
     if kind == "fact" and (applicability := _applicability_subject(statement)):
         return applicability
     forbidden = re.search(r"\bse interzice\s+(?P<subject>.+?)\s+s[ăa]\s", statement, re.I)
+    if forbidden and _TRAILING_QUALIFIER.search(statement, forbidden.start("subject"), forbidden.end("subject")):
+        forbidden = None  # The 'să' belongs to the condition, not an actor's action.
     established = re.match(r"Se (?:înfiin[țţt]eaz[ăa]|constituie)\s+(?P<subject>[^,]+)", statement)
     if forbidden or established:
         match = forbidden or established

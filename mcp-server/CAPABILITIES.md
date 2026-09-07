@@ -13,7 +13,8 @@ The full tier also includes a separate [Romanian legal statement path](../docs/l
   bounded whole-document extraction of source statements with proposed kinds and
   grounded subjects. Explicit definitions are parsed directly; ordinary rules keep
   their full statement and context. Zero `max_files` scans coverage without extraction.
-  The v7 model contract copies subject phrases; code anchors them within each statement.
+  The v8 extractor retains the literal-subject model contract and anchors phrases within
+  each statement, with syntax checks for applicability and postposed subjects.
   [Semantic evaluation](../docs/legal-semantics-2026-09.md) distinguishes role accuracy
   from exact evidence preservation.
   Set `max_batches` to checkpoint validated batches and cap new labeling calls across

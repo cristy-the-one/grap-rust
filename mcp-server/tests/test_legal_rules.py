@@ -190,6 +190,8 @@ def test_model_fragments_stay_unresolved(text, first, last):
     ("(1) Se interzice amplasarea magazinelor.", "fact", "(1) Se", "prohibition", "amplasarea magazinelor"),
     ("Se interzice utilizarea instalațiilor care nu au contor.", "prohibition", "utilizarea", "prohibition", "utilizarea instalațiilor care nu au contor"),
     ("Se interzice accesul, cu excepția personalului autorizat.", "prohibition", "accesul, cu excepția personalului autorizat", "prohibition", "accesul"),
+    ("Se interzice conectarea instalației, dacă utilizatorul încearcă să o modifice.", "prohibition", "conectarea instalației", "prohibition", "conectarea instalației"),
+    ("Se interzice accesul în sediul A.N.L.", "prohibition", "accesul", "prohibition", "accesul în sediul A.N.L."),
 ])
 def test_applicability_and_postposed_subjects(text, model_kind, selected, kind, subject):
     p = StubProvider(default=json.dumps({"units": {"u0": {"kind": model_kind, "subject": selected}}}))
@@ -205,6 +207,7 @@ def test_applicability_and_postposed_subjects(text, model_kind, selected, kind, 
     ("Banca nu aplică sancțiuni fără verificare.", "prohibition", "Banca"),
     ("Nu se interzice accesul personalului.", "permission", "accesul personalului"),
     ("Contractul trebuie adaptat reglementărilor care îi sunt aplicabile.", "obligation", "Contractul"),
+    ("Se interzice accesul persoanelor care, dacă sunt solicitate, refuză identificarea.", "prohibition", "accesul persoanelor care, dacă sunt solicitate, refuză identificarea"),
 ])
 def test_surface_rules_do_not_override_unrelated_or_mixed_semantics(text, kind, subject):
     p = StubProvider(default=json.dumps({"units": {"u0": {"kind": kind, "subject": subject}}}))
@@ -212,6 +215,33 @@ def test_surface_rules_do_not_override_unrelated_or_mixed_semantics(text, kind, 
     assert claim["kind"] == kind
     assert claim["subject"] == subject
     assert_anchored(text, [claim])
+
+
+def test_corrected_rules_survive_ledger_and_rust_export(tmp_path):
+    import pygrap
+
+    statements = ["Normele nu se aplică băncilor.",
+                  "În caz de abatere sunt aplicabile sancțiunile civile.",
+                  "Se interzice conectarea instalației, dacă lipsește contorul."]
+    body = " ".join(f"+ Articolul {i} {s}" for i, s in enumerate(statements, 1))
+    file = tmp_path / "act.json"
+    file.write_text(json.dumps({"id": "act", "titlu": "Norme", "text_complet": body}), encoding="utf-8")
+    p = StubProvider(default=json.dumps({"units": {
+        "u0": {"kind": "prohibition", "subject": "Normele"},
+        "u1": {"kind": "prohibition", "subject": "În caz de abatere"},
+        "u2": {"kind": "prohibition", "subject": statements[2][len("Se interzice "):]} }}))
+    app = GrapApplication(tmp_path / "workspace", role="operator", provider_factory=lambda **_: p)
+    assert app.extract_legal_claims(str(file))["counts"]["ready"] == 1
+    claims = app.get_legal_claims()["claims"]
+    assert {(c["kind"], c["subject"]) for c in claims} == {
+        ("fact", "Normele"), ("fact", "sancțiunile civile"), ("prohibition", "conectarea instalației")}
+    assert_anchored(body, claims)
+    snapshot = app.export_legal_claim_graph()
+    graph = pygrap.IndexedKnowledgeGraph.with_merge_policy(snapshot["graph_path"], 2)
+    assert graph.node_count() == 4 and graph.edge_count() == 3
+    hits = graph.search_and_traverse("conectarea", max_seeds=5, required_properties=[],
+        min_strength=0., max_depth=0, max_results=5, text_weight=1., graph_weight=0.)
+    assert hits
 
 
 def test_mixed_right_and_duty_keep_shared_sentence_context():
