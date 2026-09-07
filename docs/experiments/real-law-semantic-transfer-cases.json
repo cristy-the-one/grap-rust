@@ -1,0 +1,105 @@
+{
+  "annotation": "Assistant-authored source references frozen before v8 changes or model trials; not expert legal validation.",
+  "rubric": "Same primary-kind and complete-governed-subject rubric as real-law-semantic-cases.json. Applicability and tax exclusions are facts. Locative restrictions within nominal actions belong to the complete subject; trailing conditional clauses do not.",
+  "cases": [
+    {
+      "id": "transfer-01",
+      "split": "holdout",
+      "source_file": "real-data-law-ro/116303.json",
+      "source_sha256": "f0e4ab90339b514863b7fa441a8077ebcede0bfd01a07f49cc4624eb070164c2",
+      "start": 1235,
+      "end": 1312,
+      "text": "Se interzice amplasarea de unităţi cu profil alimentar în spaţiile de locuit.",
+      "expected_kind": "prohibition",
+      "accepted_subjects": [
+        "amplasarea de unităţi cu profil alimentar în spaţiile de locuit"
+      ],
+      "required_text": [
+        "în spaţiile de locuit"
+      ]
+    },
+    {
+      "id": "transfer-02",
+      "split": "holdout",
+      "source_file": "real-data-law-ro/116303.json",
+      "source_sha256": "f0e4ab90339b514863b7fa441a8077ebcede0bfd01a07f49cc4624eb070164c2",
+      "start": 20170,
+      "end": 20280,
+      "text": "Se interzice depozitarea ambalajelor de transport în spaţii de producţie, prepararea sau vânzarea alimentelor.",
+      "expected_kind": "prohibition",
+      "accepted_subjects": [
+        "depozitarea ambalajelor de transport în spaţii de producţie, prepararea sau vânzarea alimentelor"
+      ],
+      "required_text": [
+        "în spaţii de producţie, prepararea sau vânzarea alimentelor"
+      ]
+    },
+    {
+      "id": "transfer-03",
+      "split": "holdout",
+      "source_file": "real-data-law-ro/16279.json",
+      "source_sha256": "76a04c823711dd553b814e170dc74cc9270574a4172dc7745fc3c8ebf64e05db",
+      "start": 6344,
+      "end": 6688,
+      "text": "Prevederile prezentei legi nu se aplică contractelor de proiectare, finanţare, construcţie, exploatare, întreţinere şi transfer pentru orice bun public care se încheie potrivit procedurilor prevăzute în Ordonanţa Guvernului nr. 16/2002 , aprobată cu modificări şi completări prin Legea nr. 470/2002 , cu modificările şi completările ulterioare.",
+      "expected_kind": "fact",
+      "accepted_subjects": [
+        "Prevederile prezentei legi"
+      ],
+      "required_text": [
+        "contractelor de proiectare",
+        "Ordonanţa Guvernului nr. 16/2002",
+        "Legea nr. 470/2002"
+      ]
+    },
+    {
+      "id": "transfer-04",
+      "split": "holdout",
+      "source_file": "real-data-law-ro/16279.json",
+      "source_sha256": "76a04c823711dd553b814e170dc74cc9270574a4172dc7745fc3c8ebf64e05db",
+      "start": 22326,
+      "end": 22450,
+      "text": "Procedura de negociere directa este aplicabilă în cazul în care licitaţia publică nu a condus la desemnarea unui câştigător.",
+      "expected_kind": "fact",
+      "accepted_subjects": [
+        "Procedura de negociere directa"
+      ],
+      "required_text": [
+        "în cazul în care licitaţia publică nu a condus la desemnarea unui câştigător"
+      ]
+    },
+    {
+      "id": "transfer-05",
+      "split": "holdout",
+      "source_file": "real-data-law-ro/16560.json",
+      "source_sha256": "2604f09619f10f7ade696d6e1efa212ea767ee720e9b75b0b44144e3aec7f531",
+      "start": 89823,
+      "end": 89980,
+      "text": "Dispoziţiile Legii nr. 32/1968 privind stabilirea şi sancţionarea contravenţiilor sunt aplicabile contravenţiilor prevăzute în prezenta ordonanţă de urgenţă.",
+      "expected_kind": "fact",
+      "accepted_subjects": [
+        "Dispoziţiile Legii nr. 32/1968 privind stabilirea şi sancţionarea contravenţiilor"
+      ],
+      "required_text": [
+        "contravenţiilor prevăzute în prezenta ordonanţă de urgenţă"
+      ]
+    },
+    {
+      "id": "transfer-06",
+      "split": "holdout",
+      "source_file": "real-data-law-ro/16578.json",
+      "source_sha256": "e90c001c1d4949fe799b6b4571d5e6a116075bae41cda77e94448936a811d451",
+      "start": 3399,
+      "end": 3559,
+      "text": "Impozitul pe teren nu se aplică terenurilor ocupate de clădirile şi de construcţiile prevăzute în anexa nr. 2, precum şi terenurilor din perimetrul cimitirelor.",
+      "expected_kind": "fact",
+      "accepted_subjects": [
+        "Impozitul pe teren"
+      ],
+      "required_text": [
+        "anexa nr. 2",
+        "precum şi terenurilor din perimetrul cimitirelor"
+      ]
+    }
+  ]
+}
