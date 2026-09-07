@@ -1,0 +1,291 @@
+{
+  "annotation": "Assistant-authored before model outputs; not expert legal validation.",
+  "rubric": "Primary operative kind and complete governed subject, which may be an action/object in passive wording. Qualifications must remain in the same statement. Fact includes exclusions and legal consequences; it does not assert current validity.",
+  "cases": [
+    {
+      "id": "semantic-01",
+      "split": "dev",
+      "source_file": "real-data-law-ro/19961.json",
+      "source_sha256": "5003b0236b87a2d8d92fde50f04dce6db0528e800cf7e37c8d49c2fcbe3641a7",
+      "start": 1296,
+      "end": 1681,
+      "text": "Executorii bancari, precum şi oricare alt personal angajat în compartimentul acestora au obligaţia sa păstreze secretul profesional, inclusiv secretul bancar, cu privire la actele, datele şi faptele despre care au luat cunoştinţa în cadrul activităţii lor, chiar şi după încetarea funcţiei, cu excepţia cazurilor în care legea sau părţile interesate îi eliberează de aceasta obligaţie.",
+      "expected_kind": "obligation",
+      "accepted_subjects": [
+        "Executorii bancari, precum şi oricare alt personal angajat în compartimentul acestora"
+      ],
+      "required_text": [
+        "chiar şi după încetarea funcţiei",
+        "cu excepţia cazurilor"
+      ]
+    },
+    {
+      "id": "semantic-02",
+      "split": "dev",
+      "source_file": "real-data-law-ro/19961.json",
+      "source_sha256": "5003b0236b87a2d8d92fde50f04dce6db0528e800cf7e37c8d49c2fcbe3641a7",
+      "start": 7917,
+      "end": 8215,
+      "text": "Este interzis executorilor bancari sa achizitioneze, direct sau prin interpusi, pentru ei sau pentru alţii, bunurile ce au format obiectul activităţii de executare silită sau să facă acte de executare în propria lor cauza ori în cauzele privind rudele şi afinii până la gradul al patrulea inclusiv.",
+      "expected_kind": "prohibition",
+      "accepted_subjects": [
+        "executorilor bancari"
+      ],
+      "required_text": [
+        "direct sau prin interpusi",
+        "pentru ei sau pentru alţii"
+      ]
+    },
+    {
+      "id": "semantic-03",
+      "split": "dev",
+      "source_file": "real-data-law-ro/19961.json",
+      "source_sha256": "5003b0236b87a2d8d92fde50f04dce6db0528e800cf7e37c8d49c2fcbe3641a7",
+      "start": 11475,
+      "end": 11701,
+      "text": "Dosarele de executare aflate în curs de rezolvare la data intrării în vigoare a prezentului statut pot fi preluate de către executorii bancari, pe baza solicitării scrise adresate de banca preşedintelui instanţei de executare.",
+      "expected_kind": "permission",
+      "accepted_subjects": [
+        "Dosarele de executare aflate în curs de rezolvare la data intrării în vigoare a prezentului statut"
+      ],
+      "required_text": [
+        "pe baza solicitării scrise"
+      ]
+    },
+    {
+      "id": "semantic-04",
+      "split": "dev",
+      "source_file": "real-data-law-ro/19961.json",
+      "source_sha256": "5003b0236b87a2d8d92fde50f04dce6db0528e800cf7e37c8d49c2fcbe3641a7",
+      "start": 9810,
+      "end": 10084,
+      "text": "Persoanele interesate în efectuarea executării, care nu înţeleg sau nu vorbesc limba română, au dreptul sa ia cunoştinţa, printr-un interpret sau traducător, de cuprinsul oricăror acte întocmite de executorul bancar, precum şi de celelalte acte depuse la dosarul executării.",
+      "expected_kind": "right",
+      "accepted_subjects": [
+        "Persoanele interesate în efectuarea executării, care nu înţeleg sau nu vorbesc limba română"
+      ],
+      "required_text": [
+        "printr-un interpret sau traducător"
+      ]
+    },
+    {
+      "id": "semantic-05",
+      "split": "dev",
+      "source_file": "real-data-law-ro/19961.json",
+      "source_sha256": "5003b0236b87a2d8d92fde50f04dce6db0528e800cf7e37c8d49c2fcbe3641a7",
+      "start": 9735,
+      "end": 9809,
+      "text": "Toate actele întocmite de executorul bancar se redactează în limba română.",
+      "expected_kind": "obligation",
+      "accepted_subjects": [
+        "Toate actele întocmite de executorul bancar"
+      ],
+      "required_text": [
+        "în limba română"
+      ]
+    },
+    {
+      "id": "semantic-06",
+      "split": "dev",
+      "source_file": "real-data-law-ro/16861.json",
+      "source_sha256": "c6618622c61e822306f1752da49c8aa4131100aba493c1e3854bf63830364b94",
+      "start": 319,
+      "end": 542,
+      "text": "Direcţia generală de prognoza se organizează şi funcţionează ca organ de specialitate cu personalitate juridică în subordinea Ministerului Finanţelor, prin reorganizarea Comisiei Naţionale de Prognoza, care se desfiinţează.",
+      "expected_kind": "fact",
+      "accepted_subjects": [
+        "Direcţia generală de prognoza"
+      ],
+      "required_text": [
+        "în subordinea Ministerului Finanţelor"
+      ]
+    },
+    {
+      "id": "semantic-07",
+      "split": "dev",
+      "source_file": "real-data-law-ro/18860.json",
+      "source_sha256": "94ef63574a2a2d92f5d24cd26a0ebea33f518716d8174a15c60cceae3d512e58",
+      "start": 983,
+      "end": 1134,
+      "text": "Agenţia Naţionala pentru Locuinţe, denumita în continuare A.N.L., este instituţie de interes public, cu personalitate juridică şi autonomie financiară.",
+      "expected_kind": "fact",
+      "accepted_subjects": [
+        "Agenţia Naţionala pentru Locuinţe",
+        "Agenţia Naţionala pentru Locuinţe, denumita în continuare A.N.L."
+      ],
+      "required_text": [
+        "personalitate juridică",
+        "autonomie financiară"
+      ]
+    },
+    {
+      "id": "semantic-08",
+      "split": "dev",
+      "source_file": "real-data-law-ro/18860.json",
+      "source_sha256": "94ef63574a2a2d92f5d24cd26a0ebea33f518716d8174a15c60cceae3d512e58",
+      "start": 8901,
+      "end": 9109,
+      "text": "Membrii Consiliului naţional de coordonare al A.N.L. nu sunt salariaţi ai A.N.L. şi beneficiază de o indemnizaţie de şedinţa în cuantum de 25% din salariul de baza brut lunar al directorului general al A.N.L.",
+      "expected_kind": "right",
+      "accepted_subjects": [
+        "Membrii Consiliului naţional de coordonare al A.N.L."
+      ],
+      "required_text": [
+        "nu sunt salariaţi",
+        "25%",
+        "de şedinţa"
+      ]
+    },
+    {
+      "id": "semantic-09",
+      "split": "dev",
+      "source_file": "real-data-law-ro/18860.json",
+      "source_sha256": "94ef63574a2a2d92f5d24cd26a0ebea33f518716d8174a15c60cceae3d512e58",
+      "start": 9854,
+      "end": 10097,
+      "text": "Membrii Consiliului de administraţie al A.N.L., cu excepţia directorului general al A.N.L., nu sunt salariaţi ai A.N.L. şi beneficiază de o indemnizaţie lunară în cuantum de 20% din salariul de baza brut lunar al directorului general al A.N.L.",
+      "expected_kind": "right",
+      "accepted_subjects": [
+        "Membrii Consiliului de administraţie al A.N.L.",
+        "Membrii Consiliului de administraţie al A.N.L., cu excepţia directorului general al A.N.L."
+      ],
+      "required_text": [
+        "cu excepţia directorului general",
+        "20%",
+        "lunară"
+      ]
+    },
+    {
+      "id": "semantic-10",
+      "split": "dev",
+      "source_file": "real-data-law-ro/83906.json",
+      "source_sha256": "052418cca9bcc37927e5970051282109c193b628a7827536091838e662ccbe8c",
+      "start": 251,
+      "end": 494,
+      "text": "Pentru asigurarea efectuării transportului feroviar în condiţii de siguranţă a circulaţiei, vehiculele feroviare de orice tip aparţinând agentilor economici trebuie să indeplineasca condiţiile prevăzute în normele tehnice specifice în vigoare.",
+      "expected_kind": "obligation",
+      "accepted_subjects": [
+        "vehiculele feroviare de orice tip aparţinând agentilor economici"
+      ],
+      "required_text": [
+        "în condiţii de siguranţă a circulaţiei"
+      ]
+    },
+    {
+      "id": "semantic-11",
+      "split": "dev",
+      "source_file": "real-data-law-ro/83906.json",
+      "source_sha256": "052418cca9bcc37927e5970051282109c193b628a7827536091838e662ccbe8c",
+      "start": 503,
+      "end": 619,
+      "text": "Prezentele norme nu se aplică operatorilor de transport feroviar şi gestionarului infrastructurii feroviare publice.",
+      "expected_kind": "fact",
+      "accepted_subjects": [
+        "Prezentele norme"
+      ],
+      "required_text": [
+        "nu se aplică"
+      ]
+    },
+    {
+      "id": "semantic-12",
+      "split": "holdout",
+      "source_file": "real-data-law-ro/18660.json",
+      "source_sha256": "a1b9ac6dba284d0ca9d73116c0c64813fb8a3061fd6067852ea79bf31063f9ca",
+      "start": 4248,
+      "end": 4536,
+      "text": "Bursa de Valori Bucureşti, Piaţa RASDAQ, camerele arbitrale şi tribunalul arbitral au obligaţia să asigure confidenţialitatea arbitrajului, sa nu publice şi sa nu divulge date care ar putea prejudicia interesele părţilor şi de care iau cunoştinţa în îndeplinirea atribuţiilor ce le revin.",
+      "expected_kind": "obligation",
+      "accepted_subjects": [
+        "Bursa de Valori Bucureşti, Piaţa RASDAQ, camerele arbitrale şi tribunalul arbitral"
+      ],
+      "required_text": [
+        "sa nu publice",
+        "sa nu divulge",
+        "interesele părţilor"
+      ]
+    },
+    {
+      "id": "semantic-13",
+      "split": "holdout",
+      "source_file": "real-data-law-ro/17438.json",
+      "source_sha256": "8b1ed71c4608562935c1eb27eb4413d65b31e036a79159821431750d101cc92c",
+      "start": 6323,
+      "end": 6574,
+      "text": "Este interzisă înstrăinarea tractoarelor, combinelor, maşinilor şi utilajelor agricole, precum şi a instalaţiilor pentru irigat, achiziţionate în condiţiile ordonanţei şi ale prezentelor norme metodologice, înainte de achitarea integrală a creditului.",
+      "expected_kind": "prohibition",
+      "accepted_subjects": [
+        "înstrăinarea tractoarelor, combinelor, maşinilor şi utilajelor agricole, precum şi a instalaţiilor pentru irigat, achiziţionate în condiţiile ordonanţei şi ale prezentelor norme metodologice"
+      ],
+      "required_text": [
+        "înainte de achitarea integrală a creditului"
+      ]
+    },
+    {
+      "id": "semantic-14",
+      "split": "holdout",
+      "source_file": "real-data-law-ro/17438.json",
+      "source_sha256": "8b1ed71c4608562935c1eb27eb4413d65b31e036a79159821431750d101cc92c",
+      "start": 6583,
+      "end": 6674,
+      "text": "În cazul înstrăinării sunt aplicabile sancţiunile civile prevăzute la art. 6 din ordonanţa.",
+      "expected_kind": "fact",
+      "accepted_subjects": [
+        "sancţiunile civile prevăzute la art. 6 din ordonanţa"
+      ],
+      "required_text": [
+        "În cazul înstrăinării"
+      ]
+    },
+    {
+      "id": "semantic-15",
+      "split": "holdout",
+      "source_file": "real-data-law-ro/17357.json",
+      "source_sha256": "a6e596bf4dc12fa83ce0b144ad977f97975a3c062587178aa4fe4b005fa139a8",
+      "start": 21456,
+      "end": 21601,
+      "text": "Se interzice conectarea la reţelele furnizorului a instalaţiei de utilizare a unui consumator, dacă nu este prevăzută cu echipamente de măsurare.",
+      "expected_kind": "prohibition",
+      "accepted_subjects": [
+        "conectarea la reţelele furnizorului a instalaţiei de utilizare a unui consumator"
+      ],
+      "required_text": [
+        "dacă nu este prevăzută cu echipamente de măsurare"
+      ]
+    },
+    {
+      "id": "semantic-16",
+      "split": "holdout",
+      "source_file": "real-data-law-ro/19161.json",
+      "source_sha256": "d698c3d800b7ca0bb2cb31796a72a70ef14f4182699f3161e6493ad838d2f404",
+      "start": 37040,
+      "end": 37261,
+      "text": "Sumele ce urmează a fi restituite beneficiarilor în condițiile art. III alin. (1) nu se actualizează cu indicele de inflație și nu sunt purtătoare de dobânzi, penalități de întârziere sau majorări de întârziere, după caz.",
+      "expected_kind": "fact",
+      "accepted_subjects": [
+        "Sumele ce urmează a fi restituite beneficiarilor în condițiile art. III alin. (1)"
+      ],
+      "required_text": [
+        "nu se actualizează",
+        "nu sunt purtătoare de dobânzi"
+      ]
+    },
+    {
+      "id": "semantic-17",
+      "split": "holdout",
+      "source_file": "real-data-law-ro/20030.json",
+      "source_sha256": "afaaf633bf4e24003841a7c646998c72a3104d699ffefdd6e5e16a0bfcec1e69",
+      "start": 7182,
+      "end": 7700,
+      "text": "Pentru a sprijini actul decizional la nivel local și central, în scopul implementarii eficiente și corecte a RICOP, precum și al corelării măsurilor luate în cadrul acestuia cu obiectivele PSAL, toate societățile comerciale, companiile și societățile naționale, regiile autonome din subordinea F.P.S. sau a ministerelor, precum și instituțiile publice și agențiile subordonate Guvernului au obligația sa pună imediat la dispoziție structurilor locale și centrale ale RICOP toate documentele și informațiile solicitate.",
+      "expected_kind": "obligation",
+      "accepted_subjects": [
+        "toate societățile comerciale, companiile și societățile naționale, regiile autonome din subordinea F.P.S. sau a ministerelor, precum și instituțiile publice și agențiile subordonate Guvernului"
+      ],
+      "required_text": [
+        "imediat",
+        "structurilor locale și centrale ale RICOP"
+      ]
+    }
+  ]
+}
