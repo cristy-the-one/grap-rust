@@ -17,6 +17,26 @@ from .reconcile import fold
 
 VERSION = "legal-vocabulary-v1"
 
+# These are incompatibility guards, not a closed vocabulary. Unrecognized
+# predicates remain discoverable. Matching a family does not prove equivalence.
+_PREDICATE_FAMILIES = {
+    "basis": r"\b(?:in baza|pe baza|intemei\w*|temei\w*|fundament\w*)\b",
+    "decision": r"\b(?:hotar\w*|decid\w*|decizie)\b",
+    "issue": r"\b(?:emit\w*|emis\w*)\b",
+    "adopt": r"\badopt\w*\b",
+    "approve": r"\baprob\w*\b",
+    "amend": r"\bmodific\w*\b",
+    "repeal": r"\babrog\w*\b",
+    "publication": r"\bpublic\w*\b",
+}
+
+
+def _predicate_conflict(original, proposed):
+    def families(text):
+        return {key for key, pattern in _PREDICATE_FAMILIES.items() if re.search(pattern, fold(text))}
+    before, after = families(original), families(proposed)
+    return bool(before and after and before != after)
+
 
 def load_input(path):
     """Read a KEE export or receipt store without loading embeddings or a graph."""
@@ -199,14 +219,24 @@ def _valid_reply(raw, items, stage):
             raise ValueError("Unknown or duplicate id")
         if len(row.get("label", "")) > 100 or len(row.get("definition", "")) > 600 or len(row["reason"]) > 1500:
             raise ValueError("Unbounded vocabulary decision")
+        issue = None
         if stage != "verify" and row["status"] in ("entity", "type", "supported") and not (row["label"].strip() and row["definition"].strip()):
-            raise ValueError("Accepted decision needs a label and definition")
+            issue = "Accepted decision needs a label and definition"
         if stage == "concepts" and row["status"] in ("fragment", "uncertain"):
             row["label"], row["definition"] = "", ""
         if stage == "concepts" and re.match(r"^(entity|type|fragment|uncertain)(?:\s*/|$)", row["label"], re.I):
-            raise ValueError("A status word is not a class label")
+            issue = "A status word is not a class label"
         if row.get("scope_quote") and row["scope_quote"] not in expected[ident]["context"]:
-            raise ValueError("Scope quote is not verbatim source context")
+            issue = "Scope quote is not verbatim source context"
+        if issue:
+            # Valid protocol, unusable decision: keep other rows and abstain.
+            # The cache retains the raw response for audit; this view exposes
+            # only a source-safe decision, never the fabricated quote.
+            row = {**row, "status": "uncertain", "reason": issue}
+            if "scope_quote" in row:
+                row["scope_quote"] = ""
+            if stage == "concepts":
+                row["label"], row["definition"] = "", ""
         result[ident] = row
     return result
 
@@ -223,6 +253,8 @@ def distill_ontology(ontology: dict, provider, *, sources=None, cache_dir=None,
     if not 0 <= max_calls <= 1000 or not 1 <= min_documents <= 10000:
         raise ValueError("max_calls must be 0..1000; min_documents must be 1..10000")
     provider = copy.copy(provider)
+    if hasattr(provider, "extra_body"):
+        provider.extra_body = {"reasoning_effort": "none", **provider.extra_body}
     provider.temperature = 0
     provider.retries = 0
     provider.max_tokens = 4096
@@ -306,8 +338,14 @@ def distill_ontology(ontology: dict, provider, *, sources=None, cache_dir=None,
     for start in range(0, len(mentions), 8):
         found = run("concepts", mentions[start:start+8], vocabulary(classes))
         concept_decisions.update(found)
+        inputs = {item["id"]: item for item in mentions[start:start+8]}
         for row in found.values():
             if row["status"] in ("entity", "type"):
+                if (re.search(r"\bS\s*\.\s*(?:A\s*\.|R\s*\.\s*L\s*\.)", inputs[row["id"]]["name"], re.I)
+                        and _name(row["label"]) in ("autoritate publica", "institutie publica")):
+                    row["status"] = "uncertain"
+                    row["reason"] = "Commercial legal form does not establish public-authority status"
+                    continue
                 # The first definition owns a label. Conflicting definitions must
                 # not silently change the meaning of earlier assignments.
                 old = classes.setdefault(row["label"], row["definition"])
@@ -322,6 +360,11 @@ def distill_ontology(ontology: dict, provider, *, sources=None, cache_dir=None,
         relation_decisions.update(found)
         for row in found.values():
             if row["status"] == "supported":
+                original = next(item for item in batch if item["id"] == row["id"])
+                if _predicate_conflict(original["type"], row["label"]):
+                    row["status"] = "uncertain"
+                    row["reason"] = "Normalization changes the predicate family"
+                    continue
                 old = predicates.setdefault(row["label"], row["definition"])
                 if old != row["definition"]:
                     row["status"] = "uncertain"
@@ -380,6 +423,7 @@ def distill_ontology(ontology: dict, provider, *, sources=None, cache_dir=None,
             left, right = right, left
         if "entity_id" not in left or "entity_id" not in right or decision["modality"] == "uncertain":
             item["status"] = "uncertain"
+            item["guard"] = "unresolved_endpoint_class_or_modality"
             continue
         item["status"] = "model_checked_candidate"
         item["normalized"] = {"from": left["entity_id"], "to": right["entity_id"],
@@ -400,6 +444,7 @@ def distill_ontology(ontology: dict, provider, *, sources=None, cache_dir=None,
             "status": "recurring_candidate" if len(documents) >= min_documents else "sparse_candidate"})
     pending = sum(i["decision"] is None for i in mentions) + sum(i["status"] == "pending" for i in edges)
     return {"version": VERSION, "input_sha256": _hash(ontology), "model": getattr(provider, "model", None),
+            "validation_version": "legal-vocabulary-guards-v2",
             "prompt_hashes": {stage: _hash(prompt) for stage, prompt in PROMPTS.items()},
             "provider_fingerprint": identity, "min_documents": min_documents,
             "generation": {"temperature": 0, "max_tokens": 4096, "retries": 0},

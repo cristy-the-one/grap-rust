@@ -211,3 +211,46 @@ def test_reading_missing_extraction_graph_never_creates_a_dummy_graph(tmp_path):
     assert app.export_ontology(str(missing))["status"] == "error"
     assert app.open_extraction_graph(str(missing))["status"] == "error"
     assert not missing.exists()
+
+
+def test_legal_basis_cannot_become_a_decision_even_when_checker_agrees():
+    ontology = {"extraction_evidence": {"a#0": source_record(
+        "Banca hotărăște în baza Legii nr. 101/1998.", ["Banca", "Legea nr. 101/1998"],
+        [{"from": "Banca", "type": "în baza", "to": "Legea nr. 101/1998"}])}}
+    def misread(system, user):
+        obj = json.loads(answer(system, user))
+        if "type" in json.loads(user)["items"][0] and "proposal" not in json.loads(user)["items"][0]:
+            for row in obj["items"]:
+                row.update(label="hotărăște", definition="Ia o decizie.", reverse=False)
+        return json.dumps(obj)
+    out = distill_ontology(ontology, StubProvider(handler=misread))
+    assert not out["patterns"]
+    assert out["relations"][0]["status"] == "uncertain"
+
+
+def test_bad_scope_does_not_regenerate_valid_neighbors(tmp_path):
+    def bad_scope(system, user):
+        obj = json.loads(answer(system, user))
+        if "type" in json.loads(user)["items"][0] and "proposal" not in json.loads(user)["items"][0]:
+            obj["items"][0]["scope_quote"] = "Invented text"
+        return json.dumps(obj)
+    out = distill_ontology(corpus(), StubProvider(handler=bad_scope), cache_dir=tmp_path)
+    assert out["calls"] == 3  # classify, normalize, check the two usable relations
+    assert out["relations"][0]["status"] == "uncertain"
+    assert out["patterns"][0]["document_support"] == 2
+    resumed = distill_ontology(corpus(), StubProvider(handler=bad_scope), cache_dir=tmp_path, max_calls=0)
+    assert resumed["status"] == "complete" and resumed["calls"] == 0
+
+
+def test_commercial_legal_form_is_not_automatically_a_public_authority():
+    ontology = {"extraction_evidence": {"a#0": source_record(
+        "Banca Agricolă - S.A. deține active. Banca Națională a României emite acte.",
+        ["Banca Agricolă - S.A.", "Banca Națională a României"], [])}}
+    def classify(system, user):
+        rows = json.loads(answer(system, user))["items"]
+        for row in rows:
+            row.update(label="autoritate publică", definition="Instituție învestită cu competențe publice.")
+        return json.dumps({"items": rows})
+    out = distill_ontology(ontology, StubProvider(handler=classify))
+    assert out["mentions"][0]["decision"]["status"] == "uncertain"
+    assert out["mentions"][1]["decision"]["status"] == "entity"

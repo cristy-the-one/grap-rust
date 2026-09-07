@@ -1,0 +1,3046 @@
+{
+  "version": "legal-vocabulary-v1",
+  "input_sha256": "bc905d0422918d55ffdb1b082958179d194abf424cfec91d9a975be148bc2ad3",
+  "model": "grap-legal-gemma4",
+  "validation_version": "legal-vocabulary-guards-v2",
+  "prompt_hashes": {
+    "concepts": "c677e1921b43c0284b43f07cc54cc513a6f3e1b65e0214dba5c2f7d01dbe80e3",
+    "relations": "62c446406a37e57884af72d0a7266346194f93b0d24445bab9fd8b083b91b1d7",
+    "verify": "dd74f413eab3e1d3e152d2f5ec79d25afd2ddaccd25f9005bc0eab74e2b4e4ba"
+  },
+  "provider_fingerprint": "abf76c696f76b35d19cb256bcf5471701ab09bf258480a1b350a6b398bc40051",
+  "min_documents": 2,
+  "generation": {
+    "temperature": 0,
+    "max_tokens": 4096,
+    "retries": 0
+  },
+  "status": "complete",
+  "calls": 0,
+  "cache_hits": 23,
+  "pending": 0,
+  "failures": [],
+  "batches": [],
+  "classes": [
+    {
+      "label": "act normativ",
+      "definition": "Act juridic emis de o autoritate competentă care stabilește norme de drept."
+    },
+    {
+      "label": "activitate",
+      "definition": "Acțiunea de întreținere sau reparare a structurilor sau terenurilor."
+    },
+    {
+      "label": "acțiune juridică",
+      "definition": "Procedura de încetare a relațiilor de muncă sau contractuale între angajați și instituție."
+    },
+    {
+      "label": "autoritate publică",
+      "definition": "Instituție învestită cu competențe publice."
+    },
+    {
+      "label": "cerere",
+      "definition": "Document oficial prin care se solicită aprobarea sau acordarea unor fonduri sau drepturi."
+    },
+    {
+      "label": "departament",
+      "definition": "Structura de conducere care propune acțiuni către Consiliul de administraţie."
+    },
+    {
+      "label": "dispoziție legală",
+      "definition": "Referință la prevederile unui act normativ sau al unui acord."
+    },
+    {
+      "label": "element construcție",
+      "definition": "Element fizic sau structură construită, menționând dimensiuni sau suprafețe."
+    },
+    {
+      "label": "funcție",
+      "definition": "Poziția de conducere generală, cu atribuții de decizie în cadrul unei instituții."
+    },
+    {
+      "label": "organism de consultare",
+      "definition": "Un organism format pentru a oferi consultanță sau a facilita dialogul social."
+    },
+    {
+      "label": "organizare",
+      "definition": "Organismul care ia decizii și poate numi personalul conform procedurilor legale."
+    },
+    {
+      "label": "persoană fizică",
+      "definition": "Indiviziile care participă la structuri sau comitete."
+    },
+    {
+      "label": "publicație oficială",
+      "definition": "Organul oficial prin care sunt publicate actele normative și legale."
+    },
+    {
+      "label": "subiect drept",
+      "definition": "Persoanele fizice sau juridice care sunt subiecte de drept."
+    },
+    {
+      "label": "teren",
+      "definition": "Parcelă de teren sau suprafață de pământ aferent unei construcții sau unei zone."
+    }
+  ],
+  "predicates": [
+    {
+      "label": "aplică prevederile",
+      "definition": "aplică prevederile"
+    },
+    {
+      "label": "decide cu privire la",
+      "definition": "a lua o decizie în legătură cu un anumit subiect sau acțiune"
+    },
+    {
+      "label": "emit",
+      "definition": "emit"
+    },
+    {
+      "label": "hotărăşte",
+      "definition": "a emite o hotărâre oficială prin care se stabilește ceva"
+    },
+    {
+      "label": "nu necesită",
+      "definition": "nu necesită"
+    },
+    {
+      "label": "poate numi",
+      "definition": "are dreptul de a numi pe cineva la o anumită funcție sau post"
+    },
+    {
+      "label": "poate proceda la",
+      "definition": "poate proceda la"
+    },
+    {
+      "label": "preia active bancare supuse valorificării de la",
+      "definition": "preia active bancare supuse valorificării de la"
+    },
+    {
+      "label": "propune",
+      "definition": "a prezenta sau a recomanda ceva sau cineva unei instanțe sau unei persoane"
+    },
+    {
+      "label": "publicat în",
+      "definition": "a fi publicat în"
+    },
+    {
+      "label": "se întemeiază pe",
+      "definition": "se întemeiază pe"
+    }
+  ],
+  "mentions": [
+    {
+      "id": "m_572372e09b9414aaaf3f",
+      "name": "Consiliul de administraţie",
+      "source": "17101#34",
+      "document": "17101",
+      "content_hash": "8ad6853c36e1d3b8559e908dcbfcaed310e87c9d049a110914f74ad5551ba699",
+      "quote": "Consiliul de administraţie poate numi, cu delegaţie, un director general până la ocuparea postului conform legii.",
+      "start": 174,
+      "end": 287,
+      "verification": "source_checked",
+      "context": "rativă a C.A.S.A.O.P.S.N.A.J. se exercită de către un director general, ajutat de 2 directori generali adjuncţi (unul medical şi unul economic). + Articolul 56 Consiliul de administraţie poate numi, cu delegaţie, un director general până la ocuparea postului conform legii. + Articolul 57 Conducerea operativă propune consiliului de administraţie şefii structurilor organizatorice din organigrama C.A.S.A.O.P.S.N.A.J. + Articolul 58 Directorul general decide cu privire la încheierea şi la încetarea raporturilor ",
+      "decision": {
+        "id": "m_572372e09b9414aaaf3f",
+        "label": "organizare",
+        "definition": "Organismul care ia decizii și poate numi personalul conform procedurilor legale.",
+        "reason": "Menționează 'Consiliul de administraţie' ca entitate care poate numi un director general.",
+        "status": "entity"
+      },
+      "entity_id": "e_311dbc12072816139d88"
+    },
+    {
+      "id": "m_f65b0162e9185f5437ce",
+      "name": "director general",
+      "source": "17101#34",
+      "document": "17101",
+      "content_hash": "8ad6853c36e1d3b8559e908dcbfcaed310e87c9d049a110914f74ad5551ba699",
+      "quote": "Consiliul de administraţie poate numi, cu delegaţie, un director general până la ocuparea postului conform legii.",
+      "start": 174,
+      "end": 287,
+      "verification": "source_checked",
+      "context": "rativă a C.A.S.A.O.P.S.N.A.J. se exercită de către un director general, ajutat de 2 directori generali adjuncţi (unul medical şi unul economic). + Articolul 56 Consiliul de administraţie poate numi, cu delegaţie, un director general până la ocuparea postului conform legii. + Articolul 57 Conducerea operativă propune consiliului de administraţie şefii structurilor organizatorice din organigrama C.A.S.A.O.P.S.N.A.J. + Articolul 58 Directorul general decide cu privire la încheierea şi la încetarea raporturilor ",
+      "decision": {
+        "id": "m_f65b0162e9185f5437ce",
+        "label": "funcție",
+        "definition": "Poziția de conducere generală, cu atribuții de decizie în cadrul unei instituții.",
+        "reason": "Este menționat ca fiind numit de Consiliul de administraţie și ca fiind subiectul deciziilor privind raporturile de muncă.",
+        "status": "entity"
+      },
+      "entity_id": "e_d750819b188a6d6263c1"
+    },
+    {
+      "id": "m_2992a0173900d8451843",
+      "name": "Conducerea operativă",
+      "source": "17101#34",
+      "document": "17101",
+      "content_hash": "8ad6853c36e1d3b8559e908dcbfcaed310e87c9d049a110914f74ad5551ba699",
+      "quote": "Conducerea operativă propune consiliului de administraţie şefii structurilor organizatorice din organigrama C.A.S.A.O.P.S.N.A.J.",
+      "start": 303,
+      "end": 431,
+      "verification": "source_checked",
+      "context": "unul economic). + Articolul 56 Consiliul de administraţie poate numi, cu delegaţie, un director general până la ocuparea postului conform legii. + Articolul 57 Conducerea operativă propune consiliului de administraţie şefii structurilor organizatorice din organigrama C.A.S.A.O.P.S.N.A.J. + Articolul 58 Directorul general decide cu privire la încheierea şi la încetarea raporturilor de muncă cu salariaţii şi cu colaboratorii angajaţi pe bază de convenţie civilă, după consultarea prealabilă a conducerii operative a C.A.S.A.O.",
+      "decision": {
+        "id": "m_2992a0173900d8451843",
+        "label": "departament",
+        "definition": "Structura de conducere care propune acțiuni către Consiliul de administraţie.",
+        "reason": "Este menționat ca propune şefii structurilor organizatorice către Consiliul de administraţie.",
+        "status": "entity"
+      },
+      "entity_id": "e_b37368484f79ff55d654"
+    },
+    {
+      "id": "m_ef0e4424d4d08f7736b7",
+      "name": "şefii structurilor organizatorice din organigrama C.A.S.A.O.P.S.N.A.J.",
+      "source": "17101#34",
+      "document": "17101",
+      "content_hash": "8ad6853c36e1d3b8559e908dcbfcaed310e87c9d049a110914f74ad5551ba699",
+      "quote": "Conducerea operativă propune consiliului de administraţie şefii structurilor organizatorice din organigrama C.A.S.A.O.P.S.N.A.J.",
+      "start": 303,
+      "end": 431,
+      "verification": "source_checked",
+      "context": "unul economic). + Articolul 56 Consiliul de administraţie poate numi, cu delegaţie, un director general până la ocuparea postului conform legii. + Articolul 57 Conducerea operativă propune consiliului de administraţie şefii structurilor organizatorice din organigrama C.A.S.A.O.P.S.N.A.J. + Articolul 58 Directorul general decide cu privire la încheierea şi la încetarea raporturilor de muncă cu salariaţii şi cu colaboratorii angajaţi pe bază de convenţie civilă, după consultarea prealabilă a conducerii operative a C.A.S.A.O.",
+      "decision": {
+        "id": "m_ef0e4424d4d08f7736b7",
+        "label": "funcție",
+        "definition": "Titluri de conducere ale unităților structurale ale unei organizații.",
+        "reason": "Conflicting definition for an existing class label",
+        "status": "uncertain"
+      }
+    },
+    {
+      "id": "m_1481bb462c9427108272",
+      "name": "Directorul general",
+      "source": "17101#34",
+      "document": "17101",
+      "content_hash": "8ad6853c36e1d3b8559e908dcbfcaed310e87c9d049a110914f74ad5551ba699",
+      "quote": "Directorul general decide cu privire la încheierea şi la încetarea raporturilor de muncă cu salariaţii şi cu colaboratorii angajaţi pe bază de convenţie civilă, după consultarea prealabilă a conducerii operative a C.A.S.A.O.P.S.N.A.J.",
+      "start": 447,
+      "end": 681,
+      "verification": "source_checked",
+      "context": " + Articolul 57 Conducerea operativă propune consiliului de administraţie şefii structurilor organizatorice din organigrama C.A.S.A.O.P.S.N.A.J. + Articolul 58 Directorul general decide cu privire la încheierea şi la încetarea raporturilor de muncă cu salariaţii şi cu colaboratorii angajaţi pe bază de convenţie civilă, după consultarea prealabilă a conducerii operative a C.A.S.A.O.P.S.N.A.J. + Capitolul 13 Comisia centrala de arbitraj + Articolul 59 Comisia centrala de arbitraj se numeşte şi îşi desfăşoară",
+      "decision": {
+        "id": "m_1481bb462c9427108272",
+        "label": "funcție",
+        "definition": "Poziția de conducere generală, cu atribuții de decizie în cadrul unei instituții.",
+        "reason": "Este menționat ca fiind subiectul deciziilor privind încheierea raporturilor de muncă.",
+        "status": "entity"
+      },
+      "entity_id": "e_8a7918ab9358f31e92c5"
+    },
+    {
+      "id": "m_c259f90c5e485d87bbf7",
+      "name": "încheierea şi la încetarea raporturilor de muncă cu salariaţii şi cu colaboratorii angajaţi pe bază de convenţie civilă",
+      "source": "17101#34",
+      "document": "17101",
+      "content_hash": "8ad6853c36e1d3b8559e908dcbfcaed310e87c9d049a110914f74ad5551ba699",
+      "quote": "Directorul general decide cu privire la încheierea şi la încetarea raporturilor de muncă cu salariaţii şi cu colaboratorii angajaţi pe bază de convenţie civilă, după consultarea prealabilă a conducerii operative a C.A.S.A.O.P.S.N.A.J.",
+      "start": 447,
+      "end": 681,
+      "verification": "source_checked",
+      "context": " + Articolul 57 Conducerea operativă propune consiliului de administraţie şefii structurilor organizatorice din organigrama C.A.S.A.O.P.S.N.A.J. + Articolul 58 Directorul general decide cu privire la încheierea şi la încetarea raporturilor de muncă cu salariaţii şi cu colaboratorii angajaţi pe bază de convenţie civilă, după consultarea prealabilă a conducerii operative a C.A.S.A.O.P.S.N.A.J. + Capitolul 13 Comisia centrala de arbitraj + Articolul 59 Comisia centrala de arbitraj se numeşte şi îşi desfăşoară",
+      "decision": {
+        "id": "m_c259f90c5e485d87bbf7",
+        "label": "acțiune juridică",
+        "definition": "Procedura de încetare a relațiilor de muncă sau contractuale între angajați și instituție.",
+        "reason": "Descrie subiectul deciziei luate de Directorul general.",
+        "status": "entity"
+      },
+      "entity_id": "e_bf157fdbc974039d4a6f"
+    },
+    {
+      "id": "m_e453ed1a2a15a66fcf6d",
+      "name": "Directorul general decide cu privire la încheierea şi la încetarea raporturilor de muncă cu salariaţii şi cu colaboratorii angajaţi pe bază de convenţie civilă",
+      "source": "17101#34",
+      "document": "17101",
+      "content_hash": "8ad6853c36e1d3b8559e908dcbfcaed310e87c9d049a110914f74ad5551ba699",
+      "quote": "Directorul general decide cu privire la încheierea şi la încetarea raporturilor de muncă cu salariaţii şi cu colaboratorii angajaţi pe bază de convenţie civilă, după consultarea prealabilă a conducerii operative a C.A.S.A.O.P.S.N.A.J.",
+      "start": 447,
+      "end": 681,
+      "verification": "source_checked",
+      "context": " + Articolul 57 Conducerea operativă propune consiliului de administraţie şefii structurilor organizatorice din organigrama C.A.S.A.O.P.S.N.A.J. + Articolul 58 Directorul general decide cu privire la încheierea şi la încetarea raporturilor de muncă cu salariaţii şi cu colaboratorii angajaţi pe bază de convenţie civilă, după consultarea prealabilă a conducerii operative a C.A.S.A.O.P.S.N.A.J. + Capitolul 13 Comisia centrala de arbitraj + Articolul 59 Comisia centrala de arbitraj se numeşte şi îşi desfăşoară",
+      "decision": {
+        "id": "m_e453ed1a2a15a66fcf6d",
+        "label": "acțiune juridică",
+        "definition": "Procedura de încetare a relațiilor de muncă sau contractuale între angajați și instituție.",
+        "reason": "Este o formulare care descrie subiectul deciziei luate de Directorul general.",
+        "status": "entity"
+      },
+      "entity_id": "e_714d1b7c9be07ba5ca3d"
+    },
+    {
+      "id": "m_0c324307e68dd19d071e",
+      "name": "Comisia centrala de arbitraj",
+      "source": "17101#34",
+      "document": "17101",
+      "content_hash": "8ad6853c36e1d3b8559e908dcbfcaed310e87c9d049a110914f74ad5551ba699",
+      "quote": "Articolul 59 Comisia centrala de arbitraj se numeşte şi îşi desfăşoară",
+      "start": 728,
+      "end": 798,
+      "verification": "source_checked",
+      "context": "i angajaţi pe bază de convenţie civilă, după consultarea prealabilă a conducerii operative a C.A.S.A.O.P.S.N.A.J. + Capitolul 13 Comisia centrala de arbitraj + Articolul 59 Comisia centrala de arbitraj se numeşte şi îşi desfăşoară",
+      "decision": {
+        "id": "m_0c324307e68dd19d071e",
+        "label": "organizare",
+        "definition": "Comisie specializată care se ocupă de arbitraj în cadrul instituției.",
+        "reason": "Conflicting definition for an existing class label",
+        "status": "uncertain"
+      }
+    },
+    {
+      "id": "m_8a0e647c8befd7a700df",
+      "name": "Guvernul",
+      "source": "17233#18",
+      "document": "17233",
+      "content_hash": "ddbbd42377fc48c5ce0ddcab37929675c784f8e6e8e04bbc8f5de93fae08b2f7",
+      "quote": "prin hotărâre a Guvernului",
+      "start": 0,
+      "end": 26,
+      "verification": "source_checked",
+      "context": "prin hotărâre a Guvernului, în funcţie de evoluţia indicelui preţurilor de consum. ... (3) Dacă plătitorul asi corecteaza din proprie iniţiativă declaraţia, înainte de iniţierea de către organul fiscal competent a procedurii de stabilire din oficiu a obligaţiei de p",
+      "decision": {
+        "id": "m_8a0e647c8befd7a700df",
+        "label": "autoritate publică",
+        "definition": "Instituție învestită cu competențe publice.",
+        "reason": "Menționarea Guvernului ca emitent al unei hotărâri.",
+        "status": "entity"
+      },
+      "entity_id": "e_fb2011af0c75d374ad72"
+    },
+    {
+      "id": "m_1af10f34a1cca00345eb",
+      "name": "ORDONANTA nr. 11 din 26 iulie 2001",
+      "source": "17233#18",
+      "document": "17233",
+      "content_hash": "ddbbd42377fc48c5ce0ddcab37929675c784f8e6e8e04bbc8f5de93fae08b2f7",
+      "quote": "Alin. (2) al art. 14 a fost modificat de ORDONANTA nr. 11 din 26 iulie 2001 publicată în MONITORUL OFICIAL nr. 461 din 13 august 2001.",
+      "start": 628,
+      "end": 762,
+      "verification": "source_checked",
+      "context": "lui articol se completează cu dispoziţiile Legii nr. 32/1968 *) privind stabilirea şi sancţionarea contravenţiilor, cu excepţia art. 25 şi 26. ... ------------ Alin. (2) al art. 14 a fost modificat de ORDONANTA nr. 11 din 26 iulie 2001 publicată în MONITORUL OFICIAL nr. 461 din 13 august 2001. ------------ *) Legea nr. 32/1968 a",
+      "decision": {
+        "id": "m_1af10f34a1cca00345eb",
+        "label": "act normativ",
+        "definition": "Act juridic emis de o autoritate competentă care stabilește norme de drept.",
+        "reason": "Se face referire la o ordonanță specifică care modifică o lege.",
+        "status": "entity"
+      },
+      "entity_id": "e_f0367f1ca110de2fbe41"
+    },
+    {
+      "id": "m_c93ff2222dbece897a8f",
+      "name": "Legea nr. 32/1968",
+      "source": "17233#18",
+      "document": "17233",
+      "content_hash": "ddbbd42377fc48c5ce0ddcab37929675c784f8e6e8e04bbc8f5de93fae08b2f7",
+      "quote": "Prevederile prezentului articol se completează cu dispoziţiile Legii nr. 32/1968 *) privind stabilirea şi sancţionarea contravenţiilor, cu excepţia art. 25 şi 26.",
+      "start": 448,
+      "end": 610,
+      "verification": "source_checked",
+      "context": "la alin. (1) se sancţionează cu avertisment. ... (4) Constatarea contravenţiilor şi aplicarea sancţiunilor se fac de către organele fiscale competente. ... (5) Prevederile prezentului articol se completează cu dispoziţiile Legii nr. 32/1968 *) privind stabilirea şi sancţionarea contravenţiilor, cu excepţia art. 25 şi 26. ... ------------ Alin. (2) al art. 14 a fost modificat de ORDONANTA nr. 11 din 26 iulie 2001 publicată în MONITORUL OFICIAL nr. 461 din 13 august 2001. ------------ *) Legea nr. 32/1968 a",
+      "decision": {
+        "id": "m_c93ff2222dbece897a8f",
+        "label": "act normativ",
+        "definition": "Act juridic emis de o autoritate competentă care stabilește norme de drept.",
+        "reason": "Se face referire la o lege specifică care completează prevederile.",
+        "status": "entity"
+      },
+      "entity_id": "e_b6220ed1e8ce4a9d42c3"
+    },
+    {
+      "id": "m_bc0fdaf65635e5c35da0",
+      "name": "organele fiscale competente",
+      "source": "17233#18",
+      "document": "17233",
+      "content_hash": "ddbbd42377fc48c5ce0ddcab37929675c784f8e6e8e04bbc8f5de93fae08b2f7",
+      "quote": "Constatarea contravenţiilor şi aplicarea sancţiunilor se fac de către organele fiscale competente.",
+      "start": 341,
+      "end": 439,
+      "verification": "source_checked",
+      "context": "către organul fiscal competent a procedurii de stabilire din oficiu a obligaţiei de plată, fapta prevăzută la alin. (1) se sancţionează cu avertisment. ... (4) Constatarea contravenţiilor şi aplicarea sancţiunilor se fac de către organele fiscale competente. ... (5) Prevederile prezentului articol se completează cu dispoziţiile Legii nr. 32/1968 *) privind stabilirea şi sancţionarea contravenţiilor, cu excepţia art. 25 şi 26. ... ------------ Alin. (2) al art. 14 a fost modificat de ORDONANTA ",
+      "decision": {
+        "id": "m_bc0fdaf65635e5c35da0",
+        "label": "autoritate publică",
+        "definition": "Instituție învestită cu competențe publice.",
+        "reason": "Se referă la organele fiscale, care sunt autorități publice în contextul fiscal.",
+        "status": "entity"
+      },
+      "entity_id": "e_7eb9c6b8a52d272758a4"
+    },
+    {
+      "id": "m_64f41b0575ffbb63dd42",
+      "name": "utilajele, instalaţiile, echipamentele, mijloacele de transport, alte bunuri amortizabile",
+      "source": "17536#4",
+      "document": "17536",
+      "content_hash": "62f6c7a464e397a03dfab28102f8c0b2f695298a15d71c4a31a24f241501da30",
+      "quote": "utilajele, instalaţiile, echipamentele, mijloacele de transport, alte bunuri amortizabile, care se importa în vederea efectuării de investiţii în zona",
+      "start": 0,
+      "end": 150,
+      "verification": "source_checked",
+      "context": "utilajele, instalaţiile, echipamentele, mijloacele de transport, alte bunuri amortizabile, care se importa în vederea efectuării de investiţii în zona; - taxei pe valoarea adăugată pentru maşinile, utilajele, instalaţiile, echipamentele, mijloacele de transport, alte bunuri amortizabile, produse în ţara în vederea efectuării şi derulării de investiţii în zona; b) restituirea taxelor vama",
+      "decision": {
+        "id": "m_64f41b0575ffbb63dd42",
+        "label": "",
+        "definition": "",
+        "reason": "Enumeră tipuri de bunuri amortizabile (utilaje, echipamente etc.).",
+        "status": "fragment"
+      }
+    },
+    {
+      "id": "m_a3e263a3927f9e714c18",
+      "name": "taxei pe valoarea adăugată pentru maşinile, utilajele, instalaţiile, echipamentele, mijloacele de transport, alte bunuri amortizabile, produse în ţara",
+      "source": "17536#4",
+      "document": "17536",
+      "content_hash": "62f6c7a464e397a03dfab28102f8c0b2f695298a15d71c4a31a24f241501da30",
+      "quote": "taxei pe valoarea adăugată pentru maşinile, utilajele, instalaţiile, echipamentele, mijloacele de transport, alte bunuri amortizabile, produse în ţara în vederea efectuării şi derulării de investiţii în zona",
+      "start": 154,
+      "end": 361,
+      "verification": "source_checked",
+      "context": "utilajele, instalaţiile, echipamentele, mijloacele de transport, alte bunuri amortizabile, care se importa în vederea efectuării de investiţii în zona; - taxei pe valoarea adăugată pentru maşinile, utilajele, instalaţiile, echipamentele, mijloacele de transport, alte bunuri amortizabile, produse în ţara în vederea efectuării şi derulării de investiţii în zona; b) restituirea taxelor vamale pentru materiile prime, piesele de schimb şi/sau componentele importate, necesare pentru realizarea producţiei proprii în zona; ... c) scutirea de la plata impozitului pe profit pe durata de existenta a zonei",
+      "decision": {
+        "id": "m_a3e263a3927f9e714c18",
+        "label": "",
+        "definition": "",
+        "reason": "Se referă la o taxă specifică calculată pe anumite bunuri.",
+        "status": "fragment"
+      }
+    },
+    {
+      "id": "m_217e20abeb16b0368c83",
+      "name": "restituirea taxelor vamale pentru materiile prime, piesele de schimb şi/sau componentele importate",
+      "source": "17536#4",
+      "document": "17536",
+      "content_hash": "62f6c7a464e397a03dfab28102f8c0b2f695298a15d71c4a31a24f241501da30",
+      "quote": "restituirea taxelor vamale pentru materiile prime, piesele de schimb şi/sau componentele importate, necesare pentru realizarea producţiei proprii în zona",
+      "start": 366,
+      "end": 519,
+      "verification": "source_checked",
+      "context": "e, instalaţiile, echipamentele, mijloacele de transport, alte bunuri amortizabile, produse în ţara în vederea efectuării şi derulării de investiţii în zona; b) restituirea taxelor vamale pentru materiile prime, piesele de schimb şi/sau componentele importate, necesare pentru realizarea producţiei proprii în zona; ... c) scutirea de la plata impozitului pe profit pe durata de existenta a zonei defavorizate; ... d) scutirea de la plata taxelor percepute pentru modificarea destinaţiei sau pentru scoaterea din circuitul agricol a unor terenuri destina",
+      "decision": {
+        "id": "m_217e20abeb16b0368c83",
+        "label": "",
+        "definition": "",
+        "reason": "Se referă la restituirea taxelor vamale.",
+        "status": "fragment"
+      }
+    },
+    {
+      "id": "m_1adbd81db4d701bacf4b",
+      "name": "scutirea de la plata impozitului pe profit",
+      "source": "17536#4",
+      "document": "17536",
+      "content_hash": "62f6c7a464e397a03dfab28102f8c0b2f695298a15d71c4a31a24f241501da30",
+      "quote": "scutirea de la plata impozitului pe profit pe durata de existenta a zonei defavorizate",
+      "start": 528,
+      "end": 614,
+      "verification": "source_checked",
+      "context": "stituirea taxelor vamale pentru materiile prime, piesele de schimb şi/sau componentele importate, necesare pentru realizarea producţiei proprii în zona; ... c) scutirea de la plata impozitului pe profit pe durata de existenta a zonei defavorizate; ... d) scutirea de la plata taxelor percepute pentru modificarea destinaţiei sau pentru scoaterea din circuitul agricol a unor terenuri destinate realizării investiţiei; ... e)",
+      "decision": {
+        "id": "m_1adbd81db4d701bacf4b",
+        "label": "",
+        "definition": "",
+        "reason": "Se referă la scutirea de la plata impozitului pe profit.",
+        "status": "fragment"
+      }
+    },
+    {
+      "id": "m_58582c3cb1f57a3a589d",
+      "name": "scutirea de la plata taxelor percepute",
+      "source": "17536#4",
+      "document": "17536",
+      "content_hash": "62f6c7a464e397a03dfab28102f8c0b2f695298a15d71c4a31a24f241501da30",
+      "quote": "scutirea de la plata taxelor percepute pentru modificarea destinaţiei sau pentru scoaterea din circuitul agricol a unor terenuri destinate realizării investiţiei",
+      "start": 623,
+      "end": 784,
+      "verification": "source_checked",
+      "context": "e, necesare pentru realizarea producţiei proprii în zona; ... c) scutirea de la plata impozitului pe profit pe durata de existenta a zonei defavorizate; ... d) scutirea de la plata taxelor percepute pentru modificarea destinaţiei sau pentru scoaterea din circuitul agricol a unor terenuri destinate realizării investiţiei; ... e)",
+      "decision": {
+        "id": "m_58582c3cb1f57a3a589d",
+        "label": "",
+        "definition": "",
+        "reason": "Se referă la scutirea de la plata taxelor, un beneficiu fiscal.",
+        "status": "fragment"
+      }
+    },
+    {
+      "id": "m_717de0c5b7c03c751a90",
+      "name": "SOCIETATEA COMERCIALA",
+      "source": "17973#137",
+      "document": "17973",
+      "content_hash": "a8c92d99d8e71ed675f19b659241974e2a837f4a03cf7a7603c0d0aac24fc798",
+      "quote": "Societatea Comerciala",
+      "start": 11,
+      "end": 32,
+      "verification": "source_checked",
+      "context": "spatiului: Societatea Comerciala................ Sala din.................................... Luna.........., anul........................ SITUAŢIA INCASARILOR LUNARE obtinute din activitatea de exploatare a masinilor electronice cu castiguri (lei) -----------------------",
+      "decision": {
+        "id": "m_717de0c5b7c03c751a90",
+        "label": "",
+        "definition": "",
+        "reason": "Este o denumire folosită pentru o societate comercială.",
+        "status": "fragment"
+      }
+    },
+    {
+      "id": "m_157e651aff5dd26cb2c1",
+      "name": "Sala",
+      "source": "17973#137",
+      "document": "17973",
+      "content_hash": "a8c92d99d8e71ed675f19b659241974e2a837f4a03cf7a7603c0d0aac24fc798",
+      "quote": "Sala din",
+      "start": 49,
+      "end": 57,
+      "verification": "source_checked",
+      "context": "spatiului: Societatea Comerciala................ Sala din.................................... Luna.........., anul........................ SITUAŢIA INCASARILOR LUNARE obtinute din activitatea de exploatare a masinilor electronice cu castiguri (lei) ------------------------------------------------",
+      "decision": {
+        "id": "m_157e651aff5dd26cb2c1",
+        "label": "",
+        "definition": "",
+        "reason": "Indică o secțiune sau o cameră ('Sala').",
+        "status": "fragment"
+      }
+    },
+    {
+      "id": "m_583ca52eed5a0fa66a0a",
+      "name": "SITUAŢIA INCASARILOR LUNARE",
+      "source": "17973#137",
+      "document": "17973",
+      "content_hash": "a8c92d99d8e71ed675f19b659241974e2a837f4a03cf7a7603c0d0aac24fc798",
+      "quote": "SITUAŢIA INCASARILOR LUNARE",
+      "start": 139,
+      "end": 166,
+      "verification": "source_checked",
+      "context": "spatiului: Societatea Comerciala................ Sala din.................................... Luna.........., anul........................ SITUAŢIA INCASARILOR LUNARE obtinute din activitatea de exploatare a masinilor electronice cu castiguri (lei) -------------------------------------------------------------------------------- | Nr.| Seria |Indexul    |Indexul |Factorul|Diferenţa  | Soldul  |Pret/|Înca",
+      "decision": {
+        "id": "m_583ca52eed5a0fa66a0a",
+        "label": "",
+        "definition": "",
+        "reason": "Titlul 'SITUAŢIA INCASARILOR LUNARE' indică un raport financiar.",
+        "status": "fragment"
+      }
+    },
+    {
+      "id": "m_557fcf1ebef95cce6c5d",
+      "name": "lei",
+      "source": "17973#137",
+      "document": "17973",
+      "content_hash": "a8c92d99d8e71ed675f19b659241974e2a837f4a03cf7a7603c0d0aac24fc798",
+      "quote": "(lei)",
+      "start": 243,
+      "end": 248,
+      "verification": "source_checked",
+      "context": ".......... Luna.........., anul........................ SITUAŢIA INCASARILOR LUNARE obtinute din activitatea de exploatare a masinilor electronice cu castiguri (lei) -------------------------------------------------------------------------------- | Nr.| Seria |Indexul    |Indexul |Factorul|Diferenţa  | Soldul  |Pret/|Încasări |crt.|masinii|contoare-  |contoare| de     |dintre în- |impulsu- |im-  | |   ",
+      "decision": {
+        "id": "m_557fcf1ebef95cce6c5d",
+        "label": "",
+        "definition": "",
+        "reason": "Indică moneda ('lei') folosită în contextul financiar.",
+        "status": "fragment"
+      }
+    },
+    {
+      "id": "m_e7b876ddcfa1aee5e270",
+      "name": "Curtea Constituţională",
+      "source": "18019#13",
+      "document": "18019",
+      "content_hash": "1a4b7f723ed85c6d0e5b5cbe7261cca4b7778235740d1228aa544d75a68141bf",
+      "quote": "CURTEA În",
+      "start": 789,
+      "end": 798,
+      "verification": "source_checked",
+      "context": " lit. c) şi al art. 145 alin. (2) din Constituţie, precum şi al art. 1, 2, 3, al art. 13 alin. (1) lit. A.c) şi al art. 23 din Legea nr. 47/1992 , republicată, CURTEA În",
+      "decision": {
+        "id": "m_e7b876ddcfa1aee5e270",
+        "label": "autoritate publică",
+        "definition": "Instituție învestită cu competențe publice.",
+        "reason": "Se referă la Curtea Constituțională, o instituție de stat.",
+        "status": "entity"
+      },
+      "entity_id": "e_5c6dfef1675d193e25ea"
+    },
+    {
+      "id": "m_16233ff4534a4e788b50",
+      "name": "Magazie",
+      "source": "18084#4",
+      "document": "18084",
+      "content_hash": "25dbcb347f10e216bbdca0701058a046874503e46254416e70ff774af533d139",
+      "quote": "suprafaţa construită =. 209,25 m2 > Magazie",
+      "start": 2,
+      "end": 45,
+      "verification": "source_checked",
+      "context": "- suprafaţa construită =. 209,25 m2 > Magazie - suprafaţa desfăşurată = 37,28 m2 > Atelier de sudură + depozite aferente - suprafaţa desfăşurată = 10,50 m2 > Împrejmuire din beton - lungime = 33 m - înălţime = 1,5 m > Terenul aferent - suprafaţa = 491,10 m2 ----------",
+      "decision": {
+        "id": "m_16233ff4534a4e788b50",
+        "label": "",
+        "definition": "",
+        "reason": "Denumește o tipologie de spațiu ('Magazie') în contextul măsurătorilor de suprafață.",
+        "status": "fragment"
+      }
+    },
+    {
+      "id": "m_1873affda2a0cf32e696",
+      "name": "Atelier de sudură + depozite aferente",
+      "source": "18084#4",
+      "document": "18084",
+      "content_hash": "25dbcb347f10e216bbdca0701058a046874503e46254416e70ff774af533d139",
+      "quote": "suprafaţa desfăşurată = 37,28 m2 > Atelier de sudură + depozite aferente",
+      "start": 48,
+      "end": 120,
+      "verification": "source_checked",
+      "context": "- suprafaţa construită =. 209,25 m2 > Magazie - suprafaţa desfăşurată = 37,28 m2 > Atelier de sudură + depozite aferente - suprafaţa desfăşurată = 10,50 m2 > Împrejmuire din beton - lungime = 33 m - înălţime = 1,5 m > Terenul aferent - suprafaţa = 491,10 m2 ----------",
+      "decision": {
+        "id": "m_1873affda2a0cf32e696",
+        "label": "",
+        "definition": "",
+        "reason": "Denumește o tipologie de spațiu ('Atelier de sudură + depozite aferente') în contextul măsurătorilor de suprafață.",
+        "status": "fragment"
+      }
+    },
+    {
+      "id": "m_0c17f128b38045c02f5f",
+      "name": "Împrejmuire din beton",
+      "source": "18084#4",
+      "document": "18084",
+      "content_hash": "25dbcb347f10e216bbdca0701058a046874503e46254416e70ff774af533d139",
+      "quote": "suprafaţa desfăşurată = 10,50 m2 > Împrejmuire din beton",
+      "start": 123,
+      "end": 179,
+      "verification": "source_checked",
+      "context": "- suprafaţa construită =. 209,25 m2 > Magazie - suprafaţa desfăşurată = 37,28 m2 > Atelier de sudură + depozite aferente - suprafaţa desfăşurată = 10,50 m2 > Împrejmuire din beton - lungime = 33 m - înălţime = 1,5 m > Terenul aferent - suprafaţa = 491,10 m2 ----------",
+      "decision": {
+        "id": "m_0c17f128b38045c02f5f",
+        "label": "element construcție",
+        "definition": "Element fizic sau structură construită, menționând dimensiuni sau suprafețe.",
+        "reason": "Menționează o structură fizică ('Împrejmuire din beton') împreună cu dimensiuni.",
+        "status": "entity"
+      },
+      "entity_id": "e_b3d1836833a084af8e1c"
+    },
+    {
+      "id": "m_74d49520372c5348864a",
+      "name": "Terenul aferent",
+      "source": "18084#4",
+      "document": "18084",
+      "content_hash": "25dbcb347f10e216bbdca0701058a046874503e46254416e70ff774af533d139",
+      "quote": "suprafaţa = 491,10 m2",
+      "start": 236,
+      "end": 257,
+      "verification": "source_checked",
+      "context": "8 m2 > Atelier de sudură + depozite aferente - suprafaţa desfăşurată = 10,50 m2 > Împrejmuire din beton - lungime = 33 m - înălţime = 1,5 m > Terenul aferent - suprafaţa = 491,10 m2 ----------",
+      "decision": {
+        "id": "m_74d49520372c5348864a",
+        "label": "teren",
+        "definition": "Parcelă de teren sau suprafață de pământ aferent unei construcții sau unei zone.",
+        "reason": "Se referă la suprafața unui teren ('Terenul aferent').",
+        "status": "entity"
+      },
+      "entity_id": "e_eaca1be0d51c4c9eb99b"
+    },
+    {
+      "id": "m_8415e7df44d85b6babac",
+      "name": "CERERE JUSTIFICATIVĂ",
+      "source": "18121#85",
+      "document": "18121",
+      "content_hash": "65aad42fd7d4294e9f8a0bd6a1d03f13c025193651196b7e80d8c5b69aad1fe5",
+      "quote": "Ministru, CERERE JUSTIFICATIVĂ privind sumele necesare pentru cheltuielile de capital care se finanţează din Fondul special al drumurilor publice pe luna ................. 199.... - mii lei - 1.",
+      "start": 0,
+      "end": 194,
+      "verification": "source_checked",
+      "context": "Ministru, CERERE JUSTIFICATIVĂ privind sumele necesare pentru cheltuielile de capital care se finanţează din Fondul special al drumurilor publice pe luna ................. 199.... - mii lei - 1. Valoarea programului anual aprobat 2. Valoarea programului, cumulat până la finele lunii pentru care se face solicitarea 3. Valoarea realizărilor cumulate de la începutul anului până la finele lunii precedente lunii în care se face solicit",
+      "decision": {
+        "id": "m_8415e7df44d85b6babac",
+        "label": "cerere",
+        "definition": "Document oficial prin care se solicită aprobarea sau acordarea unor fonduri sau drepturi.",
+        "reason": "Este un document tip 'CERERE JUSTIFICATIVĂ' adresat unui Ministru.",
+        "status": "entity"
+      },
+      "entity_id": "e_3422e2c203e990073cd4"
+    },
+    {
+      "id": "m_55933d861b9bece2e3d2",
+      "name": "CIRCULARA nr. 10 din 13 mai 1999 privind ratele dobânzilor plătite de Banca Naţionala a României la rezervele minime obligatorii, aferente lunii mai 1999",
+      "source": "18203#1",
+      "document": "18203",
+      "content_hash": "f2f9db966d37c8ce1a07ff36af940c241971cec316ed6987c62466c97bcaf77e",
+      "quote": "CIRCULARA nr. 10 din 13 mai 1999 privind ratele dobânzilor plătite de Banca Naţionala a României la rezervele minime obligatorii, aferente lunii mai 1999 (perioade de aplicare) EMITENT BANCA NAŢIONALA A ROMÂNIEI",
+      "start": 0,
+      "end": 211,
+      "verification": "source_checked",
+      "context": "CIRCULARA nr. 10 din 13 mai 1999 privind ratele dobânzilor plătite de Banca Naţionala a României la rezervele minime obligatorii, aferente lunii mai 1999 (perioade de aplicare) EMITENT BANCA NAŢIONALA A ROMÂNIEI Publicat în MONITORUL OFICIAL nr. 225 din 20 mai 1999 În baza art. 8 din Legea nr. 101/1998 privind Statutul Băncii Naţionale a României, în aplicarea prevederilor Regulamentului nr. 4/1998 privind regimul rezervelor minime obligatorii, re",
+      "decision": {
+        "id": "m_55933d861b9bece2e3d2",
+        "label": "act normativ",
+        "definition": "Act juridic emis de o autoritate competentă care stabilește norme de drept.",
+        "reason": "Este o CIRCULARĂ care are caracter normativ și este publicată în MONITORUL OFICIAL.",
+        "status": "entity"
+      },
+      "entity_id": "e_6fb5eb1f40ff285991e8"
+    },
+    {
+      "id": "m_a9db87e0cdb2ff48f450",
+      "name": "MONITORUL OFICIAL nr. 225 din 20 mai 1999",
+      "source": "18203#1",
+      "document": "18203",
+      "content_hash": "f2f9db966d37c8ce1a07ff36af940c241971cec316ed6987c62466c97bcaf77e",
+      "quote": "Publicat în MONITORUL OFICIAL nr. 225 din 20 mai 1999",
+      "start": 212,
+      "end": 265,
+      "verification": "source_checked",
+      "context": "nzilor plătite de Banca Naţionala a României la rezervele minime obligatorii, aferente lunii mai 1999 (perioade de aplicare) EMITENT BANCA NAŢIONALA A ROMÂNIEI Publicat în MONITORUL OFICIAL nr. 225 din 20 mai 1999 În baza art. 8 din Legea nr. 101/1998 privind Statutul Băncii Naţionale a României, în aplicarea prevederilor Regulamentului nr. 4/1998 privind regimul rezervelor minime obligatorii, republicat, Banca Naţionala a României hotărăşte: Ratele",
+      "decision": {
+        "id": "m_a9db87e0cdb2ff48f450",
+        "label": "publicație oficială",
+        "definition": "Organul oficial prin care sunt publicate actele normative și legale.",
+        "reason": "Se referă la MONITORUL OFICIAL, care este un vehicul de publicare legal.",
+        "status": "entity"
+      },
+      "entity_id": "e_2a6da7b47cdfec56a197"
+    },
+    {
+      "id": "m_9f01edfda57384e15d5e",
+      "name": "Legea nr. 101/1998 privind Statutul Băncii Naţionale a României",
+      "source": "18203#1",
+      "document": "18203",
+      "content_hash": "f2f9db966d37c8ce1a07ff36af940c241971cec316ed6987c62466c97bcaf77e",
+      "quote": "În baza art. 8 din Legea nr. 101/1998 privind Statutul Băncii Naţionale a României",
+      "start": 266,
+      "end": 348,
+      "verification": "source_checked",
+      "context": "ele minime obligatorii, aferente lunii mai 1999 (perioade de aplicare) EMITENT BANCA NAŢIONALA A ROMÂNIEI Publicat în MONITORUL OFICIAL nr. 225 din 20 mai 1999 În baza art. 8 din Legea nr. 101/1998 privind Statutul Băncii Naţionale a României, în aplicarea prevederilor Regulamentului nr. 4/1998 privind regimul rezervelor minime obligatorii, republicat, Banca Naţionala a României hotărăşte: Ratele dobânzilor plătite la rezervele minime obligatorii, aferente lunii mai 1999 (perio",
+      "decision": {
+        "id": "m_9f01edfda57384e15d5e",
+        "label": "act normativ",
+        "definition": "Act juridic emis de o autoritate competentă care stabilește norme de drept.",
+        "reason": "Se face referire la o lege specifică ('Legea nr. 101/1998 privind Statutul Băncii Naţionale a României').",
+        "status": "entity"
+      },
+      "entity_id": "e_72ce260a4cd79879a1e0"
+    },
+    {
+      "id": "m_304e13c61c5e1387dbde",
+      "name": "Regulamentului nr. 4/1998 privind regimul rezervelor minime obligatorii, republicat",
+      "source": "18203#1",
+      "document": "18203",
+      "content_hash": "f2f9db966d37c8ce1a07ff36af940c241971cec316ed6987c62466c97bcaf77e",
+      "quote": "în aplicarea prevederilor Regulamentului nr. 4/1998 privind regimul rezervelor minime obligatorii, republicat",
+      "start": 350,
+      "end": 459,
+      "verification": "source_checked",
+      "context": " NAŢIONALA A ROMÂNIEI Publicat în MONITORUL OFICIAL nr. 225 din 20 mai 1999 În baza art. 8 din Legea nr. 101/1998 privind Statutul Băncii Naţionale a României, în aplicarea prevederilor Regulamentului nr. 4/1998 privind regimul rezervelor minime obligatorii, republicat, Banca Naţionala a României hotărăşte: Ratele dobânzilor plătite la rezervele minime obligatorii, aferente lunii mai 1999 (perioade de aplicare), sunt: - 8,5% pentru rezervele minime obligatorii constituite în lei; - 3,15% pentru rezervele",
+      "decision": {
+        "id": "m_304e13c61c5e1387dbde",
+        "label": "act normativ",
+        "definition": "Act juridic emis de o autoritate competentă care stabilește norme de drept.",
+        "reason": "Se face referire la un regulament specific ('Regulamentului nr. 4/1998 privind regimul rezervelor minime obligatorii').",
+        "status": "entity"
+      },
+      "entity_id": "e_fc4f8b283f4900fbbc72"
+    },
+    {
+      "id": "m_a3ddfe70011742ee5780",
+      "name": "Banca Naţionala a României",
+      "source": "18203#1",
+      "document": "18203",
+      "content_hash": "f2f9db966d37c8ce1a07ff36af940c241971cec316ed6987c62466c97bcaf77e",
+      "quote": "Banca Naţionala a României hotărăşte:",
+      "start": 461,
+      "end": 498,
+      "verification": "source_checked",
+      "context": "98 privind Statutul Băncii Naţionale a României, în aplicarea prevederilor Regulamentului nr. 4/1998 privind regimul rezervelor minime obligatorii, republicat, Banca Naţionala a României hotărăşte: Ratele dobânzilor plătite la rezervele minime obligatorii, aferente lunii mai 1999 (perioade de aplicare), sunt: - 8,5% pentru rezervele minime obligatorii constituite în lei; - 3,15% pentru rezervele minime obligatorii constituite în dola",
+      "decision": {
+        "id": "m_a3ddfe70011742ee5780",
+        "label": "autoritate publică",
+        "definition": "Instituție învestită cu competențe publice.",
+        "reason": "Banca Naţională a României este o instituție financiară cu competențe publice.",
+        "status": "entity"
+      },
+      "entity_id": "e_778ff9eb1af4f03e49ab"
+    },
+    {
+      "id": "m_581f885209c304653b25",
+      "name": "Ratele dobânzilor plătite la rezervele minime obligatorii, aferente lunii mai 1999 (perioade de aplicare)",
+      "source": "18203#1",
+      "document": "18203",
+      "content_hash": "f2f9db966d37c8ce1a07ff36af940c241971cec316ed6987c62466c97bcaf77e",
+      "quote": "Banca Naţionala a României hotărăşte: Ratele dobânzilor plătite la rezervele minime obligatorii, aferente lunii mai 1999 (perioade de aplicare), sunt:",
+      "start": 461,
+      "end": 611,
+      "verification": "source_checked",
+      "context": "98 privind Statutul Băncii Naţionale a României, în aplicarea prevederilor Regulamentului nr. 4/1998 privind regimul rezervelor minime obligatorii, republicat, Banca Naţionala a României hotărăşte: Ratele dobânzilor plătite la rezervele minime obligatorii, aferente lunii mai 1999 (perioade de aplicare), sunt: - 8,5% pentru rezervele minime obligatorii constituite în lei; - 3,15% pentru rezervele minime obligatorii constituite în dolari S.U.A. GUVERNATORUL BĂNCII NAŢIONALE A ROMÂNIEI, MUGUR",
+      "decision": {
+        "id": "m_581f885209c304653b25",
+        "label": "",
+        "definition": "",
+        "reason": "Numele se referă la calculul dobânzilor pentru rezervele minime obligatorii.",
+        "status": "fragment"
+      }
+    },
+    {
+      "id": "m_b742b098d73409c38bb3",
+      "name": "Inspectorul general de stat",
+      "source": "18463#20",
+      "document": "18463",
+      "content_hash": "3f20074c9f9a0bd0a1bb3a9eee156db3861823cfbd14f7eb008446a55bf60a35",
+      "quote": "Inspectorul general de stat și inspectorii generali de stat adjuncți au calitatea de inspector de muncă și pot exercita activități de control pe întreg teritoriul țării.",
+      "start": 109,
+      "end": 278,
+      "verification": "source_checked",
+      "context": "din LEGEA nr. 283 din 13 noiembrie 2024, publicată în MONITORUL OFICIAL nr. 1139 din 14 noiembrie 2024 ) (5) Inspectorul general de stat și inspectorii generali de stat adjuncți au calitatea de inspector de muncă și pot exercita activități de control pe întreg teritoriul țării. (6) Inspectorul general de stat este ordonator secundar de credite. (7) În exercitarea atribuțiilor sale, inspectorul general de stat emite decizii și aprobă metodologii, proceduri și instrucțiuni în domeniile de activitate ale Inspecției ",
+      "decision": {
+        "id": "m_b742b098d73409c38bb3",
+        "label": "autoritate publică",
+        "definition": "Instituție învestită cu competențe publice.",
+        "reason": "Inspectorul general de stat este o instituție publică.",
+        "status": "entity"
+      },
+      "entity_id": "e_57651593033eea28f7ae"
+    },
+    {
+      "id": "m_80fb8cd5c5e56da24985",
+      "name": "Inspectorul general de stat",
+      "source": "18463#20",
+      "document": "18463",
+      "content_hash": "3f20074c9f9a0bd0a1bb3a9eee156db3861823cfbd14f7eb008446a55bf60a35",
+      "quote": "Inspectorul general de stat este ordonator secundar de credite.",
+      "start": 283,
+      "end": 346,
+      "verification": "source_checked",
+      "context": "neral de stat și inspectorii generali de stat adjuncți au calitatea de inspector de muncă și pot exercita activități de control pe întreg teritoriul țării. (6) Inspectorul general de stat este ordonator secundar de credite. (7) În exercitarea atribuțiilor sale, inspectorul general de stat emite decizii și aprobă metodologii, proceduri și instrucțiuni în domeniile de activitate ale Inspecției Muncii. (8) Atribuțiile inspectorului general de stat și ale inspect",
+      "decision": {
+        "id": "m_80fb8cd5c5e56da24985",
+        "label": "autoritate publică",
+        "definition": "Instituție învestită cu competențe publice.",
+        "reason": "Inspectorul general de stat este o instituție publică.",
+        "status": "entity"
+      },
+      "entity_id": "e_57651593033eea28f7ae"
+    },
+    {
+      "id": "m_2a6b84007bc8a7b6324f",
+      "name": "inspectorul general de stat",
+      "source": "18463#20",
+      "document": "18463",
+      "content_hash": "3f20074c9f9a0bd0a1bb3a9eee156db3861823cfbd14f7eb008446a55bf60a35",
+      "quote": "În exercitarea atribuțiilor sale, inspectorul general de stat emite decizii și aprobă metodologii, proceduri și instrucțiuni în domeniile de activitate ale Inspecției Muncii.",
+      "start": 351,
+      "end": 525,
+      "verification": "source_checked",
+      "context": "de inspector de muncă și pot exercita activități de control pe întreg teritoriul țării. (6) Inspectorul general de stat este ordonator secundar de credite. (7) În exercitarea atribuțiilor sale, inspectorul general de stat emite decizii și aprobă metodologii, proceduri și instrucțiuni în domeniile de activitate ale Inspecției Muncii. (8) Atribuțiile inspectorului general de stat și ale inspectorilor generali de stat adjuncți sunt stabilite prin Regulament. (9) La nivelul Inspecției Muncii se constituie Consiliul Consultativ Tripartit, cu rol de dialog social, format di",
+      "decision": {
+        "id": "m_2a6b84007bc8a7b6324f",
+        "label": "autoritate publică",
+        "definition": "Instituție învestită cu competențe publice.",
+        "reason": "Inspectorul general de stat este o instituție publică.",
+        "status": "entity"
+      },
+      "entity_id": "e_57651593033eea28f7ae"
+    },
+    {
+      "id": "m_58e9994ebd41239a7a19",
+      "name": "Consiliul Consultativ Tripartit",
+      "source": "18463#20",
+      "document": "18463",
+      "content_hash": "3f20074c9f9a0bd0a1bb3a9eee156db3861823cfbd14f7eb008446a55bf60a35",
+      "quote": "La nivelul Inspecției Muncii se constituie Consiliul Consultativ Tripartit, cu rol de dialog social, format din reprezentanții desemnați ai",
+      "start": 655,
+      "end": 794,
+      "verification": "source_checked",
+      "context": "ivitate ale Inspecției Muncii. (8) Atribuțiile inspectorului general de stat și ale inspectorilor generali de stat adjuncți sunt stabilite prin Regulament. (9) La nivelul Inspecției Muncii se constituie Consiliul Consultativ Tripartit, cu rol de dialog social, format din reprezentanții desemnați ai",
+      "decision": {
+        "id": "m_58e9994ebd41239a7a19",
+        "label": "organism de consultare",
+        "definition": "Un organism format pentru a oferi consultanță sau a facilita dialogul social.",
+        "reason": "Consiliul Consultativ Tripartit este menționat ca un organ de dialog social.",
+        "status": "entity"
+      },
+      "entity_id": "e_db94c01e14af5bde63bd"
+    },
+    {
+      "id": "m_6770ea52927cc3e62845",
+      "name": "inspector de muncă",
+      "source": "18463#20",
+      "document": "18463",
+      "content_hash": "3f20074c9f9a0bd0a1bb3a9eee156db3861823cfbd14f7eb008446a55bf60a35",
+      "quote": "Inspectorul general de stat și inspectorii generali de stat adjuncți au calitatea de inspector de muncă și pot exercita activități de control pe întreg teritoriul țării.",
+      "start": 109,
+      "end": 278,
+      "verification": "source_checked",
+      "context": "din LEGEA nr. 283 din 13 noiembrie 2024, publicată în MONITORUL OFICIAL nr. 1139 din 14 noiembrie 2024 ) (5) Inspectorul general de stat și inspectorii generali de stat adjuncți au calitatea de inspector de muncă și pot exercita activități de control pe întreg teritoriul țării. (6) Inspectorul general de stat este ordonator secundar de credite. (7) În exercitarea atribuțiilor sale, inspectorul general de stat emite decizii și aprobă metodologii, proceduri și instrucțiuni în domeniile de activitate ale Inspecției ",
+      "decision": {
+        "id": "m_6770ea52927cc3e62845",
+        "label": "",
+        "definition": "",
+        "reason": "Inspector de muncă este o funcție profesională.",
+        "status": "fragment"
+      }
+    },
+    {
+      "id": "m_31a1e79bdd305a23d229",
+      "name": "decizii",
+      "source": "18463#20",
+      "document": "18463",
+      "content_hash": "3f20074c9f9a0bd0a1bb3a9eee156db3861823cfbd14f7eb008446a55bf60a35",
+      "quote": "În exercitarea atribuțiilor sale, inspectorul general de stat emite decizii și aprobă metodologii, proceduri și instrucțiuni în domeniile de activitate ale Inspecției Muncii.",
+      "start": 351,
+      "end": 525,
+      "verification": "source_checked",
+      "context": "de inspector de muncă și pot exercita activități de control pe întreg teritoriul țării. (6) Inspectorul general de stat este ordonator secundar de credite. (7) În exercitarea atribuțiilor sale, inspectorul general de stat emite decizii și aprobă metodologii, proceduri și instrucțiuni în domeniile de activitate ale Inspecției Muncii. (8) Atribuțiile inspectorului general de stat și ale inspectorilor generali de stat adjuncți sunt stabilite prin Regulament. (9) La nivelul Inspecției Muncii se constituie Consiliul Consultativ Tripartit, cu rol de dialog social, format di",
+      "decision": {
+        "id": "m_31a1e79bdd305a23d229",
+        "label": "",
+        "definition": "",
+        "reason": "Deciziile sunt acte normative emise de inspectorul general de stat.",
+        "status": "fragment"
+      }
+    },
+    {
+      "id": "m_595cf81ad1a93f6619cb",
+      "name": "metodologii, proceduri și instrucțiuni",
+      "source": "18463#20",
+      "document": "18463",
+      "content_hash": "3f20074c9f9a0bd0a1bb3a9eee156db3861823cfbd14f7eb008446a55bf60a35",
+      "quote": "În exercitarea atribuțiilor sale, inspectorul general de stat emite decizii și aprobă metodologii, proceduri și instrucțiuni în domeniile de activitate ale Inspecției Muncii.",
+      "start": 351,
+      "end": 525,
+      "verification": "source_checked",
+      "context": "de inspector de muncă și pot exercita activități de control pe întreg teritoriul țării. (6) Inspectorul general de stat este ordonator secundar de credite. (7) În exercitarea atribuțiilor sale, inspectorul general de stat emite decizii și aprobă metodologii, proceduri și instrucțiuni în domeniile de activitate ale Inspecției Muncii. (8) Atribuțiile inspectorului general de stat și ale inspectorilor generali de stat adjuncți sunt stabilite prin Regulament. (9) La nivelul Inspecției Muncii se constituie Consiliul Consultativ Tripartit, cu rol de dialog social, format di",
+      "decision": {
+        "id": "m_595cf81ad1a93f6619cb",
+        "label": "",
+        "definition": "",
+        "reason": "Metodologiile, procedurile și instrucțiunile sunt documente care reglementează activitatea.",
+        "status": "fragment"
+      }
+    },
+    {
+      "id": "m_32730fb6a1dedc0e721a",
+      "name": "Curtea de Conturi",
+      "source": "18593#11",
+      "document": "18593",
+      "content_hash": "a579dccf99647b557915be274277b0c36222fe0b979292aa90d88dc199ba1167",
+      "quote": "Curtea de Conturi exercita controlul asupra modului de formare, de administrare şi de întrebuinţare a resurselor financiare ale statului şi ale sectorului public",
+      "start": 310,
+      "end": 471,
+      "verification": "source_checked",
+      "context": " art. 18 şi art. 19 lit. a)-c) din aceeaşi lege, se întemeiază pe dispoziţiile art. 139 alin. (1) din Constituţie. Potrivit acestor prevederi constituţionale, \"Curtea de Conturi exercita controlul asupra modului de formare, de administrare şi de întrebuinţare a resurselor financiare ale statului şi ale sectorului public\". Conform art. 16 alin. (1) din Legea nr. 94/1992 , care este în concordanta cu dispoziţiile constituţionale ale art. 139 alin. (1), \"Curtea de Conturi îşi exercită funcţiunea de control asupra modului de formare, de administrare şi de înt",
+      "decision": {
+        "id": "m_32730fb6a1dedc0e721a",
+        "label": "autoritate publică",
+        "definition": "Instituție învestită cu competențe publice.",
+        "reason": "Menționează 'Curtea de Conturi', care este o instituție publică.",
+        "status": "entity"
+      },
+      "entity_id": "e_a0eae25d17dae27b37f5"
+    },
+    {
+      "id": "m_fc5146cf3e39aa2786c8",
+      "name": "Curtea de Conturi",
+      "source": "18593#11",
+      "document": "18593",
+      "content_hash": "a579dccf99647b557915be274277b0c36222fe0b979292aa90d88dc199ba1167",
+      "quote": "Curtea de Conturi îşi exercită funcţiunea de control asupra modului de formare, de administrare şi de întrebuinţare a resurselor financiare ale statului şi ale sectorului public, precum şi",
+      "start": 606,
+      "end": 794,
+      "verification": "source_checked",
+      "context": " şi ale sectorului public\". Conform art. 16 alin. (1) din Legea nr. 94/1992 , care este în concordanta cu dispoziţiile constituţionale ale art. 139 alin. (1), \"Curtea de Conturi îşi exercită funcţiunea de control asupra modului de formare, de administrare şi de întrebuinţare a resurselor financiare ale statului şi ale sectorului public, precum şi",
+      "decision": {
+        "id": "m_fc5146cf3e39aa2786c8",
+        "label": "autoritate publică",
+        "definition": "Instituție învestită cu competențe publice.",
+        "reason": "Menționează 'Curtea de Conturi', care este o instituție publică.",
+        "status": "entity"
+      },
+      "entity_id": "e_a0eae25d17dae27b37f5"
+    },
+    {
+      "id": "m_c2a2ea0497aa62fdc833",
+      "name": "obligaţiilor financiare către stat, unităţi administrativ-teritoriale şi către instituţii publice ale altor persoane juridice decât cele menţionate la art. 18 şi art. 19 lit. a)-c) din aceeaşi lege",
+      "source": "18593#11",
+      "document": "18593",
+      "content_hash": "a579dccf99647b557915be274277b0c36222fe0b979292aa90d88dc199ba1167",
+      "quote": "obligaţiilor financiare către stat, unităţi administrativ-teritoriale şi către instituţii publice ale altor persoane juridice decât cele menţionate la art. 18 şi art. 19 lit. a)-c) din aceeaşi lege, se întemeiază pe dispoziţiile art. 139 alin. (1) din Constituţie.",
+      "start": 0,
+      "end": 264,
+      "verification": "source_checked",
+      "context": "obligaţiilor financiare către stat, unităţi administrativ-teritoriale şi către instituţii publice ale altor persoane juridice decât cele menţionate la art. 18 şi art. 19 lit. a)-c) din aceeaşi lege, se întemeiază pe dispoziţiile art. 139 alin. (1) din Constituţie. Potrivit acestor prevederi constituţionale, \"Curtea de Conturi exercita controlul asupra modului de formare, de administrare şi de întrebuinţare a resurselor financiare ale statului şi ale sectorului public\". Conform art. 16 alin. (1) din ",
+      "decision": {
+        "id": "m_c2a2ea0497aa62fdc833",
+        "label": "",
+        "definition": "",
+        "reason": "Fragment de text care descrie subiectul unei obligații financiare, nu o entitate specifică.",
+        "status": "fragment"
+      }
+    },
+    {
+      "id": "m_44362848f31148fccb9b",
+      "name": "dispoziţiile art. 139 alin. (1) din Constituţie",
+      "source": "18593#11",
+      "document": "18593",
+      "content_hash": "a579dccf99647b557915be274277b0c36222fe0b979292aa90d88dc199ba1167",
+      "quote": "obligaţiilor financiare către stat, unităţi administrativ-teritoriale şi către instituţii publice ale altor persoane juridice decât cele menţionate la art. 18 şi art. 19 lit. a)-c) din aceeaşi lege, se întemeiază pe dispoziţiile art. 139 alin. (1) din Constituţie.",
+      "start": 0,
+      "end": 264,
+      "verification": "source_checked",
+      "context": "obligaţiilor financiare către stat, unităţi administrativ-teritoriale şi către instituţii publice ale altor persoane juridice decât cele menţionate la art. 18 şi art. 19 lit. a)-c) din aceeaşi lege, se întemeiază pe dispoziţiile art. 139 alin. (1) din Constituţie. Potrivit acestor prevederi constituţionale, \"Curtea de Conturi exercita controlul asupra modului de formare, de administrare şi de întrebuinţare a resurselor financiare ale statului şi ale sectorului public\". Conform art. 16 alin. (1) din ",
+      "decision": {
+        "id": "m_44362848f31148fccb9b",
+        "label": "act normativ",
+        "definition": "Act juridic emis de o autoritate competentă care stabilește norme de drept.",
+        "reason": "Se referă la 'dispozițiile art. 139 alin. (1) din Constituţie', care este o prevedere constituțională.",
+        "status": "entity"
+      },
+      "entity_id": "e_0a833fc5418a8023ffa6"
+    },
+    {
+      "id": "m_f499c730108ca99108d4",
+      "name": "modului de formare, de administrare şi de întrebuinţare a resurselor financiare ale statului şi ale sectorului public",
+      "source": "18593#11",
+      "document": "18593",
+      "content_hash": "a579dccf99647b557915be274277b0c36222fe0b979292aa90d88dc199ba1167",
+      "quote": "Curtea de Conturi exercita controlul asupra modului de formare, de administrare şi de întrebuinţare a resurselor financiare ale statului şi ale sectorului public",
+      "start": 310,
+      "end": 471,
+      "verification": "source_checked",
+      "context": " art. 18 şi art. 19 lit. a)-c) din aceeaşi lege, se întemeiază pe dispoziţiile art. 139 alin. (1) din Constituţie. Potrivit acestor prevederi constituţionale, \"Curtea de Conturi exercita controlul asupra modului de formare, de administrare şi de întrebuinţare a resurselor financiare ale statului şi ale sectorului public\". Conform art. 16 alin. (1) din Legea nr. 94/1992 , care este în concordanta cu dispoziţiile constituţionale ale art. 139 alin. (1), \"Curtea de Conturi îşi exercită funcţiunea de control asupra modului de formare, de administrare şi de înt",
+      "decision": {
+        "id": "m_f499c730108ca99108d4",
+        "label": "",
+        "definition": "",
+        "reason": "Fragment de text care descrie domeniul de control al Curții de Conturi, nu o entitate specifică.",
+        "status": "fragment"
+      }
+    },
+    {
+      "id": "m_27ff4e9727fb5421e165",
+      "name": "comitetul interministerial",
+      "source": "18731#12",
+      "document": "18731",
+      "content_hash": "c1b00e81c6ae64b9ab0051d6b688cab724c0bc8d4a6ac6b92ca6d4ced687d0a0",
+      "quote": "Persoanele care fac parte din comitetul interministerial, din secretariatul acestuia şi din comisiile ori subcomisiile de specialitate îşi păstrează calitatea pe care o au la instituţiile de la care provin, precum şi toate drepturile ce decurg din aceasta calitate.",
+      "start": 31,
+      "end": 296,
+      "verification": "source_checked",
+      "context": "droguri. ... + Articolul 9 (1) Persoanele care fac parte din comitetul interministerial, din secretariatul acestuia şi din comisiile ori subcomisiile de specialitate îşi păstrează calitatea pe care o au la instituţiile de la care provin, precum şi toate drepturile ce decurg din aceasta calitate. ... (2) Sarcinile comisiilor şi ale subcomisiilor de specialitate ale comitetului interministerial se îndeplinesc de către membrii acestora în cadrul atribuţiilor legale de serviciu. ... (3) Cheltuielile materiale şi de capital necesare pe",
+      "decision": {
+        "id": "m_27ff4e9727fb5421e165",
+        "label": "autoritate publică",
+        "definition": "Instituție învestită cu competențe publice.",
+        "reason": "Menționează 'comitetul interministerial', care este o structură de nivel interministerial.",
+        "status": "entity"
+      },
+      "entity_id": "e_b423732f648a8c39a00a"
+    },
+    {
+      "id": "m_309839ab3bafa5b0073c",
+      "name": "secretariatul acestuia",
+      "source": "18731#12",
+      "document": "18731",
+      "content_hash": "c1b00e81c6ae64b9ab0051d6b688cab724c0bc8d4a6ac6b92ca6d4ced687d0a0",
+      "quote": "Persoanele care fac parte din comitetul interministerial, din secretariatul acestuia şi din comisiile ori subcomisiile de specialitate îşi păstrează calitatea pe care o au la instituţiile de la care provin, precum şi toate drepturile ce decurg din aceasta calitate.",
+      "start": 31,
+      "end": 296,
+      "verification": "source_checked",
+      "context": "droguri. ... + Articolul 9 (1) Persoanele care fac parte din comitetul interministerial, din secretariatul acestuia şi din comisiile ori subcomisiile de specialitate îşi păstrează calitatea pe care o au la instituţiile de la care provin, precum şi toate drepturile ce decurg din aceasta calitate. ... (2) Sarcinile comisiilor şi ale subcomisiilor de specialitate ale comitetului interministerial se îndeplinesc de către membrii acestora în cadrul atribuţiilor legale de serviciu. ... (3) Cheltuielile materiale şi de capital necesare pe",
+      "decision": {
+        "id": "m_309839ab3bafa5b0073c",
+        "label": "autoritate publică",
+        "definition": "Instituție învestită cu competențe publice.",
+        "reason": "Menționează 'secretariatul acestuia', care este o structură administrativă atașată unei autorități.",
+        "status": "entity"
+      },
+      "entity_id": "e_7a6497fdc3ee894cf0d5"
+    },
+    {
+      "id": "m_81758150b5d2eb8bdc64",
+      "name": "comisiile ori subcomisiile de specialitate",
+      "source": "18731#12",
+      "document": "18731",
+      "content_hash": "c1b00e81c6ae64b9ab0051d6b688cab724c0bc8d4a6ac6b92ca6d4ced687d0a0",
+      "quote": "Persoanele care fac parte din comitetul interministerial, din secretariatul acestuia şi din comisiile ori subcomisiile de specialitate îşi păstrează calitatea pe care o au la instituţiile de la care provin, precum şi toate drepturile ce decurg din aceasta calitate.",
+      "start": 31,
+      "end": 296,
+      "verification": "source_checked",
+      "context": "droguri. ... + Articolul 9 (1) Persoanele care fac parte din comitetul interministerial, din secretariatul acestuia şi din comisiile ori subcomisiile de specialitate îşi păstrează calitatea pe care o au la instituţiile de la care provin, precum şi toate drepturile ce decurg din aceasta calitate. ... (2) Sarcinile comisiilor şi ale subcomisiilor de specialitate ale comitetului interministerial se îndeplinesc de către membrii acestora în cadrul atribuţiilor legale de serviciu. ... (3) Cheltuielile materiale şi de capital necesare pe",
+      "decision": {
+        "id": "m_81758150b5d2eb8bdc64",
+        "label": "autoritate publică",
+        "definition": "Instituție învestită cu competențe publice.",
+        "reason": "Menționează 'comisiile ori subcomisiile de specialitate', care sunt organe de consultare sau de lucru subordonate unei autorități.",
+        "status": "entity"
+      },
+      "entity_id": "e_f2dda6e67ca3d165332c"
+    },
+    {
+      "id": "m_b677ebb192ebf37d5b1a",
+      "name": "Brigazii de Combatere a Crimei Organizate şi Corupţiei din cadrul Ministerului de Interne - Inspectoratul General",
+      "source": "18731#12",
+      "document": "18731",
+      "content_hash": "c1b00e81c6ae64b9ab0051d6b688cab724c0bc8d4a6ac6b92ca6d4ced687d0a0",
+      "quote": "Cheltuielile materiale şi de capital necesare pentru desfăşurarea şedinţelor comitetului interministerial şi ale secretariatului acestuia se suporta din bugetul de venituri şi cheltuieli al Brigazii de Combatere a Crimei Organizate şi Corupţiei din cadrul Ministerului de Interne - Inspectoratul General",
+      "start": 488,
+      "end": 791,
+      "verification": "source_checked",
+      "context": " ale subcomisiilor de specialitate ale comitetului interministerial se îndeplinesc de către membrii acestora în cadrul atribuţiilor legale de serviciu. ... (3) Cheltuielile materiale şi de capital necesare pentru desfăşurarea şedinţelor comitetului interministerial şi ale secretariatului acestuia se suporta din bugetul de venituri şi cheltuieli al Brigazii de Combatere a Crimei Organizate şi Corupţiei din cadrul Ministerului de Interne - Inspectoratul General al",
+      "decision": {
+        "id": "m_b677ebb192ebf37d5b1a",
+        "label": "autoritate publică",
+        "definition": "Instituție învestită cu competențe publice.",
+        "reason": "Menționează o structură administrativă specifică: Brigazii de Combatere a Crimei Organizate şi Corupţiei din cadrul Ministerului de Interne - Inspectoratul General.",
+        "status": "entity"
+      },
+      "entity_id": "e_4e65d99fa6205a3f12af"
+    },
+    {
+      "id": "m_a833418e522f375a78fb",
+      "name": "Persoanele care fac parte din comitetul interministerial",
+      "source": "18731#12",
+      "document": "18731",
+      "content_hash": "c1b00e81c6ae64b9ab0051d6b688cab724c0bc8d4a6ac6b92ca6d4ced687d0a0",
+      "quote": "Persoanele care fac parte din comitetul interministerial, din secretariatul acestuia şi din comisiile ori subcomisiile de specialitate îşi păstrează calitatea pe care o au la instituţiile de la care provin, precum şi toate drepturile ce decurg din aceasta calitate.",
+      "start": 31,
+      "end": 296,
+      "verification": "source_checked",
+      "context": "droguri. ... + Articolul 9 (1) Persoanele care fac parte din comitetul interministerial, din secretariatul acestuia şi din comisiile ori subcomisiile de specialitate îşi păstrează calitatea pe care o au la instituţiile de la care provin, precum şi toate drepturile ce decurg din aceasta calitate. ... (2) Sarcinile comisiilor şi ale subcomisiilor de specialitate ale comitetului interministerial se îndeplinesc de către membrii acestora în cadrul atribuţiilor legale de serviciu. ... (3) Cheltuielile materiale şi de capital necesare pe",
+      "decision": {
+        "id": "m_a833418e522f375a78fb",
+        "label": "persoană fizică",
+        "definition": "Indiviziile care participă la structuri sau comitete.",
+        "reason": "Se referă la membrii comitetului interministerial, care sunt persoane fizice.",
+        "status": "entity"
+      },
+      "entity_id": "e_66f762a499c325b6017b"
+    },
+    {
+      "id": "m_d44b4def77928fd880ad",
+      "name": "instituţiile de la care provin",
+      "source": "18731#12",
+      "document": "18731",
+      "content_hash": "c1b00e81c6ae64b9ab0051d6b688cab724c0bc8d4a6ac6b92ca6d4ced687d0a0",
+      "quote": "Persoanele care fac parte din comitetul interministerial, din secretariatul acestuia şi din comisiile ori subcomisiile de specialitate îşi păstrează calitatea pe care o au la instituţiile de la care provin, precum şi toate drepturile ce decurg din aceasta calitate.",
+      "start": 31,
+      "end": 296,
+      "verification": "source_checked",
+      "context": "droguri. ... + Articolul 9 (1) Persoanele care fac parte din comitetul interministerial, din secretariatul acestuia şi din comisiile ori subcomisiile de specialitate îşi păstrează calitatea pe care o au la instituţiile de la care provin, precum şi toate drepturile ce decurg din aceasta calitate. ... (2) Sarcinile comisiilor şi ale subcomisiilor de specialitate ale comitetului interministerial se îndeplinesc de către membrii acestora în cadrul atribuţiilor legale de serviciu. ... (3) Cheltuielile materiale şi de capital necesare pe",
+      "decision": {
+        "id": "m_d44b4def77928fd880ad",
+        "label": "autoritate publică",
+        "definition": "Instituție învestită cu competențe publice.",
+        "reason": "Se referă la instituțiile de care provin membrii comitetului, care sunt autorități publice.",
+        "status": "entity"
+      },
+      "entity_id": "e_976081be85e1a401331f"
+    },
+    {
+      "id": "m_a1f6c516e81fe9f85d75",
+      "name": "membrii acestora",
+      "source": "18731#12",
+      "document": "18731",
+      "content_hash": "c1b00e81c6ae64b9ab0051d6b688cab724c0bc8d4a6ac6b92ca6d4ced687d0a0",
+      "quote": "Sarcinile comisiilor şi ale subcomisiilor de specialitate ale comitetului interministerial se îndeplinesc de către membrii acestora în cadrul atribuţiilor legale de serviciu.",
+      "start": 305,
+      "end": 479,
+      "verification": "source_checked",
+      "context": "iile de specialitate îşi păstrează calitatea pe care o au la instituţiile de la care provin, precum şi toate drepturile ce decurg din aceasta calitate. ... (2) Sarcinile comisiilor şi ale subcomisiilor de specialitate ale comitetului interministerial se îndeplinesc de către membrii acestora în cadrul atribuţiilor legale de serviciu. ... (3) Cheltuielile materiale şi de capital necesare pentru desfăşurarea şedinţelor comitetului interministerial şi ale secretariatului acestuia se suporta din bugetul de venituri şi cheltuieli al Brigazii de Combatere a Crimei Organizate",
+      "decision": {
+        "id": "m_a1f6c516e81fe9f85d75",
+        "label": "persoană fizică",
+        "definition": "Indiviziile care participă la structuri sau comitete.",
+        "reason": "Se referă la membrii comisiilor și subcomisiilor, care sunt persoane fizice.",
+        "status": "entity"
+      },
+      "entity_id": "e_ee5666950930d0a2bb6b"
+    },
+    {
+      "id": "m_fcdcb8ac2229c934fd3d",
+      "name": "proprietarii şi deţinătorii cu orice titlu de păduri",
+      "source": "18841#12",
+      "document": "18841",
+      "content_hash": "e3157d46af1640a15142185fdbb0767410b499bb3f59c73172a05e84a5bdc83c",
+      "quote": "a) controlează modul de respectare de către proprietarii şi deţinătorii cu orice titlu de păduri a dispoziţiilor legale în domeniul silviculturii, precum şi a normelor specifice regimului silvic; .......................................................................",
+      "start": 314,
+      "end": 581,
+      "verification": "source_checked",
+      "context": "tura, precum şi prin inspectoratele silvice teritoriale aflate în subordinea acesteia.\" 14. La articolul 20, literele a), e) şi j) vor avea următorul cuprins: \"a) controlează modul de respectare de către proprietarii şi deţinătorii cu orice titlu de păduri a dispoziţiilor legale în domeniul silviculturii, precum şi a normelor specifice regimului silvic; ....................................................................... e) controlează activitatea de reparare şi întreţinere a drumurilor forestiere, în conformitate cu legislaţia şi normele specifice în vigoare; ... ......................................................................",
+      "decision": {
+        "id": "m_fcdcb8ac2229c934fd3d",
+        "label": "subiect drept",
+        "definition": "Persoanele fizice sau juridice care sunt subiecte de drept.",
+        "reason": "Se referă la proprietarii și deținătorii terenurilor (pădurilor).",
+        "status": "entity"
+      },
+      "entity_id": "e_7a19c60685a3f3ef58e3"
+    },
+    {
+      "id": "m_e983052d045134e52b0b",
+      "name": "activitatea de reparare şi întreţinere a drumurilor forestiere",
+      "source": "18841#12",
+      "document": "18841",
+      "content_hash": "e3157d46af1640a15142185fdbb0767410b499bb3f59c73172a05e84a5bdc83c",
+      "quote": "e) controlează activitatea de reparare şi întreţinere a drumurilor forestiere, în conformitate cu legislaţia şi normele specifice în vigoare;",
+      "start": 582,
+      "end": 723,
+      "verification": "source_checked",
+      "context": "ilor legale în domeniul silviculturii, precum şi a normelor specifice regimului silvic; ....................................................................... e) controlează activitatea de reparare şi întreţinere a drumurilor forestiere, în conformitate cu legislaţia şi normele specifice în vigoare; ... ......................................................................",
+      "decision": {
+        "id": "m_e983052d045134e52b0b",
+        "label": "activitate",
+        "definition": "Acțiunea de întreținere sau reparare a structurilor sau terenurilor.",
+        "reason": "Descrie o activitate specifică de control și întreținere a drumurilor forestiere.",
+        "status": "entity"
+      },
+      "entity_id": "e_6c53637dd447184ca9b8"
+    },
+    {
+      "id": "m_7a8986480cc21f34b240",
+      "name": "-",
+      "source": "19131#4",
+      "document": "19131",
+      "content_hash": "6d763336370e53e24eefebe2efa87c84d370d364228278477a84dafcebc3a502",
+      "quote": "refugiindu-se pe teritoriul primei părţi înainte de a-şi fi executat condamnarea, statul de condamnare poate să adreseze primei părţi o cerere prin care să îl solicite ca aceasta să se ocupe de executarea condamnării.",
+      "start": 0,
+      "end": 217,
+      "verification": "source_checked",
+      "context": "refugiindu-se pe teritoriul primei părţi înainte de a-şi fi executat condamnarea, statul de condamnare poate să adreseze primei părţi o cerere prin care să îl solicite ca aceasta să se ocupe de executarea condamnării. 2. Partea solicitată poate, la cererea părţii solicitante, înainte de primirea documentelor în sprijinul cererii sau în asteptarea hotărârii privind cererea, sa procedeze la arestarea persoanei condamnate sau sa ia orice alta măsura coresp",
+      "decision": {
+        "id": "m_7a8986480cc21f34b240",
+        "label": "",
+        "definition": "",
+        "reason": "Este un fragment de text care nu poate fi clasificat în contextul dat.",
+        "status": "fragment"
+      }
+    },
+    {
+      "id": "m_f639d48c2a23366c068b",
+      "name": "-",
+      "source": "19131#4",
+      "document": "19131",
+      "content_hash": "6d763336370e53e24eefebe2efa87c84d370d364228278477a84dafcebc3a502",
+      "quote": "Partea solicitată poate, la cererea părţii solicitante, înainte de primirea documentelor în sprijinul cererii sau în asteptarea hotărârii privind cererea, sa procedeze la arestarea persoanei condamnate sau sa ia orice alta măsura corespunzătoare, menita să asigure ca aceasta nu îi va părăsi teritoriul.",
+      "start": 221,
+      "end": 524,
+      "verification": "source_checked",
+      "context": "xecutat condamnarea, statul de condamnare poate să adreseze primei părţi o cerere prin care să îl solicite ca aceasta să se ocupe de executarea condamnării. 2. Partea solicitată poate, la cererea părţii solicitante, înainte de primirea documentelor în sprijinul cererii sau în asteptarea hotărârii privind cererea, sa procedeze la arestarea persoanei condamnate sau sa ia orice alta măsura corespunzătoare, menita să asigure ca aceasta nu îi va părăsi teritoriul. Orice cerere în acest sens va fi însoţită de informaţiile menţionate în paragraful 3 al art. 4 din convenţie. Arestarea, cu acest titlu, a persoanei condamnate nu poate duce la agravarea situaţiei sale penale. 3. Transferul executării cond",
+      "decision": {
+        "id": "m_f639d48c2a23366c068b",
+        "label": "",
+        "definition": "",
+        "reason": "Este un fragment de text care nu poate fi clasificat în contextul dat.",
+        "status": "fragment"
+      }
+    },
+    {
+      "id": "m_63d6a481cb53ad68f5d2",
+      "name": "-",
+      "source": "19131#4",
+      "document": "19131",
+      "content_hash": "6d763336370e53e24eefebe2efa87c84d370d364228278477a84dafcebc3a502",
+      "quote": "Orice cerere în acest sens va fi însoţită de informaţiile menţionate în paragraful 3 al art. 4 din convenţie.",
+      "start": 525,
+      "end": 634,
+      "verification": "source_checked",
+      "context": "d cererea, sa procedeze la arestarea persoanei condamnate sau sa ia orice alta măsura corespunzătoare, menita să asigure ca aceasta nu îi va părăsi teritoriul. Orice cerere în acest sens va fi însoţită de informaţiile menţionate în paragraful 3 al art. 4 din convenţie. Arestarea, cu acest titlu, a persoanei condamnate nu poate duce la agravarea situaţiei sale penale. 3. Transferul executării condamnării nu necesita consimţământul",
+      "decision": {
+        "id": "m_63d6a481cb53ad68f5d2",
+        "label": "",
+        "definition": "",
+        "reason": "Fragment de propoziție fără subiect sau complement clar în contextul dat.",
+        "status": "fragment"
+      }
+    },
+    {
+      "id": "m_3bc77f63ba103b8d1ad9",
+      "name": "-",
+      "source": "19131#4",
+      "document": "19131",
+      "content_hash": "6d763336370e53e24eefebe2efa87c84d370d364228278477a84dafcebc3a502",
+      "quote": "Arestarea, cu acest titlu, a persoanei condamnate nu poate duce la agravarea situaţiei sale penale.",
+      "start": 635,
+      "end": 734,
+      "verification": "source_checked",
+      "context": "să asigure ca aceasta nu îi va părăsi teritoriul. Orice cerere în acest sens va fi însoţită de informaţiile menţionate în paragraful 3 al art. 4 din convenţie. Arestarea, cu acest titlu, a persoanei condamnate nu poate duce la agravarea situaţiei sale penale. 3. Transferul executării condamnării nu necesita consimţământul",
+      "decision": {
+        "id": "m_3bc77f63ba103b8d1ad9",
+        "label": "",
+        "definition": "",
+        "reason": "Fragment de propoziție fără subiect sau complement clar în contextul dat.",
+        "status": "fragment"
+      }
+    },
+    {
+      "id": "m_3fa5a3cff5fbcfe8431e",
+      "name": "-",
+      "source": "19131#4",
+      "document": "19131",
+      "content_hash": "6d763336370e53e24eefebe2efa87c84d370d364228278477a84dafcebc3a502",
+      "quote": "Transferul executării condamnării nu necesita consimţământul",
+      "start": 738,
+      "end": 798,
+      "verification": "source_checked",
+      "context": "iile menţionate în paragraful 3 al art. 4 din convenţie. Arestarea, cu acest titlu, a persoanei condamnate nu poate duce la agravarea situaţiei sale penale. 3. Transferul executării condamnării nu necesita consimţământul",
+      "decision": {
+        "id": "m_3fa5a3cff5fbcfe8431e",
+        "label": "",
+        "definition": "",
+        "reason": "Fragment de propoziție fără subiect sau complement clar în contextul dat.",
+        "status": "fragment"
+      }
+    },
+    {
+      "id": "m_de859815db267df19ac3",
+      "name": "statul de condamnare",
+      "source": "19131#4",
+      "document": "19131",
+      "content_hash": "6d763336370e53e24eefebe2efa87c84d370d364228278477a84dafcebc3a502",
+      "quote": "statul de condamnare poate să adreseze primei părţi o cerere prin care să îl solicite ca aceasta să se ocupe de executarea condamnării.",
+      "start": 82,
+      "end": 217,
+      "verification": "source_checked",
+      "context": "refugiindu-se pe teritoriul primei părţi înainte de a-şi fi executat condamnarea, statul de condamnare poate să adreseze primei părţi o cerere prin care să îl solicite ca aceasta să se ocupe de executarea condamnării. 2. Partea solicitată poate, la cererea părţii solicitante, înainte de primirea documentelor în sprijinul cererii sau în asteptarea hotărârii privind cererea, sa procedeze la arestarea persoanei condamnate sau sa ia orice alta măsura coresp",
+      "decision": {
+        "id": "m_de859815db267df19ac3",
+        "label": "autoritate publică",
+        "definition": "Instituție învestită cu competențe publice.",
+        "reason": "Se referă la o entitate juridică cu competențe de solicitare de executare a unei condamnări.",
+        "status": "entity"
+      },
+      "entity_id": "e_8a10e2e687aea713b584"
+    },
+    {
+      "id": "m_6b18a0a1d051d8623ce3",
+      "name": "Partea solicitată",
+      "source": "19131#4",
+      "document": "19131",
+      "content_hash": "6d763336370e53e24eefebe2efa87c84d370d364228278477a84dafcebc3a502",
+      "quote": "Partea solicitată poate, la cererea părţii solicitante, înainte de primirea documentelor în sprijinul cererii sau în asteptarea hotărârii privind cererea, sa procedeze la arestarea persoanei condamnate sau sa ia orice alta măsura corespunzătoare, menita să asigure ca aceasta nu îi va părăsi teritoriul.",
+      "start": 221,
+      "end": 524,
+      "verification": "source_checked",
+      "context": "xecutat condamnarea, statul de condamnare poate să adreseze primei părţi o cerere prin care să îl solicite ca aceasta să se ocupe de executarea condamnării. 2. Partea solicitată poate, la cererea părţii solicitante, înainte de primirea documentelor în sprijinul cererii sau în asteptarea hotărârii privind cererea, sa procedeze la arestarea persoanei condamnate sau sa ia orice alta măsura corespunzătoare, menita să asigure ca aceasta nu îi va părăsi teritoriul. Orice cerere în acest sens va fi însoţită de informaţiile menţionate în paragraful 3 al art. 4 din convenţie. Arestarea, cu acest titlu, a persoanei condamnate nu poate duce la agravarea situaţiei sale penale. 3. Transferul executării cond",
+      "decision": {
+        "id": "m_6b18a0a1d051d8623ce3",
+        "label": "autoritate publică",
+        "definition": "Instituție învestită cu competențe publice.",
+        "reason": "Se referă la o parte care poate acționa în cadrul procedurii legale.",
+        "status": "entity"
+      },
+      "entity_id": "e_d54ee1a893c51afcb896"
+    },
+    {
+      "id": "m_42533b8ecfba16985227",
+      "name": "arestarea persoanei condamnate sau sa ia orice alta măsura corespunzătoare",
+      "source": "19131#4",
+      "document": "19131",
+      "content_hash": "6d763336370e53e24eefebe2efa87c84d370d364228278477a84dafcebc3a502",
+      "quote": "Partea solicitată poate, la cererea părţii solicitante, înainte de primirea documentelor în sprijinul cererii sau în asteptarea hotărârii privind cererea, sa procedeze la arestarea persoanei condamnate sau sa ia orice alta măsura corespunzătoare, menita să asigure ca aceasta nu îi va părăsi teritoriul.",
+      "start": 221,
+      "end": 524,
+      "verification": "source_checked",
+      "context": "xecutat condamnarea, statul de condamnare poate să adreseze primei părţi o cerere prin care să îl solicite ca aceasta să se ocupe de executarea condamnării. 2. Partea solicitată poate, la cererea părţii solicitante, înainte de primirea documentelor în sprijinul cererii sau în asteptarea hotărârii privind cererea, sa procedeze la arestarea persoanei condamnate sau sa ia orice alta măsura corespunzătoare, menita să asigure ca aceasta nu îi va părăsi teritoriul. Orice cerere în acest sens va fi însoţită de informaţiile menţionate în paragraful 3 al art. 4 din convenţie. Arestarea, cu acest titlu, a persoanei condamnate nu poate duce la agravarea situaţiei sale penale. 3. Transferul executării cond",
+      "decision": {
+        "id": "m_42533b8ecfba16985227",
+        "label": "",
+        "definition": "",
+        "reason": "Descrie o acțiune legală de arestare sau măsuri similare.",
+        "status": "fragment"
+      }
+    },
+    {
+      "id": "m_83a70401b058df79456d",
+      "name": "Orice cerere în acest sens",
+      "source": "19131#4",
+      "document": "19131",
+      "content_hash": "6d763336370e53e24eefebe2efa87c84d370d364228278477a84dafcebc3a502",
+      "quote": "Orice cerere în acest sens va fi însoţită de informaţiile menţionate în paragraful 3 al art. 4 din convenţie.",
+      "start": 525,
+      "end": 634,
+      "verification": "source_checked",
+      "context": "d cererea, sa procedeze la arestarea persoanei condamnate sau sa ia orice alta măsura corespunzătoare, menita să asigure ca aceasta nu îi va părăsi teritoriul. Orice cerere în acest sens va fi însoţită de informaţiile menţionate în paragraful 3 al art. 4 din convenţie. Arestarea, cu acest titlu, a persoanei condamnate nu poate duce la agravarea situaţiei sale penale. 3. Transferul executării condamnării nu necesita consimţământul",
+      "decision": {
+        "id": "m_83a70401b058df79456d",
+        "label": "",
+        "definition": "",
+        "reason": "Fragment de propoziție care face referire la o cerere, dar nu este o entitate sau o acțiune completă.",
+        "status": "fragment"
+      }
+    },
+    {
+      "id": "m_1d2f2adeefd15d7ab2fd",
+      "name": "informaţiile menţionate în paragraful 3 al art. 4 din convenţie",
+      "source": "19131#4",
+      "document": "19131",
+      "content_hash": "6d763336370e53e24eefebe2efa87c84d370d364228278477a84dafcebc3a502",
+      "quote": "Orice cerere în acest sens va fi însoţită de informaţiile menţionate în paragraful 3 al art. 4 din convenţie.",
+      "start": 525,
+      "end": 634,
+      "verification": "source_checked",
+      "context": "d cererea, sa procedeze la arestarea persoanei condamnate sau sa ia orice alta măsura corespunzătoare, menita să asigure ca aceasta nu îi va părăsi teritoriul. Orice cerere în acest sens va fi însoţită de informaţiile menţionate în paragraful 3 al art. 4 din convenţie. Arestarea, cu acest titlu, a persoanei condamnate nu poate duce la agravarea situaţiei sale penale. 3. Transferul executării condamnării nu necesita consimţământul",
+      "decision": {
+        "id": "m_1d2f2adeefd15d7ab2fd",
+        "label": "",
+        "definition": "",
+        "reason": "Fragment de informații care fac parte dintr-o cerere, dar nu reprezintă o entitate sau o acțiune în sine.",
+        "status": "fragment"
+      }
+    },
+    {
+      "id": "m_e9a9de86171f7234db38",
+      "name": "Arestarea, cu acest titlu, a persoanei condamnate",
+      "source": "19131#4",
+      "document": "19131",
+      "content_hash": "6d763336370e53e24eefebe2efa87c84d370d364228278477a84dafcebc3a502",
+      "quote": "Arestarea, cu acest titlu, a persoanei condamnate nu poate duce la agravarea situaţiei sale penale.",
+      "start": 635,
+      "end": 734,
+      "verification": "source_checked",
+      "context": "să asigure ca aceasta nu îi va părăsi teritoriul. Orice cerere în acest sens va fi însoţită de informaţiile menţionate în paragraful 3 al art. 4 din convenţie. Arestarea, cu acest titlu, a persoanei condamnate nu poate duce la agravarea situaţiei sale penale. 3. Transferul executării condamnării nu necesita consimţământul",
+      "decision": {
+        "id": "m_e9a9de86171f7234db38",
+        "label": "",
+        "definition": "",
+        "reason": "Fragment de text legal/procedural.",
+        "status": "fragment"
+      }
+    },
+    {
+      "id": "m_f2bfb443655a413f67cc",
+      "name": "agravarea situaţiei sale penale",
+      "source": "19131#4",
+      "document": "19131",
+      "content_hash": "6d763336370e53e24eefebe2efa87c84d370d364228278477a84dafcebc3a502",
+      "quote": "Arestarea, cu acest titlu, a persoanei condamnate nu poate duce la agravarea situaţiei sale penale.",
+      "start": 635,
+      "end": 734,
+      "verification": "source_checked",
+      "context": "să asigure ca aceasta nu îi va părăsi teritoriul. Orice cerere în acest sens va fi însoţită de informaţiile menţionate în paragraful 3 al art. 4 din convenţie. Arestarea, cu acest titlu, a persoanei condamnate nu poate duce la agravarea situaţiei sale penale. 3. Transferul executării condamnării nu necesita consimţământul",
+      "decision": {
+        "id": "m_f2bfb443655a413f67cc",
+        "label": "",
+        "definition": "",
+        "reason": "Fragment de text legal/procedural.",
+        "status": "fragment"
+      }
+    },
+    {
+      "id": "m_9336d29ad5ca8a031156",
+      "name": "Transferul executării condamnării",
+      "source": "19131#4",
+      "document": "19131",
+      "content_hash": "6d763336370e53e24eefebe2efa87c84d370d364228278477a84dafcebc3a502",
+      "quote": "Transferul executării condamnării nu necesita consimţământul",
+      "start": 738,
+      "end": 798,
+      "verification": "source_checked",
+      "context": "iile menţionate în paragraful 3 al art. 4 din convenţie. Arestarea, cu acest titlu, a persoanei condamnate nu poate duce la agravarea situaţiei sale penale. 3. Transferul executării condamnării nu necesita consimţământul",
+      "decision": {
+        "id": "m_9336d29ad5ca8a031156",
+        "label": "",
+        "definition": "",
+        "reason": "Fragment de text legal/procedural.",
+        "status": "fragment"
+      }
+    },
+    {
+      "id": "m_24ba560e7dea13666627",
+      "name": "consimţământul",
+      "source": "19131#4",
+      "document": "19131",
+      "content_hash": "6d763336370e53e24eefebe2efa87c84d370d364228278477a84dafcebc3a502",
+      "quote": "Transferul executării condamnării nu necesita consimţământul",
+      "start": 738,
+      "end": 798,
+      "verification": "source_checked",
+      "context": "iile menţionate în paragraful 3 al art. 4 din convenţie. Arestarea, cu acest titlu, a persoanei condamnate nu poate duce la agravarea situaţiei sale penale. 3. Transferul executării condamnării nu necesita consimţământul",
+      "decision": {
+        "id": "m_24ba560e7dea13666627",
+        "label": "",
+        "definition": "",
+        "reason": "Fragment de text legal/procedural.",
+        "status": "fragment"
+      }
+    },
+    {
+      "id": "m_2a2224f89f7ef1f4d400",
+      "name": "decizii",
+      "source": "19164#29",
+      "document": "19164",
+      "content_hash": "c7c66b27130bd1167bd6b3f3c25727f4c08717e975c96ac96fbddb86cc3bf0a7",
+      "quote": "cercetarea comuna în condiţiile acestei decizii şi publicate de editori independenţi, vor fi diseminate cat mai larg posibil.",
+      "start": 0,
+      "end": 125,
+      "verification": "source_checked",
+      "context": "cercetarea comuna în condiţiile acestei decizii şi publicate de editori independenţi, vor fi diseminate cat mai larg posibil. 3. Toate copiile unei lucrări protejate prin regimul drepturilor de autor, pentru a fi distribuite public şi pregătite în conformitate cu aceasta prevedere, trebuie să indice numele autorului sau autorilor lucrării, dacă autorul nu şi-a pr",
+      "decision": {
+        "id": "m_2a2224f89f7ef1f4d400",
+        "label": "",
+        "definition": "",
+        "reason": "Fragment de text legal/procedural.",
+        "status": "fragment"
+      }
+    },
+    {
+      "id": "m_bea912334ebc7bbcbdf0",
+      "name": "Planului de management tehnologic",
+      "source": "19164#29",
+      "document": "19164",
+      "content_hash": "c7c66b27130bd1167bd6b3f3c25727f4c08717e975c96ac96fbddb86cc3bf0a7",
+      "quote": "Fiecare parte, agenţiile sale sau participanţii săi, după cum este cazul, trebuie să identifice în mod corespunzător, cat mai curând posibil şi preferabil în cadrul Planului de management tehnologic, informaţia care",
+      "start": 580,
+      "end": 795,
+      "verification": "source_checked",
+      "context": "Ele trebuie, de asemenea, sa pună în evidenta sprijinul cooperativ al părţilor. V. Informaţii nedifuzabile A. Informaţii nedifuzabile cu caracter documentar 1. Fiecare parte, agenţiile sale sau participanţii săi, după cum este cazul, trebuie să identifice în mod corespunzător, cat mai curând posibil şi preferabil în cadrul Planului de management tehnologic, informaţia care",
+      "decision": {
+        "id": "m_bea912334ebc7bbcbdf0",
+        "label": "",
+        "definition": "",
+        "reason": "Fragment de text legal/procedural.",
+        "status": "fragment"
+      }
+    },
+    {
+      "id": "m_f88f825405ac6c1257e7",
+      "name": "Agenția de Valorificare a Activelor Bancare",
+      "source": "19730#9",
+      "document": "19730",
+      "content_hash": "0db4c320c3970ce4d928829c9e0258a4f5b734c2202e0777b230a41fe3e4424e",
+      "quote": "Se autorizeaza Agenția de Valorificare a Activelor Bancare sa preia active bancare supuse valorificării de la Banca Agricolă - S.A., în limita unui plafon de 2.700 miliarde lei, până la data de 30 decembrie 1999, din care 1.300 miliarde lei până la data de 29 octombrie 1999.",
+      "start": 207,
+      "end": 482,
+      "verification": "source_checked",
+      "context": "prin optimizarea acestui raport sunt creșterea lichidității și reducerea ponderii cheltuielilor operationale în totalul cheltuielilor băncii. + Articolul 6 (1) Se autorizeaza Agenția de Valorificare a Activelor Bancare sa preia active bancare supuse valorificării de la Banca Agricolă - S.A., în limita unui plafon de 2.700 miliarde lei, până la data de 30 decembrie 1999, din care 1.300 miliarde lei până la data de 29 octombrie 1999. Activele bancare supuse valorificării vor fi preluate în condițiile prevăzute la art. 2 *), 3 *), 8 *), 12 *) și 12^1 **) din Ordonanța de urgenta a Guvernului nr. 51/1998 , cu modificările ulterioare. (2) Operațiunile de preluare a active",
+      "decision": {
+        "id": "m_f88f825405ac6c1257e7",
+        "label": "autoritate publică",
+        "definition": "Instituție învestită cu competențe publice.",
+        "reason": "Nume de instituție publică menționată în contextul unei autorizări.",
+        "status": "entity"
+      },
+      "entity_id": "e_6faaa165ce6dcf7d1029"
+    },
+    {
+      "id": "m_29c97a7f0551fdc887fe",
+      "name": "Banca Agricolă - S.A.",
+      "source": "19730#9",
+      "document": "19730",
+      "content_hash": "0db4c320c3970ce4d928829c9e0258a4f5b734c2202e0777b230a41fe3e4424e",
+      "quote": "Se autorizeaza Agenția de Valorificare a Activelor Bancare sa preia active bancare supuse valorificării de la Banca Agricolă - S.A., în limita unui plafon de 2.700 miliarde lei, până la data de 30 decembrie 1999, din care 1.300 miliarde lei până la data de 29 octombrie 1999.",
+      "start": 207,
+      "end": 482,
+      "verification": "source_checked",
+      "context": "prin optimizarea acestui raport sunt creșterea lichidității și reducerea ponderii cheltuielilor operationale în totalul cheltuielilor băncii. + Articolul 6 (1) Se autorizeaza Agenția de Valorificare a Activelor Bancare sa preia active bancare supuse valorificării de la Banca Agricolă - S.A., în limita unui plafon de 2.700 miliarde lei, până la data de 30 decembrie 1999, din care 1.300 miliarde lei până la data de 29 octombrie 1999. Activele bancare supuse valorificării vor fi preluate în condițiile prevăzute la art. 2 *), 3 *), 8 *), 12 *) și 12^1 **) din Ordonanța de urgenta a Guvernului nr. 51/1998 , cu modificările ulterioare. (2) Operațiunile de preluare a active",
+      "decision": {
+        "id": "m_29c97a7f0551fdc887fe",
+        "label": "autoritate publică",
+        "definition": "Instituție învestită cu competențe publice.",
+        "reason": "Commercial legal form does not establish public-authority status",
+        "status": "uncertain"
+      }
+    },
+    {
+      "id": "m_a68db59f5e604e0afa85",
+      "name": "Ordonanța de urgenta a Guvernului nr. 51/1998",
+      "source": "19730#9",
+      "document": "19730",
+      "content_hash": "0db4c320c3970ce4d928829c9e0258a4f5b734c2202e0777b230a41fe3e4424e",
+      "quote": "Activele bancare supuse valorificării vor fi preluate în condițiile prevăzute la art. 2 *), 3 *), 8 *), 12 *) și 12^1 **) din Ordonanța de urgenta a Guvernului nr. 51/1998 , cu modificările ulterioare.",
+      "start": 483,
+      "end": 684,
+      "verification": "source_checked",
+      "context": "Agricolă - S.A., în limita unui plafon de 2.700 miliarde lei, până la data de 30 decembrie 1999, din care 1.300 miliarde lei până la data de 29 octombrie 1999. Activele bancare supuse valorificării vor fi preluate în condițiile prevăzute la art. 2 *), 3 *), 8 *), 12 *) și 12^1 **) din Ordonanța de urgenta a Guvernului nr. 51/1998 , cu modificările ulterioare. (2) Operațiunile de preluare a activelor bancare supuse valorificării se vor efectua în următoarele condiții: a)",
+      "decision": {
+        "id": "m_a68db59f5e604e0afa85",
+        "label": "act normativ",
+        "definition": "Act juridic emis de o autoritate competentă care stabilește norme de drept.",
+        "reason": "Se face referire la o Ordonanță de urgență a Guvernului, care este un act normativ.",
+        "status": "entity"
+      },
+      "entity_id": "e_9098b989d5c0c3bd33d0"
+    },
+    {
+      "id": "m_1b6da8328ea86510c8f6",
+      "name": "DECIZIE din 13 septembrie 1999 privind modificarea Protocolului D al Acordului de comerţ liber dintre România şi Republica Turcia",
+      "source": "28782#1",
+      "document": "28782",
+      "content_hash": "69a1f1c99f84f75913e01d6b3a962aabdc5eced819eab0b9d52bb77fa9c74870",
+      "quote": "DECIZIE din 13 septembrie 1999 privind modificarea Protocolului D al Acordului de comerţ liber dintre România şi Republica Turcia",
+      "start": 0,
+      "end": 129,
+      "verification": "source_checked",
+      "context": "DECIZIE din 13 septembrie 1999 privind modificarea Protocolului D al Acordului de comerţ liber dintre România şi Republica Turcia, semnat la Ankara la 29 aprilie 1997 EMITENT COMITETUL MIXT ROMÂNIA-TURCIA Publicat în MONITORUL OFICIAL nr. 452 din 17 septembrie 1999 Amendamente la Protocolul D Comitetul Mixt România-Turcia, având în vedere dispoziţiile art. 39 din Pro",
+      "decision": {
+        "id": "m_1b6da8328ea86510c8f6",
+        "label": "act normativ",
+        "definition": "Act juridic emis de o autoritate competentă care stabilește norme de drept.",
+        "reason": "Se face referire la o DECIZIE care modifică un Acord de comerț liber, fiind un act normativ.",
+        "status": "entity"
+      },
+      "entity_id": "e_40b327908addc906c0be"
+    },
+    {
+      "id": "m_0a5a3254ebb4bbc3ad5c",
+      "name": "EMITENT COMITETUL MIXT ROMÂNIA-TURCIA",
+      "source": "28782#1",
+      "document": "28782",
+      "content_hash": "69a1f1c99f84f75913e01d6b3a962aabdc5eced819eab0b9d52bb77fa9c74870",
+      "quote": "EMITENT COMITETUL MIXT ROMÂNIA-TURCIA",
+      "start": 167,
+      "end": 204,
+      "verification": "source_checked",
+      "context": " din 13 septembrie 1999 privind modificarea Protocolului D al Acordului de comerţ liber dintre România şi Republica Turcia, semnat la Ankara la 29 aprilie 1997 EMITENT COMITETUL MIXT ROMÂNIA-TURCIA Publicat în MONITORUL OFICIAL nr. 452 din 17 septembrie 1999 Amendamente la Protocolul D Comitetul Mixt România-Turcia, având în vedere dispoziţiile art. 39 din Protocolul D al Acordului de comerţ liber dintre România şi Republica Turcia, ",
+      "decision": {
+        "id": "m_0a5a3254ebb4bbc3ad5c",
+        "label": "autoritate publică",
+        "definition": "Instituție învestită cu competențe publice.",
+        "reason": "Se menționează 'COMITETUL MIXT ROMÂNIA-TURCIA' ca emițător, indicând o structură cu competențe oficiale.",
+        "status": "entity"
+      },
+      "entity_id": "e_93b181b3c973ad68c784"
+    },
+    {
+      "id": "m_599d1ea38f5bd7ec2c30",
+      "name": "Amendamente la Protocolul D",
+      "source": "28782#1",
+      "document": "28782",
+      "content_hash": "69a1f1c99f84f75913e01d6b3a962aabdc5eced819eab0b9d52bb77fa9c74870",
+      "quote": "Amendamente la Protocolul D",
+      "start": 266,
+      "end": 293,
+      "verification": "source_checked",
+      "context": "nia şi Republica Turcia, semnat la Ankara la 29 aprilie 1997 EMITENT COMITETUL MIXT ROMÂNIA-TURCIA Publicat în MONITORUL OFICIAL nr. 452 din 17 septembrie 1999 Amendamente la Protocolul D Comitetul Mixt România-Turcia, având în vedere dispoziţiile art. 39 din Protocolul D al Acordului de comerţ liber dintre România şi Republica Turcia, care dau posibilitatea Comitetului mixt sa amendeze prevederile protocolului, luând în co",
+      "decision": {
+        "id": "m_599d1ea38f5bd7ec2c30",
+        "label": "",
+        "definition": "",
+        "reason": "Este o secțiune descriptivă care face parte din contextul unui act normativ, nu o entitate sau un act în sine.",
+        "status": "fragment"
+      }
+    },
+    {
+      "id": "m_5d0caf45d315dc860613",
+      "name": "Comitetul Mixt România-Turcia",
+      "source": "28782#1",
+      "document": "28782",
+      "content_hash": "69a1f1c99f84f75913e01d6b3a962aabdc5eced819eab0b9d52bb77fa9c74870",
+      "quote": "Comitetul Mixt România-Turcia",
+      "start": 294,
+      "end": 323,
+      "verification": "source_checked",
+      "context": "nat la Ankara la 29 aprilie 1997 EMITENT COMITETUL MIXT ROMÂNIA-TURCIA Publicat în MONITORUL OFICIAL nr. 452 din 17 septembrie 1999 Amendamente la Protocolul D Comitetul Mixt România-Turcia, având în vedere dispoziţiile art. 39 din Protocolul D al Acordului de comerţ liber dintre România şi Republica Turcia, care dau posibilitatea Comitetului mixt sa amendeze prevederile protocolului, luând în considerare Declaraţia comuna la",
+      "decision": {
+        "id": "m_5d0caf45d315dc860613",
+        "label": "autoritate publică",
+        "definition": "Instituție învestită cu competențe publice.",
+        "reason": "Se face referire la 'Comitetul Mixt România-Turcia', care este o structură de colaborare oficială.",
+        "status": "entity"
+      },
+      "entity_id": "e_90d6d145df1316c67075"
+    },
+    {
+      "id": "m_0c1951e106e536b401f8",
+      "name": "dispoziţiile art. 39 din Protocolul D al Acordului de comerţ liber dintre România şi Republica Turcia",
+      "source": "28782#1",
+      "document": "28782",
+      "content_hash": "69a1f1c99f84f75913e01d6b3a962aabdc5eced819eab0b9d52bb77fa9c74870",
+      "quote": "Comitetul Mixt România-Turcia, având în vedere dispoziţiile art. 39 din Protocolul D al Acordului de comerţ liber dintre România şi Republica Turcia",
+      "start": 294,
+      "end": 442,
+      "verification": "source_checked",
+      "context": "nat la Ankara la 29 aprilie 1997 EMITENT COMITETUL MIXT ROMÂNIA-TURCIA Publicat în MONITORUL OFICIAL nr. 452 din 17 septembrie 1999 Amendamente la Protocolul D Comitetul Mixt România-Turcia, având în vedere dispoziţiile art. 39 din Protocolul D al Acordului de comerţ liber dintre România şi Republica Turcia, care dau posibilitatea Comitetului mixt sa amendeze prevederile protocolului, luând în considerare Declaraţia comuna la Protocolul D, precum şi Declaraţia Turciei la Protocolul D, considerând ca, pentru asigurarea corespunzătoare a sistem",
+      "decision": {
+        "id": "m_0c1951e106e536b401f8",
+        "label": "dispoziție legală",
+        "definition": "Referință la prevederile unui act normativ sau al unui acord.",
+        "reason": "Se face referire la dispozițiile unui articol specific dintr-un acord de comerț liber.",
+        "status": "entity"
+      },
+      "entity_id": "e_2c41d67c4e16d668f5dd"
+    },
+    {
+      "id": "m_63b91a7015665bc67797",
+      "name": "Articolul 3 (1)",
+      "source": "36196#3",
+      "document": "36196",
+      "content_hash": "47afac6501ab3d576af02b5efcc9ac079076c518393f3a826dc3d42cbd925cad",
+      "quote": "Articolul 3 (1)",
+      "start": 210,
+      "end": 225,
+      "verification": "source_checked",
+      "context": "nta a Guvernului nr. 98/1999 \", după confirmarea scrisă data de agenţia pentru ocupare şi formare profesională judeţeana, respectiv a municipiului Bucureşti. + Articolul 3 (1) Restructurarea angajatorilor prevăzuţi la art. 4 şi 8 din ordonanţa de urgenţă are loc în cazul în care aceştia înregistrează pierderi sau arierate în fiecare luna, timp de 12 luni consecutive. ... (2) Prin program de restructurare, în sen",
+      "decision": {
+        "id": "m_63b91a7015665bc67797",
+        "label": "",
+        "definition": "",
+        "reason": "Este o secțiune care face parte din contextul unui articol, nu o entitate sau un act în sine.",
+        "status": "fragment"
+      }
+    },
+    {
+      "id": "m_fc64ebb251fa0ce25de6",
+      "name": "ordonanţa de urgenţă",
+      "source": "36196#3",
+      "document": "36196",
+      "content_hash": "47afac6501ab3d576af02b5efcc9ac079076c518393f3a826dc3d42cbd925cad",
+      "quote": "ordonanţa de urgenţă",
+      "start": 284,
+      "end": 304,
+      "verification": "source_checked",
+      "context": "ntru ocupare şi formare profesională judeţeana, respectiv a municipiului Bucureşti. + Articolul 3 (1) Restructurarea angajatorilor prevăzuţi la art. 4 şi 8 din ordonanţa de urgenţă are loc în cazul în care aceştia înregistrează pierderi sau arierate în fiecare luna, timp de 12 luni consecutive. ... (2) Prin program de restructurare, în sensul ordonanţei de urgenta, se înţelege ansamblul de măsuri de natura organizato",
+      "decision": {
+        "id": "m_fc64ebb251fa0ce25de6",
+        "label": "act normativ",
+        "definition": "Act juridic emis de o autoritate competentă care stabilește norme de drept.",
+        "reason": "Se face referire la o 'ordonanță de urgență', care este un tip de act normativ.",
+        "status": "entity"
+      },
+      "entity_id": "e_aac81f324e2320e8e311"
+    },
+    {
+      "id": "m_819714a7446b1812234e",
+      "name": "art. 9 alin. (1)",
+      "source": "36196#3",
+      "document": "36196",
+      "content_hash": "47afac6501ab3d576af02b5efcc9ac079076c518393f3a826dc3d42cbd925cad",
+      "quote": "art. 9 alin. (1)",
+      "start": 779,
+      "end": 795,
+      "verification": "source_checked",
+      "context": "diminuarea sau eliminarea pierderilor şi arieratelor angajatorilor şi care cuprinde şi prevederi privind concedierile colective. ... (3) În sensul prevederilor art. 9 alin. (1) din",
+      "decision": {
+        "id": "m_819714a7446b1812234e",
+        "label": "",
+        "definition": "",
+        "reason": "Citează o referință specifică la prevederile unui articol și ale altor alineate ('art. 9 alin. (1)').",
+        "status": "fragment"
+      }
+    },
+    {
+      "id": "m_fdb2ebc03b2df070edff",
+      "name": "Software",
+      "source": "50738#119",
+      "document": "50738",
+      "content_hash": "a2c2310e68274aedea3cdaee496a69c1c098e208f9ff26050ce8239794d6f1c6",
+      "quote": "\"Software\" special conceput pentru analiza parametrilor reduşi precum reflexia radar, semnalele în infraroşu/ultraviolet şi semnalele acustice. \"Software\" special conceput pentru \"utilizarea\" produselor supuse controlului prm 1B201.",
+      "start": 7,
+      "end": 239,
+      "verification": "source_checked",
+      "context": "lBIOl. \"Software\" special conceput pentru analiza parametrilor reduşi precum reflexia radar, semnalele în infraroşu/ultraviolet şi semnalele acustice. \"Software\" special conceput pentru \"utilizarea\" produselor supuse controlului prm 1B201. TEHNOLOGIE \"Tehnologie\",  în  conformitate  cu  Nota  Generală  privind  Tehnologia,  pentru \"dezvoltarea\" sau \"producţiall echipamentelor sau materialelor supuse controlului prin lA00l.b., lA0Ol.c., 1A002. la 1A003, lB sau IC. Alte \"tehno",
+      "decision": {
+        "id": "m_fdb2ebc03b2df070edff",
+        "label": "",
+        "definition": "",
+        "reason": "Este o mențiune de tip 'Software' care este folosit ca termen tehnic sau o categorie de produs, dar contextul este prea fragmentat pentru o clasificare generală precisă.",
+        "status": "fragment"
+      }
+    },
+    {
+      "id": "m_d13da2f255c24b51945e",
+      "name": "Denumirea persoanei juridice",
+      "source": "50956#306",
+      "document": "50956",
+      "content_hash": "8a3b416c72180a47644293244ebb81af14acd7757cc3705670fdf559c65ee4fb",
+      "quote": "Denumirea persoanei juridice",
+      "start": 713,
+      "end": 741,
+      "verification": "source_checked",
+      "context": "echiului constituitor ... Identificați persoana care urmează a fi înlocuită, prin menționarea denumirii/numelui și prenumelui și a numărului de ordine aferent: Denumirea persoanei juridice .................................. Numele persoanei",
+      "decision": {
+        "id": "m_d13da2f255c24b51945e",
+        "label": "subiect drept",
+        "definition": "Persoanele fizice sau juridice care sunt subiecte de drept.",
+        "reason": "Se referă la denumirea unei entități juridice care este subiect de drept.",
+        "status": "entity"
+      },
+      "entity_id": "e_f58b3e8825dced66f8f5"
+    },
+    {
+      "id": "m_8d8e5a75b5c71d796931",
+      "name": "CERERE JUSTIFICATIVĂ",
+      "source": "92217#6",
+      "document": "92217",
+      "content_hash": "5fbc3bbf0be6107bb7c2bb4646ea0435e02fc0e0b31123b0076f22bbc94ee5dd",
+      "quote": "La cerere se anexeaza şi dovada platii.",
+      "start": 173,
+      "end": 212,
+      "verification": "source_checked",
+      "context": "Articolul 6 (1) - Taxa arbitrala se plateste integral la introducerea cererii de arbitrare sau, după caz, a cererii reconventionale ori de chemare în garantie. La cerere se anexeaza şi dovada platii. ... Aceasta dovada se poate prezenta şi în cadrul unui termen stabilit de secretariatul camerei arbitrale, dar nu mai tarziu de 5 zile de la data introducerii cererii. (2) Preşedintele camerei arbitrale poate aproba ca taxa arbitrala afere",
+      "decision": {
+        "id": "m_8d8e5a75b5c71d796931",
+        "label": "cerere",
+        "definition": "Document oficial prin care se solicită aprobarea sau acordarea unor fonduri sau drepturi.",
+        "reason": "Contextul menționează 'La cerere se anexeaza şi dovada platii.', indicând un document de solicitare.",
+        "status": "entity"
+      },
+      "entity_id": "e_67bed1b89422a02bfe25"
+    }
+  ],
+  "entities": [
+    {
+      "id": "e_311dbc12072816139d88",
+      "class": "organizare",
+      "kind": "entity",
+      "document": "17101",
+      "names": [
+        "Consiliul de administraţie"
+      ],
+      "mentions": [
+        "m_572372e09b9414aaaf3f"
+      ]
+    },
+    {
+      "id": "e_d750819b188a6d6263c1",
+      "class": "funcție",
+      "kind": "entity",
+      "document": "17101",
+      "names": [
+        "director general"
+      ],
+      "mentions": [
+        "m_f65b0162e9185f5437ce"
+      ]
+    },
+    {
+      "id": "e_b37368484f79ff55d654",
+      "class": "departament",
+      "kind": "entity",
+      "document": "17101",
+      "names": [
+        "Conducerea operativă"
+      ],
+      "mentions": [
+        "m_2992a0173900d8451843"
+      ]
+    },
+    {
+      "id": "e_8a7918ab9358f31e92c5",
+      "class": "funcție",
+      "kind": "entity",
+      "document": "17101",
+      "names": [
+        "Directorul general"
+      ],
+      "mentions": [
+        "m_1481bb462c9427108272"
+      ]
+    },
+    {
+      "id": "e_bf157fdbc974039d4a6f",
+      "class": "acțiune juridică",
+      "kind": "entity",
+      "document": "17101",
+      "names": [
+        "încheierea şi la încetarea raporturilor de muncă cu salariaţii şi cu colaboratorii angajaţi pe bază de convenţie civilă"
+      ],
+      "mentions": [
+        "m_c259f90c5e485d87bbf7"
+      ]
+    },
+    {
+      "id": "e_714d1b7c9be07ba5ca3d",
+      "class": "acțiune juridică",
+      "kind": "entity",
+      "document": "17101",
+      "names": [
+        "Directorul general decide cu privire la încheierea şi la încetarea raporturilor de muncă cu salariaţii şi cu colaboratorii angajaţi pe bază de convenţie civilă"
+      ],
+      "mentions": [
+        "m_e453ed1a2a15a66fcf6d"
+      ]
+    },
+    {
+      "id": "e_fb2011af0c75d374ad72",
+      "class": "autoritate publică",
+      "kind": "entity",
+      "document": "17233",
+      "names": [
+        "Guvernul"
+      ],
+      "mentions": [
+        "m_8a0e647c8befd7a700df"
+      ]
+    },
+    {
+      "id": "e_f0367f1ca110de2fbe41",
+      "class": "act normativ",
+      "kind": "entity",
+      "document": "17233",
+      "names": [
+        "ORDONANTA nr. 11 din 26 iulie 2001"
+      ],
+      "mentions": [
+        "m_1af10f34a1cca00345eb"
+      ]
+    },
+    {
+      "id": "e_b6220ed1e8ce4a9d42c3",
+      "class": "act normativ",
+      "kind": "entity",
+      "document": "17233",
+      "names": [
+        "Legea nr. 32/1968"
+      ],
+      "mentions": [
+        "m_c93ff2222dbece897a8f"
+      ]
+    },
+    {
+      "id": "e_7eb9c6b8a52d272758a4",
+      "class": "autoritate publică",
+      "kind": "entity",
+      "document": "17233",
+      "names": [
+        "organele fiscale competente"
+      ],
+      "mentions": [
+        "m_bc0fdaf65635e5c35da0"
+      ]
+    },
+    {
+      "id": "e_5c6dfef1675d193e25ea",
+      "class": "autoritate publică",
+      "kind": "entity",
+      "document": "18019",
+      "names": [
+        "Curtea Constituţională"
+      ],
+      "mentions": [
+        "m_e7b876ddcfa1aee5e270"
+      ]
+    },
+    {
+      "id": "e_b3d1836833a084af8e1c",
+      "class": "element construcție",
+      "kind": "entity",
+      "document": "18084",
+      "names": [
+        "Împrejmuire din beton"
+      ],
+      "mentions": [
+        "m_0c17f128b38045c02f5f"
+      ]
+    },
+    {
+      "id": "e_eaca1be0d51c4c9eb99b",
+      "class": "teren",
+      "kind": "entity",
+      "document": "18084",
+      "names": [
+        "Terenul aferent"
+      ],
+      "mentions": [
+        "m_74d49520372c5348864a"
+      ]
+    },
+    {
+      "id": "e_3422e2c203e990073cd4",
+      "class": "cerere",
+      "kind": "entity",
+      "document": "18121",
+      "names": [
+        "CERERE JUSTIFICATIVĂ"
+      ],
+      "mentions": [
+        "m_8415e7df44d85b6babac"
+      ]
+    },
+    {
+      "id": "e_6fb5eb1f40ff285991e8",
+      "class": "act normativ",
+      "kind": "entity",
+      "document": "18203",
+      "names": [
+        "CIRCULARA nr. 10 din 13 mai 1999 privind ratele dobânzilor plătite de Banca Naţionala a României la rezervele minime obligatorii, aferente lunii mai 1999"
+      ],
+      "mentions": [
+        "m_55933d861b9bece2e3d2"
+      ]
+    },
+    {
+      "id": "e_2a6da7b47cdfec56a197",
+      "class": "publicație oficială",
+      "kind": "entity",
+      "document": "18203",
+      "names": [
+        "MONITORUL OFICIAL nr. 225 din 20 mai 1999"
+      ],
+      "mentions": [
+        "m_a9db87e0cdb2ff48f450"
+      ]
+    },
+    {
+      "id": "e_72ce260a4cd79879a1e0",
+      "class": "act normativ",
+      "kind": "entity",
+      "document": "18203",
+      "names": [
+        "Legea nr. 101/1998 privind Statutul Băncii Naţionale a României"
+      ],
+      "mentions": [
+        "m_9f01edfda57384e15d5e"
+      ]
+    },
+    {
+      "id": "e_fc4f8b283f4900fbbc72",
+      "class": "act normativ",
+      "kind": "entity",
+      "document": "18203",
+      "names": [
+        "Regulamentului nr. 4/1998 privind regimul rezervelor minime obligatorii, republicat"
+      ],
+      "mentions": [
+        "m_304e13c61c5e1387dbde"
+      ]
+    },
+    {
+      "id": "e_778ff9eb1af4f03e49ab",
+      "class": "autoritate publică",
+      "kind": "entity",
+      "document": "18203",
+      "names": [
+        "Banca Naţionala a României"
+      ],
+      "mentions": [
+        "m_a3ddfe70011742ee5780"
+      ]
+    },
+    {
+      "id": "e_57651593033eea28f7ae",
+      "class": "autoritate publică",
+      "kind": "entity",
+      "document": "18463",
+      "names": [
+        "Inspectorul general de stat",
+        "inspectorul general de stat"
+      ],
+      "mentions": [
+        "m_b742b098d73409c38bb3",
+        "m_80fb8cd5c5e56da24985",
+        "m_2a6b84007bc8a7b6324f"
+      ]
+    },
+    {
+      "id": "e_db94c01e14af5bde63bd",
+      "class": "organism de consultare",
+      "kind": "entity",
+      "document": "18463",
+      "names": [
+        "Consiliul Consultativ Tripartit"
+      ],
+      "mentions": [
+        "m_58e9994ebd41239a7a19"
+      ]
+    },
+    {
+      "id": "e_a0eae25d17dae27b37f5",
+      "class": "autoritate publică",
+      "kind": "entity",
+      "document": "18593",
+      "names": [
+        "Curtea de Conturi"
+      ],
+      "mentions": [
+        "m_32730fb6a1dedc0e721a",
+        "m_fc5146cf3e39aa2786c8"
+      ]
+    },
+    {
+      "id": "e_0a833fc5418a8023ffa6",
+      "class": "act normativ",
+      "kind": "entity",
+      "document": "18593",
+      "names": [
+        "dispoziţiile art. 139 alin. (1) din Constituţie"
+      ],
+      "mentions": [
+        "m_44362848f31148fccb9b"
+      ]
+    },
+    {
+      "id": "e_b423732f648a8c39a00a",
+      "class": "autoritate publică",
+      "kind": "entity",
+      "document": "18731",
+      "names": [
+        "comitetul interministerial"
+      ],
+      "mentions": [
+        "m_27ff4e9727fb5421e165"
+      ]
+    },
+    {
+      "id": "e_7a6497fdc3ee894cf0d5",
+      "class": "autoritate publică",
+      "kind": "entity",
+      "document": "18731",
+      "names": [
+        "secretariatul acestuia"
+      ],
+      "mentions": [
+        "m_309839ab3bafa5b0073c"
+      ]
+    },
+    {
+      "id": "e_f2dda6e67ca3d165332c",
+      "class": "autoritate publică",
+      "kind": "entity",
+      "document": "18731",
+      "names": [
+        "comisiile ori subcomisiile de specialitate"
+      ],
+      "mentions": [
+        "m_81758150b5d2eb8bdc64"
+      ]
+    },
+    {
+      "id": "e_4e65d99fa6205a3f12af",
+      "class": "autoritate publică",
+      "kind": "entity",
+      "document": "18731",
+      "names": [
+        "Brigazii de Combatere a Crimei Organizate şi Corupţiei din cadrul Ministerului de Interne - Inspectoratul General"
+      ],
+      "mentions": [
+        "m_b677ebb192ebf37d5b1a"
+      ]
+    },
+    {
+      "id": "e_66f762a499c325b6017b",
+      "class": "persoană fizică",
+      "kind": "entity",
+      "document": "18731",
+      "names": [
+        "Persoanele care fac parte din comitetul interministerial"
+      ],
+      "mentions": [
+        "m_a833418e522f375a78fb"
+      ]
+    },
+    {
+      "id": "e_976081be85e1a401331f",
+      "class": "autoritate publică",
+      "kind": "entity",
+      "document": "18731",
+      "names": [
+        "instituţiile de la care provin"
+      ],
+      "mentions": [
+        "m_d44b4def77928fd880ad"
+      ]
+    },
+    {
+      "id": "e_ee5666950930d0a2bb6b",
+      "class": "persoană fizică",
+      "kind": "entity",
+      "document": "18731",
+      "names": [
+        "membrii acestora"
+      ],
+      "mentions": [
+        "m_a1f6c516e81fe9f85d75"
+      ]
+    },
+    {
+      "id": "e_7a19c60685a3f3ef58e3",
+      "class": "subiect drept",
+      "kind": "entity",
+      "document": "18841",
+      "names": [
+        "proprietarii şi deţinătorii cu orice titlu de păduri"
+      ],
+      "mentions": [
+        "m_fcdcb8ac2229c934fd3d"
+      ]
+    },
+    {
+      "id": "e_6c53637dd447184ca9b8",
+      "class": "activitate",
+      "kind": "entity",
+      "document": "18841",
+      "names": [
+        "activitatea de reparare şi întreţinere a drumurilor forestiere"
+      ],
+      "mentions": [
+        "m_e983052d045134e52b0b"
+      ]
+    },
+    {
+      "id": "e_8a10e2e687aea713b584",
+      "class": "autoritate publică",
+      "kind": "entity",
+      "document": "19131",
+      "names": [
+        "statul de condamnare"
+      ],
+      "mentions": [
+        "m_de859815db267df19ac3"
+      ]
+    },
+    {
+      "id": "e_d54ee1a893c51afcb896",
+      "class": "autoritate publică",
+      "kind": "entity",
+      "document": "19131",
+      "names": [
+        "Partea solicitată"
+      ],
+      "mentions": [
+        "m_6b18a0a1d051d8623ce3"
+      ]
+    },
+    {
+      "id": "e_6faaa165ce6dcf7d1029",
+      "class": "autoritate publică",
+      "kind": "entity",
+      "document": "19730",
+      "names": [
+        "Agenția de Valorificare a Activelor Bancare"
+      ],
+      "mentions": [
+        "m_f88f825405ac6c1257e7"
+      ]
+    },
+    {
+      "id": "e_9098b989d5c0c3bd33d0",
+      "class": "act normativ",
+      "kind": "entity",
+      "document": "19730",
+      "names": [
+        "Ordonanța de urgenta a Guvernului nr. 51/1998"
+      ],
+      "mentions": [
+        "m_a68db59f5e604e0afa85"
+      ]
+    },
+    {
+      "id": "e_40b327908addc906c0be",
+      "class": "act normativ",
+      "kind": "entity",
+      "document": "28782",
+      "names": [
+        "DECIZIE din 13 septembrie 1999 privind modificarea Protocolului D al Acordului de comerţ liber dintre România şi Republica Turcia"
+      ],
+      "mentions": [
+        "m_1b6da8328ea86510c8f6"
+      ]
+    },
+    {
+      "id": "e_93b181b3c973ad68c784",
+      "class": "autoritate publică",
+      "kind": "entity",
+      "document": "28782",
+      "names": [
+        "EMITENT COMITETUL MIXT ROMÂNIA-TURCIA"
+      ],
+      "mentions": [
+        "m_0a5a3254ebb4bbc3ad5c"
+      ]
+    },
+    {
+      "id": "e_90d6d145df1316c67075",
+      "class": "autoritate publică",
+      "kind": "entity",
+      "document": "28782",
+      "names": [
+        "Comitetul Mixt România-Turcia"
+      ],
+      "mentions": [
+        "m_5d0caf45d315dc860613"
+      ]
+    },
+    {
+      "id": "e_2c41d67c4e16d668f5dd",
+      "class": "dispoziție legală",
+      "kind": "entity",
+      "document": "28782",
+      "names": [
+        "dispoziţiile art. 39 din Protocolul D al Acordului de comerţ liber dintre România şi Republica Turcia"
+      ],
+      "mentions": [
+        "m_0c1951e106e536b401f8"
+      ]
+    },
+    {
+      "id": "e_aac81f324e2320e8e311",
+      "class": "act normativ",
+      "kind": "entity",
+      "document": "36196",
+      "names": [
+        "ordonanţa de urgenţă"
+      ],
+      "mentions": [
+        "m_fc64ebb251fa0ce25de6"
+      ]
+    },
+    {
+      "id": "e_f58b3e8825dced66f8f5",
+      "class": "subiect drept",
+      "kind": "entity",
+      "document": "50956",
+      "names": [
+        "Denumirea persoanei juridice"
+      ],
+      "mentions": [
+        "m_d13da2f255c24b51945e"
+      ]
+    },
+    {
+      "id": "e_67bed1b89422a02bfe25",
+      "class": "cerere",
+      "kind": "entity",
+      "document": "92217",
+      "names": [
+        "CERERE JUSTIFICATIVĂ"
+      ],
+      "mentions": [
+        "m_8d8e5a75b5c71d796931"
+      ]
+    }
+  ],
+  "relations": [
+    {
+      "id": "r_53b7735899ea46139cb9",
+      "from_id": "m_572372e09b9414aaaf3f",
+      "to_id": "m_f65b0162e9185f5437ce",
+      "from": "Consiliul de administraţie",
+      "to": "director general",
+      "type": "numește",
+      "source": "17101#34",
+      "document": "17101",
+      "content_hash": "8ad6853c36e1d3b8559e908dcbfcaed310e87c9d049a110914f74ad5551ba699",
+      "quote": "Consiliul de administraţie poate numi, cu delegaţie, un director general până la ocuparea postului conform legii.",
+      "start": 174,
+      "end": 287,
+      "verification": "source_checked",
+      "context": "rativă a C.A.S.A.O.P.S.N.A.J. se exercită de către un director general, ajutat de 2 directori generali adjuncţi (unul medical şi unul economic). + Articolul 56 Consiliul de administraţie poate numi, cu delegaţie, un director general până la ocuparea postului conform legii. + Articolul 57 Conducerea operativă propune consiliului de administraţie şefii structurilor organizatorice din organigrama C.A.S.A.O.P.S.N.A.J. + Articolul 58 Directorul general decide cu privire la încheierea şi la încetarea raporturilor ",
+      "decision": {
+        "id": "r_53b7735899ea46139cb9",
+        "label": "poate numi",
+        "definition": "are dreptul de a numi pe cineva la o anumită funcție sau post",
+        "reason": "Contextul indică faptul că Consiliul de administraţie are posibilitatea de a numi un director general.",
+        "status": "supported",
+        "scope_quote": "Consiliul de administraţie poate numi, cu delegaţie, un director general până la ocuparea postului conform legii.",
+        "reverse": false,
+        "modality": "permission"
+      },
+      "check": {
+        "id": "r_53b7735899ea46139cb9",
+        "status": "verified",
+        "reason": "The proposal accurately reflects the permission granted by the source quote. All elements, including modality and scope, are preserved."
+      },
+      "status": "model_checked_candidate",
+      "normalized": {
+        "from": "e_311dbc12072816139d88",
+        "to": "e_d750819b188a6d6263c1",
+        "predicate": "poate numi",
+        "modality": "permission",
+        "scope_quote": "Consiliul de administraţie poate numi, cu delegaţie, un director general până la ocuparea postului conform legii."
+      }
+    },
+    {
+      "id": "r_d5cabbc6a80f4f86ad84",
+      "from_id": "m_2992a0173900d8451843",
+      "to_id": "m_ef0e4424d4d08f7736b7",
+      "from": "Conducerea operativă",
+      "to": "şefii structurilor organizatorice din organigrama C.A.S.A.O.P.S.N.A.J.",
+      "type": "propune",
+      "source": "17101#34",
+      "document": "17101",
+      "content_hash": "8ad6853c36e1d3b8559e908dcbfcaed310e87c9d049a110914f74ad5551ba699",
+      "quote": "Conducerea operativă propune consiliului de administraţie şefii structurilor organizatorice din organigrama C.A.S.A.O.P.S.N.A.J.",
+      "start": 303,
+      "end": 431,
+      "verification": "source_checked",
+      "context": "unul economic). + Articolul 56 Consiliul de administraţie poate numi, cu delegaţie, un director general până la ocuparea postului conform legii. + Articolul 57 Conducerea operativă propune consiliului de administraţie şefii structurilor organizatorice din organigrama C.A.S.A.O.P.S.N.A.J. + Articolul 58 Directorul general decide cu privire la încheierea şi la încetarea raporturilor de muncă cu salariaţii şi cu colaboratorii angajaţi pe bază de convenţie civilă, după consultarea prealabilă a conducerii operative a C.A.S.A.O.",
+      "decision": {
+        "id": "r_d5cabbc6a80f4f86ad84",
+        "label": "propune",
+        "definition": "a prezenta sau a recomanda ceva sau cineva unei instanțe sau unei persoane",
+        "reason": "Contextul menționează că Conducerea operativă propune consiliului de administraţie şefii structurilor organizatorice.",
+        "status": "supported",
+        "scope_quote": "Conducerea operativă propune consiliului de administraţie şefii structurilor organizatorice din organigrama C.A.S.A.O.P.S.N.A.J.",
+        "reverse": false,
+        "modality": "asserted"
+      },
+      "check": {
+        "id": "r_d5cabbc6a80f4f86ad84",
+        "status": "verified",
+        "reason": "The proposal correctly captures the action of proposing from the source quote. The meaning and direction are maintained."
+      },
+      "status": "uncertain",
+      "guard": "unresolved_endpoint_class_or_modality"
+    },
+    {
+      "id": "r_55daacaa9e2ad5af0c3b",
+      "from_id": "m_1481bb462c9427108272",
+      "to_id": "m_c259f90c5e485d87bbf7",
+      "from": "Directorul general",
+      "to": "încheierea şi la încetarea raporturilor de muncă cu salariaţii şi cu colaboratorii angajaţi pe bază de convenţie civilă",
+      "type": "decide cu privire la",
+      "source": "17101#34",
+      "document": "17101",
+      "content_hash": "8ad6853c36e1d3b8559e908dcbfcaed310e87c9d049a110914f74ad5551ba699",
+      "quote": "Directorul general decide cu privire la încheierea şi la încetarea raporturilor de muncă cu salariaţii şi cu colaboratorii angajaţi pe bază de convenţie civilă, după consultarea prealabilă a conducerii operative a C.A.S.A.O.P.S.N.A.J.",
+      "start": 447,
+      "end": 681,
+      "verification": "source_checked",
+      "context": " + Articolul 57 Conducerea operativă propune consiliului de administraţie şefii structurilor organizatorice din organigrama C.A.S.A.O.P.S.N.A.J. + Articolul 58 Directorul general decide cu privire la încheierea şi la încetarea raporturilor de muncă cu salariaţii şi cu colaboratorii angajaţi pe bază de convenţie civilă, după consultarea prealabilă a conducerii operative a C.A.S.A.O.P.S.N.A.J. + Capitolul 13 Comisia centrala de arbitraj + Articolul 59 Comisia centrala de arbitraj se numeşte şi îşi desfăşoară",
+      "decision": {
+        "id": "r_55daacaa9e2ad5af0c3b",
+        "label": "decide cu privire la",
+        "definition": "a lua o decizie în legătură cu un anumit subiect sau acțiune",
+        "reason": "Contextul afirmă că Directorul general decide cu privire la încheierea şi la încetarea raporturilor.",
+        "status": "supported",
+        "scope_quote": "Directorul general decide cu privire la încheierea şi la încetarea raporturilor de muncă cu salariaţii şi cu colaboratorii angajaţi pe bază de convenţie civilă, după consultarea prealabilă a conducerii operative a C.A.S.A.O.P.S.N.A.J.",
+        "reverse": false,
+        "modality": "asserted"
+      },
+      "check": {
+        "id": "r_55daacaa9e2ad5af0c3b",
+        "status": "verified",
+        "reason": "The proposal accurately reflects the decision-making power described in the source quote. Both endpoints and the asserted modality are correct."
+      },
+      "status": "model_checked_candidate",
+      "normalized": {
+        "from": "e_8a7918ab9358f31e92c5",
+        "to": "e_bf157fdbc974039d4a6f",
+        "predicate": "decide cu privire la",
+        "modality": "asserted",
+        "scope_quote": "Directorul general decide cu privire la încheierea şi la încetarea raporturilor de muncă cu salariaţii şi cu colaboratorii angajaţi pe bază de convenţie civilă, după consultarea prealabilă a conducerii operative a C.A.S.A.O.P.S.N.A.J."
+      }
+    },
+    {
+      "id": "r_ebac6b1f424cdbc64566",
+      "from_id": "m_a3ddfe70011742ee5780",
+      "to_id": "m_581f885209c304653b25",
+      "from": "Banca Naţionala a României",
+      "to": "Ratele dobânzilor plătite la rezervele minime obligatorii, aferente lunii mai 1999 (perioade de aplicare)",
+      "type": "hotărăşte",
+      "source": "18203#1",
+      "document": "18203",
+      "content_hash": "f2f9db966d37c8ce1a07ff36af940c241971cec316ed6987c62466c97bcaf77e",
+      "quote": "Banca Naţionala a României hotărăşte: Ratele dobânzilor plătite la rezervele minime obligatorii, aferente lunii mai 1999 (perioade de aplicare), sunt:",
+      "start": 461,
+      "end": 611,
+      "verification": "source_checked",
+      "context": "98 privind Statutul Băncii Naţionale a României, în aplicarea prevederilor Regulamentului nr. 4/1998 privind regimul rezervelor minime obligatorii, republicat, Banca Naţionala a României hotărăşte: Ratele dobânzilor plătite la rezervele minime obligatorii, aferente lunii mai 1999 (perioade de aplicare), sunt: - 8,5% pentru rezervele minime obligatorii constituite în lei; - 3,15% pentru rezervele minime obligatorii constituite în dolari S.U.A. GUVERNATORUL BĂNCII NAŢIONALE A ROMÂNIEI, MUGUR",
+      "decision": {
+        "id": "r_ebac6b1f424cdbc64566",
+        "label": "hotărăşte",
+        "definition": "a emite o hotărâre oficială prin care se stabilește ceva",
+        "reason": "Contextul indică faptul că Banca Naţionala a României hotărăşte ratele dobânzilor.",
+        "status": "supported",
+        "scope_quote": "Banca Naţionala a României hotărăşte: Ratele dobânzilor plătite la rezervele minime obligatorii, aferente lunii mai 1999 (perioade de aplicare), sunt:",
+        "reverse": false,
+        "modality": "asserted"
+      },
+      "check": {
+        "id": "r_ebac6b1f424cdbc64566",
+        "status": "verified",
+        "reason": "The proposal correctly identifies the act of issuing a ruling based on the source quote. The asserted modality and scope are preserved."
+      },
+      "status": "uncertain",
+      "guard": "unresolved_endpoint_class_or_modality"
+    },
+    {
+      "id": "r_4d313c1be120134e56ed",
+      "from_id": "m_55933d861b9bece2e3d2",
+      "to_id": "m_a9db87e0cdb2ff48f450",
+      "from": "CIRCULARA nr. 10 din 13 mai 1999 privind ratele dobânzilor plătite de Banca Naţionala a României la rezervele minime obligatorii, aferente lunii mai 1999",
+      "to": "MONITORUL OFICIAL nr. 225 din 20 mai 1999",
+      "type": "publicat în",
+      "source": "18203#1",
+      "document": "18203",
+      "content_hash": "f2f9db966d37c8ce1a07ff36af940c241971cec316ed6987c62466c97bcaf77e",
+      "quote": "Publicat în MONITORUL OFICIAL nr. 225 din 20 mai 1999",
+      "start": 212,
+      "end": 265,
+      "verification": "source_checked",
+      "context": "nzilor plătite de Banca Naţionala a României la rezervele minime obligatorii, aferente lunii mai 1999 (perioade de aplicare) EMITENT BANCA NAŢIONALA A ROMÂNIEI Publicat în MONITORUL OFICIAL nr. 225 din 20 mai 1999 În baza art. 8 din Legea nr. 101/1998 privind Statutul Băncii Naţionale a României, în aplicarea prevederilor Regulamentului nr. 4/1998 privind regimul rezervelor minime obligatorii, republicat, Banca Naţionala a României hotărăşte: Ratele",
+      "decision": {
+        "id": "r_4d313c1be120134e56ed",
+        "label": "publicat în",
+        "definition": "a fi publicat în",
+        "reason": "Contextul menționează explicit publicarea actului în MONITORUL OFICIAL.",
+        "status": "supported",
+        "scope_quote": "MONITORUL OFICIAL nr. 225 din 20 mai 1999",
+        "reverse": false,
+        "modality": "asserted"
+      },
+      "check": {
+        "id": "r_4d313c1be120134e56ed",
+        "status": "verified",
+        "reason": "The context explicitly mentions the publication of the act in the MONITORUL OFICIAL. The proposal accurately reflects this factual statement."
+      },
+      "status": "model_checked_candidate",
+      "normalized": {
+        "from": "e_6fb5eb1f40ff285991e8",
+        "to": "e_2a6da7b47cdfec56a197",
+        "predicate": "publicat în",
+        "modality": "asserted",
+        "scope_quote": "MONITORUL OFICIAL nr. 225 din 20 mai 1999"
+      }
+    },
+    {
+      "id": "r_bd367adeb45cf66822a8",
+      "from_id": "m_a3ddfe70011742ee5780",
+      "to_id": "m_9f01edfda57384e15d5e",
+      "from": "Banca Naţionala a României",
+      "to": "Legea nr. 101/1998 privind Statutul Băncii Naţionale a României",
+      "type": "în baza",
+      "source": "18203#1",
+      "document": "18203",
+      "content_hash": "f2f9db966d37c8ce1a07ff36af940c241971cec316ed6987c62466c97bcaf77e",
+      "quote": "În baza art. 8 din Legea nr. 101/1998 privind Statutul Băncii Naţionale a României",
+      "start": 266,
+      "end": 348,
+      "verification": "source_checked",
+      "context": "ele minime obligatorii, aferente lunii mai 1999 (perioade de aplicare) EMITENT BANCA NAŢIONALA A ROMÂNIEI Publicat în MONITORUL OFICIAL nr. 225 din 20 mai 1999 În baza art. 8 din Legea nr. 101/1998 privind Statutul Băncii Naţionale a României, în aplicarea prevederilor Regulamentului nr. 4/1998 privind regimul rezervelor minime obligatorii, republicat, Banca Naţionala a României hotărăşte: Ratele dobânzilor plătite la rezervele minime obligatorii, aferente lunii mai 1999 (perio",
+      "decision": {
+        "id": "r_bd367adeb45cf66822a8",
+        "label": "hotărăşte",
+        "definition": "a emite o hotărâre oficială prin care se stabilește ceva",
+        "reason": "Normalization changes the predicate family",
+        "status": "uncertain",
+        "scope_quote": "Banca Naţionala a României hotărăşte:",
+        "reverse": false,
+        "modality": "asserted"
+      },
+      "check": null,
+      "status": "uncertain"
+    },
+    {
+      "id": "r_ce07c1a0e885d9cb3904",
+      "from_id": "m_a3ddfe70011742ee5780",
+      "to_id": "m_304e13c61c5e1387dbde",
+      "from": "Banca Naţionala a României",
+      "to": "Regulamentului nr. 4/1998 privind regimul rezervelor minime obligatorii, republicat",
+      "type": "în aplicarea prevederilor",
+      "source": "18203#1",
+      "document": "18203",
+      "content_hash": "f2f9db966d37c8ce1a07ff36af940c241971cec316ed6987c62466c97bcaf77e",
+      "quote": "în aplicarea prevederilor Regulamentului nr. 4/1998 privind regimul rezervelor minime obligatorii, republicat",
+      "start": 350,
+      "end": 459,
+      "verification": "source_checked",
+      "context": " NAŢIONALA A ROMÂNIEI Publicat în MONITORUL OFICIAL nr. 225 din 20 mai 1999 În baza art. 8 din Legea nr. 101/1998 privind Statutul Băncii Naţionale a României, în aplicarea prevederilor Regulamentului nr. 4/1998 privind regimul rezervelor minime obligatorii, republicat, Banca Naţionala a României hotărăşte: Ratele dobânzilor plătite la rezervele minime obligatorii, aferente lunii mai 1999 (perioade de aplicare), sunt: - 8,5% pentru rezervele minime obligatorii constituite în lei; - 3,15% pentru rezervele",
+      "decision": {
+        "id": "r_ce07c1a0e885d9cb3904",
+        "label": "aplică prevederile",
+        "definition": "aplică prevederile",
+        "reason": "Contextul indică faptul că acțiunea este făcută în baza și în aplicarea unor prevederi.",
+        "status": "supported",
+        "scope_quote": "în aplicarea prevederilor Regulamentului nr. 4/1998 privind regimul rezervelor minime obligatorii, republicat",
+        "reverse": false,
+        "modality": "asserted"
+      },
+      "check": {
+        "id": "r_ce07c1a0e885d9cb3904",
+        "status": "verified",
+        "reason": "The context states that the decision is made 'în aplicarea prevederilor' (in application of the provisions), which matches the proposal's meaning and direction."
+      },
+      "status": "model_checked_candidate",
+      "normalized": {
+        "from": "e_778ff9eb1af4f03e49ab",
+        "to": "e_fc4f8b283f4900fbbc72",
+        "predicate": "aplică prevederile",
+        "modality": "asserted",
+        "scope_quote": "în aplicarea prevederilor Regulamentului nr. 4/1998 privind regimul rezervelor minime obligatorii, republicat"
+      }
+    },
+    {
+      "id": "r_0aa23d6c638312ee1929",
+      "from_id": "m_c2a2ea0497aa62fdc833",
+      "to_id": "m_44362848f31148fccb9b",
+      "from": "obligaţiilor financiare către stat, unităţi administrativ-teritoriale şi către instituţii publice ale altor persoane juridice decât cele menţionate la art. 18 şi art. 19 lit. a)-c) din aceeaşi lege",
+      "to": "dispoziţiile art. 139 alin. (1) din Constituţie",
+      "type": "se întemeiază pe",
+      "source": "18593#11",
+      "document": "18593",
+      "content_hash": "a579dccf99647b557915be274277b0c36222fe0b979292aa90d88dc199ba1167",
+      "quote": "obligaţiilor financiare către stat, unităţi administrativ-teritoriale şi către instituţii publice ale altor persoane juridice decât cele menţionate la art. 18 şi art. 19 lit. a)-c) din aceeaşi lege, se întemeiază pe dispoziţiile art. 139 alin. (1) din Constituţie.",
+      "start": 0,
+      "end": 264,
+      "verification": "source_checked",
+      "context": "obligaţiilor financiare către stat, unităţi administrativ-teritoriale şi către instituţii publice ale altor persoane juridice decât cele menţionate la art. 18 şi art. 19 lit. a)-c) din aceeaşi lege, se întemeiază pe dispoziţiile art. 139 alin. (1) din Constituţie. Potrivit acestor prevederi constituţionale, \"Curtea de Conturi exercita controlul asupra modului de formare, de administrare şi de întrebuinţare a resurselor financiare ale statului şi ale sectorului public\". Conform art. 16 alin. (1) din ",
+      "decision": {
+        "id": "r_0aa23d6c638312ee1929",
+        "label": "se întemeiază pe",
+        "definition": "se întemeiază pe",
+        "reason": "Contextul afirmă că obligațiile se întemeiază pe dispozițiile unei anumite legi.",
+        "status": "supported",
+        "scope_quote": "dispoziţiile art. 139 alin. (1) din Constituţie.",
+        "reverse": false,
+        "modality": "asserted"
+      },
+      "check": {
+        "id": "r_0aa23d6c638312ee1929",
+        "status": "verified",
+        "reason": "The context explicitly states that the obligations 'se întemeiază pe' (are based on) the provisions of the Constitution. The proposal preserves this meaning and direction."
+      },
+      "status": "uncertain",
+      "guard": "unresolved_endpoint_class_or_modality"
+    },
+    {
+      "id": "r_89c54bc675cf71e065a6",
+      "from_id": "m_a833418e522f375a78fb",
+      "to_id": "m_d44b4def77928fd880ad",
+      "from": "Persoanele care fac parte din comitetul interministerial",
+      "to": "instituţiile de la care provin",
+      "type": "păstrează calitatea",
+      "source": "18731#12",
+      "document": "18731",
+      "content_hash": "c1b00e81c6ae64b9ab0051d6b688cab724c0bc8d4a6ac6b92ca6d4ced687d0a0",
+      "quote": "Persoanele care fac parte din comitetul interministerial, din secretariatul acestuia şi din comisiile ori subcomisiile de specialitate îşi păstrează calitatea pe care o au la instituţiile de la care provin, precum şi toate drepturile ce decurg din aceasta calitate.",
+      "start": 31,
+      "end": 296,
+      "verification": "source_checked",
+      "context": "droguri. ... + Articolul 9 (1) Persoanele care fac parte din comitetul interministerial, din secretariatul acestuia şi din comisiile ori subcomisiile de specialitate îşi păstrează calitatea pe care o au la instituţiile de la care provin, precum şi toate drepturile ce decurg din aceasta calitate. ... (2) Sarcinile comisiilor şi ale subcomisiilor de specialitate ale comitetului interministerial se îndeplinesc de către membrii acestora în cadrul atribuţiilor legale de serviciu. ... (3) Cheltuielile materiale şi de capital necesare pe",
+      "decision": {
+        "id": "r_89c54bc675cf71e065a6",
+        "label": "păstrează calitatea",
+        "definition": "păstrează calitatea",
+        "reason": "Scope quote is not verbatim source context",
+        "status": "uncertain",
+        "scope_quote": "",
+        "reverse": false,
+        "modality": "asserted"
+      },
+      "check": null,
+      "status": "uncertain"
+    },
+    {
+      "id": "r_c443e7136616733b534b",
+      "from_id": "m_6b18a0a1d051d8623ce3",
+      "to_id": "m_42533b8ecfba16985227",
+      "from": "Partea solicitată",
+      "to": "arestarea persoanei condamnate sau sa ia orice alta măsura corespunzătoare",
+      "type": "poate proceda la",
+      "source": "19131#4",
+      "document": "19131",
+      "content_hash": "6d763336370e53e24eefebe2efa87c84d370d364228278477a84dafcebc3a502",
+      "quote": "Partea solicitată poate, la cererea părţii solicitante, înainte de primirea documentelor în sprijinul cererii sau în asteptarea hotărârii privind cererea, sa procedeze la arestarea persoanei condamnate sau sa ia orice alta măsura corespunzătoare, menita să asigure ca aceasta nu îi va părăsi teritoriul.",
+      "start": 221,
+      "end": 524,
+      "verification": "source_checked",
+      "context": "xecutat condamnarea, statul de condamnare poate să adreseze primei părţi o cerere prin care să îl solicite ca aceasta să se ocupe de executarea condamnării. 2. Partea solicitată poate, la cererea părţii solicitante, înainte de primirea documentelor în sprijinul cererii sau în asteptarea hotărârii privind cererea, sa procedeze la arestarea persoanei condamnate sau sa ia orice alta măsura corespunzătoare, menita să asigure ca aceasta nu îi va părăsi teritoriul. Orice cerere în acest sens va fi însoţită de informaţiile menţionate în paragraful 3 al art. 4 din convenţie. Arestarea, cu acest titlu, a persoanei condamnate nu poate duce la agravarea situaţiei sale penale. 3. Transferul executării cond",
+      "decision": {
+        "id": "r_c443e7136616733b534b",
+        "label": "poate proceda la",
+        "definition": "poate proceda la",
+        "reason": "Textul indică faptul că Partea solicitată poate proceda la arestarea persoanei condamnate.",
+        "status": "supported",
+        "scope_quote": "Partea solicitată poate, la cererea părţii solicitante, înainte de primirea documentelor în sprijinul cererii sau în asteptarea hotărârii privind cererea, sa procedeze la arestarea persoanei condamnate sau sa ia orice alta măsura corespunzătoare, menita să asigure ca aceasta nu îi va părăsi teritoriul.",
+        "reverse": false,
+        "modality": "permission"
+      },
+      "check": {
+        "id": "r_c443e7136616733b534b",
+        "status": "verified",
+        "reason": "The proposal accurately reflects the permission granted to 'Partea solicitată' to proceed with arrest or other measures."
+      },
+      "status": "uncertain",
+      "guard": "unresolved_endpoint_class_or_modality"
+    },
+    {
+      "id": "r_bb7782438f30ad2693b1",
+      "from_id": "m_83a70401b058df79456d",
+      "to_id": "m_1d2f2adeefd15d7ab2fd",
+      "from": "Orice cerere în acest sens",
+      "to": "informaţiile menţionate în paragraful 3 al art. 4 din convenţie",
+      "type": "va fi însoţită de",
+      "source": "19131#4",
+      "document": "19131",
+      "content_hash": "6d763336370e53e24eefebe2efa87c84d370d364228278477a84dafcebc3a502",
+      "quote": "Orice cerere în acest sens va fi însoţită de informaţiile menţionate în paragraful 3 al art. 4 din convenţie.",
+      "start": 525,
+      "end": 634,
+      "verification": "source_checked",
+      "context": "d cererea, sa procedeze la arestarea persoanei condamnate sau sa ia orice alta măsura corespunzătoare, menita să asigure ca aceasta nu îi va părăsi teritoriul. Orice cerere în acest sens va fi însoţită de informaţiile menţionate în paragraful 3 al art. 4 din convenţie. Arestarea, cu acest titlu, a persoanei condamnate nu poate duce la agravarea situaţiei sale penale. 3. Transferul executării condamnării nu necesita consimţământul",
+      "decision": {
+        "id": "r_bb7782438f30ad2693b1",
+        "label": "va fi însoțită de",
+        "definition": "",
+        "reason": "Accepted decision needs a label and definition",
+        "status": "uncertain",
+        "scope_quote": "",
+        "reverse": false,
+        "modality": "asserted"
+      },
+      "check": null,
+      "status": "uncertain"
+    },
+    {
+      "id": "r_ab38dcc36c84d51747b5",
+      "from_id": "m_e9a9de86171f7234db38",
+      "to_id": "m_f2bfb443655a413f67cc",
+      "from": "Arestarea, cu acest titlu, a persoanei condamnate",
+      "to": "agravarea situaţiei sale penale",
+      "type": "nu poate duce la",
+      "source": "19131#4",
+      "document": "19131",
+      "content_hash": "6d763336370e53e24eefebe2efa87c84d370d364228278477a84dafcebc3a502",
+      "quote": "Arestarea, cu acest titlu, a persoanei condamnate nu poate duce la agravarea situaţiei sale penale.",
+      "start": 635,
+      "end": 734,
+      "verification": "source_checked",
+      "context": "să asigure ca aceasta nu îi va părăsi teritoriul. Orice cerere în acest sens va fi însoţită de informaţiile menţionate în paragraful 3 al art. 4 din convenţie. Arestarea, cu acest titlu, a persoanei condamnate nu poate duce la agravarea situaţiei sale penale. 3. Transferul executării condamnării nu necesita consimţământul",
+      "decision": {
+        "id": "r_ab38dcc36c84d51747b5",
+        "label": "nu poate duce la",
+        "definition": "",
+        "reason": "Accepted decision needs a label and definition",
+        "status": "uncertain",
+        "scope_quote": "",
+        "reverse": false,
+        "modality": "asserted"
+      },
+      "check": null,
+      "status": "uncertain"
+    },
+    {
+      "id": "r_c9e986131e0240c080b5",
+      "from_id": "m_9336d29ad5ca8a031156",
+      "to_id": "m_24ba560e7dea13666627",
+      "from": "Transferul executării condamnării",
+      "to": "consimţământul",
+      "type": "nu necesita",
+      "source": "19131#4",
+      "document": "19131",
+      "content_hash": "6d763336370e53e24eefebe2efa87c84d370d364228278477a84dafcebc3a502",
+      "quote": "Transferul executării condamnării nu necesita consimţământul",
+      "start": 738,
+      "end": 798,
+      "verification": "source_checked",
+      "context": "iile menţionate în paragraful 3 al art. 4 din convenţie. Arestarea, cu acest titlu, a persoanei condamnate nu poate duce la agravarea situaţiei sale penale. 3. Transferul executării condamnării nu necesita consimţământul",
+      "decision": {
+        "id": "r_c9e986131e0240c080b5",
+        "label": "nu necesită",
+        "definition": "nu necesită",
+        "reason": "Contextul specific menționează că transferul executării condamnării nu necesită consimțământul.",
+        "status": "supported",
+        "scope_quote": "Transferul executării condamnării nu necesita consimţământul",
+        "reverse": false,
+        "modality": "asserted"
+      },
+      "check": {
+        "id": "r_c9e986131e0240c080b5",
+        "status": "verified",
+        "reason": "The proposal accurately reflects the context stating that the transfer of execution does not require consent."
+      },
+      "status": "uncertain",
+      "guard": "unresolved_endpoint_class_or_modality"
+    },
+    {
+      "id": "r_7a535e684bc38693d258",
+      "from_id": "m_f88f825405ac6c1257e7",
+      "to_id": "m_29c97a7f0551fdc887fe",
+      "from": "Agenția de Valorificare a Activelor Bancare",
+      "to": "Banca Agricolă - S.A.",
+      "type": "preia active bancare supuse valorificării de la",
+      "source": "19730#9",
+      "document": "19730",
+      "content_hash": "0db4c320c3970ce4d928829c9e0258a4f5b734c2202e0777b230a41fe3e4424e",
+      "quote": "Se autorizeaza Agenția de Valorificare a Activelor Bancare sa preia active bancare supuse valorificării de la Banca Agricolă - S.A.",
+      "start": 207,
+      "end": 338,
+      "verification": "source_checked",
+      "context": "prin optimizarea acestui raport sunt creșterea lichidității și reducerea ponderii cheltuielilor operationale în totalul cheltuielilor băncii. + Articolul 6 (1) Se autorizeaza Agenția de Valorificare a Activelor Bancare sa preia active bancare supuse valorificării de la Banca Agricolă - S.A., în limita unui plafon de 2.700 miliarde lei, până la data de 30 decembrie 1999, din care 1.300 miliarde lei până la data de 29 octombrie 1999. Activele bancare supuse valorificării vor fi preluate în condițiile prevăzute la art. 2 *), 3 *",
+      "decision": {
+        "id": "r_7a535e684bc38693d258",
+        "label": "preia active bancare supuse valorificării de la",
+        "definition": "preia active bancare supuse valorificării de la",
+        "reason": "Contextul afirmă că Agenția de Valorificare a Activelor Bancare este autorizată să preia active de la Banca Agricolă - S.A.",
+        "status": "supported",
+        "scope_quote": "Se autorizeaza Agenția de Valorificare a Activelor Bancare sa preia active bancare supuse valorificării de la Banca Agricolă - S.A.",
+        "reverse": false,
+        "modality": "permission"
+      },
+      "check": {
+        "id": "r_7a535e684bc38693d258",
+        "status": "verified",
+        "reason": "The context explicitly states that the Agency is authorized to take over assets from the specified bank."
+      },
+      "status": "uncertain",
+      "guard": "unresolved_endpoint_class_or_modality"
+    },
+    {
+      "id": "r_8748b11f1e3a55b7f9ce",
+      "from_id": "m_0a5a3254ebb4bbc3ad5c",
+      "to_id": "m_1b6da8328ea86510c8f6",
+      "from": "EMITENT COMITETUL MIXT ROMÂNIA-TURCIA",
+      "to": "DECIZIE din 13 septembrie 1999 privind modificarea Protocolului D al Acordului de comerţ liber dintre România şi Republica Turcia",
+      "type": "emit",
+      "source": "28782#1",
+      "document": "28782",
+      "content_hash": "69a1f1c99f84f75913e01d6b3a962aabdc5eced819eab0b9d52bb77fa9c74870",
+      "quote": "EMITENT COMITETUL MIXT ROMÂNIA-TURCIA",
+      "start": 167,
+      "end": 204,
+      "verification": "source_checked",
+      "context": " din 13 septembrie 1999 privind modificarea Protocolului D al Acordului de comerţ liber dintre România şi Republica Turcia, semnat la Ankara la 29 aprilie 1997 EMITENT COMITETUL MIXT ROMÂNIA-TURCIA Publicat în MONITORUL OFICIAL nr. 452 din 17 septembrie 1999 Amendamente la Protocolul D Comitetul Mixt România-Turcia, având în vedere dispoziţiile art. 39 din Protocolul D al Acordului de comerţ liber dintre România şi Republica Turcia, ",
+      "decision": {
+        "id": "r_8748b11f1e3a55b7f9ce",
+        "label": "emit",
+        "definition": "emit",
+        "reason": "Contextul indică faptul că EMITENT COMITETUL MIXT ROMÂNIA-TURCIA a emis o decizie.",
+        "status": "supported",
+        "scope_quote": "EMITENT COMITETUL MIXT ROMÂNIA-TURCIA",
+        "reverse": false,
+        "modality": "asserted"
+      },
+      "check": {
+        "id": "r_8748b11f1e3a55b7f9ce",
+        "status": "verified",
+        "reason": "The context implies the issuance of a decision by the specified entity."
+      },
+      "status": "model_checked_candidate",
+      "normalized": {
+        "from": "e_93b181b3c973ad68c784",
+        "to": "e_40b327908addc906c0be",
+        "predicate": "emit",
+        "modality": "asserted",
+        "scope_quote": "EMITENT COMITETUL MIXT ROMÂNIA-TURCIA"
+      }
+    },
+    {
+      "id": "r_b9826419b90b53201725",
+      "from_id": "m_5d0caf45d315dc860613",
+      "to_id": "m_0c1951e106e536b401f8",
+      "from": "Comitetul Mixt România-Turcia",
+      "to": "dispoziţiile art. 39 din Protocolul D al Acordului de comerţ liber dintre România şi Republica Turcia",
+      "type": "având în vedere",
+      "source": "28782#1",
+      "document": "28782",
+      "content_hash": "69a1f1c99f84f75913e01d6b3a962aabdc5eced819eab0b9d52bb77fa9c74870",
+      "quote": "Comitetul Mixt România-Turcia, având în vedere dispoziţiile art. 39 din Protocolul D al Acordului de comerţ liber dintre România şi Republica Turcia",
+      "start": 294,
+      "end": 442,
+      "verification": "source_checked",
+      "context": "nat la Ankara la 29 aprilie 1997 EMITENT COMITETUL MIXT ROMÂNIA-TURCIA Publicat în MONITORUL OFICIAL nr. 452 din 17 septembrie 1999 Amendamente la Protocolul D Comitetul Mixt România-Turcia, având în vedere dispoziţiile art. 39 din Protocolul D al Acordului de comerţ liber dintre România şi Republica Turcia, care dau posibilitatea Comitetului mixt sa amendeze prevederile protocolului, luând în considerare Declaraţia comuna la Protocolul D, precum şi Declaraţia Turciei la Protocolul D, considerând ca, pentru asigurarea corespunzătoare a sistem",
+      "decision": {
+        "id": "r_b9826419b90b53201725",
+        "label": "se întemeiază pe",
+        "definition": "se întemeiază pe",
+        "reason": "Contextul menționează că Comitetul Mixt România-Turcia acționează având în vedere dispozițiile unui articol.",
+        "status": "supported",
+        "scope_quote": "având în vedere dispoziţiile art. 39 din Protocolul D al Acordului de comerţ liber dintre România şi Republica Turcia",
+        "reverse": false,
+        "modality": "asserted"
+      },
+      "check": {
+        "id": "r_b9826419b90b53201725",
+        "status": "verified",
+        "reason": "The context uses the phrase 'având în vedere' which supports the meaning of 'se întemeiază pe'."
+      },
+      "status": "model_checked_candidate",
+      "normalized": {
+        "from": "e_90d6d145df1316c67075",
+        "to": "e_2c41d67c4e16d668f5dd",
+        "predicate": "se întemeiază pe",
+        "modality": "asserted",
+        "scope_quote": "având în vedere dispoziţiile art. 39 din Protocolul D al Acordului de comerţ liber dintre România şi Republica Turcia"
+      }
+    }
+  ],
+  "patterns": [
+    {
+      "from_class": "act normativ",
+      "from_kind": "entity",
+      "predicate": "publicat în",
+      "to_class": "publicație oficială",
+      "to_kind": "entity",
+      "modality": "asserted",
+      "documents": [
+        "18203"
+      ],
+      "document_support": 1,
+      "relations": [
+        "r_4d313c1be120134e56ed"
+      ],
+      "status": "sparse_candidate"
+    },
+    {
+      "from_class": "autoritate publică",
+      "from_kind": "entity",
+      "predicate": "aplică prevederile",
+      "to_class": "act normativ",
+      "to_kind": "entity",
+      "modality": "asserted",
+      "documents": [
+        "18203"
+      ],
+      "document_support": 1,
+      "relations": [
+        "r_ce07c1a0e885d9cb3904"
+      ],
+      "status": "sparse_candidate"
+    },
+    {
+      "from_class": "autoritate publică",
+      "from_kind": "entity",
+      "predicate": "emit",
+      "to_class": "act normativ",
+      "to_kind": "entity",
+      "modality": "asserted",
+      "documents": [
+        "28782"
+      ],
+      "document_support": 1,
+      "relations": [
+        "r_8748b11f1e3a55b7f9ce"
+      ],
+      "status": "sparse_candidate"
+    },
+    {
+      "from_class": "autoritate publică",
+      "from_kind": "entity",
+      "predicate": "se întemeiază pe",
+      "to_class": "dispoziție legală",
+      "to_kind": "entity",
+      "modality": "asserted",
+      "documents": [
+        "28782"
+      ],
+      "document_support": 1,
+      "relations": [
+        "r_b9826419b90b53201725"
+      ],
+      "status": "sparse_candidate"
+    },
+    {
+      "from_class": "funcție",
+      "from_kind": "entity",
+      "predicate": "decide cu privire la",
+      "to_class": "acțiune juridică",
+      "to_kind": "entity",
+      "modality": "asserted",
+      "documents": [
+        "17101"
+      ],
+      "document_support": 1,
+      "relations": [
+        "r_55daacaa9e2ad5af0c3b"
+      ],
+      "status": "sparse_candidate"
+    },
+    {
+      "from_class": "organizare",
+      "from_kind": "entity",
+      "predicate": "poate numi",
+      "to_class": "funcție",
+      "to_kind": "entity",
+      "modality": "permission",
+      "documents": [
+        "17101"
+      ],
+      "document_support": 1,
+      "relations": [
+        "r_53b7735899ea46139cb9"
+      ],
+      "status": "sparse_candidate"
+    }
+  ],
+  "excluded": [
+    {
+      "source": "17101#34",
+      "kind": "relation",
+      "index": 3,
+      "reason": "invalid_quote_or_ambiguous_endpoint"
+    },
+    {
+      "source": "17101#34",
+      "kind": "relation",
+      "index": 4,
+      "reason": "self_relation_without_reflexive_evidence"
+    },
+    {
+      "source": "17233#18",
+      "kind": "relation",
+      "index": 0,
+      "reason": "invalid_quote_or_ambiguous_endpoint"
+    },
+    {
+      "source": "18463#20",
+      "kind": "relation",
+      "index": 0,
+      "reason": "invalid_quote_or_ambiguous_endpoint"
+    },
+    {
+      "source": "18463#20",
+      "kind": "relation",
+      "index": 1,
+      "reason": "invalid_quote_or_ambiguous_endpoint"
+    },
+    {
+      "source": "18463#20",
+      "kind": "relation",
+      "index": 2,
+      "reason": "invalid_quote_or_ambiguous_endpoint"
+    },
+    {
+      "source": "18593#11",
+      "kind": "relation",
+      "index": 1,
+      "reason": "invalid_quote_or_ambiguous_endpoint"
+    },
+    {
+      "source": "18731#12",
+      "kind": "relation",
+      "index": 1,
+      "reason": "invalid_quote_or_ambiguous_endpoint"
+    },
+    {
+      "source": "18731#12",
+      "kind": "relation",
+      "index": 2,
+      "reason": "invalid_quote_or_ambiguous_endpoint"
+    },
+    {
+      "source": "18841#12",
+      "kind": "relation",
+      "index": 0,
+      "reason": "invalid_quote_or_ambiguous_endpoint"
+    },
+    {
+      "source": "18841#12",
+      "kind": "relation",
+      "index": 1,
+      "reason": "invalid_quote_or_ambiguous_endpoint"
+    },
+    {
+      "source": "19131#4",
+      "kind": "relation",
+      "index": 0,
+      "reason": "invalid_quote_or_ambiguous_endpoint"
+    },
+    {
+      "source": "28782#1",
+      "kind": "relation",
+      "index": 0,
+      "reason": "invalid_quote_or_ambiguous_endpoint"
+    }
+  ],
+  "counts": {
+    "mentions": 84,
+    "document_scoped_entities": 43,
+    "classes": 15,
+    "surface_predicates": 16,
+    "canonical_predicates": 11,
+    "relations": 16,
+    "relation_status": {
+      "model_checked_candidate": 6,
+      "uncertain": 10
+    },
+    "concept_status": {
+      "entity": 46,
+      "uncertain": 3,
+      "fragment": 35
+    },
+    "recurring_patterns": 0
+  },
+  "limitations": [
+    "Model checks are not legal accuracy scores.",
+    "Patterns describe observations; they are not universal axioms or current-law assertions.",
+    "No cross-document instance identity is inferred from label similarity.",
+    "Missing extraction receipts and rejected source claims cannot be recovered by distillation."
+  ]
+}

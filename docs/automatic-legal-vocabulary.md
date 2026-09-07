@@ -31,8 +31,11 @@ app.distill_ontology(path="path/to/extraction-workdir", model="grap-legal-gemma4
 This requires operator access. Application caches belong to the current workspace;
 CLI caches belong to `--out`. Successful batches are keyed by content, prompt,
 schema, and provider configuration. Failed transport calls remain retryable.
-Malformed multi-item replies split into smaller batches automatically, within the
-same call budget. Completed singleton/batch decisions survive interruption.
+Malformed multi-item protocols (missing/duplicate IDs or wrong fields) split into
+smaller batches automatically, within the same call budget. A valid protocol with
+an invalid decision, such as an invented scope quote, marks that item uncertain
+without regenerating its valid neighbors. The raw reply remains in the cache.
+Completed singleton/batch decisions survive interruption.
 
 ## What it discovers
 
@@ -64,6 +67,10 @@ bad upstream merge, but does not solve cross-document legal identity or aliases.
 - Reflexive artifacts without reflexive evidence do not enter schema patterns.
 - Explicit Romanian permission/obligation markers block an `asserted` mapping;
   dropped negation also blocks a mapping. These guards override model agreement.
+- Recognized predicate families cannot change meaning during normalization:
+  legal basis, decision, issuance, adoption, approval, amendment, repeal and
+  publication remain distinct. Unknown predicates remain discoverable; sharing
+  a family does not prove that two predicates are equivalent.
 - A label cannot silently acquire a conflicting definition. Unresolved cases
   remain visible instead of changing earlier meanings.
 - Model agreement is **not** semantic accuracy. The checker currently uses the
@@ -84,3 +91,27 @@ The earlier [distillation experiments](experiments/distillation-journal.md) foun
 that giving extraction a small relation vocabulary encouraged distorted facts.
 The discovered vocabulary therefore does not feed back as asserted patterns or
 mandatory relation names. The evidence graph remains unchanged.
+
+## Resumed real-document probe, 2026-09-07
+
+The saved 24-chunk KEE sample yielded 84 source mentions. Resumption completed with
+8 new model calls and 16 cache hits; a subsequent complete replay used zero new
+calls and 23 cached batches. The report contains 15 candidate classes, 43 entities
+grouped within documents, and 16 relations considered for normalization: six
+passed the current model/evidence checks and ten remain uncertain. No pattern
+had support from two documents. These counts are processing outcomes, not accuracy.
+
+The observed `în baza` → `hotărăște` semantic drift is now blocked even if the
+checker agrees. A minimized three-relation regression confirms that one fabricated
+scope quote no longer doubles calls from three to six. Source quotes and the
+reason for each abstention are visible in the GUI, and class lists expand to
+their supporting mentions.
+
+[Saved result](experiments/legal-vocabulary-resumed-2026-09.json) includes all
+mentions, relations, decisions, checks and exclusions. The model classified both
+a banking agency and `Banca Agricolă - S.A.` as public authorities. An explicit
+commercial-form check now abstains on that bank's classification and excludes its
+dependent schema pattern. Class membership still needs evaluation; the six
+passing relation mappings remain candidates, not a validated legal schema.
+The next accuracy experiment should measure entity typing and relation meaning
+on held-out, related documents, including counterexamples to proposed classes.

@@ -7,6 +7,12 @@ status are retained in their workspace-owned SQLite ledger.
 
 ## Knowledge
 
+- **distill_ontology(path, model="grap-legal-gemma4", max_calls=8, min_documents=2)**:
+  resumable automatic class/predicate discovery from KEE receipts. Returns source
+  mentions, candidate classes, checked relation mappings, descriptive patterns and
+  explicit abstentions. Operator only; caches belong to the workspace. Zero calls
+  reads cached work. [Workflow and limitations](../docs/automatic-legal-vocabulary.md).
+
 The full tier also includes a separate [Romanian legal statement path](../docs/legal-rules-2026-09.md):
 
 - **extract_legal_claims(path, max_files=3, max_chars=8000, refresh=False, model=None, max_batches=None)**:

@@ -1053,7 +1053,7 @@ $("#vocab-run").onclick = async () => {
     const target = $("#vocab-result");
     for (const pattern of r.patterns) {
       const details = el("details", {}, el("summary", {},
-        `${pattern.from_class} → ${pattern.predicate} → ${pattern.to_class} · ${pattern.modality} · ${pattern.document_support} document(s) · ${pattern.status}`));
+        `${pattern.from_class} → ${pattern.predicate} → ${pattern.to_class} · ${pattern.modality} · ${pattern.document_support} document(s) · ${pattern.status === "recurring_candidate" ? "recurring candidate" : "limited support"}`));
       const ids = new Set(pattern.relations);
       for (const relation of r.relations.filter(item => ids.has(item.id))) {
         details.append(el("p", {}, `${relation.source}: ${relation.from} — ${relation.type} → ${relation.to}`),
@@ -1064,13 +1064,24 @@ $("#vocab-run").onclick = async () => {
     }
     if (!r.patterns.length) target.append(el("p", {}, "No schema patterns yet. Pending or uncertain items remain in the evidence report."));
     const classes = el("details", {}, el("summary", {}, "Candidate classes"));
-    for (const c of r.classes) classes.append(el("p", {}, `${c.label}: ${c.definition}`));
+    for (const c of r.classes) {
+      const members = r.mentions.filter(m => m.decision?.label === c.label && ["entity", "type"].includes(m.decision.status));
+      const group = el("details", {}, el("summary", {}, `${c.label} · ${members.length} source mentions`),
+        el("p", {}, c.definition));
+      for (const member of members) group.append(
+        el("p", {}, `${member.name} · ${member.source} · ${member.decision.status}`),
+        el("blockquote", {}, member.quote));
+      classes.append(group);
+    }
     target.append(classes);
     const exceptions = el("details", {}, el("summary", {}, "Uncertain, rejected, and pending relations"));
     for (const relation of r.relations.filter(item => item.status !== "model_checked_candidate")) {
       exceptions.append(el("p", {}, `${relation.source}: ${relation.from} — ${relation.type} → ${relation.to} · ${relation.status}`),
         el("blockquote", {}, relation.quote),
-        el("p", {}, relation.check?.reason || relation.decision?.reason || "Not processed yet."));
+        el("p", {}, relation.guard
+          ? `Blocked by evidence check: ${relation.guard.replaceAll("_", " ")}.`
+          : relation.decision?.status === "uncertain" ? relation.decision.reason
+          : relation.check?.reason || relation.decision?.reason || "Not processed yet."));
     }
     target.append(exceptions);
     if (r.failures.length) target.append(el("p", {}, `${r.failures.length} batches failed. Resume retries them; details are in the download.`));
