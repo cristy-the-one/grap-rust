@@ -172,7 +172,6 @@ def test_negative_future_description_does_not_force_a_prohibition():
 
 
 @pytest.mark.parametrize("text,first,last", [
-    ("(1) Se interzice amplasarea magazinelor.", 0, 1),
     ("Din producția europeană cel puțin 40% va fi producție locală.", 0, 2),
     ("Din producția europeană cel puțin 40% va fi producție locală.", 6, 9),
     ("În exercitarea atribuțiilor personalul are dreptul să solicite documentele.", 5, 5),
@@ -182,6 +181,37 @@ def test_model_fragments_stay_unresolved(text, first, last):
     assert claim["subject"] == ""
     assert claim["statement"] == text
     assert "subject unresolved" in claim["review_issues"]
+
+
+@pytest.mark.parametrize("text,model_kind,selected,kind,subject", [
+    ("Normele nu se aplică băncilor.", "prohibition", "Normele", "fact", "Normele"),
+    ("În caz de abatere sunt aplicabile sancțiunile civile.", "prohibition", "În caz de abatere", "fact", "sancțiunile civile"),
+    ("Se interzice conectarea instalației, dacă lipsește contorul.", "prohibition", "conectarea instalației, dacă lipsește contorul.", "prohibition", "conectarea instalației"),
+    ("(1) Se interzice amplasarea magazinelor.", "fact", "(1) Se", "prohibition", "amplasarea magazinelor"),
+    ("Se interzice utilizarea instalațiilor care nu au contor.", "prohibition", "utilizarea", "prohibition", "utilizarea instalațiilor care nu au contor"),
+    ("Se interzice accesul, cu excepția personalului autorizat.", "prohibition", "accesul, cu excepția personalului autorizat", "prohibition", "accesul"),
+])
+def test_applicability_and_postposed_subjects(text, model_kind, selected, kind, subject):
+    p = StubProvider(default=json.dumps({"units": {"u0": {"kind": model_kind, "subject": selected}}}))
+    claim = extract_rules(p, text)["claims"][0]
+    assert (claim["kind"], claim["subject"]) == (kind, subject)
+    assert claim["statement"] == text
+    assert_anchored(text, [claim])
+
+
+@pytest.mark.parametrize("text,kind,subject", [
+    ("Normele nu se aplică băncilor, dar firmele trebuie să depună cereri.", "obligation", "firmele"),
+    ("Normele care se aplică băncilor trebuie publicate.", "obligation", "Normele care se aplică băncilor"),
+    ("Banca nu aplică sancțiuni fără verificare.", "prohibition", "Banca"),
+    ("Nu se interzice accesul personalului.", "permission", "accesul personalului"),
+    ("Contractul trebuie adaptat reglementărilor care îi sunt aplicabile.", "obligation", "Contractul"),
+])
+def test_surface_rules_do_not_override_unrelated_or_mixed_semantics(text, kind, subject):
+    p = StubProvider(default=json.dumps({"units": {"u0": {"kind": kind, "subject": subject}}}))
+    claim = extract_rules(p, text)["claims"][0]
+    assert claim["kind"] == kind
+    assert claim["subject"] == subject
+    assert_anchored(text, [claim])
 
 
 def test_mixed_right_and_duty_keep_shared_sentence_context():

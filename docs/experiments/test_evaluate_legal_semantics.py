@@ -1,4 +1,27 @@
 from evaluate_legal_semantics import score
+import json
+from pathlib import Path
+
+import pytest
+
+from grap_mcp.kee.legal_rules import extract_rules
+from grap_mcp.kee.llm import StubProvider
+
+
+DATA = Path(__file__).parent
+CASES = json.loads((DATA / "real-law-semantic-cases.json").read_text(encoding="utf-8"))["cases"]
+
+
+@pytest.mark.parametrize("case", CASES, ids=lambda c: c["id"])
+def test_recorded_gemma_subject_and_kind_regressions(case):
+    """Replay the actual v7 failures and successes, independent of model availability."""
+    name = "semantic-gemma-dev-v7-final.json" if case["split"] == "dev" else "semantic-gemma-holdout-v7.json"
+    report = json.loads((DATA / name).read_text(encoding="utf-8"))
+    row = next(r for r in report["cases"] if r["id"] == case["id"])
+    replies = iter(call["reply"] for call in row["calls"])
+    receipt = extract_rules(StubProvider(handler=lambda *_: next(replies)), case["text"])
+    result = score(case, receipt["claims"])
+    assert result["grounded"] and result["joint_correct"], receipt["claims"]
 
 
 def example():

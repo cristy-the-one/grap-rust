@@ -30,10 +30,13 @@ def main():
     parser.add_argument("--output", required=True)
     parser.add_argument("--model", default="grap-legal-gemma4")
     parser.add_argument("--extractor-file")
+    parser.add_argument("--fixture", help="Optional frozen reference JSON; default is the original 17 cases")
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[2]
-    fixture = root / "docs/experiments/real-law-semantic-cases.json"
+    fixture = Path(args.fixture) if args.fixture else root / "docs/experiments/real-law-semantic-cases.json"
     cases = [c for c in json.loads(fixture.read_text(encoding="utf-8"))["cases"] if c["split"] == args.split]
+    if not cases:
+        raise SystemExit("No cases for this split in the selected fixture.")
     out = Path(args.output)
     if out.exists():
         raise SystemExit("Choose a fresh output path.")
