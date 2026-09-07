@@ -1028,6 +1028,66 @@ $("#btn-legal-graph-file").onclick = () =>
   });
 
 /* ---------- persistent ontology (reuses the SVG renderer + stream reader) ---------- */
+let vocabularyReport = null;
+$("#vocab-run").onclick = async () => {
+  const button = $("#vocab-run"), status = $("#vocab-status");
+  const maxCalls = Number($("#vocab-budget").value);
+  if (!Number.isInteger(maxCalls) || maxCalls < 0 || maxCalls > 100 || !$("#vocab-input").value.trim()) {
+    status.textContent = "Choose an input path and a call budget between 0 and 100.";
+    return;
+  }
+  button.disabled = true;
+  $("#vocab-export").disabled = true;
+  vocabularyReport = null;
+  clear($("#vocab-result"));
+  status.textContent = "Discovering vocabulary… Batches are saved as they finish; this may take several minutes.";
+  try {
+    const response = await post("/api/ontology/distill", {path: $("#vocab-input").value.trim(),
+      model: $("#vocab-model").value.trim(), max_calls: maxCalls});
+    if (!response.report) throw new Error(response.message || "No vocabulary report returned");
+    const r = response.report;
+    vocabularyReport = r;
+    $("#vocab-export").disabled = false;
+    status.textContent = `${r.status}: ${r.counts.classes} candidate classes, ${r.counts.canonical_predicates} candidate predicates; ` +
+      `${r.pending} pending, ${r.calls} new calls, ${r.cache_hits} cached batches. Model checks are not accuracy scores.`;
+    const target = $("#vocab-result");
+    for (const pattern of r.patterns) {
+      const details = el("details", {}, el("summary", {},
+        `${pattern.from_class} → ${pattern.predicate} → ${pattern.to_class} · ${pattern.modality} · ${pattern.document_support} document(s) · ${pattern.status}`));
+      const ids = new Set(pattern.relations);
+      for (const relation of r.relations.filter(item => ids.has(item.id))) {
+        details.append(el("p", {}, `${relation.source}: ${relation.from} — ${relation.type} → ${relation.to}`),
+          el("blockquote", {}, relation.quote),
+          el("p", {class: "muted small"}, `Scope retained: ${relation.decision.scope_quote || "No restriction identified; validity is not established."}`));
+      }
+      target.append(details);
+    }
+    if (!r.patterns.length) target.append(el("p", {}, "No schema patterns yet. Pending or uncertain items remain in the evidence report."));
+    const classes = el("details", {}, el("summary", {}, "Candidate classes"));
+    for (const c of r.classes) classes.append(el("p", {}, `${c.label}: ${c.definition}`));
+    target.append(classes);
+    const exceptions = el("details", {}, el("summary", {}, "Uncertain, rejected, and pending relations"));
+    for (const relation of r.relations.filter(item => item.status !== "model_checked_candidate")) {
+      exceptions.append(el("p", {}, `${relation.source}: ${relation.from} — ${relation.type} → ${relation.to} · ${relation.status}`),
+        el("blockquote", {}, relation.quote),
+        el("p", {}, relation.check?.reason || relation.decision?.reason || "Not processed yet."));
+    }
+    target.append(exceptions);
+    if (r.failures.length) target.append(el("p", {}, `${r.failures.length} batches failed. Resume retries them; details are in the download.`));
+  } catch (error) {
+    status.textContent = `Vocabulary discovery failed: ${error.message}. Completed batches remain cached.`;
+  } finally { button.disabled = false; }
+};
+$("#vocab-export").onclick = () => {
+  if (!vocabularyReport) return;
+  const url = URL.createObjectURL(new Blob([JSON.stringify(vocabularyReport, null, 2)], {type: "application/json"}));
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = `vocabulary-${vocabularyReport.input_sha256.slice(0, 12)}.json`;
+  anchor.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+};
+
 // Map an ontology snapshot ({nodes:[{id,name,characteristics,provenance}], edges})
 // onto the legal-graph renderer's shape (label/kind) without losing the metadata.
 function ontoSnapshotToGraph(snap) {

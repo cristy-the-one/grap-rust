@@ -720,6 +720,21 @@ def ontology_export_ep(workdir: str, out_path: Optional[str] = None) -> dict:
     return r
 
 
+class DistillBody(BaseModel):
+    path: str
+    model: str = "grap-legal-gemma4"
+    max_calls: int = Field(default=8, ge=0, le=100)
+    min_documents: int = Field(default=2, ge=1, le=10000)
+
+
+@app.post("/api/ontology/distill")
+def ontology_distill(body: DistillBody) -> dict:
+    application = bridge.application
+    r = application.distill_ontology(**body.model_dump())
+    _api_error(r)
+    return r
+
+
 if FRONTEND.is_dir():
     app.mount("/assets", StaticFiles(directory=FRONTEND), name="assets")
 

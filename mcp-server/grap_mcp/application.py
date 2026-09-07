@@ -47,6 +47,7 @@ _TIERS = {
     "resolve_legal_term": "full",
     "create_legal_review": "full", "get_legal_review": "full",
     "process_legal_review": "full", "save_legal_review": "full",
+    "distill_ontology": "full",
 }
 
 class ApplicationState:
@@ -1918,6 +1919,30 @@ class GrapApplication:
 
 
     @operation
+    def distill_ontology(self, path: str, model: str = "grap-legal-gemma4",
+                         max_calls: int = 8, min_documents: int = 2) -> dict:
+        """Resume automatic vocabulary discovery from a KEE export or workdir.
+
+        Returns source-backed class/predicate candidates and descriptive patterns.
+        Cached calls resume in this workspace; no evidence graph is modified.
+        max_calls=0 reads cached work only. Model checks are not accuracy scores.
+        """
+        denied = self._require("operator")
+        if denied:
+            return denied
+        try:
+            from .kee.distill import distill_ontology, load_input
+            ontology, sources = load_input(path)
+            cache = Path(self._state.ws_root) / "vocabulary-cache"
+            report = distill_ontology(ontology, self.get_provider(model=model), sources=sources,
+                                     cache_dir=cache, max_calls=max_calls, min_documents=min_documents)
+            return {"status": "ok", "report": report}
+        except Exception as exc:
+            logger.exception("distill_ontology failed")
+            return {"status": "error", "message": str(exc)}
+
+
+    @operation
     def project_relations(self, relations: list = None) -> dict:
         """Project extracted relations as typed edges in the current Knowledge Graph.
 
@@ -3417,7 +3442,7 @@ class GrapApplication:
                               "extract_ontology_nversion",
                               "rollback_ontology", "diff_ontologies", "project_relations",
                               "open_extraction_graph", "extend_extraction_graph", "export_ontology",
-                              "get_extraction_evidence",
+                              "get_extraction_evidence", "distill_ontology",
                               "build_legal_graph", "legal_graph_from_relations",
                               "extract_legal_claims", "get_legal_claims", "get_legal_sources",
                               "export_legal_claim_graph",

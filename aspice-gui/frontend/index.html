@@ -313,6 +313,21 @@
       <!-- PERSISTENT ONTOLOGY -->
       <section id="panel-ontology" class="panel">
         <h2>Persistent ontology</h2>
+        <div class="card">
+          <h3>Discover a legal vocabulary</h3>
+          <p>Automatically classify source mentions, check relation wording and direction, and find recurring patterns.
+            Results remain candidates with source quotes. This does not change the evidence graph.</p>
+          <label for="vocab-input">KEE export file or persistent graph folder</label>
+          <input id="vocab-input" type="text" placeholder="C:\dev\grap-rust\docs\experiments\full-kee-timing-2026-09.json" />
+          <div class="inline-form">
+            <div><label for="vocab-model">Model</label><input id="vocab-model" value="grap-legal-gemma4" /></div>
+            <div><label for="vocab-budget">New model calls this run</label><input id="vocab-budget" type="number" min="0" max="100" value="8" /></div>
+            <button type="button" class="btn btn-primary" id="vocab-run">Discover / Resume</button>
+            <button type="button" class="btn" id="vocab-export" disabled>Download evidence report</button>
+          </div>
+          <p id="vocab-status" role="status">Successful batches are cached. Use 0 calls to read cached work.</p>
+          <div id="vocab-result"></div>
+        </div>
         <p class="lead">
           Build and <em>grow</em> a persistent extraction graph from a legal corpus.
           Each run is incremental — new chunks are extracted, changed chunks re-extracted,
