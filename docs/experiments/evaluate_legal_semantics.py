@@ -15,8 +15,8 @@ def score(case, claims):
     kind = one.get("kind") == case["expected_kind"]
     subject = one.get("subject") in case["accepted_subjects"]
     qualifications = bool(one) and all(q in one.get("statement", "") for q in case["required_text"])
-    grounded = bool(claims) and all(
-        case["text"][s["start"]:s["end"]] == s["quote"]
+    grounded = bool(claims) and all(c.get("evidence") for c in claims) and all(
+        0 <= s["start"] < s["end"] <= len(case["text"]) and case["text"][s["start"]:s["end"]] == s["quote"]
         for c in claims for s in c.get("evidence", []) + c.get("context_evidence", [])
         + ([c["subject_evidence"]] if "subject_evidence" in c else []))
     return {"kind_correct": kind, "subject_correct": subject, "qualifications_retained": qualifications,

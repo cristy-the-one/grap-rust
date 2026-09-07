@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+import re
 
 import pytest
 
@@ -10,9 +11,18 @@ from grap_mcp.kee.llm import StubProvider
 
 
 def labels(**rows):
-    return StubProvider(default=json.dumps({"units": {
-        name: {"kind": kind, "subject_start": first, "subject_end": last}
-        for name, (kind, first, last) in rows.items()}}))
+    # Test fixtures identify phrases by word positions; the runtime wire contract
+    # contains only literal subject strings, never these test coordinates.
+    def reply(system, user):
+        source = json.loads(user.split("\n", 1)[1])
+        result = {}
+        for name, (kind, first, last) in rows.items():
+            tokens = list(re.finditer(r"\S+", source[name]))
+            subject = (source[name][tokens[first].start():tokens[last].end()]
+                       if 0 <= first <= last < len(tokens) else "" if first == last == -1 else "fabricated subject")
+            result[name] = {"kind": kind, "subject": subject}
+        return json.dumps({"units": result})
+    return StubProvider(handler=reply)
 
 
 def assert_anchored(text, claims):
@@ -115,6 +125,39 @@ def test_obvious_circumstance_is_not_returned_as_an_actor():
 def test_all_units_must_be_accounted_for():
     with pytest.raises(ValueError, match="every supplied"):
         extract_rules(labels(u0=("fact", 0, 0)), "Banca funcționează. Firma există.")
+
+
+@pytest.mark.parametrize("selected", ["Consiliul", "Un actor inventat"])
+def test_model_subject_must_be_unique_and_literal_within_its_statement(selected):
+    text = "Consiliul consultă Consiliul înainte de publicare."
+    p = StubProvider(default=json.dumps({"units": {"u0": {"kind": "fact", "subject": selected}}}))
+    claim = extract_rules(p, text)["claims"][0]
+    assert claim["subject"] == "" and claim["statement"] == text
+    assert "selected subject is absent or ambiguous in its statement" in claim["review_issues"]
+
+
+def test_subject_quote_has_exact_offsets_without_numbering_source_words():
+    text = "La înființare, vărsămintele în contul capitalului social trebuie efectuate integral."
+    selected = "vărsămintele în contul capitalului social"
+    p = StubProvider(default=json.dumps({"units": {"u0": {"kind": "obligation", "subject": selected}}}))
+    claim = extract_rules(p, text)["claims"][0]
+    assert claim["subject"] == selected and claim["subject_method"] == "model-source-quote"
+    assert json.loads(p.calls[0][1].split("\n", 1)[1]) == {"u0": text}
+    assert_anchored(text, [claim])
+
+
+def test_nonemployee_status_does_not_negate_separate_benefit():
+    text = "Membrii nu sunt salariați și beneficiază de o indemnizație lunară."
+    claim = extract_rules(labels(u0=("fact", 0, 0)), text)["claims"][0]
+    assert claim["kind"] == "right"
+    negative = extract_rules(labels(u0=("fact", 0, 0)), "Membrii nu beneficiază de o indemnizație.")["claims"][0]
+    assert negative["kind"] == "fact"
+
+
+def test_wrong_subject_type_rejects_batch():
+    p = StubProvider(default=json.dumps({"units": {"u0": {"kind": "fact", "subject": 3}}}))
+    with pytest.raises(ValueError, match="invalid classification"):
+        extract_rules(p, "Instituția funcționează.")
 
 
 def test_does_not_turn_absence_of_duty_into_positive_duty():

@@ -16,8 +16,9 @@ def write_source(file, suffix="", count=26):
 
 
 def reply(system, user):
-    return json.dumps({"units": {key: {"kind": "obligation", "subject_start": 0, "subject_end": 1}
-                       for key in re.findall(r"^(u\d+):", user, re.M)}})
+    source = json.loads(user.split("\n", 1)[1])
+    return json.dumps({"units": {key: {"kind": "obligation", "subject": " ".join(value.split()[:2])}
+                       for key, value in source.items()}})
 
 
 def provider(handler=reply, model="local"):
