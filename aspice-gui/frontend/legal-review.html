@@ -27,7 +27,7 @@
     <div id="metrics" class="metrics"></div>
     <div class="toolbar"><p id="sample-label" class="muted"></p>
       <label>Batch budget<input id="budget" type="number" min="1" max="50" value="8"></label>
-      <button id="process" class="primary">Process sample</button><button id="stop" disabled>Stop after current batch</button></div>
+      <button id="process" class="primary">Process sample</button><button id="stop" disabled>Stop after current batch</button><button id="start-review">Start reviewing ↓</button></div>
     <details><summary>Human judgments and measurement limits</summary><div id="scores"></div>
       <p class="muted">These are counts within this frozen sample, not a corpus accuracy estimate. Unreviewed and uncertain results are not successes. Read the full source to find omissions; correctly copied text alone does not establish correct meaning or current legal validity.</p></details>
   </section>
@@ -42,6 +42,7 @@
     </section>
     <section class="review-pane" aria-label="Extraction judgments">
       <div class="pane-head"><div><span class="eyebrow">EXTRACTION PROPOSALS</span><h2 id="claim-heading">Claims to review</h2></div><span id="save-state" class="muted"></span></div>
+      <button id="save-draft" disabled>Save draft</button>
       <label>Reviewer name<input id="reviewer" autocomplete="name" placeholder="Your name"></label>
       <div id="claims"></div><div id="omissions"></div>
       <footer id="review-footer" hidden>

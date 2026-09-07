@@ -21,6 +21,12 @@ The full tier also includes a separate [Romanian legal statement path](../docs/l
   the invocation. Raise `max_chars` explicitly for larger acts. Incomplete work is
   visible through source history and is excluded from current claims and snapshots.
   See [resumption and local context setup](../docs/legal-resume-2026-09.md).
+- **create_legal_review**, **get_legal_review**, **process_legal_review**,
+  **save_legal_review**: freeze a reproducible document sample, process one resumable
+  batch per call, and store versioned human judgments and omissions against pinned
+  full-source receipts. Read/export includes uncertainty and unreviewed counts;
+  annotations never rewrite model claims. The [browser workbench](../docs/legal-review-workbench.md)
+  uses these same operations. Mutations require the operator role.
 - **get_legal_claims(kind=None, source_id=None, revision_id=None, include_stale=False,
   limit=20, offset=0)**: latest stored claims, or an exact historical source receipt.
 - **get_legal_sources(source_id=None, limit=20, offset=0)**: source status and extraction history.

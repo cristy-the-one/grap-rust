@@ -1,5 +1,11 @@
 # GRAP ASPICE Console
 
+**Romanian-law review:** a dedicated [Legal source review workflow](../docs/legal-review-workbench.md)
+now supports frozen corpus samples, complete-source evidence, reviewer corrections,
+missed-rule annotations and exportable review history. Start it with
+`scripts/run-legal-review.ps1` and open `http://127.0.0.1:8766/legal-review`.
+The older console sections described below remain ASPICE-oriented.
+
 A single-piece browser console for the **ASPICE-oriented MCP surface**
 (`mcp-server/grap_mcp`). The console owns a `GrapApplication` instance and uses
 the same operations as MCP and batch runners. Selecting a workspace replaces

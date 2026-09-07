@@ -21,6 +21,9 @@ and rule types separately from exact text preservation; extraction now uses lite
 subject phrases instead of model-generated token positions.
 The latest fixes distinguish applicability exclusions from prohibitions and correct
 subjects after predicates, passing all 23 targeted real-source reference cases.
+The [legal source review workbench](docs/legal-review-workbench.md) now lets a human
+review a reproducible corpus sample, record corrections and missed rules, and export
+source-backed review history. It reports reviewed evidence separately from extraction coverage.
 
 ## Why grap?
 

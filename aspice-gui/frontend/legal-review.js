@@ -20,6 +20,7 @@ function locks() {
   $("#retry").disabled = state.busy || !state.detail || !!state.detail.revision_id || !!state.detail.error;
   $("#omit").disabled = state.busy || !state.detail?.revision_id;
   $("#save").disabled = state.busy || !state.detail?.revision_id;
+  $("#save-draft").disabled = state.busy || !state.detail?.revision_id;
   $("#discard").disabled = state.busy || !state.dirty;
   document.querySelectorAll("#create-form input, #create-form button, .doc, .review-pane input, .review-pane select, .review-pane textarea").forEach(e => e.disabled = state.busy);
 }
@@ -76,9 +77,12 @@ function renderOmissions() {
 }
 function renderDetail(detail) {
   state.detail=detail;state.dirty=false;
+  const claims=[...(detail.receipt?.claims||[])].sort((a,b)=>(a.evidence[0]?.start??0)-(b.evidence[0]?.start??0));
   state.omissions=structuredClone(detail.review?.omissions||[]);
-  state.judgments=(detail.receipt?.claims||[]).map(c=>structuredClone(detail.review?.judgments.find(j=>j.claim_id===c.claim_id)||{claim_id:c.claim_id,kind:"unreviewed",subject:"unreviewed",qualifications:"unreviewed",note:""}));
-  $("#source-title").textContent=detail.title||detail.file;
+  state.judgments=claims.map(c=>structuredClone(detail.review?.judgments.find(j=>j.claim_id===c.claim_id)||{claim_id:c.claim_id,kind:"unreviewed",subject:"unreviewed",qualifications:"unreviewed",note:""}));
+  const title=(detail.title||detail.file).trim();
+  $("#source-title").textContent=title.length>150?title.slice(0,147)+"…":title;
+  $("#source-title").title=title;
   $("#source-meta").textContent=`${detail.original_path} · ${Array.from(detail.source_text).length.toLocaleString()} characters · ${detail.extraction_status}`;
   $("#source").textContent=detail.source_text;
   $("#claim-heading").textContent=detail.receipt ? `${detail.receipt.claims.length} claims to review` : "Extraction not complete";
@@ -90,7 +94,7 @@ function renderDetail(detail) {
     host.append(node("p",detail.extraction_error || "Process this document to see its proposals. Review remains unavailable until its complete extraction is saved.","muted"));
     if(detail.progress)host.append(node("pre",JSON.stringify(detail.progress,null,2)));
   }
-  (detail.receipt?.claims||[]).forEach((c,i)=>{
+  claims.forEach((c,i)=>{
     const j=state.judgments[i], card=node("article",null,"claim");
     card.append(node("h3",`${i+1}. ${c.kind} · ${c.provision||"Source statement"}`),node("blockquote",c.statement),node("p",`Subject: ${c.subject||"Unresolved"}`,"subject"));
     if(c.review_issues?.length)card.append(node("p",c.review_issues.join("; "),"issues"));
@@ -142,6 +146,7 @@ $("#create-form").onsubmit=e=>{e.preventDefault();action(async()=>{
 });};
 $("#campaign-select").onchange=()=>action(async()=>{const cid=$("#campaign-select").value;try{if(cid)await openCampaign(cid);}catch(e){$("#campaign-select").value=state.campaign?.campaign.campaign_id||"";throw e;}});
 $("#process").onclick=()=>action(()=>processItems());$("#retry").onclick=()=>action(()=>processItems(true));
+$("#start-review").onclick=()=>$("#workbench").scrollIntoView({block:"start",behavior:"smooth"});
 $("#stop").onclick=()=>{state.stop=true;message("Stopping after the current batch. Already completed batches remain saved.");};
 $("#reviewer").value=localStorage.getItem("grap-reviewer")||"";
 $("#reviewer").oninput=()=>{localStorage.setItem("grap-reviewer",$("#reviewer").value);if(state.detail?.receipt)dirty();};
@@ -154,6 +159,7 @@ $("#save").onclick=()=>action(async()=>{
   renderDetail(saved);await refreshCampaign();message(`Review saved as revision ${saved.version}. The model receipt remains unchanged.`);
   } finally {state.busy=false;locks();}
 });
+$("#save-draft").onclick=()=>{$("#complete").checked=false;$("#save").click();};
 $("#discard").onclick=()=>action(async()=>{renderDetail(await api(query(state.campaign.campaign.campaign_id,state.detail.item_id)));message("Unsaved edits discarded.");});
 $("#omit").onclick=()=>action(async()=>{
   const selection=window.getSelection(),pre=$("#source");
