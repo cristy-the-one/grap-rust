@@ -1815,6 +1815,8 @@ class GrapApplication:
         denied = self._require("operator")
         if denied:
             return denied
+        if not (Path(path) / "graph_store.db").is_file():
+            return {"status": "error", "message": "No extraction store at this path"}
         try:
             from .kee.working_graph import WorkingGraph
             wg = WorkingGraph.open(path, self.get_embedder())
@@ -1901,6 +1903,8 @@ class GrapApplication:
         denied = self._require("operator")
         if denied:
             return denied
+        if not (Path(path) / "graph_store.db").is_file():
+            return {"status": "error", "message": "No extraction store at this path"}
         try:
             from .kee.working_graph import WorkingGraph
             from .kee.pipeline import to_yaml

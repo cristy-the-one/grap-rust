@@ -30,7 +30,7 @@ def answer(system, user):
         row = dict(id=item["id"], status="entity", label="Act normativ", definition="Un act normativ.",
                    reverse=False, modality="uncertain", scope_quote="", reason="Source")
         if "proposal" in item:
-            row = {**item["proposal"], "status": "verified"}
+            row = {"id": item["id"], "status": "verified", "reason": "Checked source"}
         elif "type" in item:
             row.update(status="supported", label="adoptă", definition="Autorul adoptă actul.",
                        reverse=True, modality="asserted")
@@ -200,3 +200,14 @@ def test_malformed_batch_recovery_is_cached(tmp_path):
     resumed = distill_ontology(corpus(), provider, cache_dir=tmp_path, max_calls=0)
     assert resumed["status"] == "complete" and resumed["calls"] == 0
     assert resumed["patterns"] == report["patterns"]
+
+
+def test_reading_missing_extraction_graph_never_creates_a_dummy_graph(tmp_path):
+    from grap_mcp.application import GrapApplication
+    def forbidden():
+        raise AssertionError("A read of a missing store must not load embeddings")
+    app = GrapApplication(tmp_path / "ws", role="operator", embedder_factory=forbidden)
+    missing = tmp_path / "missing-graph"
+    assert app.export_ontology(str(missing))["status"] == "error"
+    assert app.open_extraction_graph(str(missing))["status"] == "error"
+    assert not missing.exists()
