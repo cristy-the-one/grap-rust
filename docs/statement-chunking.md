@@ -1,5 +1,9 @@
 # Preserve legal statements before extraction
 
+The subsequent [live accuracy evaluation](chunking-accuracy-evaluation.md) did
+not establish a semantic-accuracy improvement. Keep this mode opt-in: intact
+input still suffers from model omissions, lost qualifications and parser losses.
+
 KEE now offers opt-in `statements` chunking. It prefers recognized sentence,
 paragraph and article boundaries instead of cutting at the last space before a
 fixed limit. An individual unit may exceed the soft target, up to a hard limit of

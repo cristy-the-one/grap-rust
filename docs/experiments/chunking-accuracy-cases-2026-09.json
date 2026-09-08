@@ -1,0 +1,292 @@
+{
+  "scope": "Purposive seven-case diagnostic, not representative corpus accuracy; existing assistant-authored references, not expert legal labels.",
+  "selection": "Six existing reference cases spanning obligations, exceptions, prohibitions and institutional facts, plus the known Article 59 truncation. All full-document chunks intersecting the reference span; no synthetic chunk phase or text edits.",
+  "rubric": "Per target/arm: faithful only when emitted propositions preserve the governed subject, operative meaning and all material qualifications; partial when some target content survives but qualifications/meaning are lost; absent when not recovered. Record target-related unsupported claims separately. Exact quotes alone do not establish semantic correctness. Review normalized fragments across all intersecting chunks; no credit for content present only in quotes. No assertion of current legal validity.",
+  "target_chars": 800,
+  "cases": [
+    {
+      "id": "semantic-01",
+      "split": "dev",
+      "source_file": "real-data-law-ro/19961.json",
+      "source_sha256": "5003b0236b87a2d8d92fde50f04dce6db0528e800cf7e37c8d49c2fcbe3641a7",
+      "start": 1296,
+      "end": 1681,
+      "text": "Executorii bancari, precum şi oricare alt personal angajat în compartimentul acestora au obligaţia sa păstreze secretul profesional, inclusiv secretul bancar, cu privire la actele, datele şi faptele despre care au luat cunoştinţa în cadrul activităţii lor, chiar şi după încetarea funcţiei, cu excepţia cazurilor în care legea sau părţile interesate îi eliberează de aceasta obligaţie.",
+      "expected_kind": "obligation",
+      "accepted_subjects": [
+        "Executorii bancari, precum şi oricare alt personal angajat în compartimentul acestora"
+      ],
+      "required_text": [
+        "chiar şi după încetarea funcţiei",
+        "cu excepţia cazurilor"
+      ],
+      "arms": {
+        "legacy": [
+          {
+            "id": "19961#1",
+            "start": 794,
+            "end": 1589,
+            "text": "obligaţiilor stabilite prin titlurile executorii ce aparţin băncilor. În tot cursul executării executorii bancari au îndatorirea să îşi exercite atribuţiile şi să efectueze orice act necesar pentru îndeplinirea executării cu respectarea stricta a dispoziţiilor Codului de procedura civilă şi a celorlalte reglementări aplicabile în materie. Actul îndeplinit de executorul bancar, purtând ştampila şi semnatura acestuia, este de autoritate publică şi are forta probanta prevăzută de lege. + Articolul 3 Executorii bancari, precum şi oricare alt personal angajat în compartimentul acestora au obligaţia sa păstreze secretul profesional, inclusiv secretul bancar, cu privire la actele, datele şi faptele despre care au luat cunoştinţa în cadrul activităţii lor, chiar şi după încetarea funcţiei, cu",
+            "tabular_skipped": false
+          },
+          {
+            "id": "19961#2",
+            "start": 1590,
+            "end": 2383,
+            "text": "excepţia cazurilor în care legea sau părţile interesate îi eliberează de aceasta obligaţie. + Articolul 4 Atunci când este cazul, pe baza datelor prezentate de executorul bancar, conducerea băncii creditoare se poate adresa instanţei de executare, solicitandu-i să obţină, potrivit legii, informaţiile necesare pentru efectuarea executării silite de la cei care datorează sume de bani debitorului urmărit sau care deţin alte bunuri ale acestora, supuse urmăririi, inclusiv de la bănci ori de la alte instituţii la care debitorii urmăriţi sunt titulari de conturi. Dispoziţiile alin. 1 se aplică în mod corespunzător şi în cazul în care, pentru îndeplinirea efectivă a executării silite, executorul bancar considera necesar concursul organelor de poliţie, al jandarmeriei sau al altor agenţi ai",
+            "tabular_skipped": false
+          }
+        ],
+        "statements": [
+          {
+            "id": "19961#2",
+            "start": 1284,
+            "end": 1683,
+            "text": "Articolul 3 Executorii bancari, precum şi oricare alt personal angajat în compartimentul acestora au obligaţia sa păstreze secretul profesional, inclusiv secretul bancar, cu privire la actele, datele şi faptele despre care au luat cunoştinţa în cadrul activităţii lor, chiar şi după încetarea funcţiei, cu excepţia cazurilor în care legea sau părţile interesate îi eliberează de aceasta obligaţie. +",
+            "tabular_skipped": false
+          }
+        ]
+      }
+    },
+    {
+      "id": "semantic-06",
+      "split": "dev",
+      "source_file": "real-data-law-ro/16861.json",
+      "source_sha256": "c6618622c61e822306f1752da49c8aa4131100aba493c1e3854bf63830364b94",
+      "start": 319,
+      "end": 542,
+      "text": "Direcţia generală de prognoza se organizează şi funcţionează ca organ de specialitate cu personalitate juridică în subordinea Ministerului Finanţelor, prin reorganizarea Comisiei Naţionale de Prognoza, care se desfiinţează.",
+      "expected_kind": "fact",
+      "accepted_subjects": [
+        "Direcţia generală de prognoza"
+      ],
+      "required_text": [
+        "în subordinea Ministerului Finanţelor"
+      ],
+      "arms": {
+        "legacy": [
+          {
+            "id": "16861#0",
+            "start": 0,
+            "end": 799,
+            "text": "HOTĂRÂRE nr. 55 din 29 ianuarie 1999 privind organizarea şi funcţionarea Direcţiei generale de prognoza în subordinea Ministerului Finanţelor EMITENT GUVERNUL Publicat în MONITORUL OFICIAL nr. 48 din 30 ianuarie 1999 În temeiul prevederilor art. 115 din Constituţia României, Guvernul României hotărăşte: + Articolul 1 Direcţia generală de prognoza se organizează şi funcţionează ca organ de specialitate cu personalitate juridică în subordinea Ministerului Finanţelor, prin reorganizarea Comisiei Naţionale de Prognoza, care se desfiinţează. Direcţia generală de prognoza fundamentează şi elaborează studii şi prognoze pe termen scurt, mediu şi lung, privind evoluţia economiei româneşti în ansamblu şi a sectoarelor acesteia, necesare fundamentarii strategiei programului de guvernare. + Articolul",
+            "tabular_skipped": false
+          }
+        ],
+        "statements": [
+          {
+            "id": "16861#0",
+            "start": 0,
+            "end": 789,
+            "text": "HOTĂRÂRE nr. 55 din 29 ianuarie 1999 privind organizarea şi funcţionarea Direcţiei generale de prognoza în subordinea Ministerului Finanţelor EMITENT GUVERNUL Publicat în MONITORUL OFICIAL nr. 48 din 30 ianuarie 1999 În temeiul prevederilor art. 115 din Constituţia României, Guvernul României hotărăşte: + Articolul 1 Direcţia generală de prognoza se organizează şi funcţionează ca organ de specialitate cu personalitate juridică în subordinea Ministerului Finanţelor, prin reorganizarea Comisiei Naţionale de Prognoza, care se desfiinţează. Direcţia generală de prognoza fundamentează şi elaborează studii şi prognoze pe termen scurt, mediu şi lung, privind evoluţia economiei româneşti în ansamblu şi a sectoarelor acesteia, necesare fundamentarii strategiei programului de guvernare. +",
+            "tabular_skipped": false
+          }
+        ]
+      }
+    },
+    {
+      "id": "semantic-09",
+      "split": "dev",
+      "source_file": "real-data-law-ro/18860.json",
+      "source_sha256": "94ef63574a2a2d92f5d24cd26a0ebea33f518716d8174a15c60cceae3d512e58",
+      "start": 9854,
+      "end": 10097,
+      "text": "Membrii Consiliului de administraţie al A.N.L., cu excepţia directorului general al A.N.L., nu sunt salariaţi ai A.N.L. şi beneficiază de o indemnizaţie lunară în cuantum de 20% din salariul de baza brut lunar al directorului general al A.N.L.",
+      "expected_kind": "right",
+      "accepted_subjects": [
+        "Membrii Consiliului de administraţie al A.N.L.",
+        "Membrii Consiliului de administraţie al A.N.L., cu excepţia directorului general al A.N.L."
+      ],
+      "required_text": [
+        "cu excepţia directorului general",
+        "20%",
+        "lunară"
+      ],
+      "arms": {
+        "legacy": [
+          {
+            "id": "18860#12",
+            "start": 9567,
+            "end": 10362,
+            "text": "Consiliului de administraţie al A.N.L. este de 4 ani. ... (2) În cazul vacantarii locurilor din Consiliul de administraţie al A.N.L. ca urmare a demisiei, revocării sau decesului vor fi numiţi noi membri până la încheierea mandatului iniţial, în termen de 30 de zile. ... + Articolul 18 Membrii Consiliului de administraţie al A.N.L., cu excepţia directorului general al A.N.L., nu sunt salariaţi ai A.N.L. şi beneficiază de o indemnizaţie lunară în cuantum de 20% din salariul de baza brut lunar al directorului general al A.N.L. + Articolul 19 Consiliul de administraţie al A.N.L. are atribuţiile prevăzute de lege şi aplica hotărârile Consiliului naţional de coordonare al A.N.L. + Articolul 20 Nu pot fi desemnaţi membri ai Consiliului de administraţie al A.N.L. sau vor fi revocaţi de drept",
+            "tabular_skipped": false
+          }
+        ],
+        "statements": [
+          {
+            "id": "18860#13",
+            "start": 9841,
+            "end": 10590,
+            "text": "Articolul 18 Membrii Consiliului de administraţie al A.N.L., cu excepţia directorului general al A.N.L., nu sunt salariaţi ai A.N.L. şi beneficiază de o indemnizaţie lunară în cuantum de 20% din salariul de baza brut lunar al directorului general al A.N.L. + Articolul 19 Consiliul de administraţie al A.N.L. are atribuţiile prevăzute de lege şi aplica hotărârile Consiliului naţional de coordonare al A.N.L. + Articolul 20 Nu pot fi desemnaţi membri ai Consiliului de administraţie al A.N.L. sau vor fi revocaţi de drept acei membri care se găsesc în una dintre următoarele situaţii: a) au antecedente penale; ... b) au interdicţii, stabilite potrivit legii, de a conduce, controla, gestiona sau administra o societate sau instituţie publică. ... +",
+            "tabular_skipped": false
+          }
+        ]
+      }
+    },
+    {
+      "id": "semantic-10",
+      "split": "dev",
+      "source_file": "real-data-law-ro/83906.json",
+      "source_sha256": "052418cca9bcc37927e5970051282109c193b628a7827536091838e662ccbe8c",
+      "start": 251,
+      "end": 494,
+      "text": "Pentru asigurarea efectuării transportului feroviar în condiţii de siguranţă a circulaţiei, vehiculele feroviare de orice tip aparţinând agentilor economici trebuie să indeplineasca condiţiile prevăzute în normele tehnice specifice în vigoare.",
+      "expected_kind": "obligation",
+      "accepted_subjects": [
+        "vehiculele feroviare de orice tip aparţinând agentilor economici"
+      ],
+      "required_text": [
+        "în condiţii de siguranţă a circulaţiei"
+      ],
+      "arms": {
+        "legacy": [
+          {
+            "id": "83906#0",
+            "start": 0,
+            "end": 799,
+            "text": "NORME din 28 iunie 1999 privind verificarea tehnica a vehiculelor feroviare aparţinând agentilor economici EMITENT MINISTERUL TRANSPORTURILOR Publicat în MONITORUL OFICIAL nr. 396 din 19 august 1999 + Capitolul 1 Dispozitii generale + Articolul 1 (1) Pentru asigurarea efectuării transportului feroviar în condiţii de siguranţă a circulaţiei, vehiculele feroviare de orice tip aparţinând agentilor economici trebuie să indeplineasca condiţiile prevăzute în normele tehnice specifice în vigoare. ... (2) Prezentele norme nu se aplică operatorilor de transport feroviar şi gestionarului infrastructurii feroviare publice. ... + Articolul 2 (1) Vehiculele feroviare pot circula sau efectua operaţiuni de manevra pe liniile de cale ferata publice sau private numai dacă sunt verificate şi autorizate din",
+            "tabular_skipped": false
+          }
+        ],
+        "statements": [
+          {
+            "id": "83906#0",
+            "start": 0,
+            "end": 625,
+            "text": "NORME din 28 iunie 1999 privind verificarea tehnica a vehiculelor feroviare aparţinând agentilor economici EMITENT MINISTERUL TRANSPORTURILOR Publicat în MONITORUL OFICIAL nr. 396 din 19 august 1999 + Capitolul 1 Dispozitii generale + Articolul 1 (1) Pentru asigurarea efectuării transportului feroviar în condiţii de siguranţă a circulaţiei, vehiculele feroviare de orice tip aparţinând agentilor economici trebuie să indeplineasca condiţiile prevăzute în normele tehnice specifice în vigoare. ... (2) Prezentele norme nu se aplică operatorilor de transport feroviar şi gestionarului infrastructurii feroviare publice. ... +",
+            "tabular_skipped": false
+          }
+        ]
+      }
+    },
+    {
+      "id": "semantic-13",
+      "split": "holdout",
+      "source_file": "real-data-law-ro/17438.json",
+      "source_sha256": "8b1ed71c4608562935c1eb27eb4413d65b31e036a79159821431750d101cc92c",
+      "start": 6323,
+      "end": 6574,
+      "text": "Este interzisă înstrăinarea tractoarelor, combinelor, maşinilor şi utilajelor agricole, precum şi a instalaţiilor pentru irigat, achiziţionate în condiţiile ordonanţei şi ale prezentelor norme metodologice, înainte de achitarea integrală a creditului.",
+      "expected_kind": "prohibition",
+      "accepted_subjects": [
+        "înstrăinarea tractoarelor, combinelor, maşinilor şi utilajelor agricole, precum şi a instalaţiilor pentru irigat, achiziţionate în condiţiile ordonanţei şi ale prezentelor norme metodologice"
+      ],
+      "required_text": [
+        "înainte de achitarea integrală a creditului"
+      ],
+      "arms": {
+        "legacy": [
+          {
+            "id": "17438#7",
+            "start": 5571,
+            "end": 6364,
+            "text": "creditelor se stabileşte la minimum doua rate anuale, nefiind permisă modificarea graficului iniţial de rambursare decât în situaţiile prevăzute în normele proprii de creditare ale băncilor comerciale. Data plăţii primei rate se va stabili la expirarea anului de graţie, iar următoarele, la un interval de cel mult 6 luni între ele; ... c) în cazul în care beneficiarul de credite nu îşi achită rata la credit conform graficului de rambursare, acesta nu beneficiază de subvenţionarea dobânzii aferente soldului la data rambursarii ratei respective. ... + Articolul 8 În cazul asociaţiilor familiale, contractele de împrumut şi contractele de garanţie vor fi semnate de fiecare membru al acestora, titular al dreptului de proprietate. + Articolul 9 (1) Este interzisă înstrăinarea tractoarelor,",
+            "tabular_skipped": false
+          },
+          {
+            "id": "17438#8",
+            "start": 6365,
+            "end": 7156,
+            "text": "combinelor, maşinilor şi utilajelor agricole, precum şi a instalaţiilor pentru irigat, achiziţionate în condiţiile ordonanţei şi ale prezentelor norme metodologice, înainte de achitarea integrală a creditului. ... (2) În cazul înstrăinării sunt aplicabile sancţiunile civile prevăzute la art. 6 din ordonanţa. ... + Articolul 10 (1) Subvenţia se acordă la dobânzile calculate şi datorate de beneficiarul de credite numai la soldul creditului curent, calculat lunar. ... (2) Beneficiarul de credite primeşte de la bugetul de stat, prin banca comercială creditoare, subvenţia de 70% din dobânda calculată la creditul curent, după plata cotei de 30% din dobânda. ... (3) În cazul în care beneficiarul de credite nu îşi plăteşte cota de 30% care îi revine conform graficului de rambursare, el nu",
+            "tabular_skipped": false
+          }
+        ],
+        "statements": [
+          {
+            "id": "17438#8",
+            "start": 6307,
+            "end": 7028,
+            "text": "Articolul 9 (1) Este interzisă înstrăinarea tractoarelor, combinelor, maşinilor şi utilajelor agricole, precum şi a instalaţiilor pentru irigat, achiziţionate în condiţiile ordonanţei şi ale prezentelor norme metodologice, înainte de achitarea integrală a creditului. ... (2) În cazul înstrăinării sunt aplicabile sancţiunile civile prevăzute la art. 6 din ordonanţa. ... + Articolul 10 (1) Subvenţia se acordă la dobânzile calculate şi datorate de beneficiarul de credite numai la soldul creditului curent, calculat lunar. ... (2) Beneficiarul de credite primeşte de la bugetul de stat, prin banca comercială creditoare, subvenţia de 70% din dobânda calculată la creditul curent, după plata cotei de 30% din dobânda. ...",
+            "tabular_skipped": false
+          }
+        ]
+      }
+    },
+    {
+      "id": "semantic-15",
+      "split": "holdout",
+      "source_file": "real-data-law-ro/17357.json",
+      "source_sha256": "a6e596bf4dc12fa83ce0b144ad977f97975a3c062587178aa4fe4b005fa139a8",
+      "start": 21456,
+      "end": 21601,
+      "text": "Se interzice conectarea la reţelele furnizorului a instalaţiei de utilizare a unui consumator, dacă nu este prevăzută cu echipamente de măsurare.",
+      "expected_kind": "prohibition",
+      "accepted_subjects": [
+        "conectarea la reţelele furnizorului a instalaţiei de utilizare a unui consumator"
+      ],
+      "required_text": [
+        "dacă nu este prevăzută cu echipamente de măsurare"
+      ],
+      "arms": {
+        "legacy": [
+          {
+            "id": "17357#26",
+            "start": 20660,
+            "end": 21458,
+            "text": "initiativa furnizorului sau la cererea consumatorului, se constata arderi de sigurante pe reductoare, defectarea cablurilor de măsura sau alte defecte ori abateri ale indicaţiilor contoarelor sau reductoarelor de măsura, în afară tolerantelor metrologice, furnizorul va proceda la recalcularea facturilor, corespunzător duratei de neinregistrare corecta a echipamentului existent de măsurare a consumului de putere şi energie electrică. În situaţia în care durata respectiva nu poate fi stabilită, recalcularea facturilor se face pentru perioada anterioară începând cu prima luna care urmează ultimei verificări metrologice, fără a se putea depăşi 36 de luni. Recalcularea consumului de energie se va face în conformitate cu prevederile anexei nr. 4 bis la prezentul contract. ... + Articolul 14 Se",
+            "tabular_skipped": false
+          },
+          {
+            "id": "17357#27",
+            "start": 21459,
+            "end": 22252,
+            "text": "interzice conectarea la reţelele furnizorului a instalaţiei de utilizare a unui consumator, dacă nu este prevăzută cu echipamente de măsurare. Tarife pentru energia electrică. Modalităţi şi condiţii de plată + Articolul 15 (1) În condiţiile actualelor tarife, tipul de tarif se negociază, cu respectarea prevederilor legale. ... (2) La intrarea în vigoare a unui nou sistem de tarifare, aprobat de către autoritatea competentă, tariful este ales liber de către consumator, cu respectarea prevederilor legale. ... + Articolul 16 (1) Corespunzător tipului de tarif stabilit, consumatorul va achită până la data de 6 a lunii factura emisă de furnizor la data de întâi a perioadei de facturare, astfel: ... a) pentru consumatorul la care se aplica tariful binom, contravaloarea taxei de putere, la",
+            "tabular_skipped": false
+          }
+        ],
+        "statements": [
+          {
+            "id": "17357#30",
+            "start": 21320,
+            "end": 21973,
+            "text": "Recalcularea consumului de energie se va face în conformitate cu prevederile anexei nr. 4 bis la prezentul contract. ... + Articolul 14 Se interzice conectarea la reţelele furnizorului a instalaţiei de utilizare a unui consumator, dacă nu este prevăzută cu echipamente de măsurare. Tarife pentru energia electrică. Modalităţi şi condiţii de plată + Articolul 15 (1) În condiţiile actualelor tarife, tipul de tarif se negociază, cu respectarea prevederilor legale. ... (2) La intrarea în vigoare a unui nou sistem de tarifare, aprobat de către autoritatea competentă, tariful este ales liber de către consumator, cu respectarea prevederilor legale. ... +",
+            "tabular_skipped": false
+          }
+        ]
+      }
+    },
+    {
+      "id": "article-59",
+      "source_file": "real-data-law-ro/17101.json",
+      "source_sha256": "3309f2986cb5bb18828e6d3ad67444a088b9f344dc171b47ae41c2bea7551e95",
+      "start": 26986,
+      "end": 27071,
+      "text": "Comisia centrala de arbitraj se numeşte şi îşi desfăşoară activitatea potrivit legii.",
+      "expected_kind": "fact",
+      "accepted_subjects": [
+        "Comisia centrala de arbitraj"
+      ],
+      "required_text": [
+        "potrivit legii"
+      ],
+      "forbidden_interpretation": "Commission appoints itself or carries itself out",
+      "arms": {
+        "legacy": [
+          {
+            "id": "17101#33",
+            "start": 26245,
+            "end": 27043,
+            "text": "Conducerea operativă a C.A.S.A.O.P.S.N.A.J. se exercită de către un director general, ajutat de 2 directori generali adjuncţi (unul medical şi unul economic). + Articolul 56 Consiliul de administraţie poate numi, cu delegaţie, un director general până la ocuparea postului conform legii. + Articolul 57 Conducerea operativă propune consiliului de administraţie şefii structurilor organizatorice din organigrama C.A.S.A.O.P.S.N.A.J. + Articolul 58 Directorul general decide cu privire la încheierea şi la încetarea raporturilor de muncă cu salariaţii şi cu colaboratorii angajaţi pe bază de convenţie civilă, după consultarea prealabilă a conducerii operative a C.A.S.A.O.P.S.N.A.J. + Capitolul 13 Comisia centrala de arbitraj + Articolul 59 Comisia centrala de arbitraj se numeşte şi îşi desfăşoară",
+            "tabular_skipped": false
+          },
+          {
+            "id": "17101#34",
+            "start": 27044,
+            "end": 27843,
+            "text": "activitatea potrivit legii. + Articolul 60 Arbitrii pot fi medici, economişti sau jurişti, acreditaţi şi înregistraţi de Ministerul Justiţiei. + Articolul 61 Sediul Comisiei centrale de arbitraj este la sediul C.A.S.A.O.P.S.N.A.J. + Capitolul 14 Modalităţi de publicitate + Articolul 62 Prezentul statut al C.A.S.A.O.P.S.N.A.J., aprobat în conformitate cu prevederile art. 93 alin. (2) din Legea nr. 145/1997 , cu modificările ulterioare, în şedinţa din data de 19 februarie 1999 a consiliului de administraţie, compus din: - preşedinte: dr. Petru Chertic - vicepreşedinte: dr. Dan Mihai Marius - vicepreşedinte: economist Ioan Clim - membri: * dr. Calin Marius Teoibas Şerban * dr. Şerban Rădulescu * dr. Dorel Hotoboc * dr. Dorel Enache * dr. Cristian Livezeanu * dr. Dan Carp * dr. Valentin Vaşcu",
+            "tabular_skipped": false
+          }
+        ],
+        "statements": [
+          {
+            "id": "17101#37",
+            "start": 26973,
+            "end": 27317,
+            "text": "Articolul 59 Comisia centrala de arbitraj se numeşte şi îşi desfăşoară activitatea potrivit legii. + Articolul 60 Arbitrii pot fi medici, economişti sau jurişti, acreditaţi şi înregistraţi de Ministerul Justiţiei. + Articolul 61 Sediul Comisiei centrale de arbitraj este la sediul C.A.S.A.O.P.S.N.A.J. + Capitolul 14 Modalităţi de publicitate +",
+            "tabular_skipped": false
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,479 @@
+{
+  "fixture_sha256": "8e8ea09a2954ca3aa878c84cf5afc8782c7e8f273e75aed3db2ff67bab3a7565",
+  "results_sha256": "92711276abf342a0ac65ea61431c9d036d8452c11c40c9381e7149debb9fae34",
+  "judgments_sha256": "8789fdbb0d220f2f4835f41b1e0d28dd26cf7ded1cc07460d1f5242dc3319bac",
+  "scope": "Semantic verdicts concern normalized fragments, not full graph-augmented KEE. Rust replay is a separate mechanical retention check with fuzzy merging disabled; no embedding model loaded.",
+  "summary": {
+    "legacy": {
+      "requests": 11,
+      "fragments": 11,
+      "failures": 0,
+      "table_skips": 0,
+      "normalized_claims": 131,
+      "quoted_claims": 131,
+      "rejected_evidence": 2,
+      "structural_outcomes_dropped": 11,
+      "relations_before_rust": 42,
+      "seconds_including_cold_start_and_cache_effects": 72.335,
+      "completion_tokens": 8662,
+      "target_verdicts": {
+        "partial": 3,
+        "absent": 2,
+        "faithful": 2
+      },
+      "relations_after_rust": 40
+    },
+    "statements": {
+      "requests": 7,
+      "fragments": 7,
+      "failures": 0,
+      "table_skips": 0,
+      "normalized_claims": 61,
+      "quoted_claims": 61,
+      "rejected_evidence": 5,
+      "structural_outcomes_dropped": 8,
+      "relations_before_rust": 23,
+      "seconds_including_cold_start_and_cache_effects": 42.125,
+      "completion_tokens": 5652,
+      "target_verdicts": {
+        "partial": 4,
+        "absent": 3
+      },
+      "relations_after_rust": 22
+    }
+  },
+  "rust_replay": [
+    {
+      "case": "semantic-01",
+      "arm": "legacy",
+      "relations": [
+        {
+          "from": "executorii bancari",
+          "type": "au îndatorirea să",
+          "to": "îşi exercite atribuţiile şi să efectueze orice act necesar pentru îndeplinirea executării cu respectarea stricta a dispoziţiilor Codului de procedura civilă şi a celorlalte reglementări aplicabile în materie"
+        },
+        {
+          "from": "Actul îndeplinit de executorul bancar",
+          "type": "este",
+          "to": "de autoritate publică şi are forta probanta prevăzută de lege"
+        },
+        {
+          "from": "executorii bancari",
+          "type": "au obligaţia sa păstreze",
+          "to": "secretul profesional, inclusiv secretul bancar, cu privire la actele, datele şi faptele despre care au luat cunoştinţa în cadrul activităţii lor, chiar şi după încetarea funcţiei"
+        },
+        {
+          "from": "conducerea băncii creditoare",
+          "type": "se poate adresa",
+          "to": "instanţei de executare"
+        },
+        {
+          "from": "conducerea băncii creditoare",
+          "type": "solicitandu-i să obţină",
+          "to": "informaţiile necesare pentru efectuarea executării silite"
+        },
+        {
+          "from": "informaţiile necesare pentru efectuarea executării silite",
+          "type": "sunt pentru",
+          "to": "efectuarea executării silite"
+        },
+        {
+          "from": "Dispoziţiile alin. 1",
+          "type": "se aplică în mod corespunzător şi în cazul în care",
+          "to": "executorul bancar considera necesar concursul organelor de poliţie, al jandarmeriei sau al altor agenţi"
+        }
+      ],
+      "parked": []
+    },
+    {
+      "case": "semantic-06",
+      "arm": "legacy",
+      "relations": [
+        {
+          "from": "HOTĂRÂRE nr. 55 din 29 ianuarie 1999 privind organizarea şi funcţionarea Direcţiei generale de prognoza",
+          "type": "publicat în",
+          "to": "MONITORUL OFICIAL nr. 48 din 30 ianuarie 1999"
+        },
+        {
+          "from": "Direcţia generală de prognoza",
+          "type": "se organizează şi funcţionează ca",
+          "to": "organ de specialitate cu personalitate juridică în subordinea Ministerului Finanţelor"
+        },
+        {
+          "from": "Direcţia generală de prognoza",
+          "type": "fundamentează şi elaborează",
+          "to": "studii şi prognoze pe termen scurt, mediu şi lung, privind evoluţia economiei româneşti în ansamblu şi a sectoarelor acesteia, necesare fundamentarii strategiei programului de guvernare"
+        },
+        {
+          "from": "Comisia Naţională de Prognoza",
+          "type": "se desfiinţează prin",
+          "to": "reorganizarea Comisiei Naţionale de Prognoza"
+        }
+      ],
+      "parked": []
+    },
+    {
+      "case": "semantic-09",
+      "arm": "legacy",
+      "relations": [
+        {
+          "from": "Consiliului de administraţie al A.N.L.",
+          "type": "has duration",
+          "to": "4 ani"
+        },
+        {
+          "from": "noi membri",
+          "type": "will be appointed to",
+          "to": "Consiliului de administraţie al A.N.L."
+        },
+        {
+          "from": "Consiliul de administraţie al A.N.L.",
+          "type": "has attributes",
+          "to": "atribuţiile prevăzute de lege"
+        },
+        {
+          "from": "Consiliul de administraţie al A.N.L.",
+          "type": "applies",
+          "to": "hotărârile Consiliului naţional de coordonare al A.N.L."
+        }
+      ],
+      "parked": []
+    },
+    {
+      "case": "semantic-10",
+      "arm": "legacy",
+      "relations": [
+        {
+          "from": "vehiculele feroviare de orice tip aparţinând agentilor economici",
+          "type": "must comply with",
+          "to": "normele tehnice specifice în vigoare"
+        },
+        {
+          "from": "Prezentele norme",
+          "type": "do not apply to",
+          "to": "operatorilor de transport feroviar"
+        }
+      ],
+      "parked": [
+        {
+          "from": "vehiculele feroviare",
+          "type": "can circulate or perform operations on",
+          "to": "liniile de cale ferata publice sau private",
+          "source": "83906#0",
+          "reason": "ungrounded"
+        }
+      ]
+    },
+    {
+      "case": "semantic-13",
+      "arm": "legacy",
+      "relations": [
+        {
+          "from": "creditelor",
+          "type": "se stabileşte la",
+          "to": "minimum doua rate anuale"
+        },
+        {
+          "from": "modificarea graficului iniţial de rambursare",
+          "type": "este permisă doar în",
+          "to": "situaţiile prevăzute în normele proprii de creditare ale băncilor comerciale"
+        },
+        {
+          "from": "Data plăţii primei rate",
+          "type": "se va stabili la",
+          "to": "expirarea anului de graţie"
+        },
+        {
+          "from": "următoarele",
+          "type": "se vor plăti la",
+          "to": "un interval de cel mult 6 luni între ele"
+        },
+        {
+          "from": "beneficiarul de credite",
+          "type": "nu beneficiază de subvenţionarea dobânzii aferente soldului",
+          "to": "data rambursarii ratei respective"
+        },
+        {
+          "from": "contractele de împrumut şi contractele de garanţie",
+          "type": "vor fi semnate de",
+          "to": "fiecare membru al acestora, titular al dreptului de proprietate"
+        },
+        {
+          "from": "Articolul 9 (1)",
+          "type": "interzice",
+          "to": "înstrăinarea tractoarelor"
+        },
+        {
+          "from": "combinelor, maşinilor şi utilajelor agricole, precum şi a instalaţiilor pentru irigat",
+          "type": "achiziţionate în condiţiile",
+          "to": "ordonanţa"
+        },
+        {
+          "from": "beneficiarul de credite",
+          "type": "primeşte de la",
+          "to": "bugetul de stat"
+        }
+      ],
+      "parked": []
+    },
+    {
+      "case": "semantic-15",
+      "arm": "legacy",
+      "relations": [
+        {
+          "from": "furnizorul",
+          "type": "va proceda la",
+          "to": "recalcularea facturilor"
+        },
+        {
+          "from": "recalcularea facturilor",
+          "type": "se face pentru",
+          "to": "perioada anterioară începând cu prima luna care urmează ultimei verificări metrologice, fără a se putea depăşi 36 de luni"
+        },
+        {
+          "from": "interzice conectarea la reţelele furnizorului a instalaţiei de utilizare a unui consumator",
+          "type": "if not equipped with",
+          "to": "echipamente de măsurare"
+        },
+        {
+          "from": "tipul de tarif",
+          "type": "is negotiated",
+          "to": "prevederilor legale"
+        },
+        {
+          "from": "tariful",
+          "type": "is chosen freely by",
+          "to": "consumator"
+        },
+        {
+          "from": "consumatorul",
+          "type": "shall pay",
+          "to": "factura emisă de furnizor la data de întâi a perioadei de facturare"
+        }
+      ],
+      "parked": [
+        {
+          "from": "recalcularea consumului de energie",
+          "type": "se va face în conformitate cu",
+          "to": "prevederile anexei nr. 4 bis la prezentul contract",
+          "source": "17357#26",
+          "reason": "ungrounded"
+        }
+      ]
+    },
+    {
+      "case": "article-59",
+      "arm": "legacy",
+      "relations": [
+        {
+          "from": "Conducerea operativă a C.A.S.A.O.P.S.N.A.J.",
+          "type": "se exercită de",
+          "to": "director general"
+        },
+        {
+          "from": "director general",
+          "type": "este ajutat de",
+          "to": "directori generali adjuncţi"
+        },
+        {
+          "from": "Consiliul de administraţie",
+          "type": "poate numi",
+          "to": "director general"
+        },
+        {
+          "from": "Conducerea operativă",
+          "type": "propune",
+          "to": "consiliului de administraţie"
+        },
+        {
+          "from": "Directorul general",
+          "type": "decide cu privire la",
+          "to": "încheierea şi la încetarea raporturilor de muncă cu salariaţii şi cu colaboratorii angajaţi pe bază de convenţie civilă"
+        },
+        {
+          "from": "Directorul general",
+          "type": "consultă prealabil",
+          "to": "conducerii operative a C.A.S.A.O.P.S.N.A.J."
+        },
+        {
+          "from": "Comisiei centrale de arbitraj",
+          "type": "are located at",
+          "to": "sediul C.A.S.A.O.P.S.N.A.J."
+        },
+        {
+          "from": "Prezentul statut al C.A.S.A.O.P.S.N.A.J.",
+          "type": "approved in accordance with",
+          "to": "art. 93 alin. (2) din Legea nr. 145/1997"
+        }
+      ],
+      "parked": []
+    },
+    {
+      "case": "semantic-01",
+      "arm": "statements",
+      "relations": [
+        {
+          "from": "Executorii bancari",
+          "type": "au obligaţia sa păstreze",
+          "to": "secretul profesional"
+        },
+        {
+          "from": "Executorii bancari",
+          "type": "au obligaţia sa păstreze",
+          "to": "secretul bancar"
+        },
+        {
+          "from": "Executorii bancari",
+          "type": "au obligaţia sa păstreze",
+          "to": "actele, datele şi faptele despre care au luat cunoştinţa în cadrul activităţii lor"
+        },
+        {
+          "from": "legea",
+          "type": "eliberează de obligaţie",
+          "to": "Executorii bancari"
+        },
+        {
+          "from": "părţile interesate",
+          "type": "eliberează de obligaţie",
+          "to": "Executorii bancari"
+        }
+      ],
+      "parked": []
+    },
+    {
+      "case": "semantic-06",
+      "arm": "statements",
+      "relations": [
+        {
+          "from": "HOTĂRÂRE nr. 55 din 29 ianuarie 1999 privind organizarea şi funcţionarea Direcţiei generale de prognoza",
+          "type": "regarding",
+          "to": "organizarea şi funcţionarea Direcţiei generale de prognoza"
+        },
+        {
+          "from": "HOTĂRÂRE nr. 55 din 29 ianuarie 1999 privind organizarea şi funcţionarea Direcţiei generale de prognoza",
+          "type": "published in",
+          "to": "MONITORUL OFICIAL nr. 48 din 30 ianuarie 1999"
+        },
+        {
+          "from": "Guvernul României",
+          "type": "issues",
+          "to": "hotărăşte"
+        },
+        {
+          "from": "Direcţia generală de prognoza",
+          "type": "is organized and functions as",
+          "to": "organ de specialitate cu personalitate juridică în subordinea Ministerului Finanţelor"
+        },
+        {
+          "from": "Direcţia generală de prognoza",
+          "type": "reorganizes",
+          "to": "Comisiei Naţionale de Prognoza"
+        },
+        {
+          "from": "Comisiei Naţionale de Prognoza",
+          "type": "ceases to exist",
+          "to": "se desfiinţează"
+        },
+        {
+          "from": "Direcţia generală de prognoza",
+          "type": "develops",
+          "to": "studii şi prognoze pe termen scurt, mediu şi lung, privind evoluţia economiei româneşti în ansamblu şi a sectoarelor acesteia, necesare fundamentarii strategiei programului de guvernare"
+        }
+      ],
+      "parked": []
+    },
+    {
+      "case": "semantic-09",
+      "arm": "statements",
+      "relations": [
+        {
+          "from": "Membrii Consiliului de administraţie al A.N.L.",
+          "type": "beneficiază de",
+          "to": "indemnizaţie lunară în cuantum de 20% din salariul de baza brut lunar al directorului general al A.N.L."
+        },
+        {
+          "from": "Consiliul de administraţie al A.N.L.",
+          "type": "are atribuţiile prevăzute de",
+          "to": "lege"
+        },
+        {
+          "from": "Consiliul de administraţie al A.N.L.",
+          "type": "aplica",
+          "to": "hotărârile Consiliului naţional de coordonare al A.N.L."
+        }
+      ],
+      "parked": []
+    },
+    {
+      "case": "semantic-10",
+      "arm": "statements",
+      "relations": [
+        {
+          "from": "NORME din 28 iunie 1999 privind verificarea tehnica a vehiculelor feroviare aparţinând agentilor economici",
+          "type": "publicat în",
+          "to": "MONITORUL OFICIAL nr. 396 din 19 august 1999"
+        },
+        {
+          "from": "NORME din 28 iunie 1999 privind verificarea tehnica a vehiculelor feroviare aparţinând agentilor economici",
+          "type": "emit by",
+          "to": "MINISTERUL TRANSPORTURILOR"
+        }
+      ],
+      "parked": []
+    },
+    {
+      "case": "semantic-13",
+      "arm": "statements",
+      "relations": [
+        {
+          "from": "Articolul 9 (1)",
+          "type": "interzice înstrăinarea",
+          "to": "tractoarelor, combinelor, maşinilor şi utilajelor agricole, precum şi a instalaţiilor pentru irigat"
+        },
+        {
+          "from": "Subvenţia",
+          "type": "se acordă la",
+          "to": "dobânzile calculate şi datorate de beneficiarul de credite numai la soldul creditului curent, calculat lunar"
+        }
+      ],
+      "parked": []
+    },
+    {
+      "case": "semantic-15",
+      "arm": "statements",
+      "relations": [
+        {
+          "from": "Recalcularea consumului de energie",
+          "type": "se va face în conformitate cu",
+          "to": "anexei nr. 4 bis la prezentul contract"
+        },
+        {
+          "from": "tipul de tarif",
+          "type": "se negociază",
+          "to": "Articolul 15 (1)"
+        }
+      ],
+      "parked": [
+        {
+          "from": "tariful",
+          "type": "este ales liber de către consumator",
+          "to": "Articolul 15 (2)",
+          "source": "17357#30",
+          "reason": "ungrounded"
+        }
+      ]
+    },
+    {
+      "case": "article-59",
+      "arm": "statements",
+      "relations": [
+        {
+          "from": "Arbitrii",
+          "type": "pot fi",
+          "to": "medici, economişti sau jurişti"
+        }
+      ],
+      "parked": []
+    }
+  ]
+}
