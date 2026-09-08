@@ -167,15 +167,19 @@ impl VectorIndex for BruteForceVectorIndex {
             .map(|(&node, vec)| (node, cosine_similarity(query, vec)))
             .collect();
 
+        // Resolve ties BEFORE selection, otherwise a small top-k contains an
+        // arbitrary subset determined by HashMap iteration (and changes on load).
+        let rank =
+            |a: &(NodeId, f64), b: &(NodeId, f64)| b.1.total_cmp(&a.1).then_with(|| a.0.cmp(&b.0));
         // O(N + k log k) partial sort instead of O(N log N) full sort.
         // `select_nth_unstable_by` places the k-th best element at position k-1
         // and guarantees all elements before it are ≥ it (descending order).
         if scored.len() <= max_results {
-            scored.sort_unstable_by(|a, b| b.1.total_cmp(&a.1));
+            scored.sort_unstable_by(rank);
         } else {
-            scored.select_nth_unstable_by(max_results - 1, |a, b| b.1.total_cmp(&a.1));
+            scored.select_nth_unstable_by(max_results - 1, rank);
             scored.truncate(max_results);
-            scored.sort_unstable_by(|a, b| b.1.total_cmp(&a.1));
+            scored.sort_unstable_by(rank);
         }
 
         scored

@@ -148,3 +148,35 @@ the on-disk adapter's reverse-map rebuild.
    layers. Use mutation correctness as a prerequisite to throughput comparisons.
 4. Apply corresponding strongest-path/depth reasoning to sharded traversal,
    which uses its own queue and has not been rewritten in this pass.
+
+## Retrieval stability follow-up (2026-09-08)
+
+Equal scores must not make a legal concept appear or disappear from a small
+result set merely because the same graph was reopened. The exact vector backend
+previously used hash-map iteration to break ties, including during partial
+top-k selection. Sorting only the selected results would not fix the arbitrary
+cutoff. Selection and final ordering now both use descending similarity, then
+ascending node id. The existing O(N + k log k) selection strategy is retained.
+
+Hybrid channel ranking, optional centrality ranking, and final fused ordering
+also break equal-score ties by ascending node id. This is a reproducibility
+rule for the same graph ids, not a claim that lower ids are more legally relevant.
+The experimental HNSW backend still chooses approximate candidates; no identical
+candidate-set guarantee is made for it or for independently rebuilt graphs with
+different ids.
+
+Reciprocal rank fusion now ignores repeated node ids within each channel and
+assigns consecutive ranks to distinct hits. Previously `[A, A, B]` gave A two
+votes and pushed B to rank 3; it now behaves like `[A, B]`. A result appearing in
+different channels still receives the intended consensus benefit. Deduplication
+uses a per-channel set with linear expected work and memory in channel size.
+
+Validation reproduced three Rust failures before the fix and two failures in
+the previously installed Python binding. Regression coverage exercises insertion
+orders, cutoff ties, save/reload, duplicate votes, fused ties, and both RRF and
+linear retrieval through the real binding. The full Rust suites pass: 150 tests
+with no default features and 159 with all features, including doctests. The
+release Python wheel was rebuilt and installed in the project `.venv`; the GUI
+was restarted against it. All 587 Python/API/experiment tests pass with that
+binding (one existing Starlette deprecation warning). Targeted rustfmt and
+`git diff --check` pass. This change adds no model calls or persistence format.

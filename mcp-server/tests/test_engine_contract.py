@@ -53,3 +53,24 @@ def test_relation_traversal_uses_strongest_bounded_path(tmp_path):
     assert graph.search_and_traverse("seed", required_properties=["missing"]) == []
     assert graph.search_and_traverse("seed", max_results=0) == []
     assert graph.traverse_by_relation(2**32 - 1, "relation", "cites") == []
+
+
+@pytest.mark.parametrize("fusion_mode", ["rrf", "linear"])
+def test_tied_retrieval_survives_native_save_and_reload(tmp_path, fusion_mode):
+    """The harness's default exact vector backend must resolve top-k ties early."""
+    path = str(tmp_path / "graph")
+    graph = pygrap.IndexedKnowledgeGraph(path)
+    nodes = [graph.add_node(f"legal concept {i}", embedding=[1.0, 0.0]) for i in range(16)]
+
+    def check(current):
+        assert [node for node, _ in current.vector_search([1.0, 0.0], 4)] == nodes[:4]
+        hits = current.search_and_traverse_hybrid(
+            "", vector=[1.0, 0.0], max_seeds=4, max_depth=0,
+            min_strength=0.0, max_results=4, fusion_mode=fusion_mode,
+        )
+        assert [hit.node for hit in hits] == nodes[:4]
+        return [(hit.node, hit.fused_score, hit.channel_ranks) for hit in hits]
+
+    before = check(graph)
+    graph.save()
+    assert check(pygrap.IndexedKnowledgeGraph(path)) == before

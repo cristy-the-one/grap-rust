@@ -1,7 +1,7 @@
 //! Rank-based fusion and graph-centrality scoring for query ranking.
 use crate::ids::{EdgeId, NodeId};
 use crate::KnowledgeGraph;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 /// One channel's ranked output: an ordered list of node ids, best first.
 #[derive(Debug)]
@@ -36,6 +36,8 @@ pub const DEFAULT_RRF_K: f64 = 60.0;
 /// Each channel contributes `weight / (k + rank)` (1-based rank) to each node
 /// it ranks; scores are summed across channels. Robust to incomparable
 /// per-channel score scales.
+/// Repeated node ids within one channel count once, at their first distinct
+/// rank. Equal fused scores are ordered by ascending node id.
 ///
 /// # Arguments
 /// * `channels` – Slice of ranked channels. Each channel provides an ordered
@@ -47,8 +49,12 @@ pub const DEFAULT_RRF_K: f64 = 60.0;
 pub fn rrf_fuse(channels: &[RankedChannel], k: f64) -> Vec<FusedNode> {
     let mut accum: HashMap<NodeId, FusedNode> = HashMap::new();
     for ch in channels {
-        for (rank0, &nid) in ch.ranked.iter().enumerate() {
-            let rank1 = (rank0 + 1) as u32;
+        let mut seen = HashSet::with_capacity(ch.ranked.len());
+        for &nid in &ch.ranked {
+            if !seen.insert(nid) {
+                continue;
+            }
+            let rank1 = seen.len() as u32;
             let contribution = ch.weight / (k + rank1 as f64);
             let entry = accum.entry(nid).or_insert_with(|| FusedNode {
                 node: nid,
@@ -60,7 +66,12 @@ pub fn rrf_fuse(channels: &[RankedChannel], k: f64) -> Vec<FusedNode> {
         }
     }
     let mut out: Vec<FusedNode> = accum.into_values().collect();
-    out.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+    out.sort_by(|a, b| {
+        b.score
+            .partial_cmp(&a.score)
+            .unwrap_or(std::cmp::Ordering::Equal)
+            .then_with(|| a.node.cmp(&b.node))
+    });
     out
 }
 
@@ -91,13 +102,18 @@ pub fn pagerank(g: &KnowledgeGraph, mask: Option<u64>, damping: f64, iters: u32)
     }
 
     let base = (1.0 - damping) / live_count;
-    let mut rank: Vec<f64> = live.iter().map(|&b| if b { 1.0 / live_count } else { 0.0 }).collect();
+    let mut rank: Vec<f64> = live
+        .iter()
+        .map(|&b| if b { 1.0 / live_count } else { 0.0 })
+        .collect();
 
     for _ in 0..iters {
         let mut next = vec![0.0_f64; n_total];
         let mut dangling = 0.0;
         for i in 0..n_total {
-            if !live[i] { continue; }
+            if !live[i] {
+                continue;
+            }
             if out[i].is_empty() {
                 dangling += rank[i];
             } else {
@@ -124,8 +140,16 @@ mod tests {
 
     #[test]
     fn rrf_rewards_consensus_across_channels() {
-        let ch_a = RankedChannel { name: "a", weight: 1.0, ranked: vec![NodeId(1), NodeId(2)] };
-        let ch_b = RankedChannel { name: "b", weight: 1.0, ranked: vec![NodeId(1), NodeId(3)] };
+        let ch_a = RankedChannel {
+            name: "a",
+            weight: 1.0,
+            ranked: vec![NodeId(1), NodeId(2)],
+        };
+        let ch_b = RankedChannel {
+            name: "b",
+            weight: 1.0,
+            ranked: vec![NodeId(1), NodeId(3)],
+        };
         let fused = rrf_fuse(&[ch_a, ch_b], 60.0);
         assert_eq!(fused[0].node, NodeId(1)); // consensus wins
         assert!(fused[0].score > fused[1].score);
@@ -133,8 +157,16 @@ mod tests {
 
     #[test]
     fn rrf_respects_channel_weight() {
-        let strong = RankedChannel { name: "s", weight: 2.0, ranked: vec![NodeId(7)] };
-        let weak = RankedChannel { name: "w", weight: 0.1, ranked: vec![NodeId(8)] };
+        let strong = RankedChannel {
+            name: "s",
+            weight: 2.0,
+            ranked: vec![NodeId(7)],
+        };
+        let weak = RankedChannel {
+            name: "w",
+            weight: 0.1,
+            ranked: vec![NodeId(8)],
+        };
         let fused = rrf_fuse(&[strong, weak], 60.0);
         assert_eq!(fused[0].node, NodeId(7));
     }
@@ -163,7 +195,12 @@ mod tests {
         let plain = g.add_node("plain", None, None);
         let cites = g.properties.register("cites");
         // Only this edge carries the "cites" property — it should be followed under the mask.
-        g.add_edge(src, cited, 1.0, vec![(cites, PropertyValue::Label("c".into()))]);
+        g.add_edge(
+            src,
+            cited,
+            1.0,
+            vec![(cites, PropertyValue::Label("c".into()))],
+        );
         // This edge has no matching property — excluded under the mask.
         g.add_edge(src, plain, 1.0, vec![]);
         let mask = g.properties.build_mask(&["cites"]);

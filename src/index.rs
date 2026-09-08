@@ -1219,6 +1219,12 @@ impl IndexedKnowledgeGraph {
                 key(&combined[j])
                     .partial_cmp(&key(&combined[i]))
                     .unwrap_or(std::cmp::Ordering::Equal)
+                    .then_with(|| {
+                        combined[i]
+                            .graph_result
+                            .node_id
+                            .cmp(&combined[j].graph_result.node_id)
+                    })
             });
             idx.into_iter()
                 .filter(|&i| key(&combined[i]) > 0.0)
@@ -1265,6 +1271,7 @@ impl IndexedKnowledgeGraph {
                             .unwrap_or(&0.0)
                             .partial_cmp(pr.get(ni).unwrap_or(&0.0))
                             .unwrap_or(std::cmp::Ordering::Equal)
+                            .then_with(|| ni.cmp(&nj))
                     });
                     let ranked: Vec<crate::NodeId> = idx
                         .into_iter()
@@ -1294,6 +1301,7 @@ impl IndexedKnowledgeGraph {
             b.fused_score
                 .partial_cmp(&a.fused_score)
                 .unwrap_or(std::cmp::Ordering::Equal)
+                .then_with(|| a.graph_result.node_id.cmp(&b.graph_result.node_id))
         });
         combined.truncate(max_results);
         combined
