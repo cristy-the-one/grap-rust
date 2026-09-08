@@ -1161,7 +1161,7 @@ function renderOntoRules() {
   const rows = (ontoRules.rules || []).filter(r => r.kind !== "other" &&
     `${r.subject} ${r.statement} ${r.provision}`.toLocaleLowerCase().includes(query));
   const coverage = ontoRules.coverage || {};
-  $("#onto-rule-summary").textContent = `${rows.length} matching rules · ${coverage.unresolved || 0} unresolved · ` +
+  $("#onto-rule-summary").textContent = `${rows.length} matching rules · ${coverage.unresolved || 0} unresolved overall · ` +
     `${coverage.deferred_proposals || 0} proposals kept out of the entity graph` +
     (coverage.legacy_receipts ? ` · ${coverage.legacy_receipts} older receipts lack rule coverage; Build / Grow upgrades legal sources` : "");
   const list = clear($("#onto-rule-list"));

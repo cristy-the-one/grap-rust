@@ -1,0 +1,195 @@
+{
+  "scope": "Five additional existing references selected before this model run, after fixing the seven development targets; no prompt tuning on their new outputs. Not independent lawyer labels.",
+  "cases": [
+    {
+      "id": "semantic-02",
+      "split": "dev",
+      "source_file": "real-data-law-ro/19961.json",
+      "source_sha256": "5003b0236b87a2d8d92fde50f04dce6db0528e800cf7e37c8d49c2fcbe3641a7",
+      "start": 7917,
+      "end": 8215,
+      "text": "Este interzis executorilor bancari sa achizitioneze, direct sau prin interpusi, pentru ei sau pentru alţii, bunurile ce au format obiectul activităţii de executare silită sau să facă acte de executare în propria lor cauza ori în cauzele privind rudele şi afinii până la gradul al patrulea inclusiv.",
+      "expected_kind": "prohibition",
+      "accepted_subjects": [
+        "executorilor bancari"
+      ],
+      "required_text": [
+        "direct sau prin interpusi",
+        "pentru ei sau pentru alţii"
+      ],
+      "arms": {
+        "legacy": [
+          {
+            "id": "19961#9",
+            "start": 7164,
+            "end": 7954,
+            "text": "acţiuni, de membru al consiliului de conducere, de director general sau de director al unei societăţi comerciale, de administrator al unei societăţi civile, precum şi cu orice activităţi care lezeaza demnitatea profesiei de executor bancar sau care aduc atingere bunelor moravuri. ... + Articolul 14 Răspunderea civilă a executorului bancar poate fi angajata, în condiţiile legii, pentru cauzarea de prejudiciu prin încălcarea obligaţiilor sale profesionale. Asigurarea de răspundere profesională a executorului bancar se poate realiza de către şi în contul băncii în care îşi desfăşoară activitatea, dacă aceasta este expres stipulată, după caz, în regulamentul intern al băncii sau în convenţia încheiată de banca cu executorul bancar. + Articolul 15 Este interzis executorilor bancari sa",
+            "tabular_skipped": false
+          },
+          {
+            "id": "19961#10",
+            "start": 7955,
+            "end": 8747,
+            "text": "achizitioneze, direct sau prin interpusi, pentru ei sau pentru alţii, bunurile ce au format obiectul activităţii de executare silită sau să facă acte de executare în propria lor cauza ori în cauzele privind rudele şi afinii până la gradul al patrulea inclusiv. + Articolul 16 Răspunderea disciplinară a executorului bancar se stabileşte în condiţiile şi în cazurile prevăzute de regulamentul de organizare şi funcţionare a băncii şi de celelalte reglementări aplicabile în materie. În aceleaşi condiţii răspunderea disciplinară revine executorului bancar şi pentru următoarele abateri: a) încălcarea incompatibilităţilor şi interdictiilor prevăzute de prezentul statut; ... b) întârzierea sistematica şi neglijenţa în efectuarea lucrărilor; ... c) nerespectarea secretului profesional; ... d)",
+            "tabular_skipped": false
+          }
+        ],
+        "statements": [
+          {
+            "id": "19961#11",
+            "start": 7451,
+            "end": 8217,
+            "text": "Articolul 14 Răspunderea civilă a executorului bancar poate fi angajata, în condiţiile legii, pentru cauzarea de prejudiciu prin încălcarea obligaţiilor sale profesionale. Asigurarea de răspundere profesională a executorului bancar se poate realiza de către şi în contul băncii în care îşi desfăşoară activitatea, dacă aceasta este expres stipulată, după caz, în regulamentul intern al băncii sau în convenţia încheiată de banca cu executorul bancar. + Articolul 15 Este interzis executorilor bancari sa achizitioneze, direct sau prin interpusi, pentru ei sau pentru alţii, bunurile ce au format obiectul activităţii de executare silită sau să facă acte de executare în propria lor cauza ori în cauzele privind rudele şi afinii până la gradul al patrulea inclusiv. +",
+            "tabular_skipped": false
+          }
+        ]
+      }
+    },
+    {
+      "id": "semantic-03",
+      "split": "dev",
+      "source_file": "real-data-law-ro/19961.json",
+      "source_sha256": "5003b0236b87a2d8d92fde50f04dce6db0528e800cf7e37c8d49c2fcbe3641a7",
+      "start": 11475,
+      "end": 11701,
+      "text": "Dosarele de executare aflate în curs de rezolvare la data intrării în vigoare a prezentului statut pot fi preluate de către executorii bancari, pe baza solicitării scrise adresate de banca preşedintelui instanţei de executare.",
+      "expected_kind": "permission",
+      "accepted_subjects": [
+        "Dosarele de executare aflate în curs de rezolvare la data intrării în vigoare a prezentului statut"
+      ],
+      "required_text": [
+        "pe baza solicitării scrise"
+      ],
+      "arms": {
+        "legacy": [
+          {
+            "id": "19961#14",
+            "start": 11132,
+            "end": 11713,
+            "text": "civilă, dacă prin lege nu se dispune altfel. + Articolul 23 Corpul executorilor bancari din fiecare banca va avea propria evidenta şi arhiva a lucrărilor efectuate. + Capitolul 6 Dispoziţii finale şi tranzitorii + Articolul 24 Prezentul statut intră în vigoare la data publicării lui în Monitorul Oficial al României, Partea I. + Articolul 25 Dosarele de executare aflate în curs de rezolvare la data intrării în vigoare a prezentului statut pot fi preluate de către executorii bancari, pe baza solicitării scrise adresate de banca preşedintelui instanţei de executare. -----------",
+            "tabular_skipped": false
+          }
+        ],
+        "statements": [
+          {
+            "id": "19961#16",
+            "start": 11346,
+            "end": 11713,
+            "text": "Articolul 24 Prezentul statut intră în vigoare la data publicării lui în Monitorul Oficial al României, Partea I. + Articolul 25 Dosarele de executare aflate în curs de rezolvare la data intrării în vigoare a prezentului statut pot fi preluate de către executorii bancari, pe baza solicitării scrise adresate de banca preşedintelui instanţei de executare. -----------",
+            "tabular_skipped": false
+          }
+        ]
+      }
+    },
+    {
+      "id": "semantic-11",
+      "split": "dev",
+      "source_file": "real-data-law-ro/83906.json",
+      "source_sha256": "052418cca9bcc37927e5970051282109c193b628a7827536091838e662ccbe8c",
+      "start": 503,
+      "end": 619,
+      "text": "Prezentele norme nu se aplică operatorilor de transport feroviar şi gestionarului infrastructurii feroviare publice.",
+      "expected_kind": "fact",
+      "accepted_subjects": [
+        "Prezentele norme"
+      ],
+      "required_text": [
+        "nu se aplică"
+      ],
+      "arms": {
+        "legacy": [
+          {
+            "id": "83906#0",
+            "start": 0,
+            "end": 799,
+            "text": "NORME din 28 iunie 1999 privind verificarea tehnica a vehiculelor feroviare aparţinând agentilor economici EMITENT MINISTERUL TRANSPORTURILOR Publicat în MONITORUL OFICIAL nr. 396 din 19 august 1999 + Capitolul 1 Dispozitii generale + Articolul 1 (1) Pentru asigurarea efectuării transportului feroviar în condiţii de siguranţă a circulaţiei, vehiculele feroviare de orice tip aparţinând agentilor economici trebuie să indeplineasca condiţiile prevăzute în normele tehnice specifice în vigoare. ... (2) Prezentele norme nu se aplică operatorilor de transport feroviar şi gestionarului infrastructurii feroviare publice. ... + Articolul 2 (1) Vehiculele feroviare pot circula sau efectua operaţiuni de manevra pe liniile de cale ferata publice sau private numai dacă sunt verificate şi autorizate din",
+            "tabular_skipped": false
+          }
+        ],
+        "statements": [
+          {
+            "id": "83906#0",
+            "start": 0,
+            "end": 625,
+            "text": "NORME din 28 iunie 1999 privind verificarea tehnica a vehiculelor feroviare aparţinând agentilor economici EMITENT MINISTERUL TRANSPORTURILOR Publicat în MONITORUL OFICIAL nr. 396 din 19 august 1999 + Capitolul 1 Dispozitii generale + Articolul 1 (1) Pentru asigurarea efectuării transportului feroviar în condiţii de siguranţă a circulaţiei, vehiculele feroviare de orice tip aparţinând agentilor economici trebuie să indeplineasca condiţiile prevăzute în normele tehnice specifice în vigoare. ... (2) Prezentele norme nu se aplică operatorilor de transport feroviar şi gestionarului infrastructurii feroviare publice. ... +",
+            "tabular_skipped": false
+          }
+        ]
+      }
+    },
+    {
+      "id": "semantic-16",
+      "split": "holdout",
+      "source_file": "real-data-law-ro/19161.json",
+      "source_sha256": "d698c3d800b7ca0bb2cb31796a72a70ef14f4182699f3161e6493ad838d2f404",
+      "start": 37040,
+      "end": 37261,
+      "text": "Sumele ce urmează a fi restituite beneficiarilor în condițiile art. III alin. (1) nu se actualizează cu indicele de inflație și nu sunt purtătoare de dobânzi, penalități de întârziere sau majorări de întârziere, după caz.",
+      "expected_kind": "fact",
+      "accepted_subjects": [
+        "Sumele ce urmează a fi restituite beneficiarilor în condițiile art. III alin. (1)"
+      ],
+      "required_text": [
+        "nu se actualizează",
+        "nu sunt purtătoare de dobânzi"
+      ],
+      "arms": {
+        "legacy": [
+          {
+            "id": "19161#46",
+            "start": 36623,
+            "end": 37267,
+            "text": "nu fac obiectul scutirii de la plată și al restituirii, potrivit prevederilor prezentei legi. + Articolul V Sumele care fac obiectul restituirii sunt cele provenite din debite constituite anterior sau ulterior datei de 1 ianuarie 2015 și recuperate, total sau parțial, după caz, începând cu data de 1 ianuarie 2015 și până la data de 1 martie 2019. Aceste sume se evidențiază prin contul de creditori. + Articolul VI Sumele ce urmează a fi restituite beneficiarilor în condițiile art. III alin. (1) nu se actualizează cu indicele de inflație și nu sunt purtătoare de dobânzi, penalități de întârziere sau majorări de întârziere, după caz. -----",
+            "tabular_skipped": false
+          }
+        ],
+        "statements": [
+          {
+            "id": "19161#53",
+            "start": 36972,
+            "end": 37267,
+            "text": "Aceste sume se evidențiază prin contul de creditori. + Articolul VI Sumele ce urmează a fi restituite beneficiarilor în condițiile art. III alin. (1) nu se actualizează cu indicele de inflație și nu sunt purtătoare de dobânzi, penalități de întârziere sau majorări de întârziere, după caz. -----",
+            "tabular_skipped": false
+          }
+        ]
+      }
+    },
+    {
+      "id": "semantic-17",
+      "split": "holdout",
+      "source_file": "real-data-law-ro/20030.json",
+      "source_sha256": "afaaf633bf4e24003841a7c646998c72a3104d699ffefdd6e5e16a0bfcec1e69",
+      "start": 7182,
+      "end": 7700,
+      "text": "Pentru a sprijini actul decizional la nivel local și central, în scopul implementarii eficiente și corecte a RICOP, precum și al corelării măsurilor luate în cadrul acestuia cu obiectivele PSAL, toate societățile comerciale, companiile și societățile naționale, regiile autonome din subordinea F.P.S. sau a ministerelor, precum și instituțiile publice și agențiile subordonate Guvernului au obligația sa pună imediat la dispoziție structurilor locale și centrale ale RICOP toate documentele și informațiile solicitate.",
+      "expected_kind": "obligation",
+      "accepted_subjects": [
+        "toate societățile comerciale, companiile și societățile naționale, regiile autonome din subordinea F.P.S. sau a ministerelor, precum și instituțiile publice și agențiile subordonate Guvernului"
+      ],
+      "required_text": [
+        "imediat",
+        "structurilor locale și centrale ale RICOP"
+      ],
+      "arms": {
+        "legacy": [
+          {
+            "id": "20030#9",
+            "start": 7170,
+            "end": 7966,
+            "text": "Articolul 7 Pentru a sprijini actul decizional la nivel local și central, în scopul implementarii eficiente și corecte a RICOP, precum și al corelării măsurilor luate în cadrul acestuia cu obiectivele PSAL, toate societățile comerciale, companiile și societățile naționale, regiile autonome din subordinea F.P.S. sau a ministerelor, precum și instituțiile publice și agențiile subordonate Guvernului au obligația sa pună imediat la dispoziție structurilor locale și centrale ale RICOP toate documentele și informațiile solicitate. + Articolul 8 (1) Obiectivul principal al RICOP este sprijinirea aplicării Planului de restructurare, care este realizat, în principal, prin aplicarea programelor de restructurare a societăților comerciale supuse procesului de restructurare/privatizare/lichidare în",
+            "tabular_skipped": false
+          }
+        ],
+        "statements": [
+          {
+            "id": "20030#10",
+            "start": 7170,
+            "end": 7702,
+            "text": "Articolul 7 Pentru a sprijini actul decizional la nivel local și central, în scopul implementarii eficiente și corecte a RICOP, precum și al corelării măsurilor luate în cadrul acestuia cu obiectivele PSAL, toate societățile comerciale, companiile și societățile naționale, regiile autonome din subordinea F.P.S. sau a ministerelor, precum și instituțiile publice și agențiile subordonate Guvernului au obligația sa pună imediat la dispoziție structurilor locale și centrale ale RICOP toate documentele și informațiile solicitate. +",
+            "tabular_skipped": false
+          }
+        ]
+      }
+    }
+  ]
+}

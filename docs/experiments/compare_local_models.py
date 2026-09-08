@@ -20,7 +20,15 @@ def save_report(path, report):
     """Keep the previous complete checkpoint if interrupted during a write."""
     staging = path.with_suffix(path.suffix + ".tmp")
     staging.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
-    staging.replace(path)
+    for attempt in range(6):
+        try:
+            staging.replace(path)
+            return
+        except PermissionError:
+            if attempt == 5:
+                raise
+            # Windows indexers briefly hold freshly written result files.
+            time.sleep(0.05 * (attempt + 1))
 
 
 def summarize(rows):

@@ -12,7 +12,7 @@ from bisect import bisect_left, bisect_right
 from . import legal_rules
 
 VERSION = "qualified-rules-v1"
-_LEGAL = re.compile(r"\b(?:Articolul|ART\.|se interzice|este interzis|au obliga[țţ]ia|potrivit legii|cu excep[țţ]ia)\b", re.I)
+_LEGAL = re.compile(r"\bART\.(?=\s*\d)|\b(?:Articolul|se interzice|este interzis|au obliga[țţ]ia|potrivit legii|cu excep[țţ]ia)\b", re.I)
 _PROTECTED = {*legal_rules.KINDS, "unclassified"}
 
 

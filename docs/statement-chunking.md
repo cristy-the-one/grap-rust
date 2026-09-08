@@ -3,6 +3,8 @@
 The subsequent [live accuracy evaluation](chunking-accuracy-evaluation.md) did
 not establish a semantic-accuracy improvement. Keep this mode opt-in: intact
 input still suffers from model omissions, lost qualifications and parser losses.
+The later [qualified-rule protection](qualified-legal-rules.md) addresses these
+losses automatically in both chunking modes; it does not require this opt-in.
 
 KEE now offers opt-in `statements` chunking. It prefers recognized sentence,
 paragraph and article boundaries instead of cutting at the last space before a

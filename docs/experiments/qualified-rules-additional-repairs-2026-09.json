@@ -1,0 +1,142 @@
+{
+  "results_sha256": "5922a5299c2738d96012859d0046faa2ea0f840608e7886081ff83cfd677bb47",
+  "rows": [
+    {
+      "case": "semantic-02",
+      "arm": "legacy",
+      "chunk": "19961#9",
+      "repair": {
+        "units": {
+          "u21": {
+            "kind": "fact",
+            "subject": "Răspunderea civilă a executorului bancar"
+          }
+        },
+        "raw_reply": "{\"units\": {\"u21\": {\"kind\": \"fact\", \"subject\": \"Răspunderea civilă a executorului bancar\"}}}",
+        "unit_ids": [
+          "u21"
+        ]
+      },
+      "unresolved": 0,
+      "seconds": 5.82,
+      "failure": null
+    },
+    {
+      "case": "semantic-02",
+      "arm": "legacy",
+      "chunk": "19961#10",
+      "repair": null,
+      "unresolved": 0,
+      "seconds": 0.001,
+      "failure": null
+    },
+    {
+      "case": "semantic-02",
+      "arm": "statements",
+      "chunk": "19961#11",
+      "repair": null,
+      "unresolved": 0,
+      "seconds": 0.001,
+      "failure": null
+    },
+    {
+      "case": "semantic-03",
+      "arm": "statements",
+      "chunk": "19961#16",
+      "repair": null,
+      "unresolved": 0,
+      "seconds": 0.0,
+      "failure": null
+    },
+    {
+      "case": "semantic-03",
+      "arm": "legacy",
+      "chunk": "19961#14",
+      "repair": {
+        "units": {
+          "u39": {
+            "kind": "right",
+            "subject": "Cei interesaţi sau vătămaţi prin actele de executare"
+          },
+          "u42": {
+            "kind": "permission",
+            "subject": "Dosarele de executare aflate în curs de rezolvare la data intrării în vigoare a prezentului statut"
+          }
+        },
+        "raw_reply": "{\"units\": {\"u39\": {\"kind\": \"right\", \"subject\": \"Cei interesaţi sau vătămaţi prin actele de executare\"}, \"u42\": {\"kind\": \"permission\", \"subject\": \"Dosarele de executare aflate în curs de rezolvare la data intrării în vigoare a prezentului statut\"}}}",
+        "unit_ids": [
+          "u39",
+          "u42"
+        ]
+      },
+      "unresolved": 1,
+      "seconds": 0.837,
+      "failure": null
+    },
+    {
+      "case": "semantic-11",
+      "arm": "legacy",
+      "chunk": "83906#0",
+      "repair": null,
+      "unresolved": 0,
+      "seconds": 0.003,
+      "failure": null
+    },
+    {
+      "case": "semantic-11",
+      "arm": "statements",
+      "chunk": "83906#0",
+      "repair": null,
+      "unresolved": 0,
+      "seconds": 0.0,
+      "failure": null
+    },
+    {
+      "case": "semantic-16",
+      "arm": "statements",
+      "chunk": "19161#53",
+      "repair": null,
+      "unresolved": 0,
+      "seconds": 0.0,
+      "failure": null
+    },
+    {
+      "case": "semantic-16",
+      "arm": "legacy",
+      "chunk": "19161#46",
+      "repair": {
+        "units": {
+          "u72": {
+            "kind": "fact",
+            "subject": "Sumele ce urmează a fi restituite beneficiarilor în condițiile art. III alin. (1)"
+          }
+        },
+        "raw_reply": "{\"units\": {\"u72\": {\"kind\": \"fact\", \"subject\": \"Sumele ce urmează a fi restituite beneficiarilor în condițiile art. III alin. (1)\"}}}",
+        "unit_ids": [
+          "u72"
+        ]
+      },
+      "unresolved": 0,
+      "seconds": 0.779,
+      "failure": null
+    },
+    {
+      "case": "semantic-17",
+      "arm": "legacy",
+      "chunk": "20030#9",
+      "repair": null,
+      "unresolved": 0,
+      "seconds": 0.001,
+      "failure": null
+    },
+    {
+      "case": "semantic-17",
+      "arm": "statements",
+      "chunk": "20030#10",
+      "repair": null,
+      "unresolved": 0,
+      "seconds": 0.0,
+      "failure": null
+    }
+  ]
+}

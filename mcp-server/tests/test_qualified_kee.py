@@ -11,6 +11,10 @@ from grap_mcp.kee.working_graph import WorkingGraph
 RULE = "Executorii bancari au obligaţia sa păstreze secretul profesional, chiar şi după încetarea funcţiei, cu excepţia cazurilor în care legea îi eliberează de aceasta obligaţie."
 
 
+def test_abbreviated_article_heading_enables_rule_protection():
+    assert qualified.plan("ART. 12 Instituţia funcţionează autonom.")["units"]
+
+
 def test_full_document_rule_survives_legacy_cuts_and_article_filter(tmp_path):
     file = tmp_path / "law.txt"
     text = "+ Articolul 3 " + RULE

@@ -1,5 +1,11 @@
 # Statement chunking: live accuracy evaluation
 
+This is the historical v4 baseline. The subsequent
+[qualified-rule fix and regression evaluation](qualified-legal-rules.md) changes
+the extraction/retention path in both chunk modes; its results are separate.
+Use commit `f03bd31` for the original runner. Saved baseline replies and judgments
+remain unchanged.
+
 The structural improvement did **not** establish an extraction-accuracy gain.
 In this seven-target diagnostic, the current KEE prompt/model recovered two
 complete target meanings with legacy chunks and none with statement chunks.

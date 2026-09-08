@@ -65,6 +65,7 @@ def prepare(path):
 
 
 def run(fixture_path, output):
+    from grap_mcp.kee import qualified
     fixture_bytes = fixture_path.read_bytes()
     fixture = json.loads(fixture_bytes)
     for case in fixture["cases"]:
@@ -76,7 +77,8 @@ def run(fixture_path, output):
                 assert text[chunk["start"]:chunk["end"]] == chunk["text"]
     settings = {"model": "grap-legal-gemma4", "temperature": 0, "max_tokens": 2048,
                 "extra_body": {"reasoning_effort": "none", "seed": 20260908},
-                "context": "Stateless extraction to isolate chunk boundaries; no known-graph feedback or embedding merges"}
+                "context": "Stateless extraction; full-document qualified rule context as in production read_chunks; no known-graph feedback or embedding merges",
+                "qualified_version": qualified.VERSION}
     identity = {"fixture_sha256": hashlib.sha256(fixture_bytes).hexdigest(),
                 "settings": settings, "system_prompt": extract.SYSTEM_PROMPT,
                 "prompt_version": extract.PROMPT_VERSION}
@@ -91,6 +93,9 @@ def run(fixture_path, output):
     p.retries = 0
     done = {(r["case"], r["arm"], r["chunk"]) for r in report["rows"]}
     for i, case in enumerate(fixture["cases"]):
+        file = ROOT / case["source_file"]
+        full_text = json.loads(file.read_text(encoding="utf-8-sig"))["text_complet"]
+        full_plan = qualified.plan(full_text, str(file.resolve()))
         # Alternate arm order so one arm is not systematically colder.
         for arm in (("legacy", "statements") if i % 2 == 0 else ("statements", "legacy")):
             for chunk in case["arms"][arm]:
@@ -102,9 +107,10 @@ def run(fixture_path, output):
                     row["skipped"] = "table_filter"
                 else:
                     try:
-                        row.update(complete(p, extract.SYSTEM_PROMPT, extract.build_user_prompt(chunk["text"])))
+                        context = qualified.slice_plan(full_plan, chunk["start"], chunk["end"])
+                        row.update(complete(p, extract.SYSTEM_PROMPT, extract.build_user_prompt(chunk["text"], context)))
                         if "incomplete" not in row:
-                            row["fragment"], row["parse_failure"] = extract.parse_reply(row["raw"], chunk["id"], chunk["text"], p)
+                            row["fragment"], row["parse_failure"] = extract.finalize_reply(row["raw"], chunk["id"], chunk["text"], p, context)
                     except Exception as exc:
                         row["error"] = str(exc)
                 report["rows"].append(row)
