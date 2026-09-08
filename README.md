@@ -27,6 +27,8 @@ source-backed review history. It reports reviewed evidence separately from extra
 The [automatic vocabulary discovery](docs/automatic-legal-vocabulary.md) classifies
 KEE source mentions, proposes relation normalization and shows source-backed schema
 candidates. Runs resume from cached model decisions; unresolved meanings stay visible.
+[Statement-preserving KEE chunking](docs/statement-chunking.md) is available for new
+extraction workspaces, with measured source coverage and explicit forced-cut counts.
 
 ## Why grap?
 

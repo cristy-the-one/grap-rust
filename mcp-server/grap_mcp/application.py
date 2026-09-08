@@ -712,7 +712,7 @@ class GrapApplication:
 
     @operation
     def extract_ontology(self, path: str, out_path: str = None, sim: float = 0.86,
-                         model: str = None, max_files: int = None) -> dict:
+                         model: str = None, max_files: int = None, chunk_strategy: str = "legacy") -> dict:
         """Propose an ontology from documents (Knowledge Extraction Engine).
 
         Reads .md/.txt/.json under `path`, asks the configured LLM to extract
@@ -733,7 +733,7 @@ class GrapApplication:
             provider = self.get_provider(model=model)
             embedder = self.get_embedder()
             result = pipeline.extract_ontology(path, provider, embedder, sim=sim,
-                                               max_files=max_files)
+                                               max_files=max_files, chunk_strategy=chunk_strategy)
             onto = result["ontology"]
             self.session.record_query(f"extract_ontology:{path}", result.get("fragments", 0))
             validation = validate.validate_ontology(onto)
@@ -1841,12 +1841,15 @@ class GrapApplication:
     def extend_extraction_graph(self, path: str, docs_path: str, model: str = None,
                                 sim: float = 0.86, relook_ratio: float = 0.2,
                                 max_files: int = None, chunk_chars: int = 800,
-                                concurrency: int = 1, refresh: bool = False) -> dict:
+                                concurrency: int = 1, refresh: bool = False,
+                                chunk_strategy: str = None) -> dict:
         """Sync a durable extraction graph to `docs_path` (new/changed/removed) and
         persist it, then load its projection as the active KG. Returns sync stats.
 
         `chunk_chars` controls chunk size (bigger -> fewer LLM calls); changing it
         on an existing workdir re-chunks and re-extracts everything.
+        `chunk_strategy` is legacy or statements (soft target, 3x hard cap).
+        Omit it to inherit this store's strategy; changing it requires a fresh workdir.
         `concurrency` runs that many LLM calls in parallel per window (needs a
         backend that accepts parallel requests, e.g. OLLAMA_NUM_PARALLEL)."""
         denied = self._require("operator")
@@ -1857,7 +1860,8 @@ class GrapApplication:
             from .kee.working_graph import WorkingGraph
             out = extend_graph_ontology(path, docs_path, self.get_provider(model), self.get_embedder(),
                                         sim=sim, relook_ratio=relook_ratio, max_files=max_files,
-                                        chunk_chars=chunk_chars, concurrency=concurrency, refresh=refresh)
+                                        chunk_chars=chunk_chars, concurrency=concurrency, refresh=refresh,
+                                        chunk_strategy=chunk_strategy)
             wg = WorkingGraph.open(path, self.get_embedder())
             self._state.set_kg(wg.kg, None)  # projection is derived; see open_extraction_graph
             self._state.extraction_workdir = path
@@ -1865,7 +1869,7 @@ class GrapApplication:
             out["status"] = "ok"
             return {k: out[k] for k in ("status", "added", "changed", "removed",
                                         "concepts", "edges", "relooks", "parked",
-                                        "stale_chunks", "pending_chunks", "quality")}
+                                        "stale_chunks", "pending_chunks", "quality", "chunking")}
         except Exception as e:
             logger.exception("extend_extraction_graph failed")
             return {"status": "error", "message": str(e)}
@@ -2852,6 +2856,7 @@ class GrapApplication:
             },
             "lifecycle": {
                 "workspace_open": self._state.ws is not None,
+                "workspace_path": str(Path(self._resolve_ws_root()).resolve()),
                 "logic_id": logic_id,
                 "production_id": production,
                 "role": self._get_role(),

@@ -6,7 +6,7 @@ import json
 import os
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Any, Iterator, Optional
+from typing import Any, Iterator, Optional, Literal
 
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse, StreamingResponse
@@ -92,6 +92,7 @@ class OntologyExtendBody(BaseModel):
     sim: float = 0.86
     max_files: Optional[int] = None
     chunk_chars: int = 800
+    chunk_strategy: Optional[Literal["legacy", "statements"]] = None
     concurrency: int = 1           # parallel LLM calls per window (1 = sequential)
 
 
@@ -620,9 +621,11 @@ def ontology_extend(body: OntologyExtendBody) -> StreamingResponse:
                 body.workdir, body.corpus_path, provider, embedder,
                 sim=body.sim, max_files=body.max_files,
                 chunk_chars=body.chunk_chars, concurrency=body.concurrency,
+                chunk_strategy=body.chunk_strategy,
                 progress=lambda ev: q.put(ev))
             snap = ontology_snapshot(out)
-            q.put({"phase": "result", "stats": snap["stats"], "snapshot": snap})
+            q.put({"phase": "result", "stats": snap["stats"], "snapshot": snap,
+                   "chunking": out.get("chunking", {})})
         except Exception as exc:  # noqa: BLE001
             q.put({"phase": "error", "message": str(exc)})
         finally:
@@ -643,6 +646,7 @@ def ontology_extend(body: OntologyExtendBody) -> StreamingResponse:
                 merged = dict(pending_done or {"phase": "done"})
                 merged["snapshot"] = ev["snapshot"]
                 merged["stats"] = ev["stats"]
+                merged["chunking"] = ev["chunking"]
                 yield json.dumps(merged) + "\n"
                 pending_done = None
             else:

@@ -106,12 +106,14 @@ def test_extend_endpoint_streams_and_persists(tmp_path, monkeypatch):
         encoding="utf-8")
 
     with client.stream("POST", "/api/ontology/extend",
-                       json={"workdir": wd, "corpus_path": str(docs), "sim": 0.9}) as r:
+                       json={"workdir": wd, "corpus_path": str(docs), "sim": 0.9,
+                             "chunk_strategy": "statements"}) as r:
         events = [_json.loads(line) for line in r.iter_lines() if line]
     phases = [e.get("phase") or e.get("type") for e in events]
     assert "diff" in phases and "done" in phases
     done = next(e for e in events if e.get("phase") == "done")
     assert done["added"] == 1
+    assert done["chunking"]["chunk_strategy"] == "statements"
     assert "snapshot" in done and any(n["name"] == "Operator de date"
                                       for n in done["snapshot"]["nodes"])
 

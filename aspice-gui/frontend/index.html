@@ -358,6 +358,15 @@
               <input id="onto-chunk-chars" type="number" min="200" step="100" value="800" />
             </div>
             <div>
+              <label for="onto-chunk-strategy">Chunk boundaries</label>
+              <select id="onto-chunk-strategy">
+                <option value="">Keep workspace policy</option>
+                <option value="statements">Preserve statements (new workspace)</option>
+                <option value="legacy">Fixed size (legacy)</option>
+              </select>
+              <p class="muted small">Statement mode allows up to 3× the target for long statements.</p>
+            </div>
+            <div>
               <label for="onto-concurrency" title="LLM calls in flight at once. Needs a backend that accepts parallel requests (e.g. Ollama with OLLAMA_NUM_PARALLEL). 1 = fully sequential extraction.">Parallel LLM calls</label>
               <input id="onto-concurrency" type="number" min="1" step="1" value="1" />
             </div>

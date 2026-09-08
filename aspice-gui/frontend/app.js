@@ -94,6 +94,7 @@ async function refreshStatus() {
   const kg = st.kg || {};
   const pg = st.pg || {};
   const lc = st.lifecycle || {};
+  $("#statusbar-ws").textContent = lc.workspace_path || "Workspace unavailable";
   pills.append(
     pill("KG", kg.loaded ? `${kg.node_count} nodes` : "none", kg.loaded ? "ok" : ""),
     pill("PG", pg.loaded ? `${pg.name || "?"} · ${pg.step_count} steps` : "none", pg.loaded ? "ok" : ""),
@@ -1183,6 +1184,7 @@ $("#onto-build").onclick = async () => {
         workdir, corpus_path, sim: Number.isFinite(sim) ? sim : 0.86,
         max_files: Number.isFinite(maxFiles) && maxFiles > 0 ? maxFiles : null,
         chunk_chars: Number.isFinite(chunkChars) && chunkChars >= 200 ? chunkChars : 800,
+        chunk_strategy: $("#onto-chunk-strategy").value || null,
         concurrency: Number.isFinite(concurrency) && concurrency > 1 ? concurrency : 1,
       }),
     });
@@ -1228,6 +1230,10 @@ $("#onto-build").onclick = async () => {
       status.textContent =
         `done · +${done.added ?? 0} / ~${done.changed ?? 0} / -${done.removed ?? 0} · ` +
         `${stats.concepts ?? 0} concepts, ${stats.edges ?? 0} edges`;
+      if (done.chunking?.chunk_strategy === "statements") {
+        status.textContent += ` · ${done.chunking.forced_split_ids.length} forced statement cuts · ` +
+          `${done.chunking.tabular_skipped} table chunks skipped`;
+      }
       if (done.snapshot) renderOntoSnapshot(done.snapshot);
       await refreshStatus();
       toast(`Ontology grown — ${stats.concepts ?? 0} concepts`, "ok");
@@ -1326,12 +1332,11 @@ $("#btn-get-config").onclick = () =>
 /* ---------- init ---------- */
 (async function init() {
   try {
-    const [health, ex] = await Promise.all([api("/api/health"), api("/api/examples")]);
+    const [health, ex, state] = await Promise.all([api("/api/health"), api("/api/examples"), refreshStatus()]);
     const root = health.repo_root ? health.repo_root.replace(/\\/g, "/") : ".";
-    const ws = `${root}/aspice-gui/grap-workspace`;
+    const ws = state?.lifecycle?.workspace_path?.replace(/\\/g, "/") || "";
     $("#workspace-path").value = ws;
-    $("#statusbar-ws").textContent = ws;
-    $("#path-create-kg").value = `${ws}/kg`;
+    $("#path-create-kg").value = ws ? `${ws}/kg` : "";
     $("#path-ingest").value = ex.sample_knowledge || "";
     $("#path-extract").value = ex.sample_knowledge || "";
     $("#lg-relfile").value = `${root}/out/legal-ontology/relations.curated.json`;

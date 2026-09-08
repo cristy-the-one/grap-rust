@@ -858,6 +858,7 @@ class WorkingGraph:
         live_ids = set(live)
         st = GraphState(next_concept_id=self._next_concept_id,
                         embedding_model=self._embedding_model())
+        st.chunk_strategy = getattr(self, "chunk_strategy", "legacy")
         st.embeddings = {self.canonical[cid]: list(self._vec_cache[self.canonical[cid]])
                          for cid in live if self.canonical[cid] in self._vec_cache}
         for cid in live:
@@ -887,6 +888,7 @@ class WorkingGraph:
     def _load_state(self, st: GraphState) -> None:
         """Populate records from SQLite, then rebuild disposable retrieval views."""
         self._next_concept_id = max(st.next_concept_id, max(st.concepts, default=-1) + 1)
+        self.chunk_strategy = st.chunk_strategy
         self._vec_cache = (dict(st.embeddings)
                            if st.embedding_model == self._embedding_model() else {})
         self.canonical = dict(st.concepts)

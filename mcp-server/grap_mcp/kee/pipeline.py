@@ -24,13 +24,16 @@ logger = logging.getLogger("grap-mcp.kee")
 
 def read_chunks(root: str, max_files: Optional[int] = None,
                 chunk_chars: int = 800,
-                stats: Optional[dict] = None) -> List[Tuple[str, str]]:
+                stats: Optional[dict] = None, chunk_strategy: str = "legacy") -> List[Tuple[str, str]]:
     """Walk .md/.txt/.json under `root` → [(source_label, chunk_text), ...].
 
     JSON files are read via the law-aware/generic extractor. `max_files` caps how
     many files are read (a safety guard against pointing at a huge corpus — an
     LLM call per chunk gets expensive fast). `chunk_chars` sets the chunk size
-    (bigger = fewer LLM calls; keep modest for small models)."""
+    (bigger = fewer LLM calls; keep modest for small models). `statements` uses
+    a soft target and a 3x hard cap; `legacy` retains fixed-size behavior."""
+    if chunk_strategy not in ("legacy", "statements") or type(chunk_chars) is not int or chunk_chars < 1:
+        raise ValueError("Choose legacy/statements and a positive chunk_chars")
     p = Path(root)
     exts = set(_EXTS) | {".json"}
     if p.is_file():
@@ -44,6 +47,7 @@ def read_chunks(root: str, max_files: Optional[int] = None,
     chunks: List[Tuple[str, str]] = []
     skipped_ids: List[str] = []
     source_files: Dict[str, Path] = {}
+    forced_ids = []
     for f in files:
         try:
             raw = f.read_text(encoding="utf-8")
@@ -64,7 +68,14 @@ def read_chunks(root: str, max_files: Optional[int] = None,
         # before numbering would renumber every chunk after the first skip and
         # make ~1,500 already-processed documents look changed — a full
         # re-extract of the entire corpus. Skipped chunks simply leave gaps.
-        for i, c in enumerate(chunk_text(text, max_chars=chunk_chars)):
+        if chunk_strategy == "statements":
+            from .chunking import chunk_spans
+            spans = chunk_spans(text, chunk_chars)
+            pieces = [text[s.start:s.end] for s in spans]
+            forced_ids.extend(f"{label}#{i}" for i, span in enumerate(spans) if span.forced_end)
+        else:
+            pieces = chunk_text(text, max_chars=chunk_chars)
+        for i, c in enumerate(pieces):
             if tabular.is_tabular(c):
                 skipped_ids.append(f"{label}#{i}")
                 continue
@@ -74,6 +85,8 @@ def read_chunks(root: str, max_files: Optional[int] = None,
                     "they are still ingested as evidence, just not extracted",
                     len(skipped_ids), tabular._threshold())
     if stats is not None:
+        stats["chunk_strategy"] = chunk_strategy
+        stats["forced_split_ids"] = forced_ids if chunk_strategy == "statements" else None
         stats["tabular_skipped"] = len(skipped_ids)
         # The IDS matter, not just the count. A caller diffing this list against
         # its manifest must be able to tell "skipped" from "removed" — see
@@ -85,14 +98,14 @@ def read_chunks(root: str, max_files: Optional[int] = None,
 def extract_ontology(docs_path: str, provider, embedder, sim: float = 0.86,
                      version: str = "kee-candidate",
                      max_files: Optional[int] = None, chunk_chars: int = 800,
-                     graph_augmented: bool = True) -> Dict[str, Any]:
+                     graph_augmented: bool = True, chunk_strategy: str = "legacy") -> Dict[str, Any]:
     """Run the extraction pipeline and return the candidate ontology + run stats.
 
     `graph_augmented=True` (default) uses the graph-in-the-loop pipeline
     (live KG context + entity resolution + relation grounding + bounded
     re-looks). `graph_augmented=False` runs the legacy stateless path
     (per-chunk extract -> embedding reconcile)."""
-    chunks = read_chunks(docs_path, max_files=max_files, chunk_chars=chunk_chars)
+    chunks = read_chunks(docs_path, max_files=max_files, chunk_chars=chunk_chars, chunk_strategy=chunk_strategy)
     if graph_augmented:
         from .graph_extract import graph_extract_ontology
         return graph_extract_ontology(chunks, provider, embedder,

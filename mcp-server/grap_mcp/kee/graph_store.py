@@ -79,6 +79,7 @@ class GraphState:
     next_concept_id: int = 0
     embeddings: Dict[str, List[float]] = field(default_factory=dict)
     embedding_model: str = ""
+    chunk_strategy: str = "legacy"
     extractions: Dict[str, dict] = field(default_factory=dict)
 
 
@@ -125,7 +126,8 @@ class GraphStore:
                                  for source, record in state.extractions.items()]),
             "meta": (1, [("rel_vocab", json.dumps(state.rel_vocab)),
                          ("next_concept_id", str(state.next_concept_id)),
-                         ("embedding_model", state.embedding_model)]),
+                         ("embedding_model", state.embedding_model),
+                         ("chunk_strategy", state.chunk_strategy)]),
         }
         c = self.conn
         start = c.total_changes
@@ -193,6 +195,7 @@ class GraphStore:
         meta = dict(c.execute("SELECT key, value FROM meta"))
         s.next_concept_id = int(meta.get("next_concept_id", "0"))
         s.embedding_model = meta.get("embedding_model", "")
+        s.chunk_strategy = meta.get("chunk_strategy", "legacy")
         s.extractions = {r["chunk_id"]: json.loads(r["record"])
                          for r in c.execute("SELECT * FROM extractions")}
         for r in c.execute("SELECT * FROM embeddings"):

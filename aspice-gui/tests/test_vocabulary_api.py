@@ -23,6 +23,7 @@ def test_vocabulary_endpoint_budget_and_cache(tmp_path, monkeypatch):
     provider = StubProvider(handler=answer)
     monkeypatch.setattr(bridge, "application", GrapApplication(tmp_path / "ws", role="operator", provider_factory=lambda **_: provider))
     client = TestClient(app)
+    assert client.get("/api/status").json()["lifecycle"]["workspace_path"] == str((tmp_path / "ws").resolve())
     assert client.post("/api/ontology/distill", json={"path": str(path), "max_calls": 101}).status_code == 422
     pending = client.post("/api/ontology/distill", json={"path": str(path), "max_calls": 0}).json()
     assert pending["report"]["pending"] == 1 and not provider.calls

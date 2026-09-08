@@ -109,7 +109,7 @@ def extend_graph_ontology(workdir: str, docs_path: str, provider, embedder, *,
                           promote_min_refs: int = 2,
                           promote_max_per_run: int = 25,
                           max_extract_attempts: int = 3,
-                          refresh: bool = False) -> Dict[str, Any]:
+                          refresh: bool = False, chunk_strategy: str = None) -> Dict[str, Any]:
     """Open the durable graph at `workdir`, sync it to `docs_path`, save, return stats.
 
     new chunk -> extract; changed chunk -> replace only after successful extraction;
@@ -133,6 +133,13 @@ def extend_graph_ontology(workdir: str, docs_path: str, provider, embedder, *,
     """
     wg = WorkingGraph.open(workdir, embedder, merge_threshold=sim, context_cap=context_cap)
     try:
+        stored_strategy = getattr(wg, "chunk_strategy", "legacy")
+        selected_strategy = chunk_strategy or stored_strategy
+        if selected_strategy not in ("legacy", "statements"):
+            raise ValueError("Unknown chunk strategy")
+        if (wg.manifest or wg.extractions or wg.chunk_failures) and selected_strategy != stored_strategy:
+            raise ValueError("Chunk strategy differs from this extraction store; use a fresh workdir")
+        wg.chunk_strategy = selected_strategy
         def _emit(ev):
             if progress is not None:
                 progress(ev)
@@ -146,7 +153,7 @@ def extend_graph_ontology(workdir: str, docs_path: str, provider, embedder, *,
         _t = time.time()
         read_stats: Dict[str, Any] = {}
         chunks = read_chunks(docs_path, max_files=max_files, chunk_chars=chunk_chars,
-                             stats=read_stats)
+                             stats=read_stats, chunk_strategy=selected_strategy)
         skipped_ids = set(read_stats.get("tabular_skipped_ids") or [])
         current = {src: text for (src, text) in chunks}
         hashes = {src: incremental.chunk_hash(text) for src, text in current.items()}
@@ -308,6 +315,7 @@ def extend_graph_ontology(workdir: str, docs_path: str, provider, embedder, *,
             "relations_recovered": promo.get("relations_recovered", 0),
             "quality": quality,
             "context_mode": extract.CONTEXT_MODE,
+            "chunking": read_stats,
             "quarantined": quarantined,
             "stale_chunks": stale, "pending_chunks": pending,
             "phase_s": phase,
