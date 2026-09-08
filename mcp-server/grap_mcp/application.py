@@ -744,7 +744,7 @@ class GrapApplication:
             version, auto_adoption = self._publish_and_gate_proposal(
                 yaml_text, path, provider.name, embedder.name,
                 len(onto["process_outcomes"]),
-                extraction_complete=not result.get("failures"))
+                extraction_complete=not result.get("failures") and not onto.get("qualified_legal", {}).get("coverage", {}).get("unresolved"))
 
             return {
                 "status": "ok",
@@ -763,6 +763,7 @@ class GrapApplication:
                     for o in onto["process_outcomes"]],
                 "provenance": onto.get("provenance", []),
                 "relations": onto.get("relations", []),
+                "qualified_legal": onto.get("qualified_legal", {}),
                 "validation": validation,
                 "concept_hashes": onto.get("concept_hashes", {}),
                 "auto_adoption": auto_adoption,
@@ -1900,6 +1901,20 @@ class GrapApplication:
                     "note": None if record else "No source receipt; refresh older extractions to record one"}
         except Exception as exc:
             return {"status": "error", "message": str(exc)}
+
+    @operation
+    def get_qualified_rules(self, path: str) -> dict:
+        """Read complete legal rules and coverage without loading an embedding model."""
+        denied = self._require("operator")
+        if denied:
+            return denied
+        if not (Path(path) / "graph_store.db").is_file():
+            return {"status": "error", "message": "No extraction store at this path"}
+        from .kee.graph_store import GraphStore
+        from .kee import qualified
+        with GraphStore(str(Path(path) / "graph_store.db")) as store:
+            records = {row[0]: json.loads(row[1]) for row in store.conn.execute("SELECT chunk_id, record FROM extractions")}
+        return {"status": "ok", "qualified_legal": qualified.report(records)}
 
     @operation
     def export_ontology(self, path: str, out_path: str = None) -> dict:
@@ -3451,7 +3466,7 @@ class GrapApplication:
                               "extract_ontology_nversion",
                               "rollback_ontology", "diff_ontologies", "project_relations",
                               "open_extraction_graph", "extend_extraction_graph", "export_ontology",
-                              "get_extraction_evidence", "distill_ontology",
+                              "get_extraction_evidence", "get_qualified_rules", "distill_ontology",
                               "build_legal_graph", "legal_graph_from_relations",
                               "extract_legal_claims", "get_legal_claims", "get_legal_sources",
                               "export_legal_claim_graph",

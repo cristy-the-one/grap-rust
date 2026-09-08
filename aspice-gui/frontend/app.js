@@ -1148,9 +1148,50 @@ function ontoOpts() {
 }
 
 function renderOntoSnapshot(snap) {
+  ontoRules = snap.qualified_legal || {};
+  ontoRuleLimit = 20;
+  renderOntoRules();
   setLegalGraph(ontoSnapshotToGraph(snap));
   layoutGraph($("#onto-graph"), $("#onto-detail"), 300, ontoOpts());
 }
+
+let ontoRules = {}, ontoRuleLimit = 20;
+function renderOntoRules() {
+  const query = $("#onto-rule-search").value.trim().toLocaleLowerCase();
+  const rows = (ontoRules.rules || []).filter(r => r.kind !== "other" &&
+    `${r.subject} ${r.statement} ${r.provision}`.toLocaleLowerCase().includes(query));
+  const coverage = ontoRules.coverage || {};
+  $("#onto-rule-summary").textContent = `${rows.length} matching rules · ${coverage.unresolved || 0} unresolved · ` +
+    `${coverage.deferred_proposals || 0} proposals kept out of the entity graph` +
+    (coverage.legacy_receipts ? ` · ${coverage.legacy_receipts} older receipts lack rule coverage; Build / Grow upgrades legal sources` : "");
+  const list = clear($("#onto-rule-list"));
+  for (const rule of rows.slice(0, ontoRuleLimit)) {
+    const span = (rule.evidence || [])[0] || {};
+    list.append(el("details", {class: "card"},
+      el("summary", {}, `${rule.kind} · ${rule.subject || "Subject unresolved"} · ${rule.provision || rule.source}`),
+      el("p", {}, rule.statement),
+      el("p", {class: "muted small"}, `${rule.source_file || rule.source} · characters ${span.start}–${span.end} (${rule.offset_basis})`),
+      ...(rule.review_issues || []).map(issue => el("p", {class: "muted small"}, issue))));
+  }
+  $("#onto-rule-more").hidden = rows.length <= ontoRuleLimit;
+  $("#onto-rule-download").disabled = !(ontoRules.rules || []).length;
+}
+$("#onto-rule-search").oninput = () => { ontoRuleLimit = 20; renderOntoRules(); };
+$("#onto-rule-load").onclick = async () => {
+  try {
+    const result = await api(`/api/ontology/rules?workdir=${encodeURIComponent($("#onto-workdir").value.trim())}`);
+    ontoRules = result.qualified_legal || {};
+    ontoRuleLimit = 20;
+    renderOntoRules();
+  } catch (error) { $("#onto-rule-summary").textContent = String(error.message || error); }
+};
+$("#onto-rule-more").onclick = () => { ontoRuleLimit += 20; renderOntoRules(); };
+$("#onto-rule-download").onclick = () => {
+  const url = URL.createObjectURL(new Blob([JSON.stringify(ontoRules, null, 2)], {type: "application/json"}));
+  const a = el("a", {href: url, download: "qualified-legal-rules.json"});
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+};
 
 function fillOntoStats(s) {
   const set = (id, v) => { $(`#onto-stat-${id}`).textContent = v == null ? "—" : String(v); };
@@ -1258,7 +1299,7 @@ async function showOntoExisting() {
     if (opened && opened.status === "ok") {
       _ontoOpened = true;
       const snap = await api(`/api/ontology/snapshot?workdir=${encodeURIComponent(workdir)}`);
-      if (snap && (snap.nodes || []).length) {
+      if (snap && ((snap.nodes || []).length || (snap.qualified_legal?.rules || []).length)) {
         fillOntoStats(snap.stats || {});
         renderOntoSnapshot(snap);
         $("#onto-status").textContent =

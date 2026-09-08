@@ -454,7 +454,8 @@ def _extraction_events(corpus: str, model: Optional[str], sim: float,
     # provider only; embedder is deferred to reconcile so tokens flow immediately
     yield {"type": "phase", "name": "prepare"}
     provider = extract.configure_provider(llm.get_provider(model=model or None))
-    chunks = pipeline.read_chunks(corpus, max_files=max_files)
+    rule_contexts = {}
+    chunks = pipeline.read_chunks(corpus, max_files=max_files, rule_contexts=rule_contexts)
     yield {"type": "extract_begin", "chunks": len(chunks),
            "provider": provider.name, "model": getattr(provider, "model", None)}
 
@@ -468,19 +469,19 @@ def _extraction_events(corpus: str, model: Optional[str], sim: float,
         try:
             if can_stream:
                 for delta in provider.stream(extract.SYSTEM_PROMPT,
-                                             extract.build_user_prompt(text)):
+                                             extract.build_user_prompt(text, rule_contexts.get(src))):
                     parts.append(delta)
                     ntok += 1
                     if ntok % 6 == 0:
                         yield {"type": "token", "i": i + 1, "n": len(chunks), "tokens": ntok}
             else:
                 parts.append(provider.complete(extract.SYSTEM_PROMPT,
-                                               extract.build_user_prompt(text)))
+                                               extract.build_user_prompt(text, rule_contexts.get(src))))
         except Exception as exc:
             failures.append({"source": src, "reason": "provider"})
             yield {"type": "chunk_error", "i": i + 1, "message": str(exc)}
             continue
-        frag, reason = extract.parse_reply("".join(parts), src, text, provider)
+        frag, reason = extract.finalize_reply("".join(parts), src, text, provider, rule_contexts.get(src))
         if frag is None:
             failures.append({"source": src, "reason": reason})
             yield {"type": "chunk_error", "i": i + 1, "message": f"Extraction rejected: {reason}"}
@@ -515,7 +516,8 @@ def _extraction_events(corpus: str, model: Optional[str], sim: float,
         "status": "ok", "out_path": out_path, "version_hash": vhash,
         "provider": provider.name, "model": getattr(provider, "model", None),
         "embedder": embedder.name, "chunks": len(chunks), "fragments": len(fragments),
-        "failures": failures, "extraction_complete": not failures,
+        "failures": failures, "extraction_complete": not failures and not onto.get("qualified_legal", {}).get("coverage", {}).get("unresolved"),
+        "qualified_legal": onto.get("qualified_legal", {}),
         "process_outcomes": [{"id": o["id"], "name": o["name"],
                               "characteristics": o["required_characteristics"]}
                              for o in onto["process_outcomes"]],
@@ -714,6 +716,13 @@ def ontology_snapshot_ep(workdir: str) -> dict:
     r = bridge.call("export_ontology", path=workdir)
     _api_error(r)
     return ontology_snapshot(r)
+
+
+@app.get("/api/ontology/rules")
+def ontology_rules_ep(workdir: str) -> dict:
+    r = bridge.call("get_qualified_rules", path=workdir)
+    _api_error(r)
+    return r
 
 
 @app.get("/api/ontology/export")

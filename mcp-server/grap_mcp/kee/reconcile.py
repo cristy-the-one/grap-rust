@@ -17,7 +17,7 @@ import tempfile
 import unicodedata
 from typing import Any, Dict, List, Sequence, Tuple
 
-from . import extract
+from . import extract, qualified
 
 _STOP = {"the", "and", "for", "with", "from", "a", "an", "of", "to", "in",
          "on", "by", "or", "as", "is", "are", "be"}
@@ -210,6 +210,8 @@ def reconcile(fragments: Sequence[Dict[str, Any]], embedder, sim: float = 0.86,
         "mapping_hints": mapping_hints,
         "provenance": provenance,
         "relations": relations,
+        "qualified_legal": qualified.report({
+            frag["source"]: extract.extraction_record(frag) for frag in fragments if frag.get("extraction")}),
         "extraction_evidence": extract.proposal_evidence({
             frag["source"]: extract.extraction_record(frag)
             for frag in fragments if frag.get("extraction")}),

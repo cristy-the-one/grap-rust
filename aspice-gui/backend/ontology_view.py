@@ -44,4 +44,5 @@ def ontology_snapshot(export: Dict[str, Any]) -> Dict[str, Any]:
              ("concepts", "edges", "added", "changed", "removed", "relooks", "parked")}
     stats["concepts"] = stats["concepts"] or len(nodes)
     stats["edges"] = stats["edges"] or len(edges)
-    return {"nodes": nodes, "edges": edges, "stats": stats}
+    return {"nodes": nodes, "edges": edges, "stats": stats,
+            "qualified_legal": onto.get("qualified_legal", {})}

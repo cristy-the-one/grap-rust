@@ -24,7 +24,7 @@ logger = logging.getLogger("grap-mcp.kee")
 
 def read_chunks(root: str, max_files: Optional[int] = None,
                 chunk_chars: int = 800,
-                stats: Optional[dict] = None, chunk_strategy: str = "legacy") -> List[Tuple[str, str]]:
+                stats: Optional[dict] = None, chunk_strategy: str = "legacy", rule_contexts=None) -> List[Tuple[str, str]]:
     """Walk .md/.txt/.json under `root` → [(source_label, chunk_text), ...].
 
     JSON files are read via the law-aware/generic extractor. `max_files` caps how
@@ -64,6 +64,8 @@ def read_chunks(root: str, max_files: Optional[int] = None,
             raise ValueError(f"Duplicate extraction source label {label!r}: "
                              f"{source_files[label]} and {f}; use unique file stems or JSON ids")
         source_files[label] = f
+        from . import qualified
+        rule_plan = qualified.plan(text, str(f.resolve())) if rule_contexts is not None else None
         # Enumerate FIRST, then filter. Chunk ids embed the index, so filtering
         # before numbering would renumber every chunk after the first skip and
         # make ~1,500 already-processed documents look changed — a full
@@ -75,11 +77,16 @@ def read_chunks(root: str, max_files: Optional[int] = None,
             forced_ids.extend(f"{label}#{i}" for i, span in enumerate(spans) if span.forced_end)
         else:
             pieces = chunk_text(text, max_chars=chunk_chars)
+        cursor = 0
         for i, c in enumerate(pieces):
+            start = text.index(c, cursor)
+            cursor = start + len(c)
             if tabular.is_tabular(c):
                 skipped_ids.append(f"{label}#{i}")
                 continue
             chunks.append((f"{label}#{i}", c))
+            if rule_plan is not None:
+                rule_contexts[f"{label}#{i}"] = qualified.slice_plan(rule_plan, start, cursor)
     if skipped_ids:
         logger.info("read_chunks: skipped %d tabular chunk(s) (score >= %.2f); "
                     "they are still ingested as evidence, just not extracted",
@@ -105,12 +112,13 @@ def extract_ontology(docs_path: str, provider, embedder, sim: float = 0.86,
     (live KG context + entity resolution + relation grounding + bounded
     re-looks). `graph_augmented=False` runs the legacy stateless path
     (per-chunk extract -> embedding reconcile)."""
-    chunks = read_chunks(docs_path, max_files=max_files, chunk_chars=chunk_chars, chunk_strategy=chunk_strategy)
+    rule_contexts = {}
+    chunks = read_chunks(docs_path, max_files=max_files, chunk_chars=chunk_chars, chunk_strategy=chunk_strategy, rule_contexts=rule_contexts)
     if graph_augmented:
         from .graph_extract import graph_extract_ontology
         return graph_extract_ontology(chunks, provider, embedder,
-                                      sim=sim, version=version)
-    fragments = extract.extract_fragments(chunks, provider)
+                                      sim=sim, version=version, rule_contexts=rule_contexts)
+    fragments = extract.extract_fragments(chunks, provider, rule_contexts)
     ontology = reconcile.reconcile(fragments, embedder, sim=sim, version=version)
     return {
         "ontology": ontology,
@@ -130,7 +138,7 @@ def to_yaml(ontology: Dict[str, Any]) -> str:
     }
     if "concept_hashes" in ontology:
         loadable["concept_hashes"] = ontology["concept_hashes"]
-    for key in ("relations", "extraction_evidence"):
+    for key in ("relations", "extraction_evidence", "qualified_legal"):
         if ontology.get(key):
             loadable[key] = ontology[key]
     # Per-outcome source-chunk counts: the adoption policy's provenance-floor

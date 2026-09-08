@@ -375,6 +375,17 @@
             </div>
           </div>
           <p class="muted small" id="onto-status">Idle.</p>
+          <section aria-label="Qualified legal rules">
+            <h3>Qualified legal rules</h3>
+            <p class="muted small">Complete source statements, including conditions and exceptions. Labels are proposals; unresolved subjects remain visible.</p>
+            <p id="onto-rule-summary" role="status">Build or load a graph to inspect its rules.</p>
+            <label for="onto-rule-search">Find a rule</label>
+            <input id="onto-rule-search" type="search" placeholder="Search subject, statement or article" />
+            <button type="button" class="btn" id="onto-rule-load">Load saved rules</button>
+            <button type="button" class="btn" id="onto-rule-download" disabled>Download rules and deferred proposals</button>
+            <div id="onto-rule-list"></div>
+            <button type="button" class="btn" id="onto-rule-more" hidden>Show more rules</button>
+          </section>
           <div class="tiles" id="onto-dashboard">
             <div class="tile"><div class="tile-val" id="onto-stat-concepts">—</div><div class="tile-label muted small">Concepts</div></div>
             <div class="tile"><div class="tile-val" id="onto-stat-edges">—</div><div class="tile-label muted small">Edges</div></div>

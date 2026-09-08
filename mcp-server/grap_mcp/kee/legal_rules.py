@@ -4,7 +4,7 @@ from __future__ import annotations
 import json
 import re
 
-VERSION = "legal-rules-v8"
+VERSION = "legal-rules-v9"
 KINDS = ("fact", "definition", "right", "obligation", "prohibition", "permission", "amendment")
 PROMPT = """Classify Romanian legal statements. Every supplied unit must get a result.
 Return the required units object. For each unit choose kind and copy its complete
@@ -48,7 +48,7 @@ _DATE = re.compile(r"(?:p[âa]n[ăa]\s+la\s+(?:data\s+de\s+)?)?\d{1,2}\s+"
 _CONDITION = re.compile(r"\b(?:dec[âa]t|numai|dac[ăa]|în condi[țţt]iile|în cazul|cu condi[țţt]ia)\b", re.I)
 _EXCEPTION = re.compile(r"\b(?:cu excep[țţt]ia|în cazuri excep[țţt]ionale|în calculul c[ăa]ruia nu vor intra)\b", re.I)
 _LEAD = re.compile(r"(?:(?:\(\d+(?:\^\d+)?\))\s*|iar\s+)", re.I)
-_TRAILING_QUALIFIER = re.compile(r",\s*(?:dac[ăa]|cu excep[țţt]ia|în cazul|cu condi[țţt]ia|numai dac[ăa])\b", re.I)
+_TRAILING_QUALIFIER = re.compile(r",\s*(?:dac[ăa]|cu excep[țţt]ia|în cazul|cu condi[țţt]ia|numai dac[ăa]|înainte de|p[âa]n[ăa] la)\b", re.I)
 
 
 def _span(text, start, end):
@@ -223,7 +223,7 @@ def _explicit_subject(statement, kind):
     if forbidden or established:
         match = forbidden or established
         return match.span("subject")
-    passive = re.match(r"Se interzice\s+(?!ca\b|s[ăa]\b)", statement, re.I)
+    passive = re.match(r"(?:Se interzice|Este interzis[ăa])\s+(?!ca\b|s[ăa]\b)", statement, re.I)
     if passive and kind == "prohibition":
         return _postposed_span(statement, passive.end())
     operative = re.search(r"\b(?:trebuie|este obligat[ăa]?|sunt obliga[țţt]i|au obliga[țţt]ia|are dreptul|au dreptul|nu va|nu vor|va cuprinde|va vărsa|vor asigura|vor rezerva|primesc|se supun prevederilor|se modific[ăa]|au caracter|se desf[ăa][șşs]oar[ăa]|sunt strict limitate|se refer[ăa]|se efectueaz[ăa]|se va face)\b", statement, re.I)

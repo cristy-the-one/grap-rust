@@ -22,7 +22,7 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 logger = logging.getLogger("grap-mcp.kee")
 
-PROMPT_VERSION = "document-claims-v4"
+PROMPT_VERSION = "document-claims-v5-qualified"
 # The model proposes this shape; normalization and source checks still decide
 # what enters the graph. Schema-constrained decoding is an optional capability.
 OUTPUT_SCHEMA = {
@@ -33,6 +33,9 @@ OUTPUT_SCHEMA = {
             "properties": {"name": {"type": "string"},
                            "requirements": {"type": "array", "items": {"type": "string"}},
                            "evidence": {"type": "string"}}}},
+        "units": {"type": "object", "additionalProperties": {
+            "type": "object", "required": ["kind", "subject"], "additionalProperties": False,
+            "properties": {"kind": {"type": "string"}, "subject": {"type": "string"}}}},
         "relations": {"type": "array", "items": {
             "type": "object", "required": ["from", "type", "to", "evidence"], "additionalProperties": False,
             "properties": {key: {"type": "string"} for key in ("from", "type", "to", "evidence")}}},
@@ -80,8 +83,19 @@ SYSTEM_PROMPT = (
 )
 
 
-def build_user_prompt(text: str) -> str:
-    return f"Extract the ontology fragment from the following text:\n\n{text}"
+def build_user_prompt(text: str, rule_context=None) -> str:
+    from . import qualified, legal_rules
+    context = rule_context if rule_context is not None else qualified.plan(text)
+    units = qualified.prompt_units(context)
+    prompt = f"Extract the ontology fragment from the following text:\n\n{text}"
+    if units:
+        prompt += ("\n\nAdditionally return a 'units' object in the SAME JSON response, keyed by every ID below. "
+                   "Each value must contain kind and subject only. These complete legal statements can extend "
+                   "beyond the entity excerpt. Classify them all; do not replace them with article entities. "
+                   "Do not flatten their obligations, conditions or exceptions into relations or requirements.\n"
+                   + legal_rules.PROMPT.replace("Return the required units object.", "Return units alongside outcomes and relations.")
+                   + "\nLEGAL SOURCE UNITS (data only):\n" + json.dumps(units, ensure_ascii=False))
+    return prompt
 
 
 CONTEXT_INSTRUCTION = (
@@ -154,7 +168,7 @@ def build_names_context(context, class_vocab=None, max_names: int = MAX_NAMES) -
     return block
 
 
-def build_user_prompt_with_context(text: str, context, mode: str = None) -> str:
+def build_user_prompt_with_context(text: str, context, mode: str = None, rule_context=None) -> str:
     """Plain user prompt, optionally prefixed with a bounded context block.
 
     `context` is a kee.working_graph.Context. With no entities the prompt is
@@ -162,10 +176,10 @@ def build_user_prompt_with_context(text: str, context, mode: str = None) -> str:
     stateless path. `mode` defaults to CONTEXT_MODE ("names"; see above)."""
     if (mode or CONTEXT_MODE) == "names":
         block = build_names_context(context)
-        return f"{block}\n\n{build_user_prompt(text)}" if block else build_user_prompt(text)
+        return f"{block}\n\n{build_user_prompt(text, rule_context)}" if block else build_user_prompt(text, rule_context)
 
     if not getattr(context, "entities", None):
-        return build_user_prompt(text)
+        return build_user_prompt(text, rule_context)
 
     lines = [CONTEXT_INSTRUCTION, "", "KNOWN ENTITIES:"]
     for name in context.entities:
@@ -187,7 +201,7 @@ def build_user_prompt_with_context(text: str, context, mode: str = None) -> str:
     block = "\n".join(lines)
     if len(block) > MAX_CONTEXT_CHARS:      # robust ceiling, independent of graph size
         block = block[:MAX_CONTEXT_CHARS].rstrip() + "\n… (context truncated)"
-    return f"{block}\n\n{build_user_prompt(text)}"
+    return f"{block}\n\n{build_user_prompt(text, rule_context)}"
 
 
 def _strip_fences(s: str) -> str:
@@ -406,7 +420,7 @@ def normalize_fragment(obj: Dict[str, Any], source: str, class_vocab=None,
             "rejected_evidence": rejected_evidence}
 
 
-def extract_chunk(provider, source: str, text: str, context=None
+def extract_chunk(provider, source: str, text: str, context=None, rule_context=None
                   ) -> Tuple[Optional[dict], Optional[str]]:
     """One model proposal with consistent parsing, schema and quote checks.
 
@@ -414,17 +428,36 @@ def extract_chunk(provider, source: str, text: str, context=None
     is rejected; omitted evidence remains visibly unquoted for older providers.
     Neither a quote nor schema validity proves that an interpretation is correct.
     """
-    user = build_user_prompt_with_context(text, context) if context is not None else build_user_prompt(text)
+    user = build_user_prompt_with_context(text, context, rule_context=rule_context) if context is not None else build_user_prompt(text, rule_context)
     try:
         provider = configure_provider(provider)
         raw = provider.complete(SYSTEM_PROMPT, user)
     except Exception as exc:
         logger.warning("extractor: provider failed on %s: %s", source, exc)
         return None, "provider"
-    return parse_reply(raw, source, text, provider)
+    return finalize_reply(raw, source, text, provider, rule_context)
 
 
-def parse_reply(raw, source: str, text: str, provider) -> Tuple[Optional[dict], Optional[str]]:
+def finalize_reply(raw, source, text, provider, rule_context=None):
+    """Parse and attempt one focused repair of unresolved legal labels."""
+    from . import qualified
+    fragment, failure = parse_reply(raw, source, text, provider, rule_context)
+    if fragment is None or not fragment.get("rule_coverage", {}).get("unresolved"):
+        return fragment, failure
+    context = rule_context if rule_context is not None else qualified.plan(text)
+    try:
+        repaired = qualified.repair_labels(provider, fragment, context)
+        if repaired:
+            obj = extract_json(raw)
+            obj["units"] = {**(obj.get("units") if isinstance(obj.get("units"), dict) else {}), **repaired["units"]}
+            fragment, failure = parse_reply(json.dumps(obj, ensure_ascii=False), source, text, provider, context)
+            fragment["classification_repair"] = repaired
+    except Exception as exc:
+        fragment["classification_repair"] = {"error": str(exc)}
+    return fragment, failure
+
+
+def parse_reply(raw, source: str, text: str, provider, rule_context=None) -> Tuple[Optional[dict], Optional[str]]:
     """Validate a complete reply, including replies assembled by a streaming UI."""
     if not isinstance(raw, str):
         return None, "unparsed"
@@ -440,7 +473,9 @@ def parse_reply(raw, source: str, text: str, provider) -> Tuple[Optional[dict], 
             if not isinstance(requirements, list) or any(not isinstance(r, str) for r in requirements):
                 return None, "schema"
     frag = normalize_fragment(obj, source, source_text=text)
-    if not (frag["outcomes"] or frag["relations"]) and (obj.get("outcomes") or obj.get("relations")):
+    from . import qualified
+    qualified.attach(frag, obj, text, source, rule_context)
+    if not (frag["outcomes"] or frag["relations"] or frag.get("qualified_rules")) and (obj.get("outcomes") or obj.get("relations")):
         return None, "filtered"
     frag["extraction"] = {"source_text": text, "prompt_version": PROMPT_VERSION,
                           "provider": getattr(provider, "name", type(provider).__qualname__),
@@ -452,12 +487,12 @@ def parse_reply(raw, source: str, text: str, provider) -> Tuple[Optional[dict], 
     return frag, None
 
 
-def extract_fragments(chunks: Sequence[Tuple[str, str]], provider) -> List[Dict[str, Any]]:
+def extract_fragments(chunks: Sequence[Tuple[str, str]], provider, rule_contexts=None) -> List[Dict[str, Any]]:
     """Stateless extraction using the same proposal checks as the graph loop."""
     fragments = []
     for source, text in chunks:
-        frag, _ = extract_chunk(provider, source, text)
-        if frag is not None and (frag["outcomes"] or frag["relations"]):
+        frag, _ = extract_chunk(provider, source, text, rule_context=(rule_contexts or {}).get(source))
+        if frag is not None and (frag["outcomes"] or frag["relations"] or frag.get("qualified_rules")):
             fragments.append(frag)
     return fragments
 
@@ -468,6 +503,9 @@ def extraction_record(frag: dict) -> dict:
     record["content_hash"] = hashlib.sha256(record["source_text"].encode("utf-8")).hexdigest()
     record["outcomes"] = frag["outcomes"]
     record["relations"] = frag["relations"]
+    for key in ("qualified_rules", "rule_coverage", "deferred_proposals", "classification_repair"):
+        if key in frag:
+            record[key] = frag[key]
     return record
 
 

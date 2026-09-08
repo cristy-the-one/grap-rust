@@ -20,6 +20,7 @@ from typing import Dict, List, Optional, Set, Tuple
 import pygrap
 
 from . import extract as _extract
+from . import qualified
 from . import reconcile as rc
 from .graph_store import GraphStore, GraphState
 from ..session import SessionJournal
@@ -845,6 +846,7 @@ class WorkingGraph:
             "relations": relations_out,
             "concept_hashes": outcome_hashes,
             "extraction_evidence": _extract.proposal_evidence(self.extractions),
+            "qualified_legal": qualified.report(self.extractions),
         }
 
     # ---- persistence (Phase 2) ----

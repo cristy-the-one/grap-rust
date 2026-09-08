@@ -69,6 +69,35 @@ def test_ontology_snapshot_drops_unresolvable_edge():
     assert snap["edges"] == []
 
 
+def test_rule_only_snapshot_preserves_complete_rule_and_coverage():
+    from backend.ontology_view import ontology_snapshot
+    rules = {"rules": [{"statement": "Se interzice conectarea, dacă nu există contor.",
+                         "kind": "prohibition", "review_status": "proposed"}],
+             "coverage": {"rules": 1, "unresolved": 0, "deferred_proposals": 1}}
+    snapshot = ontology_snapshot({"ontology": {"qualified_legal": rules}})
+    assert snapshot["nodes"] == [] and snapshot["qualified_legal"] == rules
+
+
+def test_saved_rules_endpoint_never_loads_models(tmp_path, monkeypatch):
+    from grap_mcp.application import GrapApplication
+    from grap_mcp.kee.graph_store import GraphStore, GraphState
+    from backend import bridge
+    from backend.main import app
+    from fastapi.testclient import TestClient
+    graph = tmp_path / "graph"
+    graph.mkdir()
+    state = GraphState()
+    state.extractions = {"law#0": {"qualified_rules": [{"id": "one", "kind": "prohibition", "subject": "conectarea", "classification_status": "classified", "statement": "Se interzice conectarea, dacă nu există contor.", "review_issues": []}]}}
+    with GraphStore(str(graph / "graph_store.db")) as store:
+        store.save(state)
+    def forbidden(*args, **kwargs):
+        raise AssertionError("Read-only rule browsing must not load a model")
+    monkeypatch.setattr(bridge, "application", GrapApplication(tmp_path / "workspace", role="operator", provider_factory=forbidden, embedder_factory=forbidden))
+    response = TestClient(app).get("/api/ontology/rules", params={"workdir": str(graph)})
+    assert response.status_code == 200
+    assert response.json()["qualified_legal"]["rules"][0]["id"] == "one"
+
+
 def test_extend_endpoint_streams_and_persists(tmp_path, monkeypatch):
     import os, sys, tempfile, json as _json
     from pathlib import Path as _P
