@@ -5,32 +5,18 @@
 
 #![cfg(all(feature = "fulltext", feature = "sharding"))]
 
-use grap::{GlobalNodeId, NodeId, ShardId, ShardedGraph};
+use grap::ShardedGraph;
 
 #[test]
 fn ghost_edges_survive_rebalance_and_manual_roundtrip() {
     let mut sg = ShardedGraph::new(2);
 
-    // Create many nodes so we are likely to get cross-shard edges
-    for i in 0..20 {
-        let _ = sg.add_node(&format!("doc {}", i), None);
+    let nodes: Vec<_> = (0..20)
+        .map(|i| sg.add_node(&format!("doc {i}"), None).unwrap())
+        .collect();
+    for pair in nodes.windows(2) {
+        sg.add_edge(pair[0], pair[1], 0.7, vec![]).unwrap();
     }
-    // Add edges between them
-    for i in 0..19 {
-        let _ = sg.add_edge(
-            GlobalNodeId {
-                shard: ShardId(0),
-                local: NodeId(i),
-            },
-            GlobalNodeId {
-                shard: ShardId(1),
-                local: NodeId(i + 1),
-            },
-            0.7,
-            vec![],
-        );
-    }
-
     let before = sg.ghost_edge_count();
     assert!(before > 0, "we should have created at least one ghost edge");
 

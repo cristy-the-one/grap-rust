@@ -27,7 +27,9 @@ pub struct ShardId(pub u16);
 ///
 /// Contains both the shard that owns the node and the local `NodeId` inside
 /// that shard. This is the primary handle returned by [`ShardedGraph::add_node`].
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
+)]
 pub struct GlobalNodeId {
     /// Which shard the node lives on.
     pub shard: ShardId,
@@ -49,7 +51,9 @@ pub struct GhostEdge {
     pub remote_target: GlobalNodeId,
     /// Strength of the relationship.
     pub strength: f64,
-    // In a real system we would also store serialized properties here.
+    /// Property names are independent of remote shard tag numbering.
+    #[serde(default)]
+    pub properties: Vec<(String, crate::properties::PropertyValue)>,
 }
 
 /// One hop in a path that may have crossed shard boundaries.
@@ -233,23 +237,6 @@ impl Shard {
 
         self.remote_cache.insert(target, cached);
     }
-
-    /// Remove a local node and clean up its ghost edges.
-    /// Used during rebalancing.
-    /// Remove a node from this shard (used during rebalancing).
-    pub(crate) fn remove_local_node(&mut self, local_id: NodeId) {
-        // Remove outgoing ghost edges from this node
-        self.ghost_edges.remove(&local_id.0);
-
-        // Remove incoming ghost references from other nodes
-        for ghosts in self.ghost_edges.values_mut() {
-            ghosts.retain(|g| g.remote_target.local != local_id);
-        }
-
-        // Mark the node as deleted in the local graph (tombstone).
-        // This ensures is_document_deleted and future traversals will skip it.
-        self.graph.remove_node(local_id);
-    }
 }
 
 /// Simple consistent hash ring used to assign nodes to shards.
@@ -258,6 +245,7 @@ impl Shard {
 /// in the original design document).
 pub(crate) struct ConsistentHashRing {
     ring: Vec<(u64, ShardId)>,
+    routing_version: u32,
 }
 
 impl ConsistentHashRing {
@@ -266,22 +254,38 @@ impl ConsistentHashRing {
     /// `virtual_nodes` controls how many virtual nodes each real shard gets
     /// (higher = better balance, more memory).
     pub(crate) fn new(shard_count: u16, virtual_nodes: u16) -> Self {
+        Self::with_version(shard_count, virtual_nodes, 2)
+    }
+
+    fn with_version(shard_count: u16, virtual_nodes: u16, routing_version: u32) -> Self {
+        assert!(shard_count > 0, "a hash ring requires at least one shard");
         let mut ring = Vec::new();
 
         for s in 0..shard_count {
             let shard = ShardId(s);
             for v in 0..virtual_nodes {
-                let key = fxhash64(&[s as u8, (v >> 8) as u8, v as u8]);
+                let key = if routing_version == 1 {
+                    fnv64(&[s as u8, (v >> 8) as u8, v as u8])
+                } else {
+                    fxhash64(&[(s >> 8) as u8, s as u8, (v >> 8) as u8, v as u8])
+                };
                 ring.push((key, shard));
             }
         }
 
         ring.sort_by_key(|&(k, _)| k);
-        Self { ring }
+        Self {
+            ring,
+            routing_version,
+        }
     }
 
     pub(crate) fn locate(&self, key: &[u8]) -> ShardId {
-        let h = fxhash64(key);
+        let h = if self.routing_version == 1 {
+            fnv64(key)
+        } else {
+            fxhash64(key)
+        };
         // Binary search for the first entry >= h (with wrap-around)
         match self.ring.binary_search_by_key(&h, |&(k, _)| k) {
             Ok(i) => self.ring[i].1,
@@ -297,13 +301,24 @@ impl ConsistentHashRing {
 }
 
 /// Fast non-cryptographic hash (FNV-1a style) as suggested in the design.
-fn fxhash64(data: &[u8]) -> u64 {
+fn fnv64(data: &[u8]) -> u64 {
     let mut hash: u64 = 0xcbf29ce484222325;
     for &byte in data {
         hash ^= byte as u64;
         hash = hash.wrapping_mul(0x100000001b3);
     }
     hash
+}
+
+fn fxhash64(data: &[u8]) -> u64 {
+    let mut hash = fnv64(data);
+    // Avalanche short virtual-node keys as well as document hashes. Raw FNV
+    // clusters adjacent three-byte keys into narrow arcs of the ring.
+    hash ^= hash >> 30;
+    hash = hash.wrapping_mul(0xbf58476d1ce4e5b9);
+    hash ^= hash >> 27;
+    hash = hash.wrapping_mul(0x94d049bb133111eb);
+    hash ^ (hash >> 31)
 }
 
 /// Low-level coordinator that manages a set of shards and routes operations across them.
@@ -454,14 +469,17 @@ impl ShardRouter {
         let n = self.shards.len();
         for i in 0..n {
             let mut ghosts_map = std::mem::take(&mut self.shards[i].ghost_edges);
-            for ghosts in ghosts_map.values_mut() {
+            ghosts_map.retain(|&source, ghosts| {
+                if self.shards[i].graph.is_node_deleted(NodeId(source)) {
+                    return false;
+                }
                 ghosts.retain(|g| {
-                    !self.shards[g.remote_target.shard.0 as usize]
-                        .graph
-                        .text_index
-                        .is_document_deleted(g.remote_target.local)
+                    self.shards
+                        .get(g.remote_target.shard.0 as usize)
+                        .is_some_and(|s| !s.graph.is_node_deleted(g.remote_target.local))
                 });
-            }
+                !ghosts.is_empty()
+            });
             self.shards[i].ghost_edges = ghosts_map;
         }
     }
@@ -592,6 +610,7 @@ impl ShardRouter {
         let manifest = serde_json::json!({
             "shard_count": self.shards.len(),
             "version": 1,
+            "routing_version": self.hash_ring.routing_version,
         });
         let manifest_new = dir.join("manifest.json.new");
         std::fs::write(&manifest_new, serde_json::to_string_pretty(&manifest)?)?;
@@ -616,9 +635,23 @@ impl ShardRouter {
             crate::GraphError::Other(
                 "manifest.json is missing or has an invalid 'shard_count' field".to_string(),
             )
-        })? as u16;
-
+        })?;
+        let shard_count = u16::try_from(shard_count)
+            .ok()
+            .filter(|&n| n > 0)
+            .ok_or_else(|| crate::GraphError::Sharding("invalid persisted shard count".into()))?;
+        let routing_version = manifest
+            .get("routing_version")
+            .and_then(|v| v.as_u64())
+            .unwrap_or(1);
+        if !(1..=2).contains(&routing_version) {
+            return Err(crate::GraphError::Sharding(
+                "unsupported routing version".into(),
+            ));
+        }
         let mut router = Self::new(shard_count);
+        router.hash_ring =
+            ConsistentHashRing::with_version(shard_count, 150, routing_version as u32);
 
         let shards_dir = dir.join("shards");
         for i in 0..shard_count {
@@ -633,16 +666,18 @@ impl ShardRouter {
             router.shards[i as usize].graph = ig;
         }
 
-        // Restore ghost edges (critical for cross-shard queries after load)
-        if let Ok(ghost_data) = std::fs::read(dir.join("ghost_edges.json")) {
-            if let Ok(ghosts) =
-                serde_json::from_slice::<Vec<(u16, HashMap<u32, Vec<GhostEdge>>)>>(&ghost_data)
-            {
-                for (sid, map) in ghosts {
-                    if (sid as usize) < router.shards.len() {
-                        router.shards[sid as usize].ghost_edges = map;
-                    }
-                }
+        // A malformed topology file must fail visibly, not erase every crossing.
+        let ghost_path = dir.join("ghost_edges.json");
+        if ghost_path.exists() {
+            let ghosts: Vec<(u16, HashMap<u32, Vec<GhostEdge>>)> =
+                serde_json::from_slice(&std::fs::read(ghost_path)?)?;
+            for (sid, map) in ghosts {
+                let Some(shard) = router.shards.get_mut(sid as usize) else {
+                    return Err(crate::GraphError::Sharding(
+                        "ghost file references a missing source shard".into(),
+                    ));
+                };
+                shard.ghost_edges = map;
             }
         }
 
@@ -676,6 +711,28 @@ impl ShardRouter {
             )));
         }
 
+        if self.shards[src_idx].graph.is_node_deleted(source.local)
+            || self.shards[tgt_idx].graph.is_node_deleted(target.local)
+        {
+            return Err(crate::GraphError::Sharding(
+                "edge endpoint is missing or deleted".into(),
+            ));
+        }
+        let named_props: Vec<_> = props
+            .iter()
+            .map(|(tag, value)| {
+                self.shards[src_idx]
+                    .graph
+                    .graph
+                    .properties
+                    .tag_to_name
+                    .get(tag.0 as usize)
+                    .map(|name| (name.clone(), value.clone()))
+                    .ok_or_else(|| {
+                        crate::GraphError::Sharding("unregistered source property tag".into())
+                    })
+            })
+            .collect::<Result<_, _>>()?;
         if source.shard == target.shard {
             // Local edge
             let shard = &mut self.shards[src_idx];
@@ -689,6 +746,7 @@ impl ShardRouter {
                 local_source: source.local,
                 remote_target: target,
                 strength,
+                properties: named_props,
             };
             shard
                 .ghost_edges
@@ -698,6 +756,45 @@ impl ShardRouter {
         }
 
         Ok(())
+    }
+
+    /// Add an edge using property names resolved in its source shard.
+    pub fn add_edge_with_properties(
+        &mut self,
+        source: GlobalNodeId,
+        target: GlobalNodeId,
+        strength: f64,
+        properties: Vec<(String, crate::properties::PropertyValue)>,
+    ) -> Result<(), crate::GraphError> {
+        self.shard(source.shard)?;
+        self.shard(target.shard)?;
+        if self.shards[source.shard.0 as usize]
+            .graph
+            .is_node_deleted(source.local)
+            || self.shards[target.shard.0 as usize]
+                .graph
+                .is_node_deleted(target.local)
+        {
+            return Err(crate::GraphError::Sharding(
+                "edge endpoint is missing or deleted".into(),
+            ));
+        }
+        let registry = &mut self.shards[source.shard.0 as usize].graph.graph.properties;
+        let new_names: std::collections::HashSet<_> = properties
+            .iter()
+            .map(|(name, _)| name)
+            .filter(|name| registry.get_tag(name).is_none())
+            .collect();
+        if registry.property_names().len() + new_names.len() > 64 {
+            return Err(crate::GraphError::Sharding(
+                "more than 64 property names in source shard".into(),
+            ));
+        }
+        let props = properties
+            .into_iter()
+            .map(|(name, value)| (registry.register(&name), value))
+            .collect();
+        self.add_edge(source, target, strength, props)
     }
 
     /// Perform a distributed text search across all shards and merge the results.
@@ -726,166 +823,207 @@ impl ShardRouter {
         &self,
         text_query: &str,
         max_seeds: usize,
-        _property_names: &[&str],
+        property_names: &[&str],
         min_strength: f64,
         max_depth: u32,
         max_results: usize,
         weights: crate::index::FusionWeights,
     ) -> Vec<ShardedQueryResult> {
         use std::cmp::Ordering;
-        use std::collections::{BinaryHeap, HashSet};
-
-        // --- 1. Distributed seed selection ---
-        let mut seed_list = Vec::new();
-        for (s_idx, shard) in self.shards.iter().enumerate() {
-            let local = shard.graph.search(text_query, max_seeds);
-            for s in local {
-                seed_list.push((ShardId(s_idx as u16), s));
+        use std::collections::BinaryHeap;
+        if max_seeds == 0 || max_results == 0 {
+            return vec![];
+        }
+        let mut seeds = Vec::new();
+        for (sid, shard) in self.shards.iter().enumerate() {
+            if property_names
+                .iter()
+                .any(|name| shard.graph.graph.properties.get_tag(name).is_none())
+            {
+                continue;
+            }
+            for hit in shard.graph.search(text_query, max_seeds) {
+                seeds.push((
+                    GlobalNodeId {
+                        shard: ShardId(sid as u16),
+                        local: hit.node_id,
+                    },
+                    hit.score,
+                ));
             }
         }
-        seed_list.sort_by(|a, b| b.1.score.partial_cmp(&a.1.score).unwrap_or(Ordering::Equal));
-        seed_list.truncate(max_seeds);
-
-        // --- 2. Cross-shard best-first traversal with ghost following ---
-        #[derive(Debug)]
+        seeds.sort_by(|a, b| b.1.total_cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
+        seeds.truncate(max_seeds);
         struct Entry {
-            gnode: GlobalNodeId,
+            node: GlobalNodeId,
             strength: f64,
             depth: u32,
             text_score: f64,
-            path: Vec<ShardedPathHop>,
+            parent: Option<usize>,
+            via: Option<ShardedPathHop>,
         }
-
         impl PartialEq for Entry {
             fn eq(&self, other: &Self) -> bool {
-                self.strength == other.strength
+                self.cmp(other) == Ordering::Equal
             }
         }
         impl Eq for Entry {}
         impl PartialOrd for Entry {
             fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-                self.strength.partial_cmp(&other.strength)
+                Some(self.cmp(other))
             }
         }
         impl Ord for Entry {
             fn cmp(&self, other: &Self) -> Ordering {
-                self.partial_cmp(other).unwrap_or(Ordering::Equal)
+                self.strength
+                    .total_cmp(&other.strength)
+                    .then_with(|| other.depth.cmp(&self.depth))
+                    .then_with(|| self.text_score.total_cmp(&other.text_score))
+                    .then_with(|| other.node.cmp(&self.node))
+                    .then_with(|| other.parent.cmp(&self.parent))
             }
         }
-
-        let mut pq: BinaryHeap<Entry> = BinaryHeap::new();
-        let mut visited: HashSet<(u16, u32)> = HashSet::new(); // (shard, local)
-
-        for (shard_id, seed) in &seed_list {
-            let gnode = GlobalNodeId {
-                shard: *shard_id,
-                local: seed.node_id,
-            };
-            visited.insert((shard_id.0, seed.node_id.0));
-            pq.push(Entry {
-                gnode,
+        let mut heap = BinaryHeap::new();
+        for (node, text_score) in seeds {
+            heap.push(Entry {
+                node,
                 strength: 1.0,
                 depth: 0,
-                text_score: seed.score,
-                path: vec![], // starts at a seed
+                text_score,
+                parent: None,
+                via: None,
             });
         }
-
-        let mut results: Vec<ShardedQueryResult> = Vec::new();
-
-        while let Some(e) = pq.pop() {
-            self.telemetry.record_traversal_nodes_visited(1);
-            log::trace!("traversal: visiting {:?}", e.gnode);
-
-            let shard = &self.shards[e.gnode.shard.0 as usize];
-            let node = e.gnode.local;
-
-            let text = shard.graph.read_blob(node);
-
-            // Clone the (usually short) path so we can still use e.path for ghost expansion below.
-            let result_path = e.path.clone();
-
-            results.push(ShardedQueryResult {
-                node: e.gnode,
-                text_score: e.text_score,
-                vector_score: 0.0,
-                graph_strength: e.strength,
-                fused_score: e.text_score * weights.text + e.strength * weights.graph,
-                depth: e.depth,
-                path: result_path,
-                text: text.to_string(),
-            });
-
-            if results.len() >= max_results {
-                break;
-            }
-            if e.depth >= max_depth {
+        let mut expanded: HashMap<GlobalNodeId, u32> = HashMap::new();
+        let mut paths: Vec<(Option<usize>, ShardedPathHop)> = Vec::new();
+        let mut rows = Vec::new();
+        while let Some(entry) = heap.pop() {
+            let Some(shard) = self.shards.get(entry.node.shard.0 as usize) else {
+                continue;
+            };
+            if shard.graph.is_node_deleted(entry.node.local) {
                 continue;
             }
-
-            // --- Hardened real ghost-edge following ---
-            // We check the ghost edges of the current node and cross shards when needed,
-            // using the per-shard remote cache to avoid repeated work.
-            if let Some(ghosts) = shard.ghost_edges.get(&node.0) {
+            let previous = expanded.get(&entry.node).copied();
+            if previous.is_some_and(|depth| depth <= entry.depth) {
+                continue;
+            }
+            expanded.insert(entry.node, entry.depth);
+            self.telemetry.record_traversal_nodes_visited(1);
+            let tail = entry.via.map(|hop| {
+                let id = paths.len();
+                paths.push((entry.parent, hop));
+                id
+            });
+            if previous.is_none() {
+                rows.push((
+                    ShardedQueryResult {
+                        node: entry.node,
+                        text_score: entry.text_score,
+                        vector_score: 0.0,
+                        graph_strength: entry.strength,
+                        fused_score: entry.text_score * weights.text
+                            + entry.strength * weights.graph,
+                        depth: entry.depth,
+                        path: vec![],
+                        text: String::new(),
+                    },
+                    tail,
+                ));
+            }
+            if entry.depth >= max_depth {
+                continue;
+            }
+            let mut push = |node: GlobalNodeId, strength: f64, hop: ShardedPathHop| {
+                if !strength.is_finite()
+                    || !(0.0..=1.0).contains(&strength)
+                    || strength < min_strength
+                {
+                    return;
+                }
+                if self
+                    .shards
+                    .get(node.shard.0 as usize)
+                    .map_or(true, |s| s.graph.is_node_deleted(node.local))
+                {
+                    return;
+                }
+                if expanded
+                    .get(&node)
+                    .is_some_and(|&depth| depth <= entry.depth + 1)
+                {
+                    return;
+                }
+                heap.push(Entry {
+                    node,
+                    strength: entry.strength * strength,
+                    depth: entry.depth + 1,
+                    text_score: entry.text_score,
+                    parent: tail,
+                    via: Some(hop),
+                });
+            };
+            let graph = &shard.graph.graph;
+            for &eid in &graph.nodes[entry.node.local.0 as usize].outgoing {
+                let edge = &graph.edges[eid.0 as usize];
+                if property_names.iter().all(|name| {
+                    graph
+                        .properties
+                        .get_tag(name)
+                        .is_some_and(|tag| edge.properties.iter().any(|(t, _)| *t == tag))
+                }) {
+                    push(
+                        GlobalNodeId {
+                            shard: entry.node.shard,
+                            local: edge.target,
+                        },
+                        edge.strength,
+                        ShardedPathHop::Local(eid),
+                    );
+                }
+            }
+            if let Some(ghosts) = shard.ghost_edges.get(&entry.node.local.0) {
                 for ghost in ghosts {
-                    if ghost.strength < min_strength {
-                        self.telemetry.record_mask_prune(1);
-                        continue;
-                    }
-
-                    let remote = ghost.remote_target;
-                    let remote_key = (remote.shard.0, remote.local.0);
-
-                    if visited.contains(&remote_key) {
-                        continue;
-                    }
-                    visited.insert(remote_key);
-
-                    // Check remote cache for hit/miss
-                    let target_shard = &self.shards[remote.shard.0 as usize];
-                    let hit = target_shard.remote_cache.contains_key(&remote);
-                    self.telemetry.record_remote_fetch(hit);
-                    log::trace!("traversal: following ghost edge to {:?}", remote);
-
-                    // Fetch remote data (cache update is best-effort in current borrow model)
-                    let remote_shard = &self.shards[remote.shard.0 as usize];
-                    let _remote_text = remote_shard.graph.read_blob(remote.local);
-
-                    // Note: full cache population during traversal is limited by borrowing rules.
-                    // The cache is still useful for repeated lookups between traversals.
-
-                    let new_strength = e.strength * ghost.strength;
-                    if new_strength >= min_strength {
-                        let mut new_path = e.path.clone();
-                        new_path.push(ShardedPathHop::CrossShard {
-                            from: GlobalNodeId {
-                                shard: e.gnode.shard,
-                                local: e.gnode.local,
+                    if property_names
+                        .iter()
+                        .all(|name| ghost.properties.iter().any(|(n, _)| n == name))
+                    {
+                        self.telemetry.record_remote_fetch(false);
+                        push(
+                            ghost.remote_target,
+                            ghost.strength,
+                            ShardedPathHop::CrossShard {
+                                from: entry.node,
+                                to: ghost.remote_target,
+                                strength: ghost.strength,
                             },
-                            to: remote,
-                            strength: ghost.strength,
-                        });
-
-                        pq.push(Entry {
-                            gnode: remote,
-                            strength: new_strength,
-                            depth: e.depth + 1,
-                            text_score: e.text_score,
-                            path: new_path,
-                        });
+                        );
                     }
                 }
             }
         }
-
-        // Final ranking by fused score (text relevance + graph strength)
-        results.sort_by(|a, b| {
-            b.fused_score
-                .partial_cmp(&a.fused_score)
-                .unwrap_or(Ordering::Equal)
+        // Fused order can differ from path order. Limit only after ranking;
+        // materialize paths and text only for returned rows.
+        rows.sort_by(|a, b| {
+            b.0.fused_score
+                .total_cmp(&a.0.fused_score)
+                .then_with(|| a.0.node.cmp(&b.0.node))
         });
-        results.truncate(max_results);
-        results
+        rows.truncate(max_results);
+        rows.into_iter()
+            .map(|(mut row, mut cursor)| {
+                while let Some(id) = cursor {
+                    row.path.push(paths[id].1.clone());
+                    cursor = paths[id].0;
+                }
+                row.path.reverse();
+                row.text = self.shards[row.node.shard.0 as usize]
+                    .graph
+                    .read_blob(row.node.local)
+                    .to_string();
+                row
+            })
+            .collect()
     }
 
     /// Hybrid "text + vector + graph" search across the sharded cluster.
@@ -967,7 +1105,7 @@ impl ShardRouter {
         let mut all_results: Vec<(GlobalNodeId, f64)> = Vec::new();
 
         for (shard_idx, shard) in self.shards.iter().enumerate() {
-            let local_results = shard.graph.vector_search(query, top_k * 2);
+            let local_results = shard.graph.vector_search(query, top_k);
 
             for (local_id, score) in local_results {
                 let gid = GlobalNodeId {
@@ -979,7 +1117,7 @@ impl ShardRouter {
         }
 
         // Global sort by score descending and truncate
-        all_results.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        all_results.sort_by(|a, b| b.1.total_cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
         all_results.truncate(top_k);
         all_results
     }
@@ -1051,110 +1189,132 @@ impl ShardRouter {
         }
     }
 
-    /// Apply a rebalance plan, moving nodes between shards and repairing ghost edges.
+    /// Apply a rebalance plan. Use `execute_rebalance_with_mapping` when retaining
+    /// external node handles: rebuilding can change local ids even within a shard.
     pub fn execute_rebalance(&mut self, plan: RebalancePlan) -> Result<(), crate::GraphError> {
-        let nodes_moved = plan.node_migrations.len() as u64;
-        let segments_suggested = plan.segment_migrations.len();
+        self.execute_rebalance_with_mapping(plan).map(|_| ())
+    }
 
-        if segments_suggested > 0 {
-            log::info!(
-                "Rebalance plan contains {} segment migration recommendations (segment-aware rebalancing)",
-                segments_suggested
-            );
-
-            // Real bulk segment moves (reverse order keeps indices valid)
-            for mig in plan.segment_migrations.iter().rev() {
-                let src = mig.source_shard.0 as usize;
-                let tgt = mig.target_shard.0 as usize;
-                if src < self.shards.len() && tgt < self.shards.len() {
-                    if let Some((seg, tier)) = self.shards[src]
-                        .graph
-                        .text_index
-                        .take_sealed_segment(mig.segment_index)
-                    {
-                        self.shards[tgt]
-                            .graph
-                            .text_index
-                            .add_sealed_segment(seg, tier);
-                    }
-                }
-            }
-
-            for seg in &plan.segment_migrations {
-                let src_idx = seg.source_shard.0 as usize;
-                if src_idx < self.shards.len() {
-                    self.shards[src_idx].graph.text_index.compact();
-                    self.shards[src_idx].graph.text_index.vacuum();
-                }
-            }
+    /// Rebuild the requested placement off to the side, preserving live node
+    /// content, labels, embeddings, and all valid edges with named properties.
+    /// Swap only after the complete replacement is constructed. Returns old-to-new
+    /// handles; old handles must not be used after a successful rebalance.
+    /// Segment recommendations are advisory: moving postings alone cannot preserve
+    /// the node/document mapping, so this correctness path rebuilds the indexes.
+    pub fn execute_rebalance_with_mapping(
+        &mut self,
+        plan: RebalancePlan,
+    ) -> Result<HashMap<GlobalNodeId, GlobalNodeId>, crate::GraphError> {
+        let error = |message: &str| crate::GraphError::Sharding(message.into());
+        if plan.new_shard_count == 0 || plan.old_shard_count as usize != self.shards.len() {
+            return Err(error("invalid or stale rebalance shard count"));
         }
-
-        for (gid, target_shard_id) in plan.node_migrations {
-            let old_idx = gid.shard.0 as usize;
-            if old_idx >= self.shards.len() {
-                return Err(crate::GraphError::Sharding(format!(
-                    "source shard {} out of range during rebalance",
-                    old_idx
-                )));
-            }
-            if target_shard_id.0 as usize >= self.shards.len() {
-                return Err(crate::GraphError::Sharding(format!(
-                    "target shard {} out of range during rebalance",
-                    target_shard_id.0
-                )));
-            }
-
-            if self.shards[old_idx]
-                .graph
-                .text_index
-                .is_document_deleted(gid.local)
+        let mut destinations = HashMap::new();
+        for &(source, target) in &plan.node_migrations {
+            if target.0 >= plan.new_shard_count
+                || self
+                    .shards
+                    .get(source.shard.0 as usize)
+                    .map_or(true, |s| s.graph.is_node_deleted(source.local))
             {
-                continue;
+                return Err(error(
+                    "rebalance references a missing node or destination shard",
+                ));
             }
-
-            let text = self.shards[old_idx].graph.read_blob(gid.local).to_string();
-            let label = self.shards[old_idx]
-                .graph
-                .graph
-                .node_label(gid.local)
-                .map(|s| s.to_string());
-
-            self.shards[old_idx].remove_local_node(gid.local);
-
-            let new_local = self.shards[target_shard_id.0 as usize].graph.add_node(
-                &text,
-                label.as_deref(),
-                None,
-            );
-
-            let new_gid = GlobalNodeId {
-                shard: target_shard_id,
-                local: new_local,
-            };
-
-            // Update remote-target references in all shards: old gid → new_gid
-            for shard in &mut self.shards {
-                for ghosts in shard.ghost_edges.values_mut() {
-                    for ghost in ghosts.iter_mut() {
-                        if ghost.remote_target == gid {
-                            ghost.remote_target = new_gid;
-                        }
+            if destinations.insert(source, target).is_some() {
+                return Err(error("duplicate rebalance source"));
+            }
+        }
+        let expected: HashMap<_, _> = self
+            .plan_rebalance(plan.new_shard_count)
+            .node_migrations
+            .into_iter()
+            .collect();
+        if destinations != expected {
+            return Err(error(
+                "rebalance placement is stale or inconsistent with the target hash ring",
+            ));
+        }
+        let mut replacement = Self::new(plan.new_shard_count);
+        replacement.telemetry = self.telemetry.clone();
+        let mut mapping = HashMap::new();
+        for (sid, shard) in self.shards.iter().enumerate() {
+            for local in 0..shard.graph.graph.node_count() {
+                let old = GlobalNodeId {
+                    shard: ShardId(sid as u16),
+                    local: NodeId(local as u32),
+                };
+                if shard.graph.is_node_deleted(old.local) {
+                    continue;
+                }
+                let target = destinations.get(&old).copied().unwrap_or(old.shard);
+                if target.0 >= plan.new_shard_count {
+                    return Err(error("missing migration from a removed shard"));
+                }
+                let embedding = shard.graph.read_embedding(old.local);
+                let node = replacement.shards[target.0 as usize].graph.add_node(
+                    shard.graph.read_blob(old.local),
+                    shard.graph.graph.node_label(old.local),
+                    embedding.as_deref(),
+                );
+                mapping.insert(
+                    old,
+                    GlobalNodeId {
+                        shard: target,
+                        local: node,
+                    },
+                );
+            }
+        }
+        for (sid, shard) in self.shards.iter().enumerate() {
+            for edge in shard.graph.all_edges() {
+                let source = GlobalNodeId {
+                    shard: ShardId(sid as u16),
+                    local: edge.source,
+                };
+                let target = GlobalNodeId {
+                    shard: ShardId(sid as u16),
+                    local: edge.target,
+                };
+                if let (Some(&source), Some(&target)) = (mapping.get(&source), mapping.get(&target))
+                {
+                    let props = edge
+                        .properties
+                        .iter()
+                        .map(|(tag, value)| {
+                            (
+                                shard.graph.graph.properties.get_name(*tag).to_owned(),
+                                value.clone(),
+                            )
+                        })
+                        .collect();
+                    replacement.add_edge_with_properties(source, target, edge.strength, props)?;
+                }
+            }
+            for ghosts in shard.ghost_edges.values() {
+                for ghost in ghosts {
+                    let source = GlobalNodeId {
+                        shard: ShardId(sid as u16),
+                        local: ghost.local_source,
+                    };
+                    if let (Some(&source), Some(&target)) =
+                        (mapping.get(&source), mapping.get(&ghost.remote_target))
+                    {
+                        replacement.add_edge_with_properties(
+                            source,
+                            target,
+                            ghost.strength,
+                            ghost.properties.clone(),
+                        )?;
                     }
                 }
             }
         }
-
-        // Single ghost-edge cleanup pass after all migrations are done (O(S×E) not O(N×S×E))
-        self.cleanup_ghost_edges();
-
-        self.telemetry.record_rebalance(nodes_moved);
-        log::info!(
-            "rebalance completed: moved {} nodes from {} to {} shards",
-            nodes_moved,
-            plan.old_shard_count,
-            plan.new_shard_count
-        );
-        Ok(())
+        replacement
+            .telemetry
+            .record_rebalance(destinations.len() as u64);
+        *self = replacement;
+        Ok(mapping)
     }
 }
 
@@ -1175,6 +1335,15 @@ impl std::fmt::Debug for ShardedGraph {
 }
 
 impl ShardedGraph {
+    /// Read a live node's stored embedding independently of approximate search.
+    pub fn read_embedding(&self, node: GlobalNodeId) -> Option<Vec<f32>> {
+        let shard = self.router.shards.get(node.shard.0 as usize)?;
+        if shard.graph.is_node_deleted(node.local) {
+            return None;
+        }
+        shard.graph.read_embedding(node.local)
+    }
+
     /// Create a new sharded graph with the given number of shards.
     pub fn new(shard_count: u16) -> Self {
         Self {

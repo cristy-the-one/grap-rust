@@ -123,7 +123,7 @@ impl QueryResult {
 ///
 /// IMPORTANT: bool MUST be checked before int — in Python, `bool` is a subtype
 /// of `int`, so `extract::<i64>()` would succeed for `True`/`False` as well.
-fn py_to_property_value(val: &Bound<'_, PyAny>) -> PyResult<PropertyValue> {
+pub(crate) fn py_to_property_value(val: &Bound<'_, PyAny>) -> PyResult<PropertyValue> {
     if let Ok(s) = val.extract::<String>() {
         return Ok(PropertyValue::Label(s));
     }
@@ -152,20 +152,9 @@ impl IndexedKnowledgeGraph {
     fn new(path: &str, merge_policy: Option<usize>) -> PyResult<Self> {
         let dir = PathBuf::from(path);
 
-        let ig = if dir.exists() {
-            // Try to load an existing graph
-            match InnerGraph::load_from_dir(&dir) {
-                Ok(g) => g,
-                Err(_) => {
-                    // Directory exists but isn't a valid grap graph → create fresh
-                    match merge_policy {
-                        Some(n) => InnerGraph::new_on_disk_with_merge_policy(n),
-                        None => InnerGraph::new_on_disk(),
-                    }
-                }
-            }
+        let ig = if crate::existing_graph_path(&dir) {
+            InnerGraph::load_from_dir(&dir).map_err(to_py_err)?
         } else {
-            // Fresh graph
             match merge_policy {
                 Some(n) => InnerGraph::new_on_disk_with_merge_policy(n),
                 None => InnerGraph::new_on_disk(),
@@ -182,19 +171,7 @@ impl IndexedKnowledgeGraph {
     /// If the directory already contains a valid graph, it will be loaded instead.
     #[staticmethod]
     fn with_merge_policy(path: &str, segments_per_tier: usize) -> PyResult<Self> {
-        let dir = PathBuf::from(path);
-
-        let ig = if dir.exists() {
-            InnerGraph::load_from_dir(&dir)
-                .unwrap_or_else(|_| InnerGraph::new_on_disk_with_merge_policy(segments_per_tier))
-        } else {
-            InnerGraph::new_on_disk_with_merge_policy(segments_per_tier)
-        };
-
-        Ok(Self {
-            inner: ig,
-            path: Some(dir),
-        })
+        Self::new(path, Some(segments_per_tier))
     }
 
     /// Open an existing on-disk graph **read-mostly**, memory-mapping the node-text
@@ -208,7 +185,10 @@ impl IndexedKnowledgeGraph {
     fn open_mmap(path: &str) -> PyResult<Self> {
         let dir = PathBuf::from(path);
         let inner = InnerGraph::load_mmap(&dir).map_err(to_py_err)?;
-        Ok(Self { inner, path: Some(dir) })
+        Ok(Self {
+            inner,
+            path: Some(dir),
+        })
     }
 
     /// Persist the current state of the graph to disk.
@@ -646,26 +626,45 @@ impl IndexedKnowledgeGraph {
 
     /// Transitive dependents of `node_id`; `relations` optionally restricts to those edge properties.
     #[pyo3(signature = (node_id, relations=None, max_depth=10))]
-    fn blast_radius(&self, node_id: u32, relations: Option<Vec<String>>, max_depth: u32) -> Vec<u32> {
+    fn blast_radius(
+        &self,
+        node_id: u32,
+        relations: Option<Vec<String>>,
+        max_depth: u32,
+    ) -> Vec<u32> {
         let mask = relations.as_ref().map(|r| {
             let refs: Vec<&str> = r.iter().map(|s| s.as_str()).collect();
             self.inner.build_property_mask(&refs)
         });
-        self.inner.blast_radius(grap::NodeId(node_id), mask, max_depth)
-            .into_iter().map(|n| n.0).collect()
+        self.inner
+            .blast_radius(grap::NodeId(node_id), mask, max_depth)
+            .into_iter()
+            .map(|n| n.0)
+            .collect()
     }
 
     /// Dependency cycles as lists of node ids.
     fn find_cycles(&self) -> Vec<Vec<u32>> {
-        self.inner.find_cycles(None).into_iter()
-            .map(|c| c.into_iter().map(|n| n.0).collect()).collect()
+        self.inner
+            .find_cycles(None)
+            .into_iter()
+            .map(|c| c.into_iter().map(|n| n.0).collect())
+            .collect()
     }
 
     /// Orphan node ids (unreachable from entry_points, or from KG roots if None).
     #[pyo3(signature = (entry_points=None))]
     fn find_orphans(&self, entry_points: Option<Vec<u32>>) -> Vec<u32> {
-        let eps: Vec<grap::NodeId> = entry_points.unwrap_or_default().into_iter().map(grap::NodeId).collect();
-        self.inner.find_orphans(&eps).into_iter().map(|n| n.0).collect()
+        let eps: Vec<grap::NodeId> = entry_points
+            .unwrap_or_default()
+            .into_iter()
+            .map(grap::NodeId)
+            .collect();
+        self.inner
+            .find_orphans(&eps)
+            .into_iter()
+            .map(|n| n.0)
+            .collect()
     }
 
     /// Compact the on-disk blob store: reclaim bytes orphaned by node updates,

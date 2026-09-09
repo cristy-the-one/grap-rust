@@ -74,3 +74,37 @@ def test_tied_retrieval_survives_native_save_and_reload(tmp_path, fusion_mode):
     before = check(graph)
     graph.save()
     assert check(pygrap.IndexedKnowledgeGraph(path)) == before
+
+
+@pytest.mark.parametrize("sharded", [False, True])
+def test_corrupt_saved_graph_is_not_silently_replaced(tmp_path, sharded):
+    path = tmp_path / "graph"
+    create = (lambda: pygrap.ShardedGraph(str(path), 3)) if sharded else (lambda: pygrap.IndexedKnowledgeGraph(str(path)))
+    graph = create()
+    graph.add_node("preserve this legal evidence")
+    graph.save()
+    corrupt = path / "ghost_edges.json" if sharded else path / "text_index" / "manifest.json"
+    corrupt.write_text("broken", encoding="utf-8")
+    with pytest.raises(pygrap.GraphError):
+        create()
+    assert corrupt.read_text(encoding="utf-8") == "broken"
+
+
+def test_native_sharded_paths_and_rebalance_survive_reload(tmp_path):
+    path = str(tmp_path / "shards")
+    graph = pygrap.ShardedGraph(path, 3)
+    nodes = [graph.add_node(text, embedding=[1.0, float(i)]) for i, text in enumerate(["uniqueseed", "bridge", "target"])]
+    graph.add_edge(nodes[0], nodes[2], 0.1, {"cites": True})
+    graph.add_edge(nodes[0], nodes[1], 0.9, {"cites": True})
+    graph.add_edge(nodes[1], nodes[2], 0.9, {"cites": True})
+    hits = graph.search_and_traverse("uniqueseed", max_seeds=1, min_strength=0.0, max_depth=2, required_properties=["cites"])
+    assert len(hits) == 3
+    assert next(h.graph_strength for h in hits if h.depth == 2) == pytest.approx(0.81)
+    graph.save()
+    loaded = pygrap.ShardedGraph(path, 3)
+    assert len(loaded.search_and_traverse("uniqueseed", max_seeds=1, min_strength=0.0, max_depth=2)) == 3
+    mapping = loaded.execute_rebalance_to(5)
+    assert set(mapping) == set(nodes)
+    assert len(loaded.search_and_traverse("uniqueseed", max_seeds=1, min_strength=0.0, max_depth=2, required_properties=["cites"])) == 3
+    assert loaded.remove_node(mapping[nodes[2]])
+    assert len(loaded.search_and_traverse("uniqueseed", max_seeds=1, min_strength=0.0, max_depth=2)) == 2

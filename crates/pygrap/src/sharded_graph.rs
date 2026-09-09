@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use std::time::Duration;
 
 use pyo3::prelude::*;
-use pyo3::types::{PyAny, PyType};
+use pyo3::types::{PyAny, PyDict, PyType};
 
 use crate::errors::to_py_err;
 use grap::{
@@ -25,17 +25,20 @@ impl ShardedGraph {
     /// Open an existing sharded graph or create a new one.
     ///
     /// If the directory exists and contains a valid sharded graph, it will be loaded.
-    /// Otherwise a fresh `ShardedGraph` with the given number of shards is created.
+    /// A fresh graph is created only when no saved graph files are present.
+    /// Errors reading an existing graph are propagated.
     #[new]
     #[pyo3(signature = (path, shard_count))]
     fn new(path: &str, shard_count: u16) -> PyResult<Self> {
         let dir = PathBuf::from(path);
 
-        let sg = if dir.exists() {
-            match InnerShardedGraph::load_from_dir(&dir) {
-                Ok(g) => g,
-                Err(_) => InnerShardedGraph::new(shard_count),
-            }
+        if shard_count == 0 {
+            return Err(pyo3::exceptions::PyValueError::new_err(
+                "shard_count must be positive",
+            ));
+        }
+        let sg = if crate::existing_graph_path(&dir) {
+            InnerShardedGraph::load_from_dir(&dir).map_err(to_py_err)?
         } else {
             InnerShardedGraph::new(shard_count)
         };
@@ -85,7 +88,14 @@ impl ShardedGraph {
     }
 
     /// Add an edge between two global node IDs (passed as tuples).
-    fn add_edge(&mut self, source: (u16, u32), target: (u16, u32), strength: f64) -> PyResult<()> {
+    #[pyo3(signature = (source, target, strength, properties=None))]
+    fn add_edge(
+        &mut self,
+        source: (u16, u32),
+        target: (u16, u32),
+        strength: f64,
+        properties: Option<&Bound<'_, PyDict>>,
+    ) -> PyResult<()> {
         let src = GlobalNodeId {
             shard: ShardId(source.0),
             local: NodeId(source.1),
@@ -95,8 +105,18 @@ impl ShardedGraph {
             local: NodeId(target.1),
         };
 
+        let mut props = Vec::new();
+        if let Some(dict) = properties {
+            for (key, value) in dict.iter() {
+                props.push((
+                    key.extract::<String>()?,
+                    crate::indexed_graph::py_to_property_value(&value)?,
+                ));
+            }
+        }
         self.inner
-            .add_edge(src, tgt, strength, vec![])
+            .router_mut()
+            .add_edge_with_properties(src, tgt, strength, props)
             .map_err(to_py_err)?;
         Ok(())
     }
@@ -118,9 +138,9 @@ impl ShardedGraph {
             shard: ShardId(gid.0),
             local: NodeId(gid.1),
         };
-        self.inner.node_content_hash(global_id).map(|bytes| {
-            bytes.iter().map(|b| format!("{:02x}", b)).collect()
-        })
+        self.inner
+            .node_content_hash(global_id)
+            .map(|bytes| bytes.iter().map(|b| format!("{:02x}", b)).collect())
     }
 
     /// "match" | "mismatch" | "unknown" for the node's content integrity.
@@ -285,6 +305,11 @@ impl ShardedGraph {
 
     /// Compute a rebalance plan (mainly for inspection / dry-run).
     fn plan_rebalance(&self, target_shards: u16) -> PyResult<RebalancePlanPy> {
+        if target_shards == 0 {
+            return Err(pyo3::exceptions::PyValueError::new_err(
+                "target_shards must be positive",
+            ));
+        }
         let plan = self.inner.plan_rebalance(target_shards);
         Ok(RebalancePlanPy {
             target_shards,
@@ -293,11 +318,27 @@ impl ShardedGraph {
     }
 
     /// Execute a rebalance to the given number of shards.
-    /// This is the most common operation users want.
-    fn execute_rebalance_to(&mut self, target_shards: u16) -> PyResult<()> {
+    /// Returns `{old_global_id: new_global_id}`; replace retained handles with
+    /// this mapping before making further node-specific calls.
+    fn execute_rebalance_to(
+        &mut self,
+        target_shards: u16,
+    ) -> PyResult<std::collections::HashMap<(u16, u32), (u16, u32)>> {
+        if target_shards == 0 {
+            return Err(pyo3::exceptions::PyValueError::new_err(
+                "target_shards must be positive",
+            ));
+        }
         let plan = self.inner.plan_rebalance(target_shards);
-        self.inner.execute_rebalance(plan).map_err(to_py_err)?;
-        Ok(())
+        let mapping = self
+            .inner
+            .router_mut()
+            .execute_rebalance_with_mapping(plan)
+            .map_err(to_py_err)?;
+        Ok(mapping
+            .into_iter()
+            .map(|(old, new)| ((old.shard.0, old.local.0), (new.shard.0, new.local.0)))
+            .collect())
     }
 
     /// Start background maintenance (merge + vacuum + ghost cleanup) on the sharded graph.

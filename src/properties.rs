@@ -17,7 +17,7 @@ use crate::ids::PropertyTag;
 /// Values are intentionally kept small. For large or structured data, store
 /// the bulk payload in the node's text blob and use properties only for
 /// fast filtering dimensions (topics, categories, confidence scores, etc.).
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum PropertyValue {
     /// 64-bit floating point (confidence scores, weights, etc.).
     Float(f64),
