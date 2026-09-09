@@ -449,11 +449,12 @@ def _extraction_events(corpus: str, model: Optional[str], sim: float,
     an 'extracted' event carrying the extract_ontology-shaped result. Shared by
     the Extract card stream and the demo wizard."""
     srv = bridge.application
-    from grap_mcp.kee import embeddings, extract, llm, pipeline, reconcile, validate
+    from grap_mcp.kee import embeddings, extract, llm, pipeline, reconcile, validate, qualified
 
     # provider only; embedder is deferred to reconcile so tokens flow immediately
     yield {"type": "phase", "name": "prepare"}
-    provider = extract.configure_provider(llm.get_provider(model=model or None))
+    base_provider = llm.get_provider(model=model or None)
+    provider = base_provider
     rule_contexts = {}
     chunks = pipeline.read_chunks(corpus, max_files=max_files, rule_contexts=rule_contexts)
     yield {"type": "extract_begin", "chunks": len(chunks),
@@ -463,25 +464,28 @@ def _extraction_events(corpus: str, model: Optional[str], sim: float,
     fragments = []
     failures = []
     for i, (src, text) in enumerate(chunks):
+        rule_context = rule_contexts.get(src)
+        rule_context = rule_context if rule_context is not None else qualified.plan(text)
+        provider = extract.configure_provider(base_provider, rule_context)
         yield {"type": "chunk_start", "i": i + 1, "n": len(chunks), "source": src}
         parts: list[str] = []
         ntok = 0
         try:
             if can_stream:
-                for delta in provider.stream(extract.SYSTEM_PROMPT,
-                                             extract.build_user_prompt(text, rule_contexts.get(src))):
+                for delta in provider.stream(extract.system_prompt(rule_context, provider),
+                                             extract.build_user_prompt(text, rule_context)):
                     parts.append(delta)
                     ntok += 1
                     if ntok % 6 == 0:
                         yield {"type": "token", "i": i + 1, "n": len(chunks), "tokens": ntok}
             else:
-                parts.append(provider.complete(extract.SYSTEM_PROMPT,
-                                               extract.build_user_prompt(text, rule_contexts.get(src))))
+                parts.append(provider.complete(extract.system_prompt(rule_context, provider),
+                                               extract.build_user_prompt(text, rule_context)))
         except Exception as exc:
             failures.append({"source": src, "reason": "provider"})
             yield {"type": "chunk_error", "i": i + 1, "message": str(exc)}
             continue
-        frag, reason = extract.finalize_reply("".join(parts), src, text, provider, rule_contexts.get(src))
+        frag, reason = extract.finalize_reply("".join(parts), src, text, provider, rule_context)
         if frag is None:
             failures.append({"source": src, "reason": reason})
             yield {"type": "chunk_error", "i": i + 1, "message": f"Extraction rejected: {reason}"}

@@ -4,7 +4,7 @@ from __future__ import annotations
 import json
 import re
 
-VERSION = "legal-rules-v9"
+VERSION = "legal-rules-v10"
 KINDS = ("fact", "definition", "right", "obligation", "prohibition", "permission", "amendment")
 PROMPT = """Classify Romanian legal statements. Every supplied unit must get a result.
 Return the required units object. For each unit choose kind and copy its complete
@@ -327,6 +327,10 @@ def extract_batches(provider, text, batches, definitions=()):
             claim = {k: v for k, v in unit.items() if k not in ("id", "word_count")}
             subject = ""
             syntax = _explicit_subject(unit["statement"], kind)
+            whole_statement = not syntax and selected.strip() == unit["statement"].strip()
+            if whole_statement:
+                valid_quote = False
+                issues.append("model selected entire statement as subject")
             if syntax or valid_quote:
                 a, b = ((unit["evidence"][0]["start"] + syntax[0], unit["evidence"][0]["start"] + syntax[1])
                         if syntax else (unit["evidence"][0]["start"] + at,
@@ -338,7 +342,7 @@ def extract_batches(provider, text, batches, definitions=()):
                 else:
                     claim["subject_evidence"] = _span(text, a, a + len(subject))
                     claim["subject_method"] = "explicit-syntax" if syntax else "model-source-quote"
-            elif selected:
+            elif selected and not whole_statement:
                 issues.append("selected subject is absent or ambiguous in its statement")
             if not subject:
                 issues.append("subject unresolved")

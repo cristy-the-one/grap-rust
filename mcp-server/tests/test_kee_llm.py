@@ -97,6 +97,65 @@ def test_openai_compat_bad_shape_raises(monkeypatch):
         assert "unexpected LLM response" in str(e)
 
 
+def test_structured_extraction_requires_each_supplied_legal_unit(monkeypatch):
+    from grap_mcp.kee import extract, qualified
+    text = "+ Articolul 1 Băncile au obligația să păstreze documentele."
+    context = qualified.plan(text)
+    units = qualified.prompt_units(context)
+    payloads = []
+    def reply(req, timeout=None):
+        payloads.append(json.loads(req.data))
+        content = json.dumps({"outcomes": [], "relations": [], "units": {
+            key: {"kind": "obligation", "subject": "Băncile"} for key in units}})
+        return _FakeResp(json.dumps({"choices": [{"finish_reason": "stop", "message": {"content": content}}]}).encode())
+    monkeypatch.setattr(llm.urllib.request, "urlopen", reply)
+    monkeypatch.setenv("GRAP_KEE_STRUCTURED_OUTPUT", "1")
+    provider = llm.OpenAICompatProvider(base_url="http://x/v1")
+    fragment, failure = extract.extract_chunk(provider, "source", text, rule_context=context)
+    assert failure is None and fragment["rule_coverage"]["unresolved"] == 0
+    schema = payloads[0]["response_format"]["json_schema"]["schema"]
+    assert "units" in schema["required"]
+    assert schema["properties"]["units"]["required"] == list(units)
+    assert schema["properties"]["units"]["additionalProperties"] is False
+    assert "response_format" not in provider.extra_body
+    assert "units" not in extract.OUTPUT_SCHEMA["required"]
+    assert schema["properties"]["outcomes"]["items"]["properties"]["evidence"]["minLength"] == 1
+
+
+def test_structured_empty_evidence_never_seeds_prompt_example_entities():
+    from grap_mcp.kee import extract, qualified
+    text = "+ Articolul 1 Băncile au obligația să păstreze documentele."
+    context = qualified.plan(text)
+    provider = llm.OpenAICompatProvider().with_json_schema(extract.OUTPUT_SCHEMA)
+    raw = json.dumps({"outcomes": [{"name": "Test Plan", "requirements": [], "evidence": ""}],
+                      "relations": [], "units": {key: {"kind": "obligation", "subject": "Băncile"}
+                                                    for key in qualified.prompt_units(context)}})
+    fragment, failure = extract.parse_reply(raw, "source", text, provider, context)
+    assert failure is None
+    assert fragment["outcomes"] == []
+    assert fragment["qualified_rules"][0]["statement"] == context["units"][0]["statement"]
+    record = extract.extraction_record(fragment)
+    assert record["rejected_proposals"][0]["proposal"]["name"] == "Test Plan"
+    assert record["rejected_proposals"][0]["reason"] == "source evidence missing"
+    assert "Test Plan" not in extract.system_prompt(context, provider)
+    assert extract.system_prompt(context, llm.StubProvider()) == extract.SYSTEM_PROMPT
+    assert extract.system_prompt(None) == extract.SYSTEM_PROMPT
+
+
+def test_whole_statement_subject_triggers_bounded_classification_repair():
+    from grap_mcp.kee import extract, qualified
+    text = "+ Articolul 1 Direcţia generală se organizează în subordinea Ministerului."
+    context = qualified.plan(text)
+    key, statement = next(iter(qualified.prompt_units(context).items()))
+    provider = llm.StubProvider(responses=[json.dumps({"units": {key: {"kind": "fact", "subject": "Direcţia generală"}}})])
+    raw = json.dumps({"outcomes": [], "relations": [], "units": {key: {"kind": "fact", "subject": statement}}})
+    fragment, failure = extract.finalize_reply(raw, "source", text, provider, context)
+    assert failure is None
+    assert len(provider.calls) == 1
+    assert fragment["qualified_rules"][0]["subject"] == "Direcţia generală"
+    assert fragment["qualified_rules"][0]["statement"] == statement
+
+
 def test_retries_transient_500_then_succeeds(monkeypatch):
     monkeypatch.setattr(llm.time, "sleep", lambda *_: None)
     calls = {"n": 0}
