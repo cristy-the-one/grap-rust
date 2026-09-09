@@ -1,0 +1,80 @@
+Focused engine performance probes, Windows x64 release build.
+Baseline probes were measured in the same working tree before each hot-loop change; they are not timings of an entirely reverted engine.
+
+Before active-buffer append fix
+   Compiling grap v0.1.0 (C:\dev\grap-rust)
+    Finished `bench` profile [optimized] target(s) in 24.14s
+     Running benches\engine_workloads.rs (target\release\deps\engine_workloads-e4f467677499d387.exe)
+Gnuplot not found, using plotters backend
+Benchmarking disk_common_ingestion/documents1000
+Benchmarking disk_common_ingestion/documents1000: Warming up for 100.00 ms
+Benchmarking disk_common_ingestion/documents1000: Collecting 10 samples in estimated 290.86 ms (165 iterations)
+Benchmarking disk_common_ingestion/documents1000: Analyzing
+disk_common_ingestion/documents1000
+                        time:   [1.7587 ms 1.7677 ms 1.7728 ms]
+Benchmarking disk_common_ingestion/documents10000
+Benchmarking disk_common_ingestion/documents10000: Warming up for 100.00 ms
+
+Warning: Unable to complete 10 samples in 200.0ms. You may wish to increase target time to 871.7ms.
+Benchmarking disk_common_ingestion/documents10000: Collecting 10 samples in estimated 871.66 ms (10 iterations)
+Benchmarking disk_common_ingestion/documents10000: Analyzing
+disk_common_ingestion/documents10000
+                        time:   [86.975 ms 87.616 ms 88.341 ms]
+Found 1 outliers among 10 measurements (10.00%)
+  1 (10.00%) high mild
+
+
+Before retained-term replacement fix
+   Compiling grap v0.1.0 (C:\dev\grap-rust)
+    Finished `bench` profile [optimized] target(s) in 23.60s
+     Running benches\engine_workloads.rs (target\release\deps\engine_workloads-e4f467677499d387.exe)
+Gnuplot not found, using plotters backend
+Benchmarking replace_document/three_terms_n1000
+Benchmarking replace_document/three_terms_n1000: Warming up for 100.00 ms
+Benchmarking replace_document/three_terms_n1000: Collecting 10 samples in estimated 200.06 ms (72k iterations)
+Benchmarking replace_document/three_terms_n1000: Analyzing
+replace_document/three_terms_n1000
+                        time:   [2.6008 µs 2.6205 µs 2.6415 µs]
+Benchmarking replace_document/three_terms_n10000
+Benchmarking replace_document/three_terms_n10000: Warming up for 100.00 ms
+Benchmarking replace_document/three_terms_n10000: Collecting 10 samples in estimated 200.98 ms (11k iterations)
+Benchmarking replace_document/three_terms_n10000: Analyzing
+replace_document/three_terms_n10000
+                        time:   [18.632 µs 18.693 µs 18.778 µs]
+Found 1 outliers among 10 measurements (10.00%)
+  1 (10.00%) high severe
+
+
+After both hot-loop fixes
+   Compiling grap v0.1.0 (C:\dev\grap-rust)
+    Finished `bench` profile [optimized] target(s) in 22.83s
+     Running benches\engine_workloads.rs (target\release\deps\engine_workloads-e4f467677499d387.exe)
+Gnuplot not found, using plotters backend
+Benchmarking replace_document/three_terms_n1000
+Benchmarking replace_document/three_terms_n1000: Warming up for 100.00 ms
+Benchmarking replace_document/three_terms_n1000: Collecting 10 samples in estimated 200.07 ms (142k iterations)
+Benchmarking replace_document/three_terms_n1000: Analyzing
+replace_document/three_terms_n1000
+                        time:   [1.3855 µs 1.3888 µs 1.3928 µs]
+Benchmarking replace_document/three_terms_n10000
+Benchmarking replace_document/three_terms_n10000: Warming up for 100.00 ms
+Benchmarking replace_document/three_terms_n10000: Collecting 10 samples in estimated 200.01 ms (48k iterations)
+Benchmarking replace_document/three_terms_n10000: Analyzing
+replace_document/three_terms_n10000
+                        time:   [3.8304 µs 3.8825 µs 3.9764 µs]
+
+Benchmarking disk_common_ingestion/documents1000
+Benchmarking disk_common_ingestion/documents1000: Warming up for 100.00 ms
+Benchmarking disk_common_ingestion/documents1000: Collecting 10 samples in estimated 223.79 ms (220 iterations)
+Benchmarking disk_common_ingestion/documents1000: Analyzing
+disk_common_ingestion/documents1000
+                        time:   [1.0022 ms 1.0034 ms 1.0045 ms]
+Benchmarking disk_common_ingestion/documents10000
+Benchmarking disk_common_ingestion/documents10000: Warming up for 100.00 ms
+Benchmarking disk_common_ingestion/documents10000: Collecting 10 samples in estimated 217.76 ms (20 iterations)
+Benchmarking disk_common_ingestion/documents10000: Analyzing
+disk_common_ingestion/documents10000
+                        time:   [10.814 ms 10.855 ms 10.903 ms]
+Found 1 outliers among 10 measurements (10.00%)
+  1 (10.00%) high mild
+

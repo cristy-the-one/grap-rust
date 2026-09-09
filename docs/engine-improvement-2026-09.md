@@ -1,5 +1,10 @@
 # Engine improvement pass — September 2026
 
+**Status:** the initial findings below are historical; their fixes are described
+under "Implemented engine contracts". The remaining functional findings and
+lint backlog were addressed in the [September 9 follow-up](engine-findings-followup-2026-09.md).
+That follow-up distinguishes tested guarantees from remaining design limits.
+
 The Rust engine owns graph reachability, path scores, index membership, and
 retrieval limits. Python, MCP, extraction workflows, and the UI should build on
 those guarantees rather than compensate for inconsistencies in them.
@@ -136,18 +141,18 @@ not proof of current behavior. In particular, their static traversal results
 missed per-query arena allocation, and in-memory text benchmarks did not measure
 the on-disk adapter's reverse-map rebuild.
 
-## Next engine questions
+## Follow-up questions (addressed September 9)
 
-1. Measure persisted, multi-segment retrieval on a representative corpus. The
-   segmented scorer currently calculates term document frequency per segment;
-   ranking invariance across flush/merge layouts needs its own correctness pass.
-2. Define one phrase/proximity contract across both text backends. Positions are
-   byte offsets; the memory scorer allows partial ordered matches and the disk
-   scorer uses an unordered window. A zero gap is not an exact-phrase switch.
-3. Evaluate update-heavy posting storage before adding more ANN or orchestration
-   layers. Use mutation correctness as a prerequisite to throughput comparisons.
-4. Apply corresponding strongest-path/depth reasoning to sharded traversal,
-   which uses its own queue and has not been rewritten in this pass.
+1. **Fixed and evaluated:** live corpus-wide BM25 statistics within an index;
+   scores and ordering verified across storage layouts on 96 full source documents.
+2. **Fixed:** shared, complete, ordered proximity matching; byte-offset gap
+   semantics documented. A zero gap still does not mean an exact phrase.
+3. **Measured and improved:** retained terms now update postings in place;
+   active-buffer ingestion no longer scans whole lists to append each token.
+4. **Fixed for distributed text/phrase traversal:** local and cross-shard edges,
+   stronger paths, shorter shortcuts, filters, and persistence have regression
+   coverage. Rebalancing and routing defects uncovered by real-node tests were
+   also repaired. Per-shard hybrid ranking remains a documented separate limit.
 
 ## Retrieval stability follow-up (2026-09-08)
 
