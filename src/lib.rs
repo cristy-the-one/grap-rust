@@ -279,10 +279,7 @@ impl CountingTelemetry {
     /// Read the current counter values atomically.
     pub fn snapshot(&self) -> TelemetrySnapshot {
         TelemetrySnapshot {
-            traversal_nodes_visited: self
-                .inner
-                .traversal_nodes_visited
-                .load(Ordering::Relaxed),
+            traversal_nodes_visited: self.inner.traversal_nodes_visited.load(Ordering::Relaxed),
             mask_prunes: self.inner.mask_prunes.load(Ordering::Relaxed),
             remote_fetch_hits: self.inner.remote_fetch_hits.load(Ordering::Relaxed),
             remote_fetch_misses: self.inner.remote_fetch_misses.load(Ordering::Relaxed),
@@ -304,9 +301,7 @@ impl Telemetry for CountingTelemetry {
 
     fn record_remote_fetch(&self, hit: bool) {
         if hit {
-            self.inner
-                .remote_fetch_hits
-                .fetch_add(1, Ordering::Relaxed);
+            self.inner.remote_fetch_hits.fetch_add(1, Ordering::Relaxed);
         } else {
             self.inner
                 .remote_fetch_misses

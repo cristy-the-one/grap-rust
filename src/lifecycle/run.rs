@@ -186,7 +186,12 @@ mod tests {
             r.started_at = ts;
             store.put(&r).unwrap();
         }
-        let ids: Vec<String> = store.list().unwrap().into_iter().map(|r| r.run_id).collect();
+        let ids: Vec<String> = store
+            .list()
+            .unwrap()
+            .into_iter()
+            .map(|r| r.run_id)
+            .collect();
         assert_eq!(ids, vec!["run-cc", "run-bb", "run-aa"]);
     }
 }

@@ -59,7 +59,7 @@ fn main() {
     println!(
         "Loaded graph has {} nodes (text index is on-disk: {})",
         loaded.graph.node_count(),
-        loaded.text_index_segment_info().len() > 0
+        !loaded.text_index_segment_info().is_empty()
     );
 
     let loaded_segments = loaded.text_index_segment_info();

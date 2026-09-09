@@ -12,7 +12,10 @@ fn round_trip_preserves_rows_and_scalars() {
             vec![WireValue::Int(2), WireValue::Str("promote".into())],
         ],
     };
-    let scalars = vec![WireScalar { key: "count".to_string(), value: WireValue::Int(2) }];
+    let scalars = vec![WireScalar {
+        key: "count".to_string(),
+        value: WireValue::Int(2),
+    }];
     let wire = encode("query_events", "qe1", &scalars, &[table]);
     let doc = decode(&wire);
 
@@ -55,16 +58,34 @@ fn round_trip_two_tables_mirrors_graph_neighbors() {
     let edges = WireTable {
         tag: 'e',
         key: "edges".to_string(),
-        cols: vec!["source".to_string(), "target".to_string(), "type".to_string()],
+        cols: vec![
+            "source".to_string(),
+            "target".to_string(),
+            "type".to_string(),
+        ],
         intern_cols: vec![2], // intern "type"
         rows: vec![
-            vec![WireValue::Int(5), WireValue::Int(7), WireValue::Str("cites".into())],
-            vec![WireValue::Int(5), WireValue::Int(9), WireValue::Str("cites".into())],
+            vec![
+                WireValue::Int(5),
+                WireValue::Int(7),
+                WireValue::Str("cites".into()),
+            ],
+            vec![
+                WireValue::Int(5),
+                WireValue::Int(9),
+                WireValue::Str("cites".into()),
+            ],
         ],
     };
     let scalars = vec![
-        WireScalar { key: "status".to_string(), value: WireValue::Str("ok".into()) },
-        WireScalar { key: "center".to_string(), value: WireValue::Int(5) },
+        WireScalar {
+            key: "status".to_string(),
+            value: WireValue::Str("ok".into()),
+        },
+        WireScalar {
+            key: "center".to_string(),
+            value: WireValue::Int(5),
+        },
     ];
     let wire = encode("graph_neighbors", "gn1", &scalars, &[neighbors, edges]);
     let doc = decode(&wire);

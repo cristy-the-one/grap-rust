@@ -288,8 +288,10 @@ impl KnowledgeGraph {
         let bytes_before = self.blobs.total_bytes();
         let n = self.nodes.len();
         let mut new_blobs = crate::blob_store::BlobStore::new();
-        let mut new_refs: Vec<(crate::blob_store::BlobRef, Option<crate::blob_store::BlobRef>)> =
-            Vec::with_capacity(n);
+        let mut new_refs: Vec<(
+            crate::blob_store::BlobRef,
+            Option<crate::blob_store::BlobRef>,
+        )> = Vec::with_capacity(n);
         // Pass 1: copy live bytes into a fresh store, recording new refs.
         for i in 0..n {
             let deleted = self.deleted.get(i).copied().unwrap_or(false);
@@ -519,7 +521,11 @@ mod tests {
     fn vacuum_blobs_reclaims_orphaned_and_tombstoned_bytes() {
         let mut g = KnowledgeGraph::new();
         let a = g.add_node("a short node", Some("A"), None);
-        let b = g.add_node("b node to be deleted with a fairly long body", Some("B"), None);
+        let b = g.add_node(
+            "b node to be deleted with a fairly long body",
+            Some("B"),
+            None,
+        );
         g.update_node_content(a, &"X".repeat(5000), None).unwrap();
         g.update_node_content(a, "tiny", None).unwrap();
         assert!(g.remove_node(b));
@@ -543,7 +549,8 @@ mod tests {
         let a = g.add_node("alpha", Some("A"), Some(&[1.0_f32, 2.0, 3.0]));
         let b = g.add_node("beta", Some("B"), None);
         g.add_edge(a, b, 0.9, vec![]);
-        g.update_node_content(a, "alpha-v2", Some(&[4.0_f32, 5.0, 6.0])).unwrap();
+        g.update_node_content(a, "alpha-v2", Some(&[4.0_f32, 5.0, 6.0]))
+            .unwrap();
         g.vacuum_blobs();
         assert_eq!(g.read_blob(a), "alpha-v2");
         assert_eq!(g.read_embedding(a), Some(vec![4.0_f32, 5.0, 6.0]));

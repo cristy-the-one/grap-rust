@@ -360,6 +360,42 @@ impl Default for KnowledgeGraph {
     }
 }
 
+/// Internal constructor used by the serialization layer.
+impl KnowledgeGraph {
+    /// Construct a graph from its parts, supplying an explicit deleted bitmap.
+    /// `deleted` is padded with `false` if shorter than `nodes.len()`.
+    pub(crate) fn from_parts_with_deleted(
+        nodes: Vec<Node>,
+        edges: Vec<Edge>,
+        blobs: BlobStore,
+        properties: PropertyRegistry,
+        deleted: Vec<bool>,
+    ) -> Self {
+        let n = nodes.len();
+        let mut d = deleted;
+        d.resize(n, false); // pad if shorter
+        Self {
+            nodes,
+            edges,
+            blobs,
+            properties,
+            deleted: d,
+        }
+    }
+
+    /// Convenience wrapper that starts with all nodes alive.
+    #[allow(dead_code)]
+    pub(crate) fn from_parts(
+        nodes: Vec<Node>,
+        edges: Vec<Edge>,
+        blobs: BlobStore,
+        properties: PropertyRegistry,
+    ) -> Self {
+        let n = nodes.len();
+        Self::from_parts_with_deleted(nodes, edges, blobs, properties, vec![false; n])
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -413,7 +449,10 @@ mod tests {
         let mut g = KnowledgeGraph::new();
         let n = g.add_node("intact", None, None);
         assert_eq!(g.verify_node(n), crate::graph::NodeIntegrity::Match);
-        assert_eq!(g.verify_node(NodeId(999)), crate::graph::NodeIntegrity::Unknown);
+        assert_eq!(
+            g.verify_node(NodeId(999)),
+            crate::graph::NodeIntegrity::Unknown
+        );
     }
 
     #[test]
@@ -422,41 +461,5 @@ mod tests {
         let n = g.add_node("temp", None, None);
         assert!(g.remove_node(n)); // tombstone it
         assert_eq!(g.verify_node(n), crate::graph::NodeIntegrity::Unknown);
-    }
-}
-
-/// Internal constructor used by the serialization layer.
-impl KnowledgeGraph {
-    /// Construct a graph from its parts, supplying an explicit deleted bitmap.
-    /// `deleted` is padded with `false` if shorter than `nodes.len()`.
-    pub(crate) fn from_parts_with_deleted(
-        nodes: Vec<Node>,
-        edges: Vec<Edge>,
-        blobs: BlobStore,
-        properties: PropertyRegistry,
-        deleted: Vec<bool>,
-    ) -> Self {
-        let n = nodes.len();
-        let mut d = deleted;
-        d.resize(n, false); // pad if shorter
-        Self {
-            nodes,
-            edges,
-            blobs,
-            properties,
-            deleted: d,
-        }
-    }
-
-    /// Convenience wrapper that starts with all nodes alive.
-    #[allow(dead_code)]
-    pub(crate) fn from_parts(
-        nodes: Vec<Node>,
-        edges: Vec<Edge>,
-        blobs: BlobStore,
-        properties: PropertyRegistry,
-    ) -> Self {
-        let n = nodes.len();
-        Self::from_parts_with_deleted(nodes, edges, blobs, properties, vec![false; n])
     }
 }

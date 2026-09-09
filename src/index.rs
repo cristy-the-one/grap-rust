@@ -48,6 +48,12 @@ pub struct DefaultTokenizer {
     stop_words: HashSet<&'static str>,
 }
 
+impl Default for DefaultTokenizer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl DefaultTokenizer {
     /// Creates a new tokenizer with the built-in English stop-word list.
     pub fn new() -> Self {
@@ -1220,13 +1226,17 @@ impl IndexedKnowledgeGraph {
     fn fuse_combined<'a>(
         &self,
         mut combined: Vec<CombinedResult<'a>>,
-        text_w: f64,
-        vector_w: f64,
-        graph_w: f64,
-        centrality_w: f64,
-        mode: FusionMode,
+        weights: HybridWeights,
         max_results: usize,
     ) -> Vec<CombinedResult<'a>> {
+        let HybridWeights {
+            text: text_w,
+            vector: vector_w,
+            graph: graph_w,
+            centrality: centrality_w,
+            mode,
+            ..
+        } = weights;
         // Free (non-capturing) helper: rank a channel by a raw score.
         fn rank_by(
             combined: &[CombinedResult],
@@ -1333,6 +1343,10 @@ impl IndexedKnowledgeGraph {
     ///    and re-ranks the final results.
     ///
     /// Returns rich [`CombinedResult`] entries so callers can see both signals.
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "retain the established positional query API for callers"
+    )]
     pub fn search_and_traverse(
         &self,
         text_query: &str,
@@ -1390,11 +1404,14 @@ impl IndexedKnowledgeGraph {
 
         self.fuse_combined(
             combined,
-            weights.text,
-            0.0,
-            weights.graph,
-            0.0,
-            weights.mode,
+            HybridWeights {
+                text: weights.text,
+                vector: 0.0,
+                graph: weights.graph,
+                centrality: 0.0,
+                mode: weights.mode,
+                traversal_weight_property: None,
+            },
             max_results,
         )
     }
@@ -1414,6 +1431,10 @@ impl IndexedKnowledgeGraph {
     ///
     /// When `vector` is `None` (or no vector index is present), behavior is identical
     /// to the non-hybrid `search_and_traverse`.
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "retain the established positional query API for callers"
+    )]
     pub fn search_and_traverse_hybrid(
         &self,
         text_query: &str,
@@ -1513,18 +1534,14 @@ impl IndexedKnowledgeGraph {
             })
             .collect();
 
-        self.fuse_combined(
-            combined,
-            weights.text,
-            weights.vector,
-            weights.graph,
-            weights.centrality,
-            weights.mode,
-            max_results,
-        )
+        self.fuse_combined(combined, weights, max_results)
     }
 
     /// Like [`search_and_traverse_hybrid`] but with sensible default [`HybridWeights`].
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "retain the established positional query API for callers"
+    )]
     pub fn search_and_traverse_hybrid_default(
         &self,
         text_query: &str,
@@ -1580,6 +1597,10 @@ impl IndexedKnowledgeGraph {
     /// Phrase-aware high-level query (see [`search_and_traverse`] for details).
     ///
     /// Uses the hybrid phrase + BM25 scoring for seed selection.
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "retain the established positional query API for callers"
+    )]
     pub fn phrase_search_and_traverse(
         &self,
         phrase: &str,
@@ -1637,11 +1658,14 @@ impl IndexedKnowledgeGraph {
 
         self.fuse_combined(
             combined,
-            weights.text,
-            0.0,
-            weights.graph,
-            0.0,
-            weights.mode,
+            HybridWeights {
+                text: weights.text,
+                vector: 0.0,
+                graph: weights.graph,
+                centrality: 0.0,
+                mode: weights.mode,
+                traversal_weight_property: None,
+            },
             max_results,
         )
     }
@@ -1668,6 +1692,10 @@ impl IndexedKnowledgeGraph {
     }
 
     /// Convenience wrapper that uses [`FusionWeights::default()`].
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "retain the established positional query API for callers"
+    )]
     pub fn phrase_search_and_traverse_default(
         &self,
         phrase: &str,

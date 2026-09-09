@@ -8,13 +8,21 @@ use std::collections::VecDeque;
 /// Masked INCOMING adjacency: inc[t] = source nodes s with live edge s->t.
 fn incoming_adjacency(g: &KnowledgeGraph, mask: Option<u64>) -> Vec<Vec<u32>> {
     let n = g.node_count();
-    let live: Vec<bool> = (0..n).map(|i| !g.is_node_deleted(NodeId(i as u32))).collect();
+    let live: Vec<bool> = (0..n)
+        .map(|i| !g.is_node_deleted(NodeId(i as u32)))
+        .collect();
     let mut inc: Vec<Vec<u32>> = vec![Vec::new(); n];
     for (i, edge) in g.all_edges().iter().enumerate() {
-        if let Some(m) = mask { if !edge.matches_mask(m) { continue; } }
+        if let Some(m) = mask {
+            if !edge.matches_mask(m) {
+                continue;
+            }
+        }
         let (s, t) = g.edge_endpoints(EdgeId(i as u32));
         let (s, t) = (s.0 as usize, t.0 as usize);
-        if live[s] && live[t] { inc[t].push(s as u32); }
+        if live[s] && live[t] {
+            inc[t].push(s as u32);
+        }
     }
     inc
 }
@@ -22,13 +30,21 @@ fn incoming_adjacency(g: &KnowledgeGraph, mask: Option<u64>) -> Vec<Vec<u32>> {
 /// Masked OUTGOING adjacency: out[s] = target nodes t with live edge s->t.
 fn outgoing_adjacency(g: &KnowledgeGraph, mask: Option<u64>) -> Vec<Vec<u32>> {
     let n = g.node_count();
-    let live: Vec<bool> = (0..n).map(|i| !g.is_node_deleted(NodeId(i as u32))).collect();
+    let live: Vec<bool> = (0..n)
+        .map(|i| !g.is_node_deleted(NodeId(i as u32)))
+        .collect();
     let mut out: Vec<Vec<u32>> = vec![Vec::new(); n];
     for (i, edge) in g.all_edges().iter().enumerate() {
-        if let Some(m) = mask { if !edge.matches_mask(m) { continue; } }
+        if let Some(m) = mask {
+            if !edge.matches_mask(m) {
+                continue;
+            }
+        }
         let (s, t) = g.edge_endpoints(EdgeId(i as u32));
         let (s, t) = (s.0 as usize, t.0 as usize);
-        if live[s] && live[t] { out[s].push(t as u32); }
+        if live[s] && live[t] {
+            out[s].push(t as u32);
+        }
     }
     out
 }
@@ -36,9 +52,16 @@ fn outgoing_adjacency(g: &KnowledgeGraph, mask: Option<u64>) -> Vec<Vec<u32>> {
 /// Transitive dependents of `start`: every node that can reach `start` by
 /// following edges in reverse (nodes that "depend on" `start`), up to
 /// `max_depth` hops. `start` is not included. Honors `mask`.
-pub fn blast_radius(g: &KnowledgeGraph, start: NodeId, mask: Option<u64>, max_depth: u32) -> Vec<NodeId> {
+pub fn blast_radius(
+    g: &KnowledgeGraph,
+    start: NodeId,
+    mask: Option<u64>,
+    max_depth: u32,
+) -> Vec<NodeId> {
     let n = g.node_count();
-    if (start.0 as usize) >= n || g.is_node_deleted(start) { return Vec::new(); }
+    if (start.0 as usize) >= n || g.is_node_deleted(start) {
+        return Vec::new();
+    }
     let inc = incoming_adjacency(g, mask);
     let mut seen = vec![false; n];
     seen[start.0 as usize] = true;
@@ -46,7 +69,9 @@ pub fn blast_radius(g: &KnowledgeGraph, start: NodeId, mask: Option<u64>, max_de
     let mut q: VecDeque<(u32, u32)> = VecDeque::new();
     q.push_back((start.0, 0));
     while let Some((node, depth)) = q.pop_front() {
-        if depth >= max_depth { continue; }
+        if depth >= max_depth {
+            continue;
+        }
         for &pred in &inc[node as usize] {
             if !seen[pred as usize] {
                 seen[pred as usize] = true;
@@ -71,18 +96,28 @@ pub fn find_cycles(g: &KnowledgeGraph, mask: Option<u64>) -> Vec<Vec<NodeId>> {
     let mut idx_counter: u32 = 0;
     let mut sccs: Vec<Vec<NodeId>> = Vec::new();
     for root in 0..n {
-        if index[root] != u32::MAX || g.is_node_deleted(NodeId(root as u32)) { continue; }
+        if index[root] != u32::MAX || g.is_node_deleted(NodeId(root as u32)) {
+            continue;
+        }
         let mut call_stack: Vec<(u32, usize)> = vec![(root as u32, 0)];
-        index[root] = idx_counter; lowlink[root] = idx_counter; idx_counter += 1;
-        stack.push(root as u32); on_stack[root] = true;
+        index[root] = idx_counter;
+        lowlink[root] = idx_counter;
+        idx_counter += 1;
+        stack.push(root as u32);
+        on_stack[root] = true;
         while let Some(&(v, ni)) = call_stack.last() {
             let vu = v as usize;
             if ni < adj[vu].len() {
                 call_stack.last_mut().unwrap().1 += 1;
-                let w = adj[vu][ni]; let wu = w as usize;
+                let w = adj[vu][ni];
+                let wu = w as usize;
                 if index[wu] == u32::MAX {
-                    index[wu] = idx_counter; lowlink[wu] = idx_counter; idx_counter += 1;
-                    stack.push(w); on_stack[wu] = true; call_stack.push((w, 0));
+                    index[wu] = idx_counter;
+                    lowlink[wu] = idx_counter;
+                    idx_counter += 1;
+                    stack.push(w);
+                    on_stack[wu] = true;
+                    call_stack.push((w, 0));
                 } else if on_stack[wu] {
                     lowlink[vu] = lowlink[vu].min(index[wu]);
                 }
@@ -90,11 +125,16 @@ pub fn find_cycles(g: &KnowledgeGraph, mask: Option<u64>) -> Vec<Vec<NodeId>> {
                 if lowlink[vu] == index[vu] {
                     let mut comp: Vec<NodeId> = Vec::new();
                     loop {
-                        let w = stack.pop().unwrap(); on_stack[w as usize] = false;
+                        let w = stack.pop().unwrap();
+                        on_stack[w as usize] = false;
                         comp.push(NodeId(w));
-                        if w == v { break; }
+                        if w == v {
+                            break;
+                        }
                     }
-                    if comp.len() > 1 || self_loop[vu] { sccs.push(comp); }
+                    if comp.len() > 1 || self_loop[vu] {
+                        sccs.push(comp);
+                    }
                 }
                 call_stack.pop();
                 if let Some(&(parent, _)) = call_stack.last() {
@@ -116,25 +156,43 @@ pub fn find_cycles(g: &KnowledgeGraph, mask: Option<u64>) -> Vec<Vec<NodeId>> {
 /// the root-based default instead.
 pub fn find_orphans(g: &KnowledgeGraph, entry_points: &[NodeId]) -> Vec<NodeId> {
     let n = g.node_count();
-    let live: Vec<bool> = (0..n).map(|i| !g.is_node_deleted(NodeId(i as u32))).collect();
+    let live: Vec<bool> = (0..n)
+        .map(|i| !g.is_node_deleted(NodeId(i as u32)))
+        .collect();
     let adj = outgoing_adjacency(g, None);
     let entries: Vec<u32> = if entry_points.is_empty() {
         let inc = incoming_adjacency(g, None);
-        (0..n).filter(|&i| live[i] && inc[i].is_empty()).map(|i| i as u32).collect()
+        (0..n)
+            .filter(|&i| live[i] && inc[i].is_empty())
+            .map(|i| i as u32)
+            .collect()
     } else {
-        entry_points.iter()
+        entry_points
+            .iter()
             .filter(|nid| (nid.0 as usize) < n && live[nid.0 as usize])
-            .map(|nid| nid.0).collect()
+            .map(|nid| nid.0)
+            .collect()
     };
     let mut reached = vec![false; n];
     let mut q: VecDeque<u32> = VecDeque::new();
-    for e in entries { if !reached[e as usize] { reached[e as usize] = true; q.push_back(e); } }
-    while let Some(v) = q.pop_front() {
-        for &w in &adj[v as usize] {
-            if !reached[w as usize] { reached[w as usize] = true; q.push_back(w); }
+    for e in entries {
+        if !reached[e as usize] {
+            reached[e as usize] = true;
+            q.push_back(e);
         }
     }
-    (0..n).filter(|&i| live[i] && !reached[i]).map(|i| NodeId(i as u32)).collect()
+    while let Some(v) = q.pop_front() {
+        for &w in &adj[v as usize] {
+            if !reached[w as usize] {
+                reached[w as usize] = true;
+                q.push_back(w);
+            }
+        }
+    }
+    (0..n)
+        .filter(|&i| live[i] && !reached[i])
+        .map(|i| NodeId(i as u32))
+        .collect()
 }
 
 /// A structural snapshot of the graph. Structural-only — no
@@ -162,37 +220,60 @@ pub struct HealthReport {
 }
 
 /// Compute a structural health report with the top-5 central nodes.
-pub fn health_report(g: &KnowledgeGraph) -> HealthReport { health_report_top(g, 5) }
+pub fn health_report(g: &KnowledgeGraph) -> HealthReport {
+    health_report_top(g, 5)
+}
 
 /// `health_report` with a configurable number of central nodes.
 pub fn health_report_top(g: &KnowledgeGraph, top_n: usize) -> HealthReport {
     let n = g.node_count();
-    let live: Vec<bool> = (0..n).map(|i| !g.is_node_deleted(NodeId(i as u32))).collect();
+    let live: Vec<bool> = (0..n)
+        .map(|i| !g.is_node_deleted(NodeId(i as u32)))
+        .collect();
     let live_nodes = live.iter().filter(|&&b| b).count();
     let out_adj = outgoing_adjacency(g, None);
     let in_adj = incoming_adjacency(g, None);
     let (mut isolated, mut roots, mut leaves, mut edges) = (0usize, 0usize, 0usize, 0usize);
     for i in 0..n {
-        if !live[i] { continue; }
+        if !live[i] {
+            continue;
+        }
         let (od, idg) = (out_adj[i].len(), in_adj[i].len());
         edges += od;
-        if od == 0 && idg == 0 { isolated += 1; }
-        if idg == 0 { roots += 1; }
-        if od == 0 { leaves += 1; }
+        if od == 0 && idg == 0 {
+            isolated += 1;
+        }
+        if idg == 0 {
+            roots += 1;
+        }
+        if od == 0 {
+            leaves += 1;
+        }
     }
     let cycle_count = find_cycles(g, None).len();
     let orphan_count = find_orphans(g, &[]).len();
     let pr = crate::ranking::pagerank(g, None, 0.85, 30);
-    let mut ranked: Vec<(NodeId, f64)> = (0..n).filter(|&i| live[i])
-        .map(|i| (NodeId(i as u32), pr[i])).collect();
+    let mut ranked: Vec<(NodeId, f64)> = (0..n)
+        .filter(|&i| live[i])
+        .map(|i| (NodeId(i as u32), pr[i]))
+        .collect();
     ranked.sort_by(|a, b| {
         b.1.partial_cmp(&a.1)
             .unwrap_or(std::cmp::Ordering::Equal)
             .then(a.0 .0.cmp(&b.0 .0)) // explicit tie-break by ascending NodeId
     });
     ranked.truncate(top_n);
-    HealthReport { live_nodes, id_space: n, edges, isolated_nodes: isolated,
-        root_nodes: roots, leaf_nodes: leaves, cycle_count, orphan_count, top_central: ranked }
+    HealthReport {
+        live_nodes,
+        id_space: n,
+        edges,
+        isolated_nodes: isolated,
+        root_nodes: roots,
+        leaf_nodes: leaves,
+        cycle_count,
+        orphan_count,
+        top_central: ranked,
+    }
 }
 
 #[cfg(test)]
@@ -226,7 +307,8 @@ mod tests {
         g.add_edge(c, d, 1.0, vec![]);
         let cycles = find_cycles(&g, None);
         assert_eq!(cycles.len(), 1);
-        let mut members = cycles[0].clone(); members.sort();
+        let mut members = cycles[0].clone();
+        members.sort();
         assert_eq!(members, vec![a, b, c]);
     }
 

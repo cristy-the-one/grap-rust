@@ -58,9 +58,9 @@ fn indexed_knowledge_graph_exposes_hash_and_verify() {
     let mut g = IndexedKnowledgeGraph::new_on_disk();
     let n = g.add_node("indexed hash test", Some("idx"), None);
 
-    let _hex: Option<String> = g.node_content_hash(n).map(|bytes| {
-        bytes.iter().map(|b| format!("{:02x}", b)).collect()
-    });
+    let _hex: Option<String> = g
+        .node_content_hash(n)
+        .map(|bytes| bytes.iter().map(|b| format!("{:02x}", b)).collect());
     assert_eq!(g.verify_node(n), grap::NodeIntegrity::Match);
 
     g.save_to_dir(dir.path()).unwrap();

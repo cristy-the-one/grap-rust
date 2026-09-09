@@ -61,9 +61,7 @@ fn encode_tables(
     let mut sc: Vec<WireScalar> = Vec::with_capacity(scalars.len());
     for item in scalars.iter() {
         let t = item.downcast::<PyTuple>().map_err(|_| {
-            pyo3::exceptions::PyTypeError::new_err(
-                "each scalar must be a (key, value) tuple",
-            )
+            pyo3::exceptions::PyTypeError::new_err("each scalar must be a (key, value) tuple")
         })?;
         let key: String = t.get_item(0)?.extract()?;
         let val = py_to_value(&t.get_item(1)?)?;
@@ -89,9 +87,9 @@ fn encode_tables(
 
         // rows: list[list[...]]  (each row is a Python list of cell values)
         let rows_obj = t.get_item(4)?;
-        let rows_list = rows_obj.downcast::<PyList>().map_err(|_| {
-            pyo3::exceptions::PyTypeError::new_err("rows must be a list of lists")
-        })?;
+        let rows_list = rows_obj
+            .downcast::<PyList>()
+            .map_err(|_| pyo3::exceptions::PyTypeError::new_err("rows must be a list of lists"))?;
 
         let mut rows: Vec<Vec<WireValue>> = Vec::with_capacity(rows_list.len());
         for row_obj in rows_list.iter() {
@@ -105,7 +103,13 @@ fn encode_tables(
             rows.push(cells);
         }
 
-        tbls.push(WireTable { tag, key, cols, intern_cols, rows });
+        tbls.push(WireTable {
+            tag,
+            key,
+            cols,
+            intern_cols,
+            rows,
+        });
     }
 
     Ok(encode(tool, enc_id, &sc, &tbls))

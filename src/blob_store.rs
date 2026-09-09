@@ -118,7 +118,7 @@ impl BlobStore {
         let bytes = unsafe {
             std::slice::from_raw_parts(
                 embedding.as_ptr() as *const u8,
-                embedding.len() * std::mem::size_of::<f32>(),
+                std::mem::size_of_val(embedding),
             )
         };
         self.store_bytes(bytes)
@@ -293,7 +293,12 @@ mod tests {
 
     #[test]
     fn blobref_offset_is_u64_capable() {
-        let r = BlobRef { chunk_idx: 0, offset: (u32::MAX as u64) + 1234, length: 4, uncompressed_len: 4 };
+        let r = BlobRef {
+            chunk_idx: 0,
+            offset: (u32::MAX as u64) + 1234,
+            length: 4,
+            uncompressed_len: 4,
+        };
         assert_eq!(r.offset, 4_294_968_529);
     }
 }

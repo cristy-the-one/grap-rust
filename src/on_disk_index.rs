@@ -142,8 +142,7 @@ impl SimpleWal {
 
     fn append(&mut self, op: &WalOp) -> std::io::Result<()> {
         if let Some(f) = &mut self.file {
-            let bytes = bincode::serialize(op)
-                .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+            let bytes = bincode::serialize(op).map_err(std::io::Error::other)?;
             let len = bytes.len() as u32;
             use std::io::Write;
             f.write_all(&len.to_le_bytes())?;
@@ -352,8 +351,7 @@ impl OnDiskSegment {
                 "bad magic",
             ));
         }
-        bincode::deserialize(&buf[he..])
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
+        bincode::deserialize(&buf[he..]).map_err(std::io::Error::other)
     }
 }
 
@@ -365,6 +363,12 @@ pub struct SegmentBuilder {
     deleted: Vec<u8>,
     postings: HashMap<String, Vec<Posting>>,
     doc_lengths: Vec<u32>,
+}
+
+impl Default for SegmentBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl SegmentBuilder {
@@ -382,7 +386,7 @@ impl SegmentBuilder {
     pub fn add_document(&mut self, terms: &[&str], positions: &[Vec<u32>]) -> LocalDocId {
         let doc_id = self.doc_count;
         self.doc_count += 1;
-        let needed = ((self.doc_count as usize) + 7) / 8;
+        let needed = (self.doc_count as usize).div_ceil(8);
         self.deleted.resize(needed, 0);
         self.doc_lengths.push(terms.len() as u32);
         for (i, t) in terms.iter().enumerate() {
@@ -455,6 +459,12 @@ pub struct ActiveBuffer {
     wal: Option<SimpleWal>,
 }
 
+impl Default for ActiveBuffer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ActiveBuffer {
     /// Creates a new empty active buffer (no WAL).
     pub fn new() -> Self {
@@ -510,7 +520,7 @@ impl ActiveBuffer {
                         .builder
                         .deleted
                         .get((x.doc_id as usize) / 8)
-                        .map_or(false, |b| (b & (1 << (x.doc_id as usize % 8))) != 0)
+                        .is_some_and(|b| (b & (1 << (x.doc_id as usize % 8))) != 0)
                 })
                 .cloned()
                 .collect()
@@ -577,6 +587,12 @@ pub struct OnDiskIndex {
     merge_policy: Option<TieredMergePolicy>,
 }
 
+impl Default for OnDiskIndex {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl OnDiskIndex {
     /// Creates an empty index with no merge policy (segments are never merged automatically).
     pub fn new() -> Self {
@@ -611,7 +627,7 @@ impl OnDiskIndex {
     /// `enable_wal` immediately after `new()`, before adding any documents.
     pub fn enable_wal(&mut self, p: &Path) -> std::io::Result<()> {
         let w = SimpleWal::create(p)?;
-        self.active = std::mem::replace(&mut self.active, ActiveBuffer::new()).with_wal(w);
+        self.active = std::mem::take(&mut self.active).with_wal(w);
         Ok(())
     }
 
@@ -686,7 +702,7 @@ impl OnDiskIndex {
                     .builder
                     .deleted
                     .get(byte)
-                    .map_or(false, |b| (b & (1 << bit)) != 0);
+                    .is_some_and(|b| (b & (1 << bit)) != 0);
             }
         }
         // Search sealed segments
@@ -724,7 +740,7 @@ impl OnDiskIndex {
             return None;
         }
         let seg_start = self.active_start_global_id;
-        let seg = std::mem::replace(&mut self.active, ActiveBuffer::new()).seal();
+        let seg = std::mem::take(&mut self.active).seal();
         self.active_start_global_id = self.global_doc_counter;
         self.total_docs += seg.doc_count as u64;
         self.total_tokens += seg.doc_lengths.iter().map(|&l| l as u64).sum::<u64>();
@@ -1182,6 +1198,7 @@ fn compute_ondisk_proximity(term_positions: &[Vec<u32>], max_gap: u32) -> f32 {
 /// - Filters out deleted documents (tombstones) from each input segment.
 /// - Remaps live document IDs to a dense 0..live_count range.
 /// - Rebuilds a single clean `OnDiskSegment` with merged term dictionary and postings.
+///
 /// This is the core primitive used by both full `compact()` and incremental `vacuum()`.
 pub fn merge_segments(segs: &[&OnDiskSegment]) -> OnDiskSegment {
     if segs.is_empty() {
@@ -1268,7 +1285,7 @@ pub fn merge_segments(segs: &[&OnDiskSegment]) -> OnDiskSegment {
     }
 
     let new_deleted = if global_live > 0 {
-        vec![0u8; ((global_live as usize) + 7) / 8]
+        vec![0u8; (global_live as usize).div_ceil(8)]
     } else {
         vec![]
     };
@@ -1457,7 +1474,7 @@ pub fn merge_segments_with_offsets(segs: &[(&OnDiskSegment, u32)]) -> OnDiskSegm
     }
 
     let new_deleted = if global_live > 0 {
-        vec![0u8; ((global_live as usize) + 7) / 8]
+        vec![0u8; (global_live as usize).div_ceil(8)]
     } else {
         vec![]
     };

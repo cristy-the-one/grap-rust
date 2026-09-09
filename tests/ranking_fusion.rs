@@ -131,13 +131,17 @@ fn rrf_and_linear_both_return_results() {
     g.add_edge(a, c, 0.9, vec![]);
     g.add_edge(b, c, 0.2, vec![]);
 
-    let mut w = HybridWeights::default();
-    w.mode = FusionMode::Rrf { k: 60.0 };
+    let w = HybridWeights {
+        mode: FusionMode::Rrf { k: 60.0 },
+        ..HybridWeights::default()
+    };
     let rrf = g.search_and_traverse_hybrid("memory safety", None, 5, &[], 0.0, 2, 10, w);
     assert!(!rrf.is_empty());
 
-    let mut wl = HybridWeights::default();
-    wl.mode = FusionMode::Linear;
+    let wl = HybridWeights {
+        mode: FusionMode::Linear,
+        ..HybridWeights::default()
+    };
     let lin = g.search_and_traverse_hybrid("memory safety", None, 5, &[], 0.0, 2, 10, wl);
     assert!(!lin.is_empty());
 }

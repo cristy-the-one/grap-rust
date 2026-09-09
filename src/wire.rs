@@ -269,7 +269,12 @@ pub fn decode(payload: &str) -> DecodedDoc {
             tables.entry(key.clone()).or_default().push(row);
         }
     }
-    DecodedDoc { tool, enc_id, scalars, tables }
+    DecodedDoc {
+        tool,
+        enc_id,
+        scalars,
+        tables,
+    }
 }
 
 fn header_field(header: &str, key: &str) -> String {

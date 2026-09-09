@@ -281,9 +281,9 @@ pub(crate) fn rename_with_retry(src: &Path, dst: &Path) -> Result<(), GraphError
             }
         }
     }
-    Err(last_err.map(GraphError::from).unwrap_or_else(|| {
-        std::io::Error::new(std::io::ErrorKind::Other, "rename failed after retries").into()
-    }))
+    Err(last_err
+        .map(GraphError::from)
+        .unwrap_or_else(|| std::io::Error::other("rename failed after retries").into()))
 }
 
 impl KnowledgeGraph {
@@ -376,7 +376,7 @@ impl KnowledgeGraph {
         let property_names = self.properties.property_names().to_vec();
         let topo_data =
             bincode::serialize(&(serializable_nodes, serializable_edges, property_names))
-                .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+                .map_err(io::Error::other)?;
         fs::write(&topo_path, &topo_data)?;
 
         // 4. Write meta
@@ -421,10 +421,8 @@ impl KnowledgeGraph {
 
         // Clean staging dir INSIDE dir itself (current save strategy)
         let staging = dir.join(".grap-new");
-        if staging.exists() {
-            if fs::remove_dir_all(&staging).is_ok() {
-                removed += 1;
-            }
+        if staging.exists() && fs::remove_dir_all(&staging).is_ok() {
+            removed += 1;
         }
 
         // Clean sibling temp dirs (from old atomic-rename approach)
@@ -433,11 +431,11 @@ impl KnowledgeGraph {
                 for entry in entries.flatten() {
                     let name = entry.file_name();
                     if let Some(name_str) = name.to_str() {
-                        if name_str.starts_with(".grap-save-") || name_str.starts_with(".grap-old-")
+                        if (name_str.starts_with(".grap-save-")
+                            || name_str.starts_with(".grap-old-"))
+                            && fs::remove_dir_all(entry.path()).is_ok()
                         {
-                            if fs::remove_dir_all(entry.path()).is_ok() {
-                                removed += 1;
-                            }
+                            removed += 1;
                         }
                     }
                 }
@@ -561,8 +559,7 @@ impl KnowledgeGraph {
 
         // Read meta
         let meta_str = fs::read_to_string(dir.join("graph.meta"))?;
-        let meta: GraphMeta =
-            serde_json::from_str(&meta_str).map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+        let meta: GraphMeta = serde_json::from_str(&meta_str).map_err(io::Error::other)?;
 
         if meta.version != CURRENT_GRAPH_FORMAT_VERSION {
             return Err(GraphError::UnsupportedVersion {
@@ -630,8 +627,7 @@ impl KnowledgeGraph {
             Vec<SerializableNode>,
             Vec<SerializableEdge>,
             Vec<String>,
-        ) = bincode::deserialize(&topo_data)
-            .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+        ) = bincode::deserialize(&topo_data).map_err(io::Error::other)?;
 
         // Rebuild PropertyRegistry first
         let mut properties = crate::properties::PropertyRegistry::new();
@@ -771,8 +767,7 @@ impl KnowledgeGraph {
     /// [`GraphError::UnsupportedVersion`]).
     pub fn load_meta(dir: &Path) -> Result<GraphMeta, GraphError> {
         let meta_str = fs::read_to_string(dir.join("graph.meta"))?;
-        let meta: GraphMeta =
-            serde_json::from_str(&meta_str).map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+        let meta: GraphMeta = serde_json::from_str(&meta_str).map_err(io::Error::other)?;
 
         if meta.version != CURRENT_GRAPH_FORMAT_VERSION {
             return Err(GraphError::UnsupportedVersion {
@@ -805,8 +800,7 @@ impl KnowledgeGraph {
 pub fn load_mmap(dir: &Path) -> Result<KnowledgeGraph, GraphError> {
     // Read meta (version-check exactly like load_from_disk).
     let meta_str = fs::read_to_string(dir.join("graph.meta"))?;
-    let meta: GraphMeta =
-        serde_json::from_str(&meta_str).map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+    let meta: GraphMeta = serde_json::from_str(&meta_str).map_err(io::Error::other)?;
 
     if meta.version != CURRENT_GRAPH_FORMAT_VERSION {
         return Err(GraphError::UnsupportedVersion {
@@ -843,7 +837,7 @@ pub fn load_mmap(dir: &Path) -> Result<KnowledgeGraph, GraphError> {
         Vec<SerializableNode>,
         Vec<SerializableEdge>,
         Vec<String>,
-    ) = bincode::deserialize(&topo_data).map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+    ) = bincode::deserialize(&topo_data).map_err(io::Error::other)?;
 
     // Rebuild PropertyRegistry first.
     let mut properties = crate::properties::PropertyRegistry::new();
@@ -904,8 +898,7 @@ pub fn load_mmap(dir: &Path) -> Result<KnowledgeGraph, GraphError> {
         };
 
         // Recompute the content hash via a zero-copy read from the map.
-        let content_hash =
-            crate::lifecycle::hash::sha256_digest(blobs.read(&blob).as_bytes());
+        let content_hash = crate::lifecycle::hash::sha256_digest(blobs.read(&blob).as_bytes());
 
         rebuilt_nodes.push(crate::graph::Node {
             blob,

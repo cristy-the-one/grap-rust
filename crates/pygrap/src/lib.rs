@@ -53,6 +53,15 @@ fn version() -> &'static str {
 // A damaged or partial saved graph must fail to open, never become a fresh
 // empty graph that a subsequent save could overwrite. Empty workdirs are valid.
 fn existing_graph_path(dir: &std::path::Path) -> bool {
-    ["graph", "text_index", "vector_index", "manifest.json", "shards", "graph.meta", "graph.topo"]
-        .iter().any(|entry| dir.join(entry).exists())
+    [
+        "graph",
+        "text_index",
+        "vector_index",
+        "manifest.json",
+        "shards",
+        "graph.meta",
+        "graph.topo",
+    ]
+    .iter()
+    .any(|entry| dir.join(entry).exists())
 }
