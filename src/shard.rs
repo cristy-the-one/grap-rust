@@ -1283,6 +1283,7 @@ impl ShardRouter {
         let mut replacement = Self::new(plan.new_shard_count);
         replacement.telemetry = self.telemetry.clone();
         let mut mapping = HashMap::new();
+        let mut imports = vec![HashMap::new(); plan.new_shard_count as usize];
         for (sid, shard) in self.shards.iter().enumerate() {
             for local in 0..shard.graph.graph.node_count() {
                 let old = GlobalNodeId {
@@ -1296,11 +1297,10 @@ impl ShardRouter {
                 if target.0 >= plan.new_shard_count {
                     return Err(error("missing migration from a removed shard"));
                 }
-                let embedding = shard.graph.read_embedding(old.local);
-                let node = replacement.shards[target.0 as usize].graph.add_node(
-                    shard.graph.read_blob(old.local),
-                    shard.graph.graph.node_label(old.local),
-                    embedding.as_deref(),
+                let node = replacement.shards[target.0 as usize].graph.import_node(
+                    &shard.graph,
+                    old.local,
+                    &mut imports[target.0 as usize],
                 );
                 mapping.insert(
                     old,

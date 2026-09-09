@@ -1026,6 +1026,46 @@ impl IndexedKnowledgeGraph {
         id
     }
 
+    /// Import immutable payloads without duplicating the source arena. Topology
+    /// is rebuilt separately; indexes receive the destination's new local ID.
+    pub(crate) fn import_node(
+        &mut self,
+        source: &Self,
+        node: NodeId,
+        imported: &mut std::collections::HashMap<usize, u32>,
+    ) -> NodeId {
+        let old = &source.graph.nodes[node.0 as usize];
+        let blob = self
+            .graph
+            .blobs
+            .import_blob(&source.graph.blobs, &old.blob, imported);
+        let embedding = old.embedding.as_ref().map(|r| {
+            self.graph
+                .blobs
+                .import_blob(&source.graph.blobs, r, imported)
+        });
+        let id = NodeId(u32::try_from(self.graph.nodes.len()).expect("too many nodes"));
+        self.graph.nodes.push(crate::graph::Node {
+            blob,
+            embedding,
+            label: old.label.clone(),
+            content_hash: old.content_hash,
+            outgoing: Vec::new(),
+            incoming: Vec::new(),
+            outgoing_property_mask: 0,
+        });
+        self.graph.deleted.push(false);
+        self.text_index
+            .index_document(id, source.graph.read_blob(node));
+        if let Some(emb) = source.read_embedding(node) {
+            self.vector_index
+                .get_or_insert_with(crate::vector_index::create_default_vector_index)
+                .add_vector(id, &emb);
+        }
+        *self.pagerank_cache.lock().unwrap() = None;
+        id
+    }
+
     /// Replace a node's text content and optionally its embedding.
     ///
     /// - Text index is updated: old terms are removed (tombstoned for on-disk

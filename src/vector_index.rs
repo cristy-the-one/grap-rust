@@ -304,7 +304,7 @@ impl BruteForceVectorIndex {
 
 /// In-memory HNSW vector index using the `hnsw_rs` crate.
 ///
-/// This is the recommended production-grade backend for Phase 1+.
+/// Experimental approximate backend with exact scoring and mutation reconciliation.
 ///
 /// It is only compiled when the `ann-hnsw` feature is enabled.
 #[cfg(feature = "ann-hnsw")]
@@ -323,8 +323,12 @@ pub struct HNSWVectorIndex {
     vectors: std::collections::HashMap<NodeId, Vec<f32>>,
     /// Dimension of the vectors (inferred on first insert).
     dimension: usize,
-    /// Set of logically deleted node ids (we don't have great delete in hnsw_rs yet).
-    deleted: std::collections::HashSet<NodeId>,
+    /// Labels physically present in the immutable-until-rebuild ANN structure.
+    base_ids: std::collections::HashSet<NodeId>,
+    /// Updated/deleted labels whose old ANN entries must never be returned.
+    changed: std::collections::HashSet<NodeId>,
+    /// Zero vectors cannot enter cosine HNSW; score them in the exact overlay.
+    zero_vectors: std::collections::HashSet<NodeId>,
     /// Parameters used at construction time (for stats / future rebuild).
     params: HNSWParams,
 }
@@ -335,7 +339,7 @@ impl std::fmt::Debug for HNSWVectorIndex {
         f.debug_struct("HNSWVectorIndex")
             .field("dimension", &self.dimension)
             .field("vector_count", &self.inner.get_nb_point())
-            .field("deleted_count", &self.deleted.len())
+            .field("pending_changes", &self.changed.len())
             .field("params", &self.params)
             .finish_non_exhaustive()
     }
@@ -376,108 +380,200 @@ impl HNSWVectorIndex {
     }
 
     /// Create a new HNSW index with custom parameters.
+    /// Panics for invalid parameters; use `try_with_params` for untrusted inputs.
     pub fn with_params(params: HNSWParams) -> Self {
-        // We use a generous initial capacity. Hnsw will grow as needed.
-        let hnsw = Hnsw::<f32, DistCosine>::new(
-            params.max_connections,
-            10_000, // initial capacity hint
-            params.max_layers,
-            params.ef_construction,
+        Self::try_with_params(params).expect("invalid HNSW parameters")
+    }
+
+    /// Validate parameters before entering upstream code (which can exit the
+    /// process for an excessive connection count).
+    pub fn try_with_params(params: HNSWParams) -> Result<Self, crate::GraphError> {
+        if !(2..=256).contains(&params.max_connections)
+            || !(1..=16).contains(&params.max_layers)
+            || params.ef_construction < params.max_connections
+            || params.ef_search == 0
+        {
+            return Err(crate::GraphError::Other("invalid HNSW parameters: require M=2..256, layers=1..16, ef_construction>=M and ef_search>0".into()));
+        }
+        Ok(Self {
+            inner: Hnsw::new(
+                params.max_connections,
+                10_000,
+                params.max_layers,
+                params.ef_construction,
+                DistCosine {},
+            ),
+            vectors: Default::default(),
+            dimension: 0,
+            base_ids: Default::default(),
+            changed: Default::default(),
+            zero_vectors: Default::default(),
+            params,
+        })
+    }
+
+    /// Physical ANN points, including stale entries awaiting compaction.
+    pub fn physical_vector_count(&self) -> usize {
+        self.inner.get_nb_point()
+    }
+
+    /// Number of invalidated ANN labels awaiting compaction.
+    pub fn pending_change_count(&self) -> usize {
+        self.changed.len()
+    }
+
+    /// Checked insertion. Empty, non-finite and mismatched vectors are rejected
+    /// without changing the existing value. Zero vectors are supported exactly.
+    pub fn try_add_vector(
+        &mut self,
+        node: NodeId,
+        embedding: &[f32],
+    ) -> Result<(), crate::GraphError> {
+        if embedding.is_empty()
+            || embedding.iter().any(|v| !v.is_finite())
+            || (self.dimension != 0 && embedding.len() != self.dimension)
+        {
+            return Err(crate::GraphError::Other(
+                "invalid HNSW embedding: expected nonempty finite values with consistent dimension"
+                    .into(),
+            ));
+        }
+        self.dimension = embedding.len();
+        self.zero_vectors.remove(&node);
+        if self.base_ids.contains(&node) {
+            self.changed.insert(node);
+        }
+        if let Some(normalized) = Self::normalize(embedding) {
+            if !self.base_ids.contains(&node) {
+                self.inner.insert((&normalized, node.0 as usize));
+                self.base_ids.insert(node);
+            }
+        } else {
+            self.zero_vectors.insert(node);
+        }
+        self.vectors.insert(node, embedding.to_vec());
+        self.compact_if_needed();
+        Ok(())
+    }
+
+    fn normalize(vector: &[f32]) -> Option<Vec<f32>> {
+        let norm = vector
+            .iter()
+            .map(|v| (*v as f64).powi(2))
+            .sum::<f64>()
+            .sqrt();
+        (norm > 0.0 && norm.is_finite())
+            .then(|| vector.iter().map(|v| (*v as f64 / norm) as f32).collect())
+    }
+
+    fn compact_if_needed(&mut self) {
+        if self.changed.len() >= 64.max(self.vectors.len() / 4) {
+            self.rebuild();
+        }
+    }
+
+    fn rebuild(&mut self) {
+        self.inner = Hnsw::new(
+            self.params.max_connections,
+            self.vectors.len().max(1),
+            self.params.max_layers,
+            self.params.ef_construction,
             DistCosine {},
         );
-
-        Self {
-            inner: hnsw,
-            vectors: std::collections::HashMap::new(),
-            dimension: 0,
-            deleted: std::collections::HashSet::new(),
-            params,
+        self.base_ids.clear();
+        self.changed.clear();
+        self.zero_vectors.clear();
+        // Stable insertion order; upstream still assigns random hierarchy levels.
+        let mut ids: Vec<_> = self.vectors.keys().copied().collect();
+        ids.sort_unstable();
+        for id in ids {
+            if let Some(vector) = Self::normalize(&self.vectors[&id]) {
+                self.inner.insert((&vector, id.0 as usize));
+                self.base_ids.insert(id);
+            } else {
+                self.zero_vectors.insert(id);
+            }
         }
+    }
+
+    fn score_candidates(
+        &self,
+        query: &[f32],
+        ids: impl Iterator<Item = NodeId>,
+        k: usize,
+    ) -> Vec<(NodeId, f64)> {
+        let mut results: Vec<_> = ids
+            .filter_map(|id| {
+                self.vectors
+                    .get(&id)
+                    .map(|v| (id, cosine_similarity(query, v)))
+            })
+            .collect();
+        results.sort_unstable_by(|a, b| b.1.total_cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
+        results.truncate(k);
+        results
     }
 }
 
 #[cfg(feature = "ann-hnsw")]
 impl VectorIndex for HNSWVectorIndex {
     fn add_vector(&mut self, node: NodeId, embedding: &[f32]) {
-        if self.dimension == 0 && !embedding.is_empty() {
-            self.dimension = embedding.len();
-        } else if self.dimension > 0 && embedding.len() != self.dimension {
-            // Silently skip mismatched vectors in release; panic in debug to catch bugs early.
-            debug_assert_eq!(
-                embedding.len(),
-                self.dimension,
-                "HNSWVectorIndex: dimension mismatch (got {}, expected {})",
-                embedding.len(),
-                self.dimension
-            );
-            return;
+        if let Err(error) = self.try_add_vector(node, embedding) {
+            log::warn!("{error}");
         }
-
-        // hnsw_rs uses usize labels. We cast NodeId (u32) safely.
-        let label = node.0 as usize;
-
-        // Insert (or re-insert). hnsw_rs will handle duplicates by label.
-        self.inner.insert((embedding, label));
-
-        // Keep the raw vector so we can persist the index efficiently
-        // without re-reading the entire graph's BlobStore on load.
-        self.vectors.insert(node, embedding.to_vec());
-
-        // If it was previously deleted, un-delete it.
-        self.deleted.remove(&node);
     }
 
     fn remove_vector(&mut self, node: NodeId) {
-        self.deleted.insert(node);
         self.vectors.remove(&node);
-        // Note: We do not call any remove on the inner HNSW because
-        // hnsw_rs has limited delete support. We filter at search time.
+        self.zero_vectors.remove(&node);
+        if self.base_ids.contains(&node) {
+            self.changed.insert(node);
+        }
+        self.compact_if_needed();
     }
 
     fn search(&self, query: &[f32], max_results: usize) -> Vec<(NodeId, f64)> {
-        if self.dimension == 0 || query.len() != self.dimension || max_results == 0 {
+        if query.len() != self.dimension || query.iter().any(|v| !v.is_finite()) || max_results == 0
+        {
             return Vec::new();
         }
-
-        let max_results = max_results.min(self.vectors.len());
-        if max_results == 0 {
-            return vec![];
+        let k = max_results.min(self.vectors.len());
+        if k == 0 {
+            return Vec::new();
         }
-        // Only fetch extra candidates when there are soft-deleted nodes to skip.
-        // This avoids the 2× over-fetch cost on the common (no deletes) path.
-        let fetch = if self.deleted.is_empty() {
-            max_results
-        } else {
-            max_results.saturating_add(self.deleted.len())
-        };
-        // Minimum search expansion factor (ef). The actual ef used at query time
-        // is `max(ef_search, fetch)` to ensure enough candidates are explored
-        // when large result sets are requested.
-        let ef = self.params.ef_search.max(fetch);
-
-        // hnsw_rs returns neighbors with distance (lower is better for DistCosine)
-        let neighbors = self.inner.search(query, fetch, ef);
-
-        let mut results = Vec::with_capacity(max_results);
-
-        for neighbor in neighbors {
-            let node_id = NodeId(neighbor.d_id as u32);
-
-            if self.deleted.contains(&node_id) {
-                continue;
-            }
-
-            // Convert cosine *distance* to similarity.
-            // DistCosine returns 1 - cosine_similarity for normalized vectors.
-            let similarity: f64 = (1.0 - neighbor.distance as f64).clamp(0.0, 1.0);
-            results.push((node_id, similarity));
-
-            if results.len() == max_results {
-                break;
+        let normalized = Self::normalize(query);
+        if self.vectors.len() <= 64 || k == self.vectors.len() || normalized.is_none() {
+            return self.score_candidates(query, self.vectors.keys().copied(), k);
+        }
+        let fetch = self
+            .params
+            .ef_search
+            .max(k.saturating_add(self.changed.len()))
+            .min(self.base_ids.len());
+        let mut ids = std::collections::HashSet::new();
+        if fetch > 0 {
+            for neighbor in self.inner.search(
+                &normalized.unwrap(),
+                fetch,
+                self.params.ef_search.max(fetch),
+            ) {
+                let id = NodeId(neighbor.d_id as u32);
+                if !self.changed.contains(&id) {
+                    ids.insert(id);
+                }
             }
         }
-
+        ids.extend(self.changed.iter().chain(&self.zero_vectors).copied());
+        let results = self.score_candidates(query, ids.into_iter(), k);
+        // Approximate search is not guaranteed to enumerate even k live points.
+        if results.len() < k {
+            return self.score_candidates(query, self.vectors.keys().copied(), k);
+        }
         results
+    }
+
+    fn vacuum(&mut self) {
+        self.rebuild();
     }
 
     fn stats(&self) -> VectorIndexStats {
@@ -541,11 +637,12 @@ impl HNSWVectorIndex {
 
         // Write vectors.bin (compact)
         let vectors_path = dir.join("vectors.bin");
-        let persisted: Vec<(u32, Vec<f32>)> = self
+        let mut persisted: Vec<(u32, &[f32])> = self
             .vectors
             .iter()
-            .map(|(id, vec)| (id.0, vec.clone()))
+            .map(|(id, vector)| (id.0, vector.as_slice()))
             .collect();
+        persisted.sort_unstable_by_key(|(id, _)| *id);
 
         let encoded = bincode::serialize(&persisted)
             .map_err(|e| crate::GraphError::Other(format!("Failed to serialize vectors: {e}")))?;
@@ -587,49 +684,38 @@ impl HNSWVectorIndex {
                 manifest.version
             )));
         }
-        if manifest.dimension == 0 {
-            return Ok(false);
-        }
-
-        // Read vectors
         let data = fs::read(&vectors_path)?;
-        let persisted: Vec<(u32, Vec<f32>)> = bincode::deserialize(&data)
+        let mut persisted: Vec<(u32, Vec<f32>)> = bincode::deserialize(&data)
             .map_err(|e| crate::GraphError::Other(format!("Corrupted vectors.bin: {e}")))?;
-
-        // Dimension mismatch check (defensive)
-        for (_, emb) in &persisted {
-            if emb.len() != manifest.dimension {
+        let params = match manifest.hnsw_params {
+            Some(value) => serde_json::from_value(value)
+                .map_err(|e| crate::GraphError::Other(format!("Invalid HNSW parameters: {e}")))?,
+            None => HNSWParams::default(),
+        };
+        let mut replacement = Self::try_with_params(params)?;
+        if persisted.len() != manifest.vector_count {
+            return Err(crate::GraphError::Other(
+                "HNSW vector count mismatch".into(),
+            ));
+        }
+        let mut ids = std::collections::HashSet::new();
+        for (id, emb) in &persisted {
+            if !ids.insert(*id)
+                || emb.is_empty()
+                || emb.len() != manifest.dimension
+                || emb.iter().any(|v| !v.is_finite())
+            {
                 return Err(crate::GraphError::Other(
-                    "Dimension mismatch between manifest and stored vectors".into(),
+                    "Invalid or duplicate persisted HNSW vector".into(),
                 ));
             }
         }
-
-        // Rebuild HNSW from the persisted list (fast path)
-        self.dimension = manifest.dimension;
-        if let Some(json_val) = manifest.hnsw_params {
-            if let Ok(p) = serde_json::from_value::<HNSWParams>(json_val) {
-                self.params = p;
-            }
+        replacement.dimension = manifest.dimension;
+        persisted.sort_unstable_by_key(|(id, _)| *id);
+        for (id, emb) in persisted {
+            replacement.try_add_vector(NodeId(id), &emb)?;
         }
-
-        // Recreate HNSW with the saved parameters
-        self.inner = Hnsw::<f32, DistCosine>::new(
-            self.params.max_connections,
-            persisted.len().max(10_000),
-            self.params.max_layers,
-            self.params.ef_construction,
-            DistCosine {},
-        );
-        self.vectors.clear();
-        self.deleted.clear();
-
-        for (id_u32, emb) in persisted {
-            let node = NodeId(id_u32);
-            let label = id_u32 as usize;
-            self.inner.insert((&emb, label));
-            self.vectors.insert(node, emb);
-        }
+        *self = replacement;
 
         Ok(true)
     }

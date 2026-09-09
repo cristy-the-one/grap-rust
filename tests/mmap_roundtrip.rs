@@ -61,10 +61,14 @@ fn write_after_mmap_open_preserves_existing_and_adds_new() {
 
     let mut g2 = KnowledgeGraph::load_mmap(dir.path()).unwrap();
     assert!(g2.blobs_are_mapped());
-    let b = g2.add_node("newly added text", Some("B"), None); // triggers copy-on-write
-    assert!(!g2.blobs_are_mapped()); // now owned chunks
+    let b = g2.add_node("newly added text", Some("B"), None); // appends an owned chunk
+    assert!(g2.blobs_are_mapped()); // existing mapping remains shared
     assert_eq!(g2.read_blob(a), "original mapped text"); // existing ref still valid
     assert_eq!(g2.read_blob(b), "newly added text"); // new ref valid
+    g2.save_to_disk(dir.path()).unwrap();
+    let loaded = KnowledgeGraph::load_from_disk(dir.path()).unwrap();
+    assert_eq!(loaded.read_blob(a), "original mapped text");
+    assert_eq!(loaded.read_blob(b), "newly added text");
 }
 
 #[test]

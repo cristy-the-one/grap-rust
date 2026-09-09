@@ -18,5 +18,6 @@ pyo3 = { version = "0.23", features = ["extension-module"] }
 
 [features]
 default = []
+ann-hnsw = ["grap/ann-hnsw"] # Opt-in approximate vectors; exact remains the default.
 # Future: add "mmap" feature here when we want to expose mmap loading from Python
 # mmap = ["grap/mmap"]

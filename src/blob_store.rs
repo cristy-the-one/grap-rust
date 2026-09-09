@@ -16,7 +16,7 @@ pub struct BlobRef {
     /// Index of the chunk inside the `BlobStore`.
     pub chunk_idx: u32,
     /// Byte offset: local within the chunk for in-memory `Chunks`, or the global
-    /// offset into the mapped file for `Storage::Mmap`.
+    /// offset into the mapped file for mapped chunks.
     pub offset: u64,
     /// Length of the stored (possibly compressed) bytes.
     pub length: u32,
@@ -24,88 +24,59 @@ pub struct BlobRef {
     pub uncompressed_len: u32,
 }
 
-/// Internal storage backend for blobs.
+/// An immutable shared arena chunk. Only uniquely owned memory can be appended.
 #[derive(Debug)]
-pub(crate) enum Storage {
-    /// Normal in-memory chunks (used for writing and portable loading).
-    Chunks(Vec<Vec<u8>>),
-    /// Memory-mapped flat blob file (used for fast loading of huge datasets).
+enum Chunk {
+    Owned(Vec<u8>),
     #[cfg(feature = "mmap")]
-    Mmap(memmap2::Mmap),
+    Mapped(memmap2::Mmap),
 }
-
-impl Default for Storage {
-    fn default() -> Self {
-        Storage::Chunks(vec![Vec::with_capacity(CHUNK_SIZE)])
+impl Chunk {
+    fn bytes(&self) -> &[u8] {
+        match self {
+            Self::Owned(bytes) => bytes,
+            #[cfg(feature = "mmap")]
+            Self::Mapped(map) => map,
+        }
     }
 }
 
-impl Storage {
-    fn from_chunks(chunks: Vec<Vec<u8>>) -> Self {
-        Storage::Chunks(chunks)
-    }
-}
-
-/// Arena-based storage for large immutable text payloads (node blobs).
-///
-/// Blobs are appended to fixed-size chunks and referenced by [`BlobRef`].
-/// In-memory mode (always available) stores chunks as plain `Vec<u8>`.
-/// The `mmap` feature adds a read-only memory-mapped backend for large corpora.
+/// Append-only payload arena. Rebalance shares immutable chunks; subsequent writes
+/// allocate a new chunk rather than copying or modifying shared payloads.
 #[derive(Debug, Default)]
 pub struct BlobStore {
-    pub(crate) storage: Storage,
+    chunks: Vec<std::sync::Arc<Chunk>>,
 }
 
 impl BlobStore {
-    /// Creates an empty `BlobStore` with a single empty in-memory chunk.
+    /// Creates an empty arena, allocating payload memory on first write.
     pub fn new() -> Self {
-        Self {
-            storage: Storage::default(),
-        }
+        Self::default()
     }
 
-    /// Append text, return lightweight BlobRef.
-    /// Only supported in in-memory mode (writing while using mmap mode is not intended).
+    /// Append text and return a lightweight reference.
     pub fn store(&mut self, text: &str) -> BlobRef {
-        // Copy-on-write: a write to a memory-mapped (read-mostly) store migrates the
-        // mapped bytes into a single owned chunk so every existing BlobRef (global
-        // offset, chunk_idx 0) stays valid, then we append normally. One-time cost:
-        // the corpus is copied into RAM on the first mutation after a mmap open.
-        #[cfg(feature = "mmap")]
-        if let Storage::Mmap(mmap) = &self.storage {
-            let owned: Vec<u8> = mmap.to_vec();
-            self.storage = Storage::Chunks(vec![owned]);
-        }
+        self.store_bytes(text.as_bytes())
+    }
 
-        // At this point the storage is always Chunks (either originally or after the
-        // copy-on-write migration above).
-        let chunks = match &mut self.storage {
-            Storage::Chunks(chunks) => chunks,
-            #[cfg(feature = "mmap")]
-            Storage::Mmap(_) => unreachable!("mmap was already converted to Chunks above"),
-        };
-
-        let bytes = text.as_bytes();
-        let len = bytes.len();
-
-        let chunk_idx = {
-            let last = chunks.len() - 1;
-            if chunks[last].len() + len > CHUNK_SIZE && !chunks[last].is_empty() {
-                chunks.push(Vec::with_capacity(CHUNK_SIZE.max(len)));
-                chunks.len() - 1
-            } else {
-                last
-            }
-        };
-
-        let offset = chunks[chunk_idx].len();
-        chunks[chunk_idx].extend_from_slice(bytes);
-
+    /// Share the referenced chunk, remapping its local index. The import cache
+    /// belongs to this destination store and must not outlive its chunk layout.
+    pub(crate) fn import_blob(
+        &mut self,
+        source: &Self,
+        reference: &BlobRef,
+        imported: &mut std::collections::HashMap<usize, u32>,
+    ) -> BlobRef {
+        let chunk = &source.chunks[reference.chunk_idx as usize];
+        let key = std::sync::Arc::as_ptr(chunk) as usize;
+        let index = *imported.entry(key).or_insert_with(|| {
+            let index = u32::try_from(self.chunks.len()).expect("too many blob chunks");
+            self.chunks.push(chunk.clone());
+            index
+        });
         BlobRef {
-            chunk_idx: chunk_idx as u32,
-            offset: offset as u64,
-            length: len as u32,
-            uncompressed_len: len as u32,
+            chunk_idx: index,
+            ..reference.clone()
         }
     }
 
@@ -124,75 +95,43 @@ impl BlobStore {
         self.store_bytes(bytes)
     }
 
-    /// Internal helper used by both `store` and `store_embedding`.
     fn store_bytes(&mut self, bytes: &[u8]) -> BlobRef {
-        // Copy-on-write: a write to a memory-mapped (read-mostly) store migrates the
-        // mapped bytes into a single owned chunk so every existing BlobRef (global
-        // offset, chunk_idx 0) stays valid, then we append normally. One-time cost:
-        // the corpus is copied into RAM on the first mutation after a mmap open.
-        #[cfg(feature = "mmap")]
-        if let Storage::Mmap(mmap) = &self.storage {
-            let owned: Vec<u8> = mmap.to_vec();
-            self.storage = Storage::Chunks(vec![owned]);
+        let writable = self.chunks.last_mut().and_then(std::sync::Arc::get_mut);
+        if !matches!(writable, Some(Chunk::Owned(chunk)) if chunk.len() + bytes.len() <= CHUNK_SIZE)
+        {
+            self.chunks
+                .push(std::sync::Arc::new(Chunk::Owned(Vec::with_capacity(
+                    CHUNK_SIZE.max(bytes.len()),
+                ))));
         }
-
-        let chunks = match &mut self.storage {
-            Storage::Chunks(chunks) => chunks,
+        let last = self.chunks.len() - 1;
+        let chunk = match std::sync::Arc::get_mut(&mut self.chunks[last]).unwrap() {
+            Chunk::Owned(chunk) => chunk,
             #[cfg(feature = "mmap")]
-            Storage::Mmap(_) => unreachable!(),
+            Chunk::Mapped(_) => unreachable!("new chunk is writable"),
         };
-
-        let len = bytes.len();
-        let chunk_idx = {
-            let last = chunks.len() - 1;
-            if chunks[last].len() + len > CHUNK_SIZE && !chunks[last].is_empty() {
-                chunks.push(Vec::with_capacity(CHUNK_SIZE.max(len)));
-                chunks.len() - 1
-            } else {
-                last
-            }
-        };
-
-        let offset = chunks[chunk_idx].len();
-        chunks[chunk_idx].extend_from_slice(bytes);
-
+        let offset = chunk.len();
+        chunk.extend_from_slice(bytes);
         BlobRef {
-            chunk_idx: chunk_idx as u32,
+            chunk_idx: u32::try_from(last).expect("too many blob chunks"),
             offset: offset as u64,
-            length: len as u32,
-            uncompressed_len: len as u32,
+            length: u32::try_from(bytes.len()).expect("blob exceeds u32::MAX"),
+            uncompressed_len: bytes.len() as u32,
         }
     }
 
-    /// Zero-copy read. Works for both in-memory and memory-mapped backends.
-    #[allow(unsafe_code)]
+    /// Zero-copy UTF-8 read, including shared and mapped chunks.
     pub fn read(&self, r: &BlobRef) -> &str {
-        match &self.storage {
-            Storage::Chunks(chunks) => {
-                let chunk = &chunks[r.chunk_idx as usize];
-                let start = r.offset as usize;
-                let end = start + r.length as usize;
-                unsafe { std::str::from_utf8_unchecked(&chunk[start..end]) }
-            }
-            #[cfg(feature = "mmap")]
-            Storage::Mmap(mmap) => {
-                // In mmap mode the entire file is one flat region. BlobRef.offset is the
-                // global byte offset into the map (set by load_mmap from blob_global_offset).
-                // chunk_idx is always 0 in this backend.
-                let start = r.offset as usize;
-                let end = start + r.length as usize;
-
-                // SAFETY: The mmap is owned by this BlobStore and lives at least as long as the &str.
-                let bytes = &mmap[start..end];
-                unsafe { std::str::from_utf8_unchecked(bytes) }
-            }
-        }
+        std::str::from_utf8(self.read_bytes(r).expect("invalid blob reference"))
+            .expect("text blob is not UTF-8")
     }
 
-    /// Returns true if this BlobStore is backed by a memory map.
+    /// Whether any payload chunk is memory mapped.
     #[cfg(feature = "mmap")]
     pub fn is_mapped(&self) -> bool {
-        matches!(self.storage, Storage::Mmap(_))
+        self.chunks
+            .iter()
+            .any(|chunk| matches!(chunk.as_ref(), Chunk::Mapped(_)))
     }
 
     /// Best-effort read back of a previously stored embedding.
@@ -216,73 +155,37 @@ impl BlobStore {
         Some(out)
     }
 
-    /// Internal helper to read raw bytes for a BlobRef (used by `read` and `read_embedding`).
-    fn read_bytes(&self, r: &BlobRef) -> Option<&[u8]> {
-        match &self.storage {
-            Storage::Chunks(chunks) => {
-                let chunk = &chunks[r.chunk_idx as usize];
-                let start = r.offset as usize;
-                let end = start + r.length as usize;
-                if end > chunk.len() {
-                    return None;
-                }
-                Some(&chunk[start..end])
-            }
-            #[cfg(feature = "mmap")]
-            Storage::Mmap(mmap) => {
-                let start = r.offset as usize;
-                let end = start + r.length as usize;
-                if end > mmap.len() {
-                    return None;
-                }
-                Some(&mmap[start..end])
-            }
-        }
+    /// Checked raw payload access, also used by the streaming serializer.
+    pub(crate) fn read_bytes(&self, r: &BlobRef) -> Option<&[u8]> {
+        let chunk = self.chunks.get(r.chunk_idx as usize)?.bytes();
+        let start = usize::try_from(r.offset).ok()?;
+        chunk.get(start..start.checked_add(r.length as usize)?)
     }
 
-    /// Total bytes currently held by the store (sum of chunk lengths, or the
-    /// mapped-file length). Includes dead/orphaned bytes — `vacuum_blobs` reclaims them.
+    /// Bytes referenced by this arena, including dead bytes in shared chunks.
+    /// Summing this across shards can count shared allocations more than once.
     pub fn total_bytes(&self) -> usize {
-        match &self.storage {
-            Storage::Chunks(c) => c.iter().map(|chunk| chunk.len()).sum(),
-            #[cfg(feature = "mmap")]
-            Storage::Mmap(m) => m.len(),
-        }
+        self.chunks.iter().map(|c| c.bytes().len()).sum()
     }
 
-    /// Returns the number of chunks (only meaningful in in-memory mode).
+    /// Number of referenced chunks.
     pub fn chunk_count(&self) -> usize {
-        match &self.storage {
-            Storage::Chunks(c) => c.len(),
-            #[cfg(feature = "mmap")]
-            Storage::Mmap(_) => 1, // treated as one flat region
-        }
+        self.chunks.len()
     }
 
-    /// Iterate over chunks (in-memory mode only). Used by the serializer.
-    pub(crate) fn chunks(&self) -> &[Vec<u8>] {
-        match &self.storage {
-            Storage::Chunks(c) => c,
-            #[cfg(feature = "mmap")]
-            Storage::Mmap(_) => &[], // should not be called in mmap mode during save
-        }
-    }
-
-    /// Internal constructor used by the serializer for the portable load path.
     pub(crate) fn from_chunks(chunks: Vec<Vec<u8>>) -> Self {
         Self {
-            storage: Storage::from_chunks(chunks),
+            chunks: chunks
+                .into_iter()
+                .map(|c| std::sync::Arc::new(Chunk::Owned(c)))
+                .collect(),
         }
     }
-}
 
-#[cfg(feature = "mmap")]
-impl BlobStore {
-    /// Create a BlobStore backed by an already-mapped file.
-    /// The caller is responsible for ensuring the offsets in BlobRef make sense for this mapping.
+    #[cfg(feature = "mmap")]
     pub(crate) fn from_mmap(mmap: memmap2::Mmap) -> Self {
         Self {
-            storage: Storage::Mmap(mmap),
+            chunks: vec![std::sync::Arc::new(Chunk::Mapped(mmap))],
         }
     }
 }
@@ -290,6 +193,26 @@ impl BlobStore {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn imported_payload_is_shared_and_appends_do_not_copy_or_alias_writes() {
+        let mut source = BlobStore::new();
+        let original = source.store("Romanian legal rule");
+        let pointer = source.read(&original).as_ptr();
+        let mut target = BlobStore::new();
+        let mut imports = Default::default();
+        let imported = target.import_blob(&source, &original, &mut imports);
+        assert_eq!(target.read(&imported).as_ptr(), pointer);
+        let another = target.import_blob(&source, &original, &mut imports);
+        assert_eq!(another.chunk_idx, imported.chunk_idx);
+        source.store("source append");
+        let new = target.store("target append");
+        assert_ne!(new.chunk_idx, imported.chunk_idx);
+        assert_eq!(source.read(&original).as_ptr(), pointer);
+        drop(source);
+        assert_eq!(target.read(&imported), "Romanian legal rule");
+        assert_eq!(target.read(&new), "target append");
+    }
 
     #[test]
     fn blobref_offset_is_u64_capable() {

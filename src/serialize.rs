@@ -286,61 +286,103 @@ pub(crate) fn rename_with_retry(src: &Path, dst: &Path) -> Result<(), GraphError
         .unwrap_or_else(|| std::io::Error::other("rename failed after retries").into()))
 }
 
+// Bounds save-time payload buffering independently of corpus/shard size.
+struct PayloadWriter {
+    writer: BufWriter<File>,
+    buffer: Vec<u8>,
+    written: u64,
+    boundaries: Vec<u64>,
+    checksums: Vec<u32>,
+}
+impl PayloadWriter {
+    const CAPACITY: usize = 4 * 1024 * 1024;
+    fn new(file: File) -> Self {
+        Self {
+            writer: BufWriter::new(file),
+            buffer: Vec::with_capacity(Self::CAPACITY),
+            written: 0,
+            boundaries: Vec::new(),
+            checksums: Vec::new(),
+        }
+    }
+    fn flush_chunk(&mut self) -> io::Result<()> {
+        if !self.buffer.is_empty() {
+            self.boundaries.push(self.written);
+            self.checksums.push(crc32(&self.buffer));
+            self.writer.write_all(&self.buffer)?;
+            self.written += self.buffer.len() as u64;
+            self.buffer.clear();
+        }
+        Ok(())
+    }
+    fn append(&mut self, bytes: &[u8]) -> io::Result<u64> {
+        if self.buffer.len() + bytes.len() > Self::CAPACITY {
+            self.flush_chunk()?;
+        }
+        let offset = self.written + self.buffer.len() as u64;
+        if bytes.len() > Self::CAPACITY {
+            // Oversized blobs remain contiguous without an equally large copy.
+            self.boundaries.push(self.written);
+            self.checksums.push(crc32(bytes));
+            self.writer.write_all(bytes)?;
+            self.written += bytes.len() as u64;
+        } else {
+            self.buffer.extend_from_slice(bytes);
+        }
+        Ok(offset)
+    }
+    fn finish(&mut self) -> io::Result<()> {
+        self.flush_chunk()?;
+        if self.boundaries.is_empty() {
+            self.boundaries.push(0);
+            self.checksums.push(crc32(&[]));
+        }
+        self.writer.flush()
+    }
+}
+
 impl KnowledgeGraph {
     /// Internal: writes the graph contents into an existing directory.
     fn write_graph_to_dir(&self, dir: &Path) -> Result<(), GraphError> {
         fs::create_dir_all(dir)?;
 
-        let chunk_offsets = self.compute_chunk_offsets();
-
-        // 1. Write flat blob file
-        let blob_path = dir.join("graph.blobs");
-        let mut checksums = Vec::new();
-        {
-            let mut writer = BufWriter::new(File::create(&blob_path)?);
-            for chunk in self.blobs.chunks() {
-                writer.write_all(chunk)?;
-                checksums.push(crc32(chunk));
-            }
-            writer.flush()?;
+        // Stream only referenced payloads into bounded chunks. In-memory chunks
+        // may be shared across shards; dumping them would multiply snapshot size.
+        let mut payload = PayloadWriter::new(File::create(dir.join("graph.blobs"))?);
+        let mut serializable_nodes = Vec::with_capacity(self.nodes.len());
+        for node in &self.nodes {
+            let global_offset = payload.append(
+                self.blobs
+                    .read_bytes(&node.blob)
+                    .ok_or_else(|| io::Error::other("invalid text blob reference"))?,
+            )?;
+            let embedding_ref = if let Some(e) = &node.embedding {
+                let offset = payload.append(
+                    self.blobs
+                        .read_bytes(e)
+                        .ok_or_else(|| io::Error::other("invalid embedding blob reference"))?,
+                )?;
+                Some((offset, e.length, e.uncompressed_len))
+            } else {
+                None
+            };
+            serializable_nodes.push(SerializableNode {
+                blob_global_offset: global_offset,
+                blob_length: node.blob.length,
+                blob_uncompressed_len: node.blob.uncompressed_len,
+                embedding_global_offset: embedding_ref.map(|(off, _, _)| off),
+                embedding_length: embedding_ref.map(|(_, len, _)| len),
+                embedding_uncompressed_len: embedding_ref.map(|(_, _, ulen)| ulen),
+                outgoing: node.outgoing.iter().map(|e| e.0).collect(),
+                incoming: node.incoming.iter().map(|e| e.0).collect(),
+                label: node.label.clone(),
+                outgoing_property_mask: node.outgoing_property_mask,
+            });
         }
-
-        let total_blob_bytes: u64 = self.blobs.chunks().iter().map(|c| c.len() as u64).sum();
-
-        // 2. Build serializable structures
-        let serializable_nodes: Vec<SerializableNode> = self
-            .nodes
-            .iter()
-            .map(|node| {
-                let chunk_base = chunk_offsets
-                    .get(node.blob.chunk_idx as usize)
-                    .copied()
-                    .expect("internal error: node blob chunk_idx is out of range");
-
-                let global_offset = chunk_base + node.blob.offset;
-
-                let embedding_ref = node.embedding.as_ref().map(|e| {
-                    let emb_base = chunk_offsets
-                        .get(e.chunk_idx as usize)
-                        .copied()
-                        .expect("internal error: embedding blob chunk_idx out of range");
-                    (emb_base + e.offset, e.length, e.uncompressed_len)
-                });
-
-                SerializableNode {
-                    blob_global_offset: global_offset,
-                    blob_length: node.blob.length,
-                    blob_uncompressed_len: node.blob.uncompressed_len,
-                    embedding_global_offset: embedding_ref.map(|(off, _, _)| off),
-                    embedding_length: embedding_ref.map(|(_, len, _)| len),
-                    embedding_uncompressed_len: embedding_ref.map(|(_, _, ulen)| ulen),
-                    outgoing: node.outgoing.iter().map(|e| e.0).collect(),
-                    incoming: node.incoming.iter().map(|e| e.0).collect(),
-                    label: node.label.clone(),
-                    outgoing_property_mask: node.outgoing_property_mask,
-                }
-            })
-            .collect();
+        payload.finish()?;
+        let total_blob_bytes = payload.written;
+        let chunk_offsets = payload.boundaries;
+        let checksums = payload.checksums;
 
         let serializable_edges: Vec<SerializableEdge> = self
             .edges
@@ -394,16 +436,6 @@ impl KnowledgeGraph {
         fs::write(deleted_path, &deleted_bytes)?;
 
         Ok(())
-    }
-
-    fn compute_chunk_offsets(&self) -> Vec<u64> {
-        let mut offsets = Vec::with_capacity(self.blobs.chunk_count());
-        let mut running = 0u64;
-        for chunk in self.blobs.chunks() {
-            offsets.push(running);
-            running += chunk.len() as u64;
-        }
-        offsets
     }
 
     /// Best-effort fsync on a directory (important for durability of rename).

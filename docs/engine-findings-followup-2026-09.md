@@ -31,8 +31,9 @@ retain version 1 when opened and saved. Explicit rebalancing upgrades routing;
 opening a saved graph alone does not change its placement scheme.
 
 Rebalancing reconstructs indexes from nodes, rather than moving postings without
-their node mapping. It temporarily needs a second copy of the live graph and
-can change node ids. Rust's `execute_rebalance_with_mapping` and Python's
+their node mapping. A subsequent pass removed the full payload copy through immutable chunk sharing;
+topology and indexes are still rebuilt, and node ids can change. See
+[rebalance and HNSW follow-up](graph-copy-hnsw-2026-09.md). Rust's `execute_rebalance_with_mapping` and Python's
 `execute_rebalance_to` return the old-to-new handle map. Python previously
 returned `None`; callers retaining node handles must now apply that map. Invalid
 plans fail before replacing the original graph. Segment suggestions remain

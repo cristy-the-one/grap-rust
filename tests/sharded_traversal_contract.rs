@@ -231,6 +231,7 @@ fn rebalance_preserves_live_content_vectors_and_qualified_topology() {
         }
         for (i, &node) in nodes.iter().enumerate() {
             assert_eq!(graph.read_embedding(node), Some(vec![1.0, i as f32]));
+            assert_eq!(graph.node_label(node).unwrap(), Some("concept"));
         }
         let dir = tempfile::tempdir().unwrap();
         graph.save_to_dir(dir.path()).unwrap();
@@ -251,6 +252,75 @@ fn rebalance_preserves_live_content_vectors_and_qualified_topology() {
             .len(),
         20
     );
+}
+
+#[test]
+fn shared_rebalance_payloads_save_without_cross_shard_amplification() {
+    let mut graph = ShardedGraph::new(2);
+    let mut total = 0;
+    for i in 0..40 {
+        let text = format!("document {i} {}", " ".repeat(100_000));
+        total += text.len() as u64;
+        graph.add_node(&text, None).unwrap();
+    }
+    for count in [5, 3, 6] {
+        let plan = graph.plan_rebalance(count);
+        graph.execute_rebalance(plan).unwrap();
+        let dir = tempfile::tempdir().unwrap();
+        graph.save_to_dir(dir.path()).unwrap();
+        let saved: u64 = (0..count)
+            .map(|id| {
+                std::fs::metadata(dir.path().join(format!("shards/{id:04}/graph/graph.blobs")))
+                    .unwrap()
+                    .len()
+            })
+            .sum();
+        assert_eq!(saved, total);
+        let loaded = ShardedGraph::load_from_dir(dir.path()).unwrap();
+        assert_eq!(
+            loaded
+                .search_and_traverse("document", 100, &[], 0.0, 0, 100)
+                .len(),
+            40
+        );
+    }
+}
+
+#[test]
+fn failed_rebalance_after_payload_import_keeps_original_usable() {
+    let mut graph = ShardedGraph::new(2);
+    let a = graph.add_node("first rule", Some("original")).unwrap();
+    let b = (0..100)
+        .map(|i| graph.add_node(&format!("other {i}"), None).unwrap())
+        .find(|id| id.shard != a.shard)
+        .unwrap();
+    let properties = (0..64)
+        .map(|i| (format!("property{i}"), grap::PropertyValue::Bool(true)))
+        .collect();
+    graph
+        .router_mut()
+        .add_edge_with_properties(a, a, 1.0, properties)
+        .unwrap();
+    graph
+        .router_mut()
+        .add_edge_with_properties(
+            b,
+            b,
+            1.0,
+            vec![("overflow".into(), grap::PropertyValue::Bool(true))],
+        )
+        .unwrap();
+    let plan = graph.plan_rebalance(1);
+    assert!(graph.execute_rebalance(plan).is_err());
+    assert_eq!(graph.node_label(a).unwrap(), Some("original"));
+    assert_eq!(
+        graph.search_and_traverse("first", 1, &["property63"], 0.0, 1, 10)[0].node,
+        a
+    );
+    graph.add_node("still writable", None).unwrap();
+    let dir = tempfile::tempdir().unwrap();
+    graph.save_to_dir(dir.path()).unwrap();
+    assert!(ShardedGraph::load_from_dir(dir.path()).is_ok());
 }
 
 #[test]
