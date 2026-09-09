@@ -167,14 +167,17 @@ impl TextIndex for OnDiskTextIndex {
             return vec![];
         }
         let raw = self.engine.lock().unwrap().search(&terms);
-        raw.into_iter()
+        let mut mapped: Vec<_> = raw
+            .into_iter()
             .filter_map(|(global_id, score)| {
                 self.global_to_node
                     .get(&global_id)
                     .map(|&nid| (NodeId(nid), score as f64))
             })
-            .take(max_results)
-            .collect()
+            .collect();
+        mapped.sort_by(|a, b| b.1.total_cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
+        mapped.truncate(max_results);
+        mapped
     }
 
     fn phrase_search(&self, phrase: &str, max_gap: u32, max_results: usize) -> Vec<(NodeId, f64)> {
@@ -191,14 +194,17 @@ impl TextIndex for OnDiskTextIndex {
             return vec![];
         }
         let raw = self.engine.lock().unwrap().phrase_search(&terms, max_gap);
-        raw.into_iter()
+        let mut mapped: Vec<_> = raw
+            .into_iter()
             .filter_map(|(global_id, score)| {
                 self.global_to_node
                     .get(&global_id)
                     .map(|&nid| (NodeId(nid), score as f64))
             })
-            .take(max_results)
-            .collect()
+            .collect();
+        mapped.sort_by(|a, b| b.1.total_cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
+        mapped.truncate(max_results);
+        mapped
     }
 
     fn stats(&self) -> IndexStats {
@@ -348,7 +354,7 @@ mod tests {
         let lower = idx.search("rust memory", 10);
         assert!(lower.iter().any(|(n, _)| n.0 == 1), "case must fold");
 
-        let phrase = idx.phrase_search("asigurarile sociale", 10, 5);
+        let phrase = idx.phrase_search("asigurarile sociale", 20, 5);
         assert!(phrase.iter().any(|(n, _)| n.0 == 0));
     }
 

@@ -164,8 +164,6 @@ impl StringInterner {
 // Postings
 // ============================================================================
 
-const MAX_POSITIONS_PER_POSTING: usize = 256;
-
 #[derive(Debug, Clone)]
 struct Posting {
     node_id: NodeId,
@@ -182,34 +180,27 @@ struct PostingList {
 impl PostingList {
     fn add_posting(&mut self, node_id: NodeId, positions: Vec<u32>) {
         let freq = positions.len() as u32;
-        self.total_frequency += freq as u64;
-
         match self
             .postings
             .binary_search_by_key(&node_id.0, |p| p.node_id.0)
         {
             Ok(idx) => {
-                // Re-indexing the same node (rare in append-only use)
-                self.postings[idx].frequency += freq;
-                let p = &mut self.postings[idx];
-                if p.positions.len() < MAX_POSITIONS_PER_POSTING {
-                    p.positions.extend_from_slice(&positions);
-                    p.positions.sort_unstable();
-                    p.positions.dedup();
-                }
+                self.total_frequency =
+                    self.total_frequency - self.postings[idx].frequency as u64 + freq as u64;
+                self.postings[idx] = Posting {
+                    node_id,
+                    frequency: freq,
+                    positions,
+                };
             }
             Err(idx) => {
-                let capped = if positions.len() > MAX_POSITIONS_PER_POSTING {
-                    positions[..MAX_POSITIONS_PER_POSTING].to_vec()
-                } else {
-                    positions
-                };
+                self.total_frequency += freq as u64;
                 self.postings.insert(
                     idx,
                     Posting {
                         node_id,
                         frequency: freq,
-                        positions: capped,
+                        positions,
                     },
                 );
             }
@@ -389,7 +380,10 @@ pub trait TextIndex: Send + Sync + std::any::Any {
     /// may return up to `max_results` entries.
     fn search(&self, query: &str, max_results: usize) -> Vec<(NodeId, f64)>;
 
-    /// Phrase / proximity search.
+    /// Ordered proximity search: all tokenized terms must occur at distinct,
+    /// increasing byte offsets. `max_gap` bounds consecutive start-offset
+    /// distance in bytes; zero matches no multi-term phrase. A single token
+    /// uses ordinary BM25. Tokenization/normalization also apply to the query.
     fn phrase_search(&self, phrase: &str, max_gap: u32, max_results: usize) -> Vec<(NodeId, f64)>;
 
     /// Return basic statistics about the index.
@@ -551,27 +545,49 @@ impl InvertedIndex {
         let doc_length = tokens.len() as u32;
         let idx = node_id.0 as usize;
 
-        self.delete_document(node_id);
         if idx >= self.doc_lengths.len() {
             self.doc_lengths.resize(idx + 1, 0);
             self.doc_terms.resize_with(idx + 1, || None);
         }
-        // Maintain `total_tokens` incrementally: subtract the previous length for
-        // this slot (0 if new/just-resized) and add the new one. Equivalent to the
-        // old full re-sum, but O(1) instead of O(N) -> bulk ingest is O(N) not O(N^2).
-        let old_length = self.doc_lengths[idx];
-        self.total_tokens = self.total_tokens - old_length as u64 + doc_length as u64;
+        let old_terms = self.doc_terms[idx].take();
+        if old_terms.is_none() {
+            self.document_count += 1;
+        }
+        self.total_tokens = self.total_tokens - self.doc_lengths[idx] as u64 + doc_length as u64;
         self.doc_lengths[idx] = doc_length;
-        self.document_count += 1;
-
         self.avg_doc_length = self.total_tokens as f64 / self.document_count.max(1) as f64;
 
-        let mut doc_terms = Vec::with_capacity(term_positions.len());
-        for (term, positions) in term_positions {
-            let term_id = self.interner.intern(&term);
-            doc_terms.push(term_id);
-            let pl = self.index.entry(term_id).or_default();
-            pl.add_posting(node_id, positions);
+        let postings: Vec<_> = term_positions
+            .into_iter()
+            .map(|(term, positions)| (self.interner.intern(&term), positions))
+            .collect();
+        let retained: std::collections::HashSet<_> = postings.iter().map(|(id, _)| *id).collect();
+        // Shared terms replace their posting in place. Only removed terms pay
+        // for a posting-vector shift; repeated revisions do not shift every list.
+        for term in old_terms
+            .into_iter()
+            .flatten()
+            .filter(|term| !retained.contains(term))
+        {
+            if let Some(pl) = self.index.get_mut(&term) {
+                if let Ok(pos) = pl
+                    .postings
+                    .binary_search_by_key(&node_id.0, |p| p.node_id.0)
+                {
+                    pl.total_frequency -= pl.postings.remove(pos).frequency as u64;
+                }
+                if pl.postings.is_empty() {
+                    self.index.remove(&term);
+                }
+            }
+        }
+        let mut doc_terms = Vec::with_capacity(postings.len());
+        for (term, positions) in postings {
+            doc_terms.push(term);
+            self.index
+                .entry(term)
+                .or_default()
+                .add_posting(node_id, positions);
         }
         self.doc_terms[idx] = Some(doc_terms);
     }
@@ -695,7 +711,9 @@ impl InvertedIndex {
     ///
     /// Falls back to regular `search()` if the phrase has fewer than 2 terms.
     /// Search for documents where the given `phrase` terms appear within `max_gap`
-    /// positions of each other, then rank by a blended BM25 + proximity score.
+    /// bytes between consecutive token starts, in query order, then rank by
+    /// blended BM25 + proximity. All terms must match at distinct positions.
+    /// Zero gap does not mean exact phrase: it matches no multi-term phrase.
     ///
     /// # Single-term phrases
     ///
@@ -1902,6 +1920,25 @@ impl IndexedKnowledgeGraph {
         Ok(())
     }
 
+    fn restore_text_index(
+        graph: &KnowledgeGraph,
+        dir: &std::path::Path,
+    ) -> Result<Box<dyn TextIndex>, GraphError> {
+        if dir.join("manifest.json").exists() {
+            return crate::on_disk_text_index::OnDiskTextIndex::load_from_dir(dir);
+        }
+        // Memory indexes have no persisted posting files. Reconstruct the
+        // default-tokenizer index from live blobs, never return an empty index.
+        let mut index = InvertedIndex::new();
+        for local in 0..graph.node_count() {
+            let node = NodeId(local as u32);
+            if !graph.is_node_deleted(node) {
+                index.index_document(node, graph.read_blob(node));
+            }
+        }
+        Ok(Box::new(index))
+    }
+
     /// Load a previously saved `IndexedKnowledgeGraph` from `dir`.
     ///
     /// Auto-detects whether `text_index/manifest.json` is present and chooses
@@ -1914,14 +1951,7 @@ impl IndexedKnowledgeGraph {
         // If a manifest.json is present we use the persistent on-disk backend;
         // otherwise we fall back to the lightweight in-memory index.
         let text_dir = dir.join("text_index");
-        let text_index: Box<dyn TextIndex> = if text_dir.join("manifest.json").exists() {
-            match crate::on_disk_text_index::OnDiskTextIndex::load_from_dir(&text_dir) {
-                Ok(idx) => idx,
-                Err(_) => Box::new(InvertedIndex::new()),
-            }
-        } else {
-            Box::new(InvertedIndex::new())
-        };
+        let text_index = Self::restore_text_index(&graph, &text_dir)?;
 
         let mut result = Self {
             graph,
@@ -1945,21 +1975,14 @@ impl IndexedKnowledgeGraph {
     /// Loads an `IndexedKnowledgeGraph` from `dir` using memory-mapped I/O for the graph data.
     ///
     /// Requires the `mmap` feature. Falls back to an empty in-memory text index when no
-    /// on-disk text-index manifest is found.
+    /// on-disk text-index manifest is found (rebuilt from live node text).
     #[cfg(feature = "mmap")]
     pub fn load_mmap(dir: &std::path::Path) -> Result<Self, GraphError> {
         // When the mmap feature is enabled, use the real mmap loader for the graph part.
         let graph = KnowledgeGraph::load_mmap(&dir.join("graph"))?;
 
         let text_dir = dir.join("text_index");
-        let text_index: Box<dyn TextIndex> = if text_dir.join("manifest.json").exists() {
-            match crate::on_disk_text_index::OnDiskTextIndex::load_from_dir(&text_dir) {
-                Ok(idx) => idx,
-                Err(_) => Box::new(InvertedIndex::new()),
-            }
-        } else {
-            Box::new(InvertedIndex::new())
-        };
+        let text_index = Self::restore_text_index(&graph, &text_dir)?;
 
         let mut result = Self {
             graph,
@@ -2099,56 +2122,50 @@ impl Default for IndexedKnowledgeGraph {
     }
 }
 
-/// Score how well term positions form a near-consecutive phrase.
-/// Ported from core_graph_design.md.
-fn compute_proximity_score(term_positions: &[&[u32]], max_gap: u32) -> f64 {
-    if term_positions.is_empty() {
+/// Shared ordered proximity contract. Every term needs a distinct increasing
+/// position, with at most `max_gap` position units between consecutive terms.
+/// Text adapters store byte offsets; low-level callers supply their own units.
+/// A zero gap cannot match a multi-term phrase. No partial phrase is accepted.
+pub(crate) fn compute_proximity_score(term_positions: &[&[u32]], max_gap: u32) -> f64 {
+    if term_positions.is_empty() || term_positions.iter().any(|p| p.is_empty()) {
         return 0.0;
     }
     if term_positions.len() == 1 {
         return 1.0;
     }
-
-    let first_positions = term_positions[0];
-    let mut best_score = 0.0f64;
-
-    for &start_pos in first_positions {
-        let mut current_pos = start_pos;
-        let mut matched = 1u32;
-
-        for i in 1..term_positions.len() {
-            let next_positions = term_positions[i];
-            let search = next_positions.binary_search(&(current_pos + 1));
-            let candidate_idx = match search {
-                Ok(idx) => idx,
-                Err(idx) => idx,
-            };
-
-            if candidate_idx < next_positions.len() {
-                let candidate = next_positions[candidate_idx];
-                if candidate <= current_pos + max_gap {
-                    current_pos = candidate;
-                    matched += 1;
-                } else {
-                    break;
+    if max_gap == 0 {
+        return 0.0;
+    }
+    // For each reachable position retain the latest possible start. Keeping
+    // all reachable positions avoids the greedy-earliest-match dead end.
+    let mut frontier: Vec<(u32, u32)> = term_positions[0].iter().map(|&p| (p, p)).collect();
+    for positions in &term_positions[1..] {
+        let mut next = Vec::new();
+        let mut previous = 0;
+        for &pos in *positions {
+            while previous < frontier.len() && frontier[previous].0 < pos {
+                previous += 1;
+            }
+            if previous > 0 {
+                let (last, start) = frontier[previous - 1];
+                if pos - last <= max_gap {
+                    next.push((pos, start));
                 }
-            } else {
-                break;
             }
         }
-
-        let coverage = matched as f64 / term_positions.len() as f64;
-        if coverage > best_score {
-            best_score = coverage;
+        if next.is_empty() {
+            return 0.0;
         }
+        frontier = next;
     }
-
-    best_score
+    let span = frontier
+        .iter()
+        .map(|(last, start)| last - start)
+        .min()
+        .unwrap();
+    let limit = max_gap as f64 * (term_positions.len() - 1) as f64;
+    1.0 - span as f64 / (limit + 1.0)
 }
-
-// ============================================================================
-// Basic smoke test for the index + traversal integration
-// ============================================================================
 
 #[cfg(test)]
 mod tests {
@@ -2292,7 +2309,7 @@ mod tests {
         assert!(ids.contains(&0) && ids.contains(&1));
 
         // Phrase path folds too.
-        let phrase = idx.phrase_search("asigurarile sociale", 10, 5);
+        let phrase = idx.phrase_search("asigurarile sociale", 20, 5);
         assert!(phrase.iter().any(|r| r.node_id == NodeId(0)));
     }
 

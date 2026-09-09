@@ -64,10 +64,30 @@ fn replace_document(c: &mut Criterion) {
     group.finish();
 }
 
+fn disk_common_ingestion(c: &mut Criterion) {
+    let mut group = c.benchmark_group("disk_common_ingestion");
+    for n in [1_000, 10_000] {
+        group.bench_function(format!("documents{n}"), |b| {
+            b.iter_batched(
+                OnDiskTextIndex::new,
+                |mut index| {
+                    for id in 0..n {
+                        index.index_document(NodeId(id), "credit contract termen credit");
+                    }
+                    black_box(index);
+                },
+                criterion::BatchSize::LargeInput,
+            );
+        });
+    }
+    group.finish();
+}
+
 criterion_group!(
     benches,
     bounded_traversal,
     selective_disk_search,
-    replace_document
+    replace_document,
+    disk_common_ingestion
 );
 criterion_main!(benches);
