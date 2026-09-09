@@ -1,0 +1,82 @@
+{
+  "scope": "Live local embedding scheduling with fixed replies; no generation or legal accuracy measurement",
+  "model": "bge-m3:latest",
+  "source_cases": [
+    "office-subordination",
+    "bank-register-fields",
+    "shareholder-payment",
+    "bank-capital-deadline",
+    "agent-prohibitions",
+    "exception-preservation"
+  ],
+  "runs": [
+    {
+      "mode": "legacy",
+      "seconds": 0.8239911000000575,
+      "embedding_requests": 11,
+      "embedding_seconds": 0.7906077999996342,
+      "batch_sizes": [
+        2,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        2,
+        1,
+        1
+      ]
+    },
+    {
+      "mode": "batched",
+      "seconds": 0.33143969999991896,
+      "embedding_requests": 6,
+      "embedding_seconds": 0.30191350000040984,
+      "batch_sizes": [
+        3,
+        2,
+        2,
+        2,
+        3,
+        1
+      ]
+    },
+    {
+      "mode": "batched",
+      "seconds": 0.2997817999998915,
+      "embedding_requests": 6,
+      "embedding_seconds": 0.27075489999924685,
+      "batch_sizes": [
+        3,
+        2,
+        2,
+        2,
+        3,
+        1
+      ]
+    },
+    {
+      "mode": "legacy",
+      "seconds": 0.49669589999984964,
+      "embedding_requests": 11,
+      "embedding_seconds": 0.4667076000009729,
+      "batch_sizes": [
+        2,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        2,
+        1,
+        1
+      ]
+    }
+  ],
+  "identical_results": true,
+  "identical_prompts": true
+}

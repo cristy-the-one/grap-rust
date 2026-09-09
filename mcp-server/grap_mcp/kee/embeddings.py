@@ -195,9 +195,16 @@ class OpenAICompatEmbedder:
         with urllib.request.urlopen(req, timeout=self.timeout) as resp:
             body = json.loads(resp.read().decode("utf-8"))
         try:
-            rows = sorted(body["data"], key=lambda d: d.get("index", 0))
+            rows = sorted(body["data"], key=lambda d: d["index"])
+            if ([row["index"] for row in rows] != list(range(len(texts)))
+                    or any(type(row["index"]) is not int for row in rows)):
+                raise ValueError("embedding indices must cover each input exactly once")
             vectors = [[float(x) for x in row["embedding"]] for row in rows]
-        except (KeyError, TypeError) as exc:
+            dimension = self.dim or len(vectors[0])
+            if not dimension or any(len(v) != dimension or any(not math.isfinite(x) for x in v)
+                                    for v in vectors):
+                raise ValueError("embedding vectors must be finite and have consistent nonzero dimension")
+        except (KeyError, TypeError, ValueError, IndexError) as exc:
             raise RuntimeError(f"unexpected embeddings response shape: {body!r}") from exc
         if vectors:
             self.dim = len(vectors[0])

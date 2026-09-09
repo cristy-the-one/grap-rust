@@ -166,7 +166,7 @@ class WorkingGraph:
             self._vec_cache[text] = vec
         return vec
 
-    def _prefetch_vectors(self, names) -> None:
+    def _prefetch_vectors(self, names, *, strip=True) -> None:
         """Embed every not-yet-cached name in ONE batched request.
 
         A single-text embed round-trip against a local Ollama costs ~2.2s, while
@@ -176,14 +176,15 @@ class WorkingGraph:
         collapses dozens of sequential round-trips into one. Names that turn out
         to resolve by alias or content hash simply never consume their vector.
 
-        Best-effort: on any embedder error we stay silent and fall back to the
-        lazy per-name path in `_embed_one`, so this can only make things faster.
+        Best-effort: on an embedder error, keep the lazy per-name path in
+        `_embed_one`. A failed prefetch can add latency; it must not install an
+        incomplete response in the cache.
         """
         todo, seen = [], set()
         for name in names:
             if not isinstance(name, str):
                 continue
-            name = name.strip()
+            name = name.strip() if strip else name
             if name and name not in self._vec_cache and name not in seen:
                 seen.add(name)
                 todo.append(name)
@@ -193,10 +194,30 @@ class WorkingGraph:
             group = todo[start:start + EMBED_BATCH]
             try:
                 vecs = self.embedder.embed(group)
+                if len(vecs) != len(group):
+                    raise ValueError("embedding result count does not match the input batch")
             except Exception:
                 return
             for name, vec in zip(group, vecs):
                 self._vec_cache[name] = vec
+
+    def prefetch_extraction(self, fragments, query_texts=()) -> None:
+        """Batch independent vectors, never graph context or entity resolution.
+
+        Query text keeps its exact cache key. Only one upcoming extraction window
+        is supplied by the caller; no model calls or graph writes run concurrently.
+        """
+        names = []
+        for frag in fragments:
+            if frag is None:
+                continue
+            names.extend(o.get("name") for o in (frag.get("outcomes") or []))
+            for relation in frag.get("relations") or []:
+                names.extend((relation.get("from"), relation.get("to")))
+        names = [name.strip() for name in names if isinstance(name, str) and name.strip()]
+        # Don't embed speculative queries for a graph that remains empty.
+        queries = list(query_texts) if self.canonical or names else []
+        self._prefetch_vectors(names + queries, strip=False)
 
     def _content_hash(self, text: str) -> str:
         """Compute content hash using same algo as core (for dedup/provenance)."""

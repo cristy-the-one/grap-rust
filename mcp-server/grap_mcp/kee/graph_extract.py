@@ -46,7 +46,9 @@ def _extract_windows(wg, chunks: List[Tuple[str, str]], provider, concurrency: i
             if on_chunk is not None:
                 on_chunk(i, source)
             ctx = wg.context_for(text)
-            yield [(source, text)], [extract.extract_chunk(provider, source, text, ctx, (rule_contexts or {}).get(source))]
+            result = extract.extract_chunk(provider, source, text, ctx, (rule_contexts or {}).get(source))
+            wg.prefetch_extraction([result[0]], [t for _, t in chunks[i + 1:i + 2]])
+            yield [(source, text)], [result]
         return
     with ThreadPoolExecutor(max_workers=width) as pool:
         for start in range(0, len(chunks), width):
@@ -54,10 +56,15 @@ def _extract_windows(wg, chunks: List[Tuple[str, str]], provider, concurrency: i
             for j, (source, _text) in enumerate(window):
                 if on_chunk is not None:
                     on_chunk(start + j, source)
+            # The first window of a reopened graph may not have cached queries.
+            wg.prefetch_extraction([], [text for _, text in window])
             ctxs = [wg.context_for(text) for (_source, text) in window]
             futs = [pool.submit(extract.extract_chunk, provider, source, text, ctx, (rule_contexts or {}).get(source))
                     for (source, text), ctx in zip(window, ctxs)]
-            yield window, [f.result() for f in futs]
+            results = [f.result() for f in futs]
+            wg.prefetch_extraction([frag for frag, _ in results],
+                                  [text for _, text in chunks[start + width:start + 2 * width]])
+            yield window, results
 
 
 def graph_extract_ontology(chunks: Sequence[Tuple[str, str]], provider, embedder, *,

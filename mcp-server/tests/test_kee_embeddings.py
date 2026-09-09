@@ -195,3 +195,29 @@ def test_small_embed_still_makes_one_request(monkeypatch):
                         lambda texts: (calls.append(len(texts)) or [[0.0]] * len(texts)))
     emb.embed(["a", "b", "c"])
     assert calls == [3]
+
+
+def test_embedding_batch_rejects_missing_duplicate_and_invalid_rows(monkeypatch):
+    import pytest
+    from grap_mcp.kee import embeddings as em
+    valid = [{"index": 0, "embedding": [1.0, 0.0]},
+             {"index": 1, "embedding": [0.0, 1.0]}]
+    invalid = [valid[:1], valid + [valid[0]], [valid[0], valid[0]],
+               [{"embedding": [1.0, 0.0]}, valid[1]],
+               [valid[0], {"index": 1, "embedding": [float("nan"), 0.0]}],
+               [valid[0], {"index": 1, "embedding": [1.0]}],
+               [{"index": 0, "embedding": []}, {"index": 1, "embedding": []}]]
+    embedder = em.OpenAICompatEmbedder(base_url="http://x/v1", model="m")
+    for rows in invalid:
+        monkeypatch.setattr(em.urllib.request, "urlopen",
+                            lambda *a, **k: io.BytesIO(json.dumps({"data": rows}).encode()))
+        with pytest.raises(RuntimeError, match="unexpected embeddings response"):
+            embedder.embed(["Alpha", "Beta"])
+        assert embedder.dim == 0
+    monkeypatch.setattr(em.urllib.request, "urlopen",
+                        lambda *a, **k: io.BytesIO(json.dumps({"data": valid}).encode()))
+    assert embedder.embed(["Alpha", "Beta"]) == [[1.0, 0.0], [0.0, 1.0]]
+    embedder.dim = 3
+    with pytest.raises(RuntimeError, match="unexpected embeddings response"):
+        embedder.embed(["Alpha", "Beta"])
+    assert embedder.dim == 3
