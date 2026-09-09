@@ -28,7 +28,7 @@ fn main() {
         .parse()
         .unwrap();
     let connections: usize = std::env::var("HNSW_M")
-        .unwrap_or_else(|_| "16".into())
+        .unwrap_or_else(|_| HNSWParams::default().max_connections.to_string())
         .parse()
         .unwrap();
     for ef in expansion.split(',').map(|s| s.parse::<usize>().unwrap()) {

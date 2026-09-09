@@ -375,9 +375,9 @@ pub struct HNSWParams {
 impl Default for HNSWParams {
     fn default() -> Self {
         Self {
-            max_connections: 16,
+            max_connections: 32,
             ef_construction: 100,
-            ef_search: 50,
+            ef_search: 150,
             max_layers: 16,
         }
     }

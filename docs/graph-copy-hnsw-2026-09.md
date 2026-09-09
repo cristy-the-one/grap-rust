@@ -66,6 +66,11 @@ replacing the live index. Snapshots contain current raw vectors, not ANN topolog
 reload rebuilds it. Stable insertion order does not eliminate upstream hierarchy
 randomness. Valid candidate scores and mutation safety do not guarantee recall.
 
+New HNSW indexes use M=32, ef_construction=100, ef_search=150, maximum 16
+layers, and retain pruned neighbors to fill unused neighbor slots. Previously
+saved parameters remain honored. Compaction preserves those parameters; it
+does not silently upgrade an existing custom configuration.
+
 The graph loader also validates cached vector values and live membership against
 the graph's own embeddings. A syntactically valid older cache previously restored
 obsolete values and deleted nodes. Mismatched caches now trigger a rebuild;
@@ -81,6 +86,65 @@ default. Build an isolated ANN wheel with:
 ```powershell
 maturin build --release --manifest-path crates/pygrap/Cargo.toml --features ann-hnsw --interpreter .venv/Scripts/python.exe --out .logs/ann-wheel
 ```
+
+## Measured retrieval and explicit limits
+
+The read-only experiment uses 9,934 saved 1,024-dimensional project vectors:
+65 records are held out as queries, leaving 9,869 indexed records. Holding out
+records does not establish semantic uniqueness; duplicate content can remain.
+The mutation stage deletes 581 and replaces 489 vectors, then the reload stage
+rebuilds from the resulting saved index. Two independent constructions per
+configuration exercise upstream random hierarchy choices.
+
+The [selected configuration results](experiments/hnsw-m32-selected-2026-09.jsonl)
+include the source SHA-256 and per-trial metrics. These measure agreement with
+exact cosine retrieval, **not legal accuracy**, lawyer-query relevance, entity
+merge correctness or corpus completeness.
+
+| Stage | Mean recall@10, trial range | Worst query recall@10 | ANN median | Exact median |
+|---|---:|---:|---:|---:|
+| Fresh | 98.92–99.08% | 80% | 2.88–3.01 ms | 7.46–7.67 ms |
+| Edited/deleted | 99.08–99.23% | 80% | 3.63–3.68 ms | 7.06–7.28 ms |
+| Reloaded | 98.77–98.92% | 70–80% | 2.84–2.86 ms | 7.20–7.24 ms |
+
+Build time was 14.59–14.91 s; save plus reload was 13.57–13.63 s. Timings are
+observations on this machine, not guarantees. There are only 65 queries and
+two trials, so the worst observed query is not a lower bound for future recall.
+
+The initial mutation policy expanded search by every invalidated label, making
+edited-index queries roughly 9.6–9.8 ms, slower than exact. Expansion now scales
+by the invalidated fraction, with exact fallback if too few live candidates are
+returned. This fixes the observed cost amplification without claiming complete
+ANN retrieval. At M=16, retaining pruned neighbors helped a synthetic fixture
+but some real-vector queries still recovered only 30%; expanding construction
+candidates did not help and was discarded. M=32 improved the measured tails.
+The intermediate experiment artifacts are retained beside the selected results.
+
+For this product, use exact search for retrieval requiring complete results.
+HNSW is an opt-in candidate accelerator, with current values and scores checked,
+but it can omit relevant candidates. A graph loaded with an ANN build does not
+thereby become suitable for automatic legal conclusions or exhaustive merging.
+
+Reproduce the selected retrieval probe:
+
+```powershell
+$env:HNSW_M='32'
+$env:HNSW_EFS='150'
+$env:HNSW_TRIALS='2'
+cargo run --release --features ann-hnsw --example hnsw_evaluate -- pilot-law-ro/kee-workdir/graph/vector_index/vectors.bin
+```
+
+Validation: 171 Rust tests without default features; 188 with all features;
+strict core Clippy and workspace formatting; 591 Python/API/experiment tests
+against each of the exact and isolated ANN wheels. The final synthetic recall
+guard passed 25 independent hierarchy trials through fresh, edited and reloaded
+states, without lowering its 90% aggregate threshold. Storage assertions use
+direct or exhaustive access instead of assuming ANN top-k is complete.
+
+The 96-document Romanian-law layout probe was rerun with the same source hashes:
+all 70 comparisons still agree. The exact release wheel is installed for the GUI;
+the selected ANN wheel was tested separately. The release CLI was rebuilt.
+Existing PyO3 and Starlette deprecation warnings remain.
 
 ## Python as orchestration glue
 
