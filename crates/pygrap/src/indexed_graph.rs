@@ -555,6 +555,26 @@ impl IndexedKnowledgeGraph {
             .collect())
     }
 
+    /// Report the active vector backend, dimension and live count.
+    fn vector_index_stats(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        let d = pyo3::types::PyDict::new(py);
+        if let Some(stats) = self.inner.vector_index_stats() {
+            d.set_item("backend", stats.backend)?;
+            d.set_item("dimension", stats.dimension)?;
+            d.set_item("vector_count", stats.vector_count)?;
+        } else {
+            d.set_item("backend", "none")?;
+            d.set_item("dimension", 0)?;
+            d.set_item("vector_count", 0)?;
+        }
+        Ok(d.into())
+    }
+
+    /// Explicitly compact vector storage; HNSW rebuilds and may pause queries.
+    fn compact_vector_index(&mut self) {
+        self.inner.compact_vector_index();
+    }
+
     /// Start background merge/vacuum workers.
     fn start_background_workers(&mut self, interval_ms: u64) -> usize {
         self.inner

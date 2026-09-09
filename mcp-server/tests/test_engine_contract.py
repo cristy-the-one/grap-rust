@@ -4,6 +4,26 @@ import pytest
 import pygrap
 
 
+def test_vector_backend_is_visible_and_compaction_preserves_current_values(tmp_path):
+    path = str(tmp_path / "vectors")
+    graph = pygrap.IndexedKnowledgeGraph(path)
+    assert graph.vector_index_stats() == {"backend": "none", "dimension": 0, "vector_count": 0}
+    nodes = [graph.add_node(f"rule {i}", embedding=[0.0, 1.0]) for i in range(100)]
+    graph.update_node(nodes[0], "updated rule", embedding=[1.0, 0.0])
+    graph.remove_node(nodes[1])
+    before = graph.vector_index_stats()
+    assert before["backend"] in {"brute_force", "hnsw"}
+    assert before["dimension"] == 2
+    assert before["vector_count"] == 99
+    graph.compact_vector_index()
+    assert graph.vector_index_stats() == before
+    assert graph.vector_search([1.0, 0.0], 1000)[0] == (nodes[0], 1.0)
+    graph.save()
+    loaded = pygrap.IndexedKnowledgeGraph(path)
+    assert loaded.vector_index_stats() == before
+    assert loaded.vector_search([1.0, 0.0], 1000)[0] == (nodes[0], 1.0)
+
+
 def test_centrality_is_explicitly_opt_in(tmp_path):
     graph = pygrap.IndexedKnowledgeGraph(str(tmp_path / "graph"))
     a = graph.add_node("alpha")

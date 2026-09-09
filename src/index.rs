@@ -1195,6 +1195,19 @@ impl IndexedKnowledgeGraph {
         }
     }
 
+    /// Report the active backend and live vector count, or None before ingestion.
+    pub fn vector_index_stats(&self) -> Option<crate::vector_index::VectorIndexStats> {
+        self.vector_index.as_ref().map(|index| index.stats())
+    }
+
+    /// Explicitly compact vector storage. HNSW rebuilds its topology; this can
+    /// pause queries. Exact backends need no maintenance. Node IDs stay intact.
+    pub fn compact_vector_index(&mut self) {
+        if let Some(index) = &mut self.vector_index {
+            index.vacuum();
+        }
+    }
+
     /// Transitive dependents of a node (see `analytics::blast_radius`).
     pub fn blast_radius(&self, node: NodeId, mask: Option<u64>, max_depth: u32) -> Vec<NodeId> {
         crate::analytics::blast_radius(&self.graph, node, mask, max_depth)
@@ -1842,6 +1855,27 @@ impl IndexedKnowledgeGraph {
 
         match vidx.try_load_from_dir(&vdir) {
             Ok(true) => {
+                // Graph and acceleration-cache files can come from different
+                // saves. A matching ID alone does not establish a matching value.
+                let mut confirmed = 0;
+                for i in 0..self.graph.node_count() {
+                    let id = NodeId(i as u32);
+                    if self.graph.is_node_deleted(id) {
+                        continue;
+                    }
+                    if let Some(embedding) = self.graph.read_embedding(id) {
+                        if vidx.contains_vector(id) {
+                            if !vidx.matches_vector(id, &embedding) {
+                                return false;
+                            }
+                            confirmed += 1;
+                        }
+                    }
+                }
+                // Also rejects deleted, out-of-range and embedding-less IDs.
+                if confirmed != vidx.stats().vector_count {
+                    return false;
+                }
                 self.vector_index = Some(vidx);
                 true
             }

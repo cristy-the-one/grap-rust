@@ -22,11 +22,21 @@ fn main() {
         "vectors":corpus.len(),"dimension":corpus[0].1.len(),"held_out_queries":queries.len(),
         "k":10,"note":"Retrieval agreement with exact cosine; not legal or model accuracy. HNSW hierarchy randomness is upstream."})
     );
-    for ef in [50, 150] {
-        for trial in 0..2 {
+    let expansion = std::env::var("HNSW_EFS").unwrap_or_else(|_| "50,150,500".into());
+    let trials: usize = std::env::var("HNSW_TRIALS")
+        .unwrap_or_else(|_| "2".into())
+        .parse()
+        .unwrap();
+    let connections: usize = std::env::var("HNSW_M")
+        .unwrap_or_else(|_| "16".into())
+        .parse()
+        .unwrap();
+    for ef in expansion.split(',').map(|s| s.parse::<usize>().unwrap()) {
+        for trial in 0..trials {
             let mut exact = BruteForceVectorIndex::new();
             let mut ann = HNSWVectorIndex::with_params(HNSWParams {
                 ef_search: ef,
+                max_connections: connections,
                 ..Default::default()
             });
             let start = Instant::now();
@@ -90,7 +100,7 @@ fn main() {
                 ann_us.sort_by(f64::total_cmp);
                 println!(
                     "{}",
-                    serde_json::json!({"ef_search":ef,"trial":trial,"stage":stage,
+                    serde_json::json!({"max_connections":connections,"ef_search":ef,"trial":trial,"stage":stage,
                     "build_ms":build_ms,"maintenance_ms":maintenance_ms,
                     "mean_id_recall_at_10":recalls.iter().sum::<f64>()/recalls.len() as f64,
                     "worst_id_recall_at_10":recalls.iter().copied().fold(1.0,f64::min),

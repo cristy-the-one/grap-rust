@@ -2,6 +2,64 @@
 use grap::{HNSWVectorIndex, NodeId, VectorIndex};
 
 #[test]
+fn approximate_recall_and_current_scores_survive_churn_and_reload() {
+    let mut state = 20260909u64;
+    let mut vector = || {
+        (0..24)
+            .map(|_| {
+                state = state.wrapping_mul(6364136223846793005).wrapping_add(1);
+                ((state >> 32) as u32 as f64 / u32::MAX as f64 * 2.0 - 1.0) as f32
+            })
+            .collect::<Vec<_>>()
+    };
+    let mut ann = HNSWVectorIndex::new();
+    let mut exact = grap::BruteForceVectorIndex::new();
+    for id in 0..512 {
+        let v = vector();
+        ann.add_vector(NodeId(id), &v);
+        exact.add_vector(NodeId(id), &v);
+    }
+    let queries: Vec<_> = (0..32).map(|_| vector()).collect();
+    for stage in 0..3 {
+        if stage == 1 {
+            for id in 0..80 {
+                if id % 2 == 0 {
+                    ann.remove_vector(NodeId(id));
+                    exact.remove_vector(NodeId(id));
+                } else {
+                    let v = vector();
+                    ann.add_vector(NodeId(id), &v);
+                    exact.add_vector(NodeId(id), &v);
+                }
+            }
+        } else if stage == 2 {
+            let dir = tempfile::tempdir().unwrap();
+            ann.save_to_dir(dir.path()).unwrap();
+            assert!(ann.try_load_from_dir(dir.path()).unwrap());
+        }
+        let mut recovered = 0;
+        for query in &queries {
+            let truth = exact.search(query, 1000);
+            let hits = ann.search(query, 10);
+            assert_eq!(hits.len(), 10);
+            for &(id, score) in &hits {
+                assert_eq!(truth.iter().find(|(n, _)| *n == id).unwrap().1, score);
+            }
+            recovered += truth[..10]
+                .iter()
+                .filter(|(id, _)| hits.iter().any(|(n, _)| n == id))
+                .count();
+        }
+        // Broad regression guard, not a guarantee for arbitrary corpora. Upstream
+        // hierarchy levels remain randomized despite the deterministic input.
+        assert!(
+            recovered as f64 / 320.0 >= 0.90,
+            "stage {stage}: {recovered}/320"
+        );
+    }
+}
+
+#[test]
 fn ann_updates_are_exactly_scored_and_physical_growth_is_bounded() {
     let mut index = HNSWVectorIndex::new();
     for i in 0..256 {
@@ -44,8 +102,17 @@ fn invalid_inputs_preserve_values_and_zero_and_extreme_vectors_are_safe() {
     index
         .try_add_vector(NodeId(101), &[f32::MAX, f32::MAX])
         .unwrap();
-    assert_eq!(index.search(&[1.0, 0.0], 1), vec![(NodeId(1), 1.0)]);
-    assert_eq!(index.search(&[f32::MAX, f32::MAX], 1)[0].0, NodeId(101));
+    for query in [[1.0, 0.0], [f32::MAX, f32::MAX]] {
+        let truth = index.search(&query, 1000);
+        let approximate = index.search(&query, 10);
+        assert_eq!(approximate.len(), 10);
+        for (id, score) in approximate {
+            assert!(score.is_finite());
+            assert_eq!(score, truth.iter().find(|(n, _)| *n == id).unwrap().1);
+        }
+    }
+    assert_eq!(index.search(&[1.0, 0.0], 1000)[0], (NodeId(1), 1.0));
+    assert_eq!(index.search(&[f32::MAX, f32::MAX], 1000)[0].0, NodeId(101));
     assert_eq!(index.search(&[0.0, 0.0], 1), vec![(NodeId(1), 0.0)]);
     assert!(index.search(&[f32::NAN, 1.0], 2).is_empty());
 }
@@ -78,6 +145,9 @@ fn corrupt_snapshots_fail_without_changing_the_live_index() {
     .unwrap();
     assert!(index.try_load_from_dir(dir.path()).is_err());
     assert!(index.contains_vector(NodeId(3)));
+    std::fs::remove_file(dir.path().join("vectors.bin")).unwrap();
+    assert!(index.try_load_from_dir(dir.path()).is_err());
+    assert!(index.contains_vector(NodeId(3)));
 }
 
 #[test]
@@ -94,7 +164,7 @@ fn empty_and_mutated_snapshots_preserve_current_vectors() {
     index.save_to_dir(dir.path()).unwrap();
     let mut loaded = HNSWVectorIndex::new();
     assert!(loaded.try_load_from_dir(dir.path()).unwrap());
-    assert_eq!(loaded.search(&[1.0, 0.0], 1), vec![(NodeId(0), 1.0)]);
+    assert_eq!(loaded.search(&[1.0, 0.0], 1000)[0], (NodeId(0), 1.0));
     assert!(!loaded.contains_vector(NodeId(1)));
     assert_eq!(loaded.stats().vector_count, 99);
 }

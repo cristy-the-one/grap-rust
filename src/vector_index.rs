@@ -65,8 +65,7 @@ pub trait VectorIndex: Send + Sync + std::any::Any {
     /// Perform approximate (or exact) nearest neighbor search.
     ///
     /// Returns up to `max_results` pairs of `(NodeId, similarity)` where
-    /// similarity is typically cosine similarity in [0.0, 1.0] or [-1.0, 1.0]
-    /// depending on the normalization used by the implementation.
+    /// the built-in backends use signed cosine similarity (zero for zero vectors).
     fn search(&self, query: &[f32], max_results: usize) -> Vec<(NodeId, f64)>;
 
     /// Return diagnostic statistics about the index.
@@ -75,6 +74,12 @@ pub trait VectorIndex: Send + Sync + std::any::Any {
     /// Returns true if the index currently contains a vector for this node.
     /// Used for efficient delta sync after loading a persisted index.
     fn contains_vector(&self, _node: NodeId) -> bool {
+        false
+    }
+
+    /// Verify a cached value against the graph's authoritative embedding.
+    /// Unknown backends conservatively decline cache reuse.
+    fn matches_vector(&self, _node: NodeId, _embedding: &[f32]) -> bool {
         false
     }
 
@@ -186,6 +191,12 @@ impl VectorIndex for BruteForceVectorIndex {
 
     fn contains_vector(&self, node: NodeId) -> bool {
         self.vectors.contains_key(&node)
+    }
+
+    fn matches_vector(&self, node: NodeId, embedding: &[f32]) -> bool {
+        self.vectors
+            .get(&node)
+            .is_some_and(|stored| stored == embedding)
     }
 
     fn save_to_dir(&self, dir: &std::path::Path) -> Result<(), crate::GraphError> {
@@ -396,13 +407,7 @@ impl HNSWVectorIndex {
             return Err(crate::GraphError::Other("invalid HNSW parameters: require M=2..256, layers=1..16, ef_construction>=M and ef_search>0".into()));
         }
         Ok(Self {
-            inner: Hnsw::new(
-                params.max_connections,
-                10_000,
-                params.max_layers,
-                params.ef_construction,
-                DistCosine {},
-            ),
+            inner: Self::new_inner(params, 10_000),
             vectors: Default::default(),
             dimension: 0,
             base_ids: Default::default(),
@@ -472,14 +477,22 @@ impl HNSWVectorIndex {
         }
     }
 
-    fn rebuild(&mut self) {
-        self.inner = Hnsw::new(
-            self.params.max_connections,
-            self.vectors.len().max(1),
-            self.params.max_layers,
-            self.params.ef_construction,
+    fn new_inner(params: HNSWParams, capacity: usize) -> Hnsw<'static, f32, DistCosine> {
+        let mut inner = Hnsw::new(
+            params.max_connections,
+            capacity,
+            params.max_layers,
+            params.ef_construction,
             DistCosine {},
         );
+        // Fill otherwise-pruned neighbor slots to avoid weak connectivity,
+        // especially in small indexes and after rebuilding a reduced corpus.
+        inner.set_keeping_pruned(true);
+        inner
+    }
+
+    fn rebuild(&mut self) {
+        self.inner = Self::new_inner(self.params, self.vectors.len().max(1));
         self.base_ids.clear();
         self.changed.clear();
         self.zero_vectors.clear();
@@ -545,10 +558,17 @@ impl VectorIndex for HNSWVectorIndex {
         if self.vectors.len() <= 64 || k == self.vectors.len() || normalized.is_none() {
             return self.score_candidates(query, self.vectors.keys().copied(), k);
         }
-        let fetch = self
-            .params
-            .ef_search
-            .max(k.saturating_add(self.changed.len()))
+        // Compensate for the *fraction* of invalidated labels, not their total
+        // count. Adding every tombstone to ef can make ANN slower than exact.
+        let live_base = self
+            .base_ids
+            .len()
+            .saturating_sub(self.changed.len())
+            .max(1);
+        let desired = self.params.ef_search.max(k);
+        let fetch = desired
+            .saturating_mul(self.base_ids.len())
+            .div_ceil(live_base)
             .min(self.base_ids.len());
         let mut ids = std::collections::HashSet::new();
         if fetch > 0 {
@@ -595,6 +615,12 @@ impl VectorIndex for HNSWVectorIndex {
 
     fn contains_vector(&self, node: NodeId) -> bool {
         self.vectors.contains_key(&node)
+    }
+
+    fn matches_vector(&self, node: NodeId, embedding: &[f32]) -> bool {
+        self.vectors
+            .get(&node)
+            .is_some_and(|stored| stored == embedding)
     }
 }
 
@@ -663,8 +689,11 @@ impl HNSWVectorIndex {
         let manifest_path = dir.join("manifest.json");
         let vectors_path = dir.join("vectors.bin");
 
-        if !manifest_path.exists() || !vectors_path.exists() {
+        if !manifest_path.exists() && !vectors_path.exists() {
             return Ok(false);
+        }
+        if !manifest_path.exists() || !vectors_path.exists() {
+            return Err(crate::GraphError::Other("incomplete HNSW snapshot".into()));
         }
 
         // Read manifest

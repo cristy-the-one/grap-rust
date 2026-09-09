@@ -229,8 +229,8 @@ impl KnowledgeGraph {
         self.nodes.get(node.0 as usize).map(|n| n.content_hash)
     }
 
-    /// True if this graph's blobs are backed by a read-only memory map
-    /// (loaded via `load_mmap`) rather than owned in-RAM chunks.
+    /// True if any blob chunk is backed by a read-only memory map. Appending
+    /// owned chunks after `load_mmap` leaves existing mapped chunks intact.
     pub fn blobs_are_mapped(&self) -> bool {
         #[cfg(feature = "mmap")]
         {

@@ -65,3 +65,33 @@ Loading validates counts, dimensions, duplicate IDs and parameters before
 replacing the live index. Snapshots contain current raw vectors, not ANN topology;
 reload rebuilds it. Stable insertion order does not eliminate upstream hierarchy
 randomness. Valid candidate scores and mutation safety do not guarantee recall.
+
+The graph loader also validates cached vector values and live membership against
+the graph's own embeddings. A syntactically valid older cache previously restored
+obsolete values and deleted nodes. Mismatched caches now trigger a rebuild;
+matching caches can still ingest newly added graph vectors. This check applies
+to both backends and adds a linear embedding-validation pass during load.
+
+Python exposes `vector_index_stats()` (backend, dimension, live count) and
+`compact_vector_index()` (explicit synchronous maintenance). The latter can
+pause queries; it is not silently added to background text maintenance.
+The Python extension has an opt-in `ann-hnsw` Cargo feature; exact remains its
+default. Build an isolated ANN wheel with:
+
+```powershell
+maturin build --release --manifest-path crates/pygrap/Cargo.toml --features ann-hnsw --interpreter .venv/Scripts/python.exe --out .logs/ann-wheel
+```
+
+## Python as orchestration glue
+
+The current native binding already puts graph operations, search, storage and
+rebalance in Rust. Inspection found no `allow_threads` calls in the binding and
+per-node calls in `grap_mcp/ingest.py`, `incremental.py` and KEE graph construction.
+These are candidate boundaries to measure, not measured explanations of total
+runtime. Releasing the GIL around pure Rust work may improve responsiveness;
+batching may reduce conversion and call overhead. Neither establishes an
+end-to-end speedup without profiling inference, I/O and engine time separately.
+
+Prefer measured movement of cohesive hot loops into Rust over a wholesale
+Python-to-Go/Rust orchestration rewrite. Keep domain policy and evidence
+semantics covered by the same harness regressions across either boundary.
