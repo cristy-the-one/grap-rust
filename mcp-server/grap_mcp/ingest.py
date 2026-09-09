@@ -1,6 +1,8 @@
 """Ingest plain-text / markdown / JSON documents into a grap KG as real evidence nodes."""
 
 import json
+from itertools import islice
+from .native_graph import add_node_batch
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -91,27 +93,26 @@ def ingest_paths(kg, root: str, embedder=None, batch_size: int = EMBED_BATCH) ->
     else:
         raise FileNotFoundError(f"ingest path not found: {root}")
 
-    pending: List[tuple] = []           # (label, chunk) in stable file order
-    for f in files:
-        text = read_document(f)
-        if text is None:
-            continue
-        for i, chunk in enumerate(chunk_text(text)):
-            pending.append((f"doc:{f.stem}#{i}", chunk))
+    def records():
+        for f in files:
+            text = read_document(f)
+            if text is None:
+                continue
+            for i, chunk in enumerate(chunk_text(text)):
+                yield (f"doc:{f.stem}#{i}", chunk)
 
     nodes_added = 0
     labels: List[str] = []
     step = max(1, int(batch_size))
-    for start in range(0, len(pending), step):
-        group = pending[start:start + step]
+    pending = records()
+    while group := list(islice(pending, step)):
         embeddings = embedder.embed([c for _, c in group]) if embedder else None
-        for j, (label, chunk) in enumerate(group):
-            if embeddings is not None:
-                kg.add_node(text=chunk, label=label, embedding=embeddings[j])
-            else:
-                kg.add_node(text=chunk, label=label)
-            nodes_added += 1
-            if len(labels) < 5:
-                labels.append(label)
+        if embeddings is not None and len(embeddings) != len(group):
+            raise ValueError("embedding result count does not match the input batch")
+        rows = [(chunk, label, embeddings[j] if embeddings is not None else None)
+                for j, (label, chunk) in enumerate(group)]
+        add_node_batch(kg, rows)
+        nodes_added += len(rows)
+        labels.extend(label for label, _ in group[:max(0, 5 - len(labels))])
     return {"files": len(files), "nodes_added": nodes_added, "labels": labels,
             "embedded": bool(embedder)}

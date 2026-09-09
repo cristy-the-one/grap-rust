@@ -60,6 +60,15 @@ def evaluate(corpus, output, count=96):
             if (i + 1) % 8 == 0:
                 segmented.save()
         expected = results(baseline)
+        batched = pygrap.IndexedKnowledgeGraph(str(root / "batched"))
+        for offset in range(0, len(documents), 16):
+            rows = [(text, None, None) for text in documents[offset:offset + 16]]
+            assert batched.add_nodes(rows) == list(range(offset, offset + len(rows)))
+        compare("scalar_vs_batch", results(batched), expected)
+        batched.save()
+        del batched
+        batched = pygrap.IndexedKnowledgeGraph(str(root / "batched"))
+        compare("batch_reload", results(batched), expected)
         compare("buffer_vs_tiered_segments", results(segmented), expected)
         baseline.save()
         segmented.save()
@@ -81,7 +90,7 @@ def evaluate(corpus, output, count=96):
         reloaded = pygrap.IndexedKnowledgeGraph(str(root / "segmented"))
         compare("revised_reload", results(reloaded), revised)
         hit_counts = {query: len(rows) for query, rows in expected.items()}
-        del baseline, segmented, reloaded
+        del baseline, segmented, reloaded, batched
 
     report = {
         "scope": "Storage-layout and revision invariance; no claim of semantic accuracy or corpus-wide completeness.",

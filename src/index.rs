@@ -923,6 +923,9 @@ pub struct IndexedKnowledgeGraph {
     pagerank_cache: std::sync::Mutex<Option<Vec<f64>>>,
 }
 
+/// One batch insertion record: text, optional label, optional embedding.
+pub type NodeInput<'a> = (&'a str, Option<&'a str>, Option<&'a [f32]>);
+
 impl std::fmt::Debug for IndexedKnowledgeGraph {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("IndexedKnowledgeGraph")
@@ -1011,6 +1014,48 @@ impl IndexedKnowledgeGraph {
         label: Option<&str>,
         embedding: Option<&[f32]>,
     ) -> NodeId {
+        let id = self.index_new_node(text, label, embedding);
+        *self.pagerank_cache.lock().unwrap() = None;
+        id
+    }
+
+    /// Insert an ordered batch, returning IDs in the same order. Validate all
+    /// supplied embeddings before mutation; empty batches do nothing.
+    pub fn add_nodes(&mut self, rows: &[NodeInput<'_>]) -> Result<Vec<NodeId>, GraphError> {
+        let mut dimension = self.vector_index_stats().map_or(0, |s| s.dimension);
+        for (_, _, embedding) in rows {
+            if let Some(vector) = embedding {
+                if vector.is_empty()
+                    || vector.iter().any(|v| !v.is_finite())
+                    || (dimension != 0 && vector.len() != dimension)
+                {
+                    return Err(GraphError::Other(
+                        "batch embeddings must be nonempty, finite and have a consistent dimension"
+                            .into(),
+                    ));
+                }
+                dimension = vector.len();
+            }
+        }
+        if rows.is_empty() {
+            return Ok(Vec::new());
+        }
+        self.graph.nodes.reserve(rows.len());
+        self.graph.deleted.reserve(rows.len());
+        let ids = rows
+            .iter()
+            .map(|&(text, label, embedding)| self.index_new_node(text, label, embedding))
+            .collect();
+        *self.pagerank_cache.lock().unwrap() = None;
+        Ok(ids)
+    }
+
+    fn index_new_node(
+        &mut self,
+        text: &str,
+        label: Option<&str>,
+        embedding: Option<&[f32]>,
+    ) -> NodeId {
         let id = self.graph.add_node(text, label, embedding);
         self.text_index.index_document(id, text);
 
@@ -1022,7 +1067,6 @@ impl IndexedKnowledgeGraph {
             vidx.add_vector(id, emb);
         }
 
-        *self.pagerank_cache.lock().unwrap() = None;
         id
     }
 

@@ -23,6 +23,8 @@ pub struct MergeReport {
     pub embedding_updated: bool,
 }
 
+type OwnedNodeInput = (String, Option<String>, Option<Vec<f32>>);
+
 #[pymethods]
 impl MergeReport {
     fn __repr__(&self) -> String {
@@ -195,9 +197,10 @@ impl IndexedKnowledgeGraph {
     ///
     /// If the graph was created/opened with a path, this will write to that directory.
     /// Returns `True` on success.
-    fn save(&mut self) -> PyResult<bool> {
+    fn save(&mut self, py: Python<'_>) -> PyResult<bool> {
         if let Some(ref dir) = self.path {
-            self.inner.save_to_dir(dir).map_err(to_py_err)?;
+            py.allow_threads(|| self.inner.save_to_dir(dir))
+                .map_err(to_py_err)?;
             Ok(true)
         } else {
             Err(pyo3::exceptions::PyValueError::new_err(
@@ -207,9 +210,10 @@ impl IndexedKnowledgeGraph {
     }
 
     /// Explicitly save the graph to a specific directory.
-    fn save_to_dir(&mut self, path: &str) -> PyResult<()> {
+    fn save_to_dir(&mut self, py: Python<'_>, path: &str) -> PyResult<()> {
         let dir = PathBuf::from(path);
-        self.inner.save_to_dir(&dir).map_err(to_py_err)?;
+        py.allow_threads(|| self.inner.save_to_dir(&dir))
+            .map_err(to_py_err)?;
         // Remember the new path for future save() calls
         self.path = Some(dir);
         Ok(())
@@ -229,6 +233,24 @@ impl IndexedKnowledgeGraph {
         let emb_ref: Option<&[f32]> = embedding.as_deref();
         let id = self.inner.add_node(text, label, emb_ref);
         Ok(id.0)
+    }
+
+    /// Insert (text, optional label, optional embedding) records in order.
+    /// Conversion and embedding validation precede mutation. Callers should use
+    /// bounded batches; this is not a rollback transaction for allocation failure.
+    fn add_nodes(&mut self, py: Python<'_>, rows: Vec<OwnedNodeInput>) -> PyResult<Vec<u32>> {
+        py.allow_threads(|| {
+            let borrowed: Vec<_> = rows
+                .iter()
+                .map(|(text, label, embedding)| {
+                    (text.as_str(), label.as_deref(), embedding.as_deref())
+                })
+                .collect();
+            self.inner
+                .add_nodes(&borrowed)
+                .map(|ids| ids.into_iter().map(|id| id.0).collect())
+        })
+        .map_err(to_py_err)
     }
 
     /// Add a directed edge between two nodes with optional property dict.
@@ -409,6 +431,7 @@ impl IndexedKnowledgeGraph {
     ))]
     fn search_and_traverse(
         &self,
+        py: Python<'_>,
         query: &str,
         max_seeds: usize,
         required_properties: Vec<String>,
@@ -427,15 +450,17 @@ impl IndexedKnowledgeGraph {
         // Convert Vec<String> to Vec<&str> for the Rust API
         let prop_refs: Vec<&str> = required_properties.iter().map(|s| s.as_str()).collect();
 
-        let results = self.inner.search_and_traverse(
-            query,
-            max_seeds,
-            &prop_refs,
-            min_strength,
-            max_depth,
-            max_results,
-            weights,
-        );
+        let results = py.allow_threads(|| {
+            self.inner.search_and_traverse(
+                query,
+                max_seeds,
+                &prop_refs,
+                min_strength,
+                max_depth,
+                max_results,
+                weights,
+            )
+        });
 
         Ok(results
             .into_iter()
@@ -482,6 +507,7 @@ impl IndexedKnowledgeGraph {
     ))]
     fn search_and_traverse_hybrid(
         &self,
+        py: Python<'_>,
         query: &str,
         vector: Option<Vec<f32>>,
         max_seeds: usize,
@@ -514,16 +540,18 @@ impl IndexedKnowledgeGraph {
 
         let vec_ref: Option<&[f32]> = vector.as_deref();
 
-        let results = self.inner.search_and_traverse_hybrid(
-            query,
-            vec_ref,
-            max_seeds,
-            &prop_refs,
-            min_strength,
-            max_depth,
-            max_results,
-            weights,
-        );
+        let results = py.allow_threads(|| {
+            self.inner.search_and_traverse_hybrid(
+                query,
+                vec_ref,
+                max_seeds,
+                &prop_refs,
+                min_strength,
+                max_depth,
+                max_results,
+                weights,
+            )
+        });
 
         Ok(results
             .into_iter()
@@ -547,8 +575,13 @@ impl IndexedKnowledgeGraph {
     /// Standalone approximate nearest neighbor search using the vector index (HNSW or brute-force).
     ///
     /// Returns up to `top_k` results as `(node_id, similarity_score)`.
-    fn vector_search(&self, embedding: Vec<f32>, top_k: usize) -> PyResult<Vec<(u32, f64)>> {
-        let results = self.inner.vector_search(&embedding, top_k);
+    fn vector_search(
+        &self,
+        py: Python<'_>,
+        embedding: Vec<f32>,
+        top_k: usize,
+    ) -> PyResult<Vec<(u32, f64)>> {
+        let results = py.allow_threads(|| self.inner.vector_search(&embedding, top_k));
         Ok(results
             .into_iter()
             .map(|(node_id, score)| (node_id.0, score))
@@ -571,8 +604,8 @@ impl IndexedKnowledgeGraph {
     }
 
     /// Explicitly compact vector storage; HNSW rebuilds and may pause queries.
-    fn compact_vector_index(&mut self) {
-        self.inner.compact_vector_index();
+    fn compact_vector_index(&mut self, py: Python<'_>) {
+        py.allow_threads(|| self.inner.compact_vector_index());
     }
 
     /// Start background merge/vacuum workers.
@@ -725,13 +758,14 @@ impl IndexedKnowledgeGraph {
     /// On exit, try to save the graph if it has a path.
     fn __exit__(
         &mut self,
+        py: Python<'_>,
         _exc_type: Option<&Bound<'_, PyType>>,
         _exc_value: Option<&Bound<'_, PyAny>>,
         _traceback: Option<&Bound<'_, PyAny>>,
     ) -> PyResult<bool> {
         if self.path.is_some() {
             // Best effort save — ignore errors in __exit__
-            let _ = self.save();
+            let _ = self.save(py);
         }
         Ok(false) // do not suppress exceptions
     }

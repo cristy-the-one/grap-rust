@@ -21,6 +21,7 @@ from . import config as config_store
 from . import auth
 from . import governance
 from . import ingest
+from .native_graph import SerializedGraph
 from .session import SessionJournal
 from .pagination import paginate
 # Defaults can be replaced per application instance.
@@ -114,7 +115,7 @@ class ApplicationState:
 
     def set_kg(self, kg, path=None):
         """Select a graph and clear state belonging to the previous graph."""
-        self.kg = kg
+        self.kg = SerializedGraph(kg) if isinstance(kg, pygrap.IndexedKnowledgeGraph) else kg
         self.kg_path = path
         self.extraction_workdir = None
         self.projected_nodes = set()
@@ -241,7 +242,7 @@ class GrapApplication:
         shutil.rmtree(path, ignore_errors=True)
         okg = pygrap.IndexedKnowledgeGraph.with_merge_policy(path, 2)
         projection = onto_loader.project_ontology_to_grap(ontology, okg)
-        self._state.ontology_kg = okg
+        self._state.ontology_kg = SerializedGraph(okg)
         self._state.ontology_kg_path = path
         self._state.ontology_nodes = set(projection.get("projected_node_ids", []))
         return projection
@@ -383,6 +384,7 @@ class GrapApplication:
         try:
             kg = pygrap.IndexedKnowledgeGraph.with_merge_policy(path, 2)
             self._state.set_kg(kg, path)
+            kg = self._state.kg
             try:
                 self._get_workspace().record_event("kg_loaded", path,
                                               details={"node_count": str(kg.node_count())})
@@ -415,6 +417,7 @@ class GrapApplication:
             kg = pygrap.IndexedKnowledgeGraph.with_merge_policy(path, 2)
             kg.save_to_dir(path)
             self._state.set_kg(kg, path)
+            kg = self._state.kg
             self._state.projected_nodes = set()
             try:
                 self._get_workspace().record_event("kg_created", path,

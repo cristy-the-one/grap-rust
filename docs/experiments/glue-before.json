@@ -1,0 +1,43 @@
+{
+  "binding": "C:\\dev\\grap-rust\\.venv\\Lib\\site-packages\\pygrap\\__init__.py",
+  "native": [
+    {
+      "chars_approx": 24,
+      "dimension": 0,
+      "nodes": 4000,
+      "mode": "single",
+      "median_seconds": 0.0042818000074476
+    },
+    {
+      "chars_approx": 800,
+      "dimension": 0,
+      "nodes": 4000,
+      "mode": "single",
+      "median_seconds": 0.07974310003919527
+    },
+    {
+      "chars_approx": 800,
+      "dimension": 256,
+      "nodes": 4000,
+      "mode": "single",
+      "median_seconds": 0.08849300001747906
+    }
+  ],
+  "save_gil": {
+    "other_thread_progressed": false,
+    "seconds": 0.025846300006378442
+  },
+  "ingest_buffer": {
+    "python_peak_bytes": 10438622,
+    "files": 128,
+    "nodes_added": 11520,
+    "labels": [
+      "doc:0000#0",
+      "doc:0000#1",
+      "doc:0000#2",
+      "doc:0000#3",
+      "doc:0000#4"
+    ],
+    "embedded": false
+  }
+}

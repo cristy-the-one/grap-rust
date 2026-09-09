@@ -13,7 +13,8 @@ import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from .ingest import _ALL_EXTS, chunk_text, read_document
+from .ingest import _ALL_EXTS, EMBED_BATCH, chunk_text, read_document
+from .native_graph import add_node_batch
 
 logger = logging.getLogger(__name__)
 
@@ -85,19 +86,18 @@ def ingest_incremental(kg, root: str, embedder=None,
                     pass
                 removed += 1
         to_add = [(h, c) for h, c in new_by_hash.items() if h not in prev]
-        embeddings = embedder.embed([c for _, c in to_add]) if (embedder and to_add) else None
-        new_file: Dict[str, int] = {}
-        for h in new_by_hash:
-            if h in prev:
-                new_file[h] = prev[h]   # unchanged → keep node id
-        for i, (h, c) in enumerate(to_add):
-            label = f"doc:{f.stem}#{h[:8]}"
-            if embeddings is not None:
-                nid = kg.add_node(text=c, label=label, embedding=embeddings[i])
-            else:
-                nid = kg.add_node(text=c, label=label)
-            new_file[h] = nid
-            added += 1
+        new_file: Dict[str, int] = {h: prev[h] for h in new_by_hash if h in prev}
+        for offset in range(0, len(to_add), EMBED_BATCH):
+            group = to_add[offset:offset + EMBED_BATCH]
+            embeddings = embedder.embed([c for _, c in group]) if embedder else None
+            if embeddings is not None and len(embeddings) != len(group):
+                raise ValueError("embedding result count does not match the input batch")
+            rows = [(c, f"doc:{f.stem}#{h[:8]}", embeddings[i] if embeddings is not None else None)
+                    for i, (h, c) in enumerate(group)]
+            ids = add_node_batch(kg, rows)
+            for (h, _), nid in zip(group, ids, strict=True):
+                new_file[h] = nid
+                added += 1
         skipped += sum(1 for h in new_by_hash if h in prev)
         if new_file:
             manifest[key] = new_file

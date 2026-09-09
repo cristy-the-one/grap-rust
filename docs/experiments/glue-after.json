@@ -1,0 +1,106 @@
+{
+  "binding": "C:\\dev\\grap-rust\\.logs\\glue-python\\pygrap\\__init__.py",
+  "native": [
+    {
+      "chars_approx": 24,
+      "dimension": 0,
+      "nodes": 4000,
+      "mode": "single",
+      "median_seconds": 0.004214600019622594
+    },
+    {
+      "chars_approx": 24,
+      "dimension": 0,
+      "nodes": 4000,
+      "mode": "batch",
+      "median_seconds": 0.0041930999723263085
+    },
+    {
+      "chars_approx": 24,
+      "dimension": 0,
+      "nodes": 4000,
+      "mode": "serialized_single",
+      "median_seconds": 0.0052423999877646565
+    },
+    {
+      "chars_approx": 24,
+      "dimension": 0,
+      "nodes": 4000,
+      "mode": "serialized_batch",
+      "median_seconds": 0.0042057999526150525
+    },
+    {
+      "chars_approx": 800,
+      "dimension": 0,
+      "nodes": 4000,
+      "mode": "single",
+      "median_seconds": 0.0805512000224553
+    },
+    {
+      "chars_approx": 800,
+      "dimension": 0,
+      "nodes": 4000,
+      "mode": "batch",
+      "median_seconds": 0.07988559996010736
+    },
+    {
+      "chars_approx": 800,
+      "dimension": 0,
+      "nodes": 4000,
+      "mode": "serialized_single",
+      "median_seconds": 0.0823015000205487
+    },
+    {
+      "chars_approx": 800,
+      "dimension": 0,
+      "nodes": 4000,
+      "mode": "serialized_batch",
+      "median_seconds": 0.07999739999650046
+    },
+    {
+      "chars_approx": 800,
+      "dimension": 256,
+      "nodes": 4000,
+      "mode": "single",
+      "median_seconds": 0.08642479998525232
+    },
+    {
+      "chars_approx": 800,
+      "dimension": 256,
+      "nodes": 4000,
+      "mode": "batch",
+      "median_seconds": 0.08892489998834208
+    },
+    {
+      "chars_approx": 800,
+      "dimension": 256,
+      "nodes": 4000,
+      "mode": "serialized_single",
+      "median_seconds": 0.08946129999822006
+    },
+    {
+      "chars_approx": 800,
+      "dimension": 256,
+      "nodes": 4000,
+      "mode": "serialized_batch",
+      "median_seconds": 0.09447050001472235
+    }
+  ],
+  "save_gil": {
+    "other_thread_progressed": true,
+    "seconds": 0.027667200018186122
+  },
+  "ingest_buffer": {
+    "python_peak_bytes": 656308,
+    "files": 128,
+    "nodes_added": 11520,
+    "labels": [
+      "doc:0000#0",
+      "doc:0000#1",
+      "doc:0000#2",
+      "doc:0000#3",
+      "doc:0000#4"
+    ],
+    "embedded": false
+  }
+}
