@@ -288,3 +288,18 @@ fn legacy_routing_is_preserved_until_explicit_rebalance() {
     std::fs::write(dir.path().join("ghost_edges.json"), b"broken topology").unwrap();
     assert!(ShardedGraph::load_from_dir(dir.path()).is_err());
 }
+
+#[test]
+fn sharded_phrase_traversal_uses_phrase_seeds_and_gap() {
+    let mut graph = ShardedGraph::new(3);
+    let exact = graph.add_node("credit bancar", None).unwrap();
+    graph.add_node("bancar credit", None).unwrap();
+    let tail = graph.add_node("tail", None).unwrap();
+    graph.add_edge(exact, tail, 0.9, vec![]).unwrap();
+    let hits = graph.phrase_search_and_traverse("credit bancar", 10, 10, &[], 0.0, 1, 20);
+    assert_eq!(hits.len(), 2);
+    assert!(hits.iter().any(|h| h.node == tail));
+    assert!(graph
+        .phrase_search_and_traverse("credit bancar", 0, 10, &[], 0.0, 1, 20)
+        .is_empty());
+}

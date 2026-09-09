@@ -819,6 +819,10 @@ impl ShardRouter {
     /// When expansion reaches a node that has `GhostEdge`s, the router will
     /// cross into the remote shard, fetch the target node (with caching),
     /// and continue the traversal from there, multiplying the edge strength.
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "retain the established positional query API for callers"
+    )]
     pub fn search_and_traverse(
         &self,
         text_query: &str,
@@ -829,9 +833,25 @@ impl ShardRouter {
         max_results: usize,
         weights: crate::index::FusionWeights,
     ) -> Vec<ShardedQueryResult> {
-        use std::cmp::Ordering;
-        use std::collections::BinaryHeap;
-        if max_seeds == 0 || max_results == 0 {
+        let seeds = self.select_seeds(text_query, None, max_seeds, property_names);
+        self.traverse_seeds(
+            seeds,
+            property_names,
+            min_strength,
+            max_depth,
+            max_results,
+            weights,
+        )
+    }
+
+    fn select_seeds(
+        &self,
+        text_query: &str,
+        phrase_gap: Option<u32>,
+        max_seeds: usize,
+        property_names: &[&str],
+    ) -> Vec<(GlobalNodeId, f64)> {
+        if max_seeds == 0 {
             return vec![];
         }
         let mut seeds = Vec::new();
@@ -842,7 +862,11 @@ impl ShardRouter {
             {
                 continue;
             }
-            for hit in shard.graph.search(text_query, max_seeds) {
+            let hits = match phrase_gap {
+                Some(gap) => shard.graph.phrase_search(text_query, gap, max_seeds),
+                None => shard.graph.search(text_query, max_seeds),
+            };
+            for hit in hits {
                 seeds.push((
                     GlobalNodeId {
                         shard: ShardId(sid as u16),
@@ -854,6 +878,23 @@ impl ShardRouter {
         }
         seeds.sort_by(|a, b| b.1.total_cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
         seeds.truncate(max_seeds);
+        seeds
+    }
+
+    fn traverse_seeds(
+        &self,
+        seeds: Vec<(GlobalNodeId, f64)>,
+        property_names: &[&str],
+        min_strength: f64,
+        max_depth: u32,
+        max_results: usize,
+        weights: crate::index::FusionWeights,
+    ) -> Vec<ShardedQueryResult> {
+        use std::cmp::Ordering;
+        use std::collections::BinaryHeap;
+        if max_results == 0 {
+            return vec![];
+        }
         struct Entry {
             node: GlobalNodeId,
             strength: f64,
@@ -1037,6 +1078,10 @@ impl ShardRouter {
     /// A fully cross-shard hybrid is a future enhancement.
     ///
     /// A fully cross-shard best-first hybrid traversal is possible in a follow-up if needed.
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "retain the established positional query API for callers"
+    )]
     pub fn search_and_traverse_hybrid(
         &self,
         text_query: &str,
@@ -1434,6 +1479,10 @@ impl ShardedGraph {
     }
 
     /// Hybrid text + vector + graph search over the sharded cluster (see [`ShardRouter::search_and_traverse_hybrid`]).
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "retain the established positional query API for callers"
+    )]
     pub fn search_and_traverse_hybrid(
         &self,
         text_query: &str,
@@ -1633,26 +1682,27 @@ impl ShardedGraph {
         all
     }
 
-    /// Distributed phrase search followed by graph traversal.
-    ///
-    /// Currently reuses the normal `search_and_traverse` path after
-    /// performing phrase search on each shard. A dedicated phrase-aware
-    /// traversal may be added later.
+    /// Distributed ordered phrase selection followed by the same bounded
+    /// local/cross-shard traversal used by ordinary text search.
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "retain the established positional query API for callers"
+    )]
     pub fn phrase_search_and_traverse(
         &self,
         phrase: &str,
-        _max_gap: u32,
+        max_gap: u32,
         max_seeds: usize,
         property_names: &[&str],
         min_strength: f64,
         max_depth: u32,
         max_results: usize,
     ) -> Vec<ShardedQueryResult> {
-        // For now we reuse the text search + traverse path.
-        // A dedicated phrase-aware version can be added later.
-        self.router.search_and_traverse(
-            phrase,
-            max_seeds,
+        let seeds = self
+            .router
+            .select_seeds(phrase, Some(max_gap), max_seeds, property_names);
+        self.router.traverse_seeds(
+            seeds,
             property_names,
             min_strength,
             max_depth,

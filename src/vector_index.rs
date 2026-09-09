@@ -120,21 +120,12 @@ pub trait VectorIndex: Send + Sync + std::any::Any {
 /// - A reference implementation for testing
 /// - A safe fallback when no ANN index is configured
 /// - The initial implementation while we bring up HNSW
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct BruteForceVectorIndex {
     /// node_id -> embedding
     vectors: std::collections::HashMap<NodeId, Vec<f32>>,
     /// Cached dimension (taken from the first inserted vector)
     dimension: usize,
-}
-
-impl Default for BruteForceVectorIndex {
-    fn default() -> Self {
-        Self {
-            vectors: std::collections::HashMap::new(),
-            dimension: 0,
-        }
-    }
 }
 
 impl BruteForceVectorIndex {
@@ -444,16 +435,20 @@ impl VectorIndex for HNSWVectorIndex {
     }
 
     fn search(&self, query: &[f32], max_results: usize) -> Vec<(NodeId, f64)> {
-        if self.dimension == 0 || query.is_empty() {
+        if self.dimension == 0 || query.len() != self.dimension || max_results == 0 {
             return Vec::new();
         }
 
+        let max_results = max_results.min(self.vectors.len());
+        if max_results == 0 {
+            return vec![];
+        }
         // Only fetch extra candidates when there are soft-deleted nodes to skip.
         // This avoids the 2× over-fetch cost on the common (no deletes) path.
         let fetch = if self.deleted.is_empty() {
             max_results
         } else {
-            max_results * 2
+            max_results.saturating_add(self.deleted.len())
         };
         // Minimum search expansion factor (ef). The actual ef used at query time
         // is `max(ef_search, fetch)` to ensure enough candidates are explored
@@ -487,11 +482,19 @@ impl VectorIndex for HNSWVectorIndex {
 
     fn stats(&self) -> VectorIndexStats {
         VectorIndexStats {
-            // Use saturating_sub + prefer our local map for accuracy after deletes.
-            vector_count: self.vectors.len().saturating_sub(self.deleted.len()),
+            // Deleted vectors have already been removed from the live map.
+            vector_count: self.vectors.len(),
             dimension: self.dimension,
             backend: "hnsw",
         }
+    }
+
+    fn save_to_dir(&self, dir: &Path) -> Result<(), crate::GraphError> {
+        HNSWVectorIndex::save_to_dir(self, dir)
+    }
+
+    fn try_load_from_dir(&mut self, dir: &Path) -> Result<bool, crate::GraphError> {
+        HNSWVectorIndex::try_load_from_dir(self, dir)
     }
 
     fn contains_vector(&self, node: NodeId) -> bool {

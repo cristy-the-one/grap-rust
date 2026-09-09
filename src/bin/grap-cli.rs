@@ -10,7 +10,7 @@
 //! - Minimal new dependencies (only clap for argument parsing).
 
 use clap::{Parser, Subcommand};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use grap::{ids::NodeId, IndexedKnowledgeGraph, SegmentInfo, ShardedGraph};
 
@@ -166,7 +166,7 @@ fn main() {
 // Command implementations
 // ---------------------------------------------------------------------------
 
-fn run_stats(graph_dir: &PathBuf, json: bool, args: StatsArgs) {
+fn run_stats(graph_dir: &Path, json: bool, args: StatsArgs) {
     // Try to load as a single IndexedKnowledgeGraph first (most common case for demos).
     match IndexedKnowledgeGraph::load_from_dir(graph_dir) {
         Ok(ig) => {
@@ -251,7 +251,7 @@ fn run_stats(graph_dir: &PathBuf, json: bool, args: StatsArgs) {
     }
 }
 
-fn run_query(graph_dir: &PathBuf, json: bool, args: QueryArgs) {
+fn run_query(graph_dir: &Path, json: bool, args: QueryArgs) {
     // Load the graph (single-graph path for the first version of the demo)
     let ig = match IndexedKnowledgeGraph::load_from_dir(graph_dir) {
         Ok(g) => g,
@@ -354,7 +354,7 @@ fn create_on_disk_graph() -> IndexedKnowledgeGraph {
     IndexedKnowledgeGraph::new_on_disk()
 }
 
-fn run_add_file(graph_dir: &PathBuf, json: bool, args: AddFileArgs) {
+fn run_add_file(graph_dir: &Path, json: bool, args: AddFileArgs) {
     // Ensure the target directory exists (harmless if it already does).
     if let Err(e) = std::fs::create_dir_all(graph_dir) {
         eprintln!("Failed to create graph directory {:?}: {}", graph_dir, e);
@@ -409,7 +409,7 @@ fn run_add_file(graph_dir: &PathBuf, json: bool, args: AddFileArgs) {
     }
 }
 
-fn run_delete_node(graph_dir: &PathBuf, json: bool, args: DeleteNodeArgs) {
+fn run_delete_node(graph_dir: &Path, json: bool, args: DeleteNodeArgs) {
     let mut ig = match IndexedKnowledgeGraph::load_from_dir(graph_dir) {
         Ok(g) => g,
         Err(e) => {
@@ -420,7 +420,7 @@ fn run_delete_node(graph_dir: &PathBuf, json: bool, args: DeleteNodeArgs) {
 
     let node_id = grap::NodeId(args.node_id);
 
-    ig.graph.remove_node(node_id);
+    ig.remove_node(node_id);
 
     if let Err(e) = ig.save_to_dir(graph_dir) {
         eprintln!("Failed to save after delete: {}", e);
@@ -440,7 +440,7 @@ fn run_delete_node(graph_dir: &PathBuf, json: bool, args: DeleteNodeArgs) {
     }
 }
 
-fn run_vacuum(graph_dir: &PathBuf, json: bool, args: VacuumArgs) {
+fn run_vacuum(graph_dir: &Path, json: bool, args: VacuumArgs) {
     let mut ig = match IndexedKnowledgeGraph::load_from_dir(graph_dir) {
         Ok(g) => g,
         Err(e) => {
@@ -485,7 +485,7 @@ fn run_vacuum(graph_dir: &PathBuf, json: bool, args: VacuumArgs) {
     }
 }
 
-fn run_export(graph_dir: &PathBuf, json: bool, args: ExportArgs) {
+fn run_export(graph_dir: &Path, json: bool, args: ExportArgs) {
     let ig = match IndexedKnowledgeGraph::load_from_dir(graph_dir) {
         Ok(g) => g,
         Err(e) => {
@@ -533,7 +533,7 @@ fn run_export(graph_dir: &PathBuf, json: bool, args: ExportArgs) {
     }
 }
 
-fn run_add_edge(graph_dir: &PathBuf, json: bool, args: AddEdgeArgs) {
+fn run_add_edge(graph_dir: &Path, json: bool, args: AddEdgeArgs) {
     let mut ig = match IndexedKnowledgeGraph::load_from_dir(graph_dir) {
         Ok(g) => g,
         Err(e) => {
@@ -545,7 +545,7 @@ fn run_add_edge(graph_dir: &PathBuf, json: bool, args: AddEdgeArgs) {
     let source = NodeId(args.source);
     let target = NodeId(args.target);
 
-    ig.graph.add_edge(source, target, args.strength, vec![]);
+    ig.add_edge(source, target, args.strength, vec![]);
 
     if let Err(e) = ig.save_to_dir(graph_dir) {
         eprintln!("Failed to save after adding edge: {}", e);
@@ -573,7 +573,7 @@ fn run_add_edge(graph_dir: &PathBuf, json: bool, args: AddEdgeArgs) {
 /// Long-running command that loads a graph (respecting GRAP_MERGE_POLICY)
 /// and keeps background merge/vacuum workers alive.
 /// Useful for demos so that tiered merging happens visibly in the background.
-fn run_start_workers(graph_dir: &PathBuf, args: WorkerArgs) {
+fn run_start_workers(graph_dir: &Path, args: WorkerArgs) {
     let mut ig = match IndexedKnowledgeGraph::load_from_dir(graph_dir) {
         Ok(g) => g,
         Err(e) => {
