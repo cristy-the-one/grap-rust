@@ -1,0 +1,2362 @@
+{
+  "model": "grap-legal-gemma4",
+  "fixture_sha256": "f21c854ebfb89c27deaeb1d8dd393305a689ada51cda139916746f1e1a4c170f",
+  "transport": "Ollama native chat; temperature 0, seed 42, think false, max output 2048, no retries",
+  "warmup": [
+    {
+      "purpose": "classification",
+      "wall_s": 7.973790000000008,
+      "prompt_sha256": "eba5a3056eca3b0102ab6b715d208fee43989e72abe908d1de6f965bd651dc37",
+      "prompt_chars": 34,
+      "raw": "{\"ready\":true}",
+      "finish_reason": "stop",
+      "total_duration": 7949449300,
+      "load_duration": 7723074000,
+      "prompt_eval_duration": 162693000,
+      "eval_duration": 57527000,
+      "prompt_eval_count": 23,
+      "eval_count": 6
+    }
+  ],
+  "compact_instruction": "\nEmit compact JSON: no indentation or optional whitespace outside strings. Preserve all required fields, complete string values, evidence and legal classifications.",
+  "rows": [
+    {
+      "case": "semantic-02",
+      "mode": "baseline",
+      "wall_s": 5.8738680999999815,
+      "correct_target": true,
+      "failures": [],
+      "calls": [
+        {
+          "purpose": "extraction",
+          "wall_s": 5.871046400000068,
+          "prompt_sha256": "24941747b5ad29ad50f2c22f109bc185c44f1106d5aced5c01b56d36503074eb",
+          "prompt_chars": 6095,
+          "raw": "```json\n{\n  \"outcomes\": [\n    {\n      \"name\": \"Articolul 14\",\n      \"requirements\": [],\n      \"evidence\": \"Articolul 14 Răspunderea civilă a executorului bancar poate fi angajata, în condiţiile legii, pentru cauzarea de prejudiciu prin încălcarea obligaţiilor sale profesionale.\"\n    },\n    {\n      \"name\": \"Articolul 15\",\n      \"requirements\": [],\n      \"evidence\": \"Articolul 15 Este interzis executorilor bancari sa achizitioneze, direct sau prin interpusi, pentru ei sau pentru alţii, bunurile ce au format obiectul activităţii de executare silită sau să facă acte de executare în propria lor cauza ori în cauzele privind rudele şi afinii până la gradul al patrulea inclusiv.\"\n    }\n  ],\n  \"relations\": [\n    {\n      \"from\": \"executorului bancar\",\n      \"type\": \"can be engaged for\",\n      \"to\": \"cauzarea de prejudiciu prin încălcarea obligaţiilor sale profesionale\",\n      \"evidence\": \"Răspunderea civilă a executorului bancar poate fi angajata, în condiţiile legii, pentru cauzarea de prejudiciu prin încălcarea obligaţiilor sale profesionale.\"\n    },\n    {\n      \"from\": \"Asigurarea de răspundere profesională a executorului bancar\",\n      \"type\": \"can be realized by and in the account of\",\n      \"to\": \"băncii în care îşi desfăşoară activitatea\",\n      \"evidence\": \"Asigurarea de răspundere profesională a executorului bancar se poate realiza de către şi în contul băncii în care îşi desfăşoară activitatea, dacă aceasta este expres stipulată, după caz, în regulamentul intern al băncii sau în convenţia încheiată de banca cu executorul bancar.\"\n    },\n    {\n      \"from\": \"executorilor bancari\",\n      \"type\": \"is forbidden to\",\n      \"to\": \"achizitioneze, direct sau prin interpusi, pentru ei sau pentru alţii, bunurile ce au format obiectul activităţii de executare silită sau să facă acte de executare în propria lor cauza ori în cauzele privind rudele şi afinii până la gradul al patrulea inclusiv\",\n      \"evidence\": \"Este interzis executorilor bancari sa achizitioneze, direct sau prin interpusi, pentru ei sau pentru alţii, bunurile ce au format obiectul activităţii de executare silită sau să facă acte de executare în propria lor cauza ori în cauzele privind rudele şi afinii până la gradul al patrulea inclusiv.\"\n    }\n  ],\n  \"units\": {\n    \"u21\": {\n      \"kind\": \"fact\",\n      \"subject\": \"Răspunderea civilă a executorului bancar\"\n    },\n    \"u22\": {\n      \"kind\": \"permission\",\n      \"subject\": \"Asigurarea de răspundere profesională a executorului bancar\"\n    },\n    \"u23\": {\n      \"kind\": \"prohibition\",\n      \"subject\": \"executorilor bancari\"\n    }\n  }\n}\n```",
+          "finish_reason": "stop",
+          "total_duration": 5850975700,
+          "load_duration": 2430800,
+          "prompt_eval_duration": 326873000,
+          "eval_duration": 5510147000,
+          "prompt_eval_count": 1366,
+          "eval_count": 760
+        }
+      ],
+      "fragments": [
+        {
+          "source": "19961#11",
+          "outcomes": [
+            {
+              "name": "executorului bancar",
+              "characteristics": [],
+              "evidence": {
+                "status": "quoted",
+                "quote": "Răspunderea civilă a executorului bancar poate fi angajata, în condiţiile legii, pentru cauzarea de prejudiciu prin încălcarea obligaţiilor sale profesionale.",
+                "start": 13,
+                "end": 171
+              },
+              "origin": "quoted_relation_endpoint"
+            },
+            {
+              "name": "cauzarea de prejudiciu prin încălcarea obligaţiilor sale profesionale",
+              "characteristics": [],
+              "evidence": {
+                "status": "quoted",
+                "quote": "Răspunderea civilă a executorului bancar poate fi angajata, în condiţiile legii, pentru cauzarea de prejudiciu prin încălcarea obligaţiilor sale profesionale.",
+                "start": 13,
+                "end": 171
+              },
+              "origin": "quoted_relation_endpoint"
+            },
+            {
+              "name": "Asigurarea de răspundere profesională a executorului bancar",
+              "characteristics": [],
+              "evidence": {
+                "status": "quoted",
+                "quote": "Asigurarea de răspundere profesională a executorului bancar se poate realiza de către şi în contul băncii în care îşi desfăşoară activitatea, dacă aceasta este expres stipulată, după caz, în regulamentul intern al băncii sau în convenţia încheiată de banca cu executorul bancar.",
+                "start": 172,
+                "end": 450
+              },
+              "origin": "quoted_relation_endpoint"
+            },
+            {
+              "name": "băncii în care îşi desfăşoară activitatea",
+              "characteristics": [],
+              "evidence": {
+                "status": "quoted",
+                "quote": "Asigurarea de răspundere profesională a executorului bancar se poate realiza de către şi în contul băncii în care îşi desfăşoară activitatea, dacă aceasta este expres stipulată, după caz, în regulamentul intern al băncii sau în convenţia încheiată de banca cu executorul bancar.",
+                "start": 172,
+                "end": 450
+              },
+              "origin": "quoted_relation_endpoint"
+            },
+            {
+              "name": "executorilor bancari",
+              "characteristics": [],
+              "evidence": {
+                "status": "quoted",
+                "quote": "Este interzis executorilor bancari sa achizitioneze, direct sau prin interpusi, pentru ei sau pentru alţii, bunurile ce au format obiectul activităţii de executare silită sau să facă acte de executare în propria lor cauza ori în cauzele privind rudele şi afinii până la gradul al patrulea inclusiv.",
+                "start": 466,
+                "end": 764
+              },
+              "origin": "quoted_relation_endpoint"
+            },
+            {
+              "name": "achizitioneze, direct sau prin interpusi, pentru ei sau pentru alţii, bunurile ce au format obiectul activităţii de executare silită sau să facă acte de executare în propria lor cauza ori în cauzele privind rudele şi afinii până la gradul al patrulea inclusiv",
+              "characteristics": [],
+              "evidence": {
+                "status": "quoted",
+                "quote": "Este interzis executorilor bancari sa achizitioneze, direct sau prin interpusi, pentru ei sau pentru alţii, bunurile ce au format obiectul activităţii de executare silită sau să facă acte de executare în propria lor cauza ori în cauzele privind rudele şi afinii până la gradul al patrulea inclusiv.",
+                "start": 466,
+                "end": 764
+              },
+              "origin": "quoted_relation_endpoint"
+            }
+          ],
+          "relations": [],
+          "rejected_class_named": [],
+          "rejected_structural": [
+            "Articolul 14",
+            "Articolul 15"
+          ],
+          "rejected_class_edges": 0,
+          "rejected_evidence": 0,
+          "qualified_rules": [
+            {
+              "statement": "Răspunderea civilă a executorului bancar poate fi angajata, în condiţiile legii, pentru cauzarea de prejudiciu prin încălcarea obligaţiilor sale profesionale.",
+              "subject": "Răspunderea civilă a executorului bancar",
+              "predicate": "",
+              "object": "",
+              "provision": "+ Articolul 14",
+              "scope": [],
+              "conditions": [
+                "în condiţiile legii, pentru cauzarea de prejudiciu prin încălcarea obligaţiilor sale profesionale."
+              ],
+              "exceptions": [],
+              "dates": [],
+              "evidence": [
+                {
+                  "quote": "Răspunderea civilă a executorului bancar poate fi angajata, în condiţiile legii, pentru cauzarea de prejudiciu prin încălcarea obligaţiilor sale profesionale.",
+                  "start": 7464,
+                  "end": 7622
+                }
+              ],
+              "context_evidence": [
+                {
+                  "quote": "+ Articolul 14 Răspunderea civilă a executorului bancar poate fi angajata, în condiţiile legii, pentru cauzarea de prejudiciu prin încălcarea obligaţiilor sale profesionale. Asigurarea de răspundere profesională a executorului bancar se poate realiza de către şi în contul băncii în care îşi desfăşoară activitatea, dacă aceasta este expres stipulată, după caz, în regulamentul intern al băncii sau în convenţia încheiată de banca cu executorul bancar. ",
+                  "start": 7449,
+                  "end": 7902
+                }
+              ],
+              "provision_evidence": {
+                "quote": "+ Articolul 14",
+                "start": 7449,
+                "end": 7463
+              },
+              "review_status": "proposed",
+              "scope_resolution": "unresolved",
+              "review_issues": [],
+              "subject_evidence": {
+                "quote": "Răspunderea civilă a executorului bancar",
+                "start": 7464,
+                "end": 7504
+              },
+              "subject_method": "model-source-quote",
+              "kind": "fact",
+              "extraction_method": "source-statement-classification",
+              "classification_status": "classified",
+              "id": "3e8ea9334d0f7893f8bb5e5c0ee65097b4f7485c93aa0af08adaf5b0485f9713",
+              "source": "19961#11",
+              "source_hash": "720ae30d6d7345a6a0771f03ade9a713e1dc3421fc0153719b6edfaa683a1ae9",
+              "source_file": "C:\\dev\\grap-rust\\real-data-law-ro\\19961.json",
+              "offset_basis": "document"
+            },
+            {
+              "statement": "Asigurarea de răspundere profesională a executorului bancar se poate realiza de către şi în contul băncii în care îşi desfăşoară activitatea, dacă aceasta este expres stipulată, după caz, în regulamentul intern al băncii sau în convenţia încheiată de banca cu executorul bancar.",
+              "subject": "Asigurarea de răspundere profesională a executorului bancar",
+              "predicate": "",
+              "object": "",
+              "provision": "+ Articolul 14",
+              "scope": [],
+              "conditions": [
+                "dacă aceasta este expres stipulată, după caz, în regulamentul intern al băncii sau în convenţia încheiată de banca cu executorul bancar."
+              ],
+              "exceptions": [],
+              "dates": [],
+              "evidence": [
+                {
+                  "quote": "Asigurarea de răspundere profesională a executorului bancar se poate realiza de către şi în contul băncii în care îşi desfăşoară activitatea, dacă aceasta este expres stipulată, după caz, în regulamentul intern al băncii sau în convenţia încheiată de banca cu executorul bancar.",
+                  "start": 7623,
+                  "end": 7901
+                }
+              ],
+              "context_evidence": [
+                {
+                  "quote": "+ Articolul 14 Răspunderea civilă a executorului bancar poate fi angajata, în condiţiile legii, pentru cauzarea de prejudiciu prin încălcarea obligaţiilor sale profesionale. Asigurarea de răspundere profesională a executorului bancar se poate realiza de către şi în contul băncii în care îşi desfăşoară activitatea, dacă aceasta este expres stipulată, după caz, în regulamentul intern al băncii sau în convenţia încheiată de banca cu executorul bancar. ",
+                  "start": 7449,
+                  "end": 7902
+                }
+              ],
+              "provision_evidence": {
+                "quote": "+ Articolul 14",
+                "start": 7449,
+                "end": 7463
+              },
+              "review_status": "proposed",
+              "scope_resolution": "unresolved",
+              "review_issues": [],
+              "subject_evidence": {
+                "quote": "Asigurarea de răspundere profesională a executorului bancar",
+                "start": 7623,
+                "end": 7682
+              },
+              "subject_method": "model-source-quote",
+              "kind": "permission",
+              "extraction_method": "source-statement-classification",
+              "classification_status": "classified",
+              "id": "7da0e3e02737c227eccfb4d876a003440d81ba282680954339401af3189ba424",
+              "source": "19961#11",
+              "source_hash": "720ae30d6d7345a6a0771f03ade9a713e1dc3421fc0153719b6edfaa683a1ae9",
+              "source_file": "C:\\dev\\grap-rust\\real-data-law-ro\\19961.json",
+              "offset_basis": "document"
+            },
+            {
+              "statement": "Este interzis executorilor bancari sa achizitioneze, direct sau prin interpusi, pentru ei sau pentru alţii, bunurile ce au format obiectul activităţii de executare silită sau să facă acte de executare în propria lor cauza ori în cauzele privind rudele şi afinii până la gradul al patrulea inclusiv.",
+              "subject": "executorilor bancari",
+              "predicate": "",
+              "object": "",
+              "provision": "+ Articolul 15",
+              "scope": [],
+              "conditions": [],
+              "exceptions": [],
+              "dates": [],
+              "evidence": [
+                {
+                  "quote": "Este interzis executorilor bancari sa achizitioneze, direct sau prin interpusi, pentru ei sau pentru alţii, bunurile ce au format obiectul activităţii de executare silită sau să facă acte de executare în propria lor cauza ori în cauzele privind rudele şi afinii până la gradul al patrulea inclusiv.",
+                  "start": 7917,
+                  "end": 8215
+                }
+              ],
+              "context_evidence": [
+                {
+                  "quote": "+ Articolul 15 Este interzis executorilor bancari sa achizitioneze, direct sau prin interpusi, pentru ei sau pentru alţii, bunurile ce au format obiectul activităţii de executare silită sau să facă acte de executare în propria lor cauza ori în cauzele privind rudele şi afinii până la gradul al patrulea inclusiv. ",
+                  "start": 7902,
+                  "end": 8216
+                }
+              ],
+              "provision_evidence": {
+                "quote": "+ Articolul 15",
+                "start": 7902,
+                "end": 7916
+              },
+              "review_status": "proposed",
+              "scope_resolution": "unresolved",
+              "review_issues": [],
+              "subject_evidence": {
+                "quote": "executorilor bancari",
+                "start": 7931,
+                "end": 7951
+              },
+              "subject_method": "model-source-quote",
+              "kind": "prohibition",
+              "extraction_method": "source-statement-classification",
+              "classification_status": "classified",
+              "id": "3a5efb4ae1317c81635cf3df2b0ac1622e13f0923656bd8b09a31149fa2f09b3",
+              "source": "19961#11",
+              "source_hash": "720ae30d6d7345a6a0771f03ade9a713e1dc3421fc0153719b6edfaa683a1ae9",
+              "source_file": "C:\\dev\\grap-rust\\real-data-law-ro\\19961.json",
+              "offset_basis": "document"
+            }
+          ],
+          "rule_coverage": {
+            "version": "qualified-rules-v1",
+            "units": 3,
+            "unresolved": 0,
+            "nonassertions": 0,
+            "deferred_proposals": 5
+          },
+          "deferred_proposals": [
+            {
+              "kind": "relation",
+              "proposal": {
+                "from": "executorului bancar",
+                "type": "can be engaged for",
+                "to": "cauzarea de prejudiciu prin încălcarea obligaţiilor sale profesionale",
+                "evidence": {
+                  "status": "quoted",
+                  "quote": "Răspunderea civilă a executorului bancar poate fi angajata, în condiţiile legii, pentru cauzarea de prejudiciu prin încălcarea obligaţiilor sale profesionale.",
+                  "start": 13,
+                  "end": 171
+                }
+              },
+              "reason": "requires qualified rule interpretation"
+            },
+            {
+              "kind": "relation",
+              "proposal": {
+                "from": "Asigurarea de răspundere profesională a executorului bancar",
+                "type": "can be realized by and in the account of",
+                "to": "băncii în care îşi desfăşoară activitatea",
+                "evidence": {
+                  "status": "quoted",
+                  "quote": "Asigurarea de răspundere profesională a executorului bancar se poate realiza de către şi în contul băncii în care îşi desfăşoară activitatea, dacă aceasta este expres stipulată, după caz, în regulamentul intern al băncii sau în convenţia încheiată de banca cu executorul bancar.",
+                  "start": 172,
+                  "end": 450
+                }
+              },
+              "reason": "requires qualified rule interpretation"
+            },
+            {
+              "kind": "relation",
+              "proposal": {
+                "from": "executorilor bancari",
+                "type": "is forbidden to",
+                "to": "achizitioneze, direct sau prin interpusi, pentru ei sau pentru alţii, bunurile ce au format obiectul activităţii de executare silită sau să facă acte de executare în propria lor cauza ori în cauzele privind rudele şi afinii până la gradul al patrulea inclusiv",
+                "evidence": {
+                  "status": "quoted",
+                  "quote": "Este interzis executorilor bancari sa achizitioneze, direct sau prin interpusi, pentru ei sau pentru alţii, bunurile ce au format obiectul activităţii de executare silită sau să facă acte de executare în propria lor cauza ori în cauzele privind rudele şi afinii până la gradul al patrulea inclusiv.",
+                  "start": 466,
+                  "end": 764
+                }
+              },
+              "reason": "requires qualified rule interpretation"
+            },
+            {
+              "kind": "outcome",
+              "proposal": {
+                "name": "Articolul 14",
+                "requirements": [],
+                "evidence": "Articolul 14 Răspunderea civilă a executorului bancar poate fi angajata, în condiţiile legii, pentru cauzarea de prejudiciu prin încălcarea obligaţiilor sale profesionale."
+              },
+              "reason": "article reference is not an entity identity"
+            },
+            {
+              "kind": "outcome",
+              "proposal": {
+                "name": "Articolul 15",
+                "requirements": [],
+                "evidence": "Articolul 15 Este interzis executorilor bancari sa achizitioneze, direct sau prin interpusi, pentru ei sau pentru alţii, bunurile ce au format obiectul activităţii de executare silită sau să facă acte de executare în propria lor cauza ori în cauzele privind rudele şi afinii până la gradul al patrulea inclusiv."
+              },
+              "reason": "article reference is not an entity identity"
+            }
+          ],
+          "extraction": {
+            "source_text": "Articolul 14 Răspunderea civilă a executorului bancar poate fi angajata, în condiţiile legii, pentru cauzarea de prejudiciu prin încălcarea obligaţiilor sale profesionale. Asigurarea de răspundere profesională a executorului bancar se poate realiza de către şi în contul băncii în care îşi desfăşoară activitatea, dacă aceasta este expres stipulată, după caz, în regulamentul intern al băncii sau în convenţia încheiată de banca cu executorul bancar. + Articolul 15 Este interzis executorilor bancari sa achizitioneze, direct sau prin interpusi, pentru ei sau pentru alţii, bunurile ce au format obiectul activităţii de executare silită sau să facă acte de executare în propria lor cauza ori în cauzele privind rudele şi afinii până la gradul al patrulea inclusiv. +",
+            "prompt_version": "document-claims-v5-qualified",
+            "provider": "openai-compat",
+            "model": "grap-legal-gemma4"
+          }
+        }
+      ]
+    },
+    {
+      "case": "semantic-02",
+      "mode": "compact",
+      "wall_s": 5.652928699999848,
+      "correct_target": true,
+      "failures": [],
+      "calls": [
+        {
+          "purpose": "extraction",
+          "wall_s": 5.652188300000034,
+          "prompt_sha256": "6e6b0b8c5daac7d38f49bea5b3712f985b5439f13d763694c4795f56ab9f5ec0",
+          "prompt_chars": 6259,
+          "raw": "```json\n{\n  \"outcomes\": [\n    {\n      \"name\": \"Articolul 14\",\n      \"requirements\": [],\n      \"evidence\": \"Articolul 14 Răspunderea civilă a executorului bancar poate fi angajata, în condiţiile legii, pentru cauzarea de prejudiciu prin încălcarea obligaţiilor sale profesionale.\"\n    },\n    {\n      \"name\": \"Articolul 15\",\n      \"requirements\": [],\n      \"evidence\": \"Articolul 15 Este interzis executorilor bancari sa achizitioneze, direct sau prin interpusi, pentru ei sau pentru alţii, bunurile ce au format obiectul activităţii de executare silită sau să facă acte de executare în propria lor cauza ori în cauzele privind rudele şi afinii până la gradul al patrulea inclusiv.\"\n    }\n  ],\n  \"relations\": [\n    {\n      \"from\": \"executorului bancar\",\n      \"type\": \"is subject of\",\n      \"to\": \"Răspunderea civilă a executorului bancar\",\n      \"evidence\": \"Răspunderea civilă a executorului bancar poate fi angajata, în condiţiile legii, pentru cauzarea de prejudiciu prin încălcarea obligaţiilor sale profesionale.\"\n    },\n    {\n      \"from\": \"Asigurarea de răspundere profesională a executorului bancar\",\n      \"type\": \"can be realized by\",\n      \"to\": \"băncii în care îşi desfăşoară activitatea\",\n      \"evidence\": \"Asigurarea de răspundere profesională a executorului bancar se poate realiza de către şi în contul băncii în care îşi desfăşoară activitatea, dacă aceasta este expres stipulată, după caz, în regulamentul intern al băncii sau în convenţia încheiată de banca cu executorul bancar.\"\n    },\n    {\n      \"from\": \"executorilor bancari\",\n      \"type\": \"is prohibited from\",\n      \"to\": \"achizitioneze, direct sau prin interpusi, pentru ei sau pentru alţii, bunurile ce au format obiectul activităţii de executare silită sau să facă acte de executare în propria lor cauza ori în cauzele privind rudele şi afinii până la gradul al patrulea inclusiv\",\n      \"evidence\": \"Este interzis executorilor bancari sa achizitioneze, direct sau prin interpusi, pentru ei sau pentru alţii, bunurile ce au format obiectul activităţii de executare silită sau să facă acte de executare în propria lor cauza ori în cauzele privind rudele şi afinii până la gradul al patrulea inclusiv.\"\n    }\n  ],\n  \"units\": {\n    \"u21\": {\n      \"kind\": \"fact\",\n      \"subject\": \"Răspunderea civilă a executorului bancar\"\n    },\n    \"u22\": {\n      \"kind\": \"permission\",\n      \"subject\": \"Asigurarea de răspundere profesională a executorului bancar\"\n    },\n    \"u23\": {\n      \"kind\": \"prohibition\",\n      \"subject\": \"executorilor bancari\"\n    }\n  }\n}\n```",
+          "finish_reason": "stop",
+          "total_duration": 5650848700,
+          "load_duration": 4503600,
+          "prompt_eval_duration": 191641000,
+          "eval_duration": 5417084000,
+          "prompt_eval_count": 1393,
+          "eval_count": 749
+        }
+      ],
+      "fragments": [
+        {
+          "source": "19961#11",
+          "outcomes": [
+            {
+              "name": "executorului bancar",
+              "characteristics": [],
+              "evidence": {
+                "status": "quoted",
+                "quote": "Răspunderea civilă a executorului bancar poate fi angajata, în condiţiile legii, pentru cauzarea de prejudiciu prin încălcarea obligaţiilor sale profesionale.",
+                "start": 13,
+                "end": 171
+              },
+              "origin": "quoted_relation_endpoint"
+            },
+            {
+              "name": "Răspunderea civilă a executorului bancar",
+              "characteristics": [],
+              "evidence": {
+                "status": "quoted",
+                "quote": "Răspunderea civilă a executorului bancar poate fi angajata, în condiţiile legii, pentru cauzarea de prejudiciu prin încălcarea obligaţiilor sale profesionale.",
+                "start": 13,
+                "end": 171
+              },
+              "origin": "quoted_relation_endpoint"
+            },
+            {
+              "name": "Asigurarea de răspundere profesională a executorului bancar",
+              "characteristics": [],
+              "evidence": {
+                "status": "quoted",
+                "quote": "Asigurarea de răspundere profesională a executorului bancar se poate realiza de către şi în contul băncii în care îşi desfăşoară activitatea, dacă aceasta este expres stipulată, după caz, în regulamentul intern al băncii sau în convenţia încheiată de banca cu executorul bancar.",
+                "start": 172,
+                "end": 450
+              },
+              "origin": "quoted_relation_endpoint"
+            },
+            {
+              "name": "băncii în care îşi desfăşoară activitatea",
+              "characteristics": [],
+              "evidence": {
+                "status": "quoted",
+                "quote": "Asigurarea de răspundere profesională a executorului bancar se poate realiza de către şi în contul băncii în care îşi desfăşoară activitatea, dacă aceasta este expres stipulată, după caz, în regulamentul intern al băncii sau în convenţia încheiată de banca cu executorul bancar.",
+                "start": 172,
+                "end": 450
+              },
+              "origin": "quoted_relation_endpoint"
+            },
+            {
+              "name": "executorilor bancari",
+              "characteristics": [],
+              "evidence": {
+                "status": "quoted",
+                "quote": "Este interzis executorilor bancari sa achizitioneze, direct sau prin interpusi, pentru ei sau pentru alţii, bunurile ce au format obiectul activităţii de executare silită sau să facă acte de executare în propria lor cauza ori în cauzele privind rudele şi afinii până la gradul al patrulea inclusiv.",
+                "start": 466,
+                "end": 764
+              },
+              "origin": "quoted_relation_endpoint"
+            },
+            {
+              "name": "achizitioneze, direct sau prin interpusi, pentru ei sau pentru alţii, bunurile ce au format obiectul activităţii de executare silită sau să facă acte de executare în propria lor cauza ori în cauzele privind rudele şi afinii până la gradul al patrulea inclusiv",
+              "characteristics": [],
+              "evidence": {
+                "status": "quoted",
+                "quote": "Este interzis executorilor bancari sa achizitioneze, direct sau prin interpusi, pentru ei sau pentru alţii, bunurile ce au format obiectul activităţii de executare silită sau să facă acte de executare în propria lor cauza ori în cauzele privind rudele şi afinii până la gradul al patrulea inclusiv.",
+                "start": 466,
+                "end": 764
+              },
+              "origin": "quoted_relation_endpoint"
+            }
+          ],
+          "relations": [],
+          "rejected_class_named": [],
+          "rejected_structural": [
+            "Articolul 14",
+            "Articolul 15"
+          ],
+          "rejected_class_edges": 0,
+          "rejected_evidence": 0,
+          "qualified_rules": [
+            {
+              "statement": "Răspunderea civilă a executorului bancar poate fi angajata, în condiţiile legii, pentru cauzarea de prejudiciu prin încălcarea obligaţiilor sale profesionale.",
+              "subject": "Răspunderea civilă a executorului bancar",
+              "predicate": "",
+              "object": "",
+              "provision": "+ Articolul 14",
+              "scope": [],
+              "conditions": [
+                "în condiţiile legii, pentru cauzarea de prejudiciu prin încălcarea obligaţiilor sale profesionale."
+              ],
+              "exceptions": [],
+              "dates": [],
+              "evidence": [
+                {
+                  "quote": "Răspunderea civilă a executorului bancar poate fi angajata, în condiţiile legii, pentru cauzarea de prejudiciu prin încălcarea obligaţiilor sale profesionale.",
+                  "start": 7464,
+                  "end": 7622
+                }
+              ],
+              "context_evidence": [
+                {
+                  "quote": "+ Articolul 14 Răspunderea civilă a executorului bancar poate fi angajata, în condiţiile legii, pentru cauzarea de prejudiciu prin încălcarea obligaţiilor sale profesionale. Asigurarea de răspundere profesională a executorului bancar se poate realiza de către şi în contul băncii în care îşi desfăşoară activitatea, dacă aceasta este expres stipulată, după caz, în regulamentul intern al băncii sau în convenţia încheiată de banca cu executorul bancar. ",
+                  "start": 7449,
+                  "end": 7902
+                }
+              ],
+              "provision_evidence": {
+                "quote": "+ Articolul 14",
+                "start": 7449,
+                "end": 7463
+              },
+              "review_status": "proposed",
+              "scope_resolution": "unresolved",
+              "review_issues": [],
+              "subject_evidence": {
+                "quote": "Răspunderea civilă a executorului bancar",
+                "start": 7464,
+                "end": 7504
+              },
+              "subject_method": "model-source-quote",
+              "kind": "fact",
+              "extraction_method": "source-statement-classification",
+              "classification_status": "classified",
+              "id": "3e8ea9334d0f7893f8bb5e5c0ee65097b4f7485c93aa0af08adaf5b0485f9713",
+              "source": "19961#11",
+              "source_hash": "720ae30d6d7345a6a0771f03ade9a713e1dc3421fc0153719b6edfaa683a1ae9",
+              "source_file": "C:\\dev\\grap-rust\\real-data-law-ro\\19961.json",
+              "offset_basis": "document"
+            },
+            {
+              "statement": "Asigurarea de răspundere profesională a executorului bancar se poate realiza de către şi în contul băncii în care îşi desfăşoară activitatea, dacă aceasta este expres stipulată, după caz, în regulamentul intern al băncii sau în convenţia încheiată de banca cu executorul bancar.",
+              "subject": "Asigurarea de răspundere profesională a executorului bancar",
+              "predicate": "",
+              "object": "",
+              "provision": "+ Articolul 14",
+              "scope": [],
+              "conditions": [
+                "dacă aceasta este expres stipulată, după caz, în regulamentul intern al băncii sau în convenţia încheiată de banca cu executorul bancar."
+              ],
+              "exceptions": [],
+              "dates": [],
+              "evidence": [
+                {
+                  "quote": "Asigurarea de răspundere profesională a executorului bancar se poate realiza de către şi în contul băncii în care îşi desfăşoară activitatea, dacă aceasta este expres stipulată, după caz, în regulamentul intern al băncii sau în convenţia încheiată de banca cu executorul bancar.",
+                  "start": 7623,
+                  "end": 7901
+                }
+              ],
+              "context_evidence": [
+                {
+                  "quote": "+ Articolul 14 Răspunderea civilă a executorului bancar poate fi angajata, în condiţiile legii, pentru cauzarea de prejudiciu prin încălcarea obligaţiilor sale profesionale. Asigurarea de răspundere profesională a executorului bancar se poate realiza de către şi în contul băncii în care îşi desfăşoară activitatea, dacă aceasta este expres stipulată, după caz, în regulamentul intern al băncii sau în convenţia încheiată de banca cu executorul bancar. ",
+                  "start": 7449,
+                  "end": 7902
+                }
+              ],
+              "provision_evidence": {
+                "quote": "+ Articolul 14",
+                "start": 7449,
+                "end": 7463
+              },
+              "review_status": "proposed",
+              "scope_resolution": "unresolved",
+              "review_issues": [],
+              "subject_evidence": {
+                "quote": "Asigurarea de răspundere profesională a executorului bancar",
+                "start": 7623,
+                "end": 7682
+              },
+              "subject_method": "model-source-quote",
+              "kind": "permission",
+              "extraction_method": "source-statement-classification",
+              "classification_status": "classified",
+              "id": "7da0e3e02737c227eccfb4d876a003440d81ba282680954339401af3189ba424",
+              "source": "19961#11",
+              "source_hash": "720ae30d6d7345a6a0771f03ade9a713e1dc3421fc0153719b6edfaa683a1ae9",
+              "source_file": "C:\\dev\\grap-rust\\real-data-law-ro\\19961.json",
+              "offset_basis": "document"
+            },
+            {
+              "statement": "Este interzis executorilor bancari sa achizitioneze, direct sau prin interpusi, pentru ei sau pentru alţii, bunurile ce au format obiectul activităţii de executare silită sau să facă acte de executare în propria lor cauza ori în cauzele privind rudele şi afinii până la gradul al patrulea inclusiv.",
+              "subject": "executorilor bancari",
+              "predicate": "",
+              "object": "",
+              "provision": "+ Articolul 15",
+              "scope": [],
+              "conditions": [],
+              "exceptions": [],
+              "dates": [],
+              "evidence": [
+                {
+                  "quote": "Este interzis executorilor bancari sa achizitioneze, direct sau prin interpusi, pentru ei sau pentru alţii, bunurile ce au format obiectul activităţii de executare silită sau să facă acte de executare în propria lor cauza ori în cauzele privind rudele şi afinii până la gradul al patrulea inclusiv.",
+                  "start": 7917,
+                  "end": 8215
+                }
+              ],
+              "context_evidence": [
+                {
+                  "quote": "+ Articolul 15 Este interzis executorilor bancari sa achizitioneze, direct sau prin interpusi, pentru ei sau pentru alţii, bunurile ce au format obiectul activităţii de executare silită sau să facă acte de executare în propria lor cauza ori în cauzele privind rudele şi afinii până la gradul al patrulea inclusiv. ",
+                  "start": 7902,
+                  "end": 8216
+                }
+              ],
+              "provision_evidence": {
+                "quote": "+ Articolul 15",
+                "start": 7902,
+                "end": 7916
+              },
+              "review_status": "proposed",
+              "scope_resolution": "unresolved",
+              "review_issues": [],
+              "subject_evidence": {
+                "quote": "executorilor bancari",
+                "start": 7931,
+                "end": 7951
+              },
+              "subject_method": "model-source-quote",
+              "kind": "prohibition",
+              "extraction_method": "source-statement-classification",
+              "classification_status": "classified",
+              "id": "3a5efb4ae1317c81635cf3df2b0ac1622e13f0923656bd8b09a31149fa2f09b3",
+              "source": "19961#11",
+              "source_hash": "720ae30d6d7345a6a0771f03ade9a713e1dc3421fc0153719b6edfaa683a1ae9",
+              "source_file": "C:\\dev\\grap-rust\\real-data-law-ro\\19961.json",
+              "offset_basis": "document"
+            }
+          ],
+          "rule_coverage": {
+            "version": "qualified-rules-v1",
+            "units": 3,
+            "unresolved": 0,
+            "nonassertions": 0,
+            "deferred_proposals": 5
+          },
+          "deferred_proposals": [
+            {
+              "kind": "relation",
+              "proposal": {
+                "from": "executorului bancar",
+                "type": "is subject of",
+                "to": "Răspunderea civilă a executorului bancar",
+                "evidence": {
+                  "status": "quoted",
+                  "quote": "Răspunderea civilă a executorului bancar poate fi angajata, în condiţiile legii, pentru cauzarea de prejudiciu prin încălcarea obligaţiilor sale profesionale.",
+                  "start": 13,
+                  "end": 171
+                }
+              },
+              "reason": "requires qualified rule interpretation"
+            },
+            {
+              "kind": "relation",
+              "proposal": {
+                "from": "Asigurarea de răspundere profesională a executorului bancar",
+                "type": "can be realized by",
+                "to": "băncii în care îşi desfăşoară activitatea",
+                "evidence": {
+                  "status": "quoted",
+                  "quote": "Asigurarea de răspundere profesională a executorului bancar se poate realiza de către şi în contul băncii în care îşi desfăşoară activitatea, dacă aceasta este expres stipulată, după caz, în regulamentul intern al băncii sau în convenţia încheiată de banca cu executorul bancar.",
+                  "start": 172,
+                  "end": 450
+                }
+              },
+              "reason": "requires qualified rule interpretation"
+            },
+            {
+              "kind": "relation",
+              "proposal": {
+                "from": "executorilor bancari",
+                "type": "is prohibited from",
+                "to": "achizitioneze, direct sau prin interpusi, pentru ei sau pentru alţii, bunurile ce au format obiectul activităţii de executare silită sau să facă acte de executare în propria lor cauza ori în cauzele privind rudele şi afinii până la gradul al patrulea inclusiv",
+                "evidence": {
+                  "status": "quoted",
+                  "quote": "Este interzis executorilor bancari sa achizitioneze, direct sau prin interpusi, pentru ei sau pentru alţii, bunurile ce au format obiectul activităţii de executare silită sau să facă acte de executare în propria lor cauza ori în cauzele privind rudele şi afinii până la gradul al patrulea inclusiv.",
+                  "start": 466,
+                  "end": 764
+                }
+              },
+              "reason": "requires qualified rule interpretation"
+            },
+            {
+              "kind": "outcome",
+              "proposal": {
+                "name": "Articolul 14",
+                "requirements": [],
+                "evidence": "Articolul 14 Răspunderea civilă a executorului bancar poate fi angajata, în condiţiile legii, pentru cauzarea de prejudiciu prin încălcarea obligaţiilor sale profesionale."
+              },
+              "reason": "article reference is not an entity identity"
+            },
+            {
+              "kind": "outcome",
+              "proposal": {
+                "name": "Articolul 15",
+                "requirements": [],
+                "evidence": "Articolul 15 Este interzis executorilor bancari sa achizitioneze, direct sau prin interpusi, pentru ei sau pentru alţii, bunurile ce au format obiectul activităţii de executare silită sau să facă acte de executare în propria lor cauza ori în cauzele privind rudele şi afinii până la gradul al patrulea inclusiv."
+              },
+              "reason": "article reference is not an entity identity"
+            }
+          ],
+          "extraction": {
+            "source_text": "Articolul 14 Răspunderea civilă a executorului bancar poate fi angajata, în condiţiile legii, pentru cauzarea de prejudiciu prin încălcarea obligaţiilor sale profesionale. Asigurarea de răspundere profesională a executorului bancar se poate realiza de către şi în contul băncii în care îşi desfăşoară activitatea, dacă aceasta este expres stipulată, după caz, în regulamentul intern al băncii sau în convenţia încheiată de banca cu executorul bancar. + Articolul 15 Este interzis executorilor bancari sa achizitioneze, direct sau prin interpusi, pentru ei sau pentru alţii, bunurile ce au format obiectul activităţii de executare silită sau să facă acte de executare în propria lor cauza ori în cauzele privind rudele şi afinii până la gradul al patrulea inclusiv. +",
+            "prompt_version": "document-claims-v5-qualified",
+            "provider": "openai-compat",
+            "model": "grap-legal-gemma4"
+          }
+        }
+      ]
+    },
+    {
+      "case": "semantic-03",
+      "mode": "compact",
+      "wall_s": 3.759549699999752,
+      "correct_target": true,
+      "failures": [],
+      "calls": [
+        {
+          "purpose": "extraction",
+          "wall_s": 3.758921499999815,
+          "prompt_sha256": "f17d5a4846c22d1c5992d2d56fb03fbbe0a380614c62205d5f3adb66657153ca",
+          "prompt_chars": 5453,
+          "raw": "```json\n{\n  \"outcomes\": [\n    {\n      \"name\": \"Articolul 24\",\n      \"requirements\": [],\n      \"evidence\": \"Articolul 24 Prezentul statut intră în vigoare la data publicării lui în Monitorul Oficial al României, Partea I.\"\n    },\n    {\n      \"name\": \"Articolul 25\",\n      \"requirements\": [],\n      \"evidence\": \"Articolul 25 Dosarele de executare aflate în curs de rezolvare la data intrării în vigoare a prezentului statut pot fi preluate de către executorii bancari, pe baza solicitării scrise adresate de banca preşedintelui instanţei de executare.\"\n    }\n  ],\n  \"relations\": [\n    {\n      \"from\": \"Prezentul statut\",\n      \"type\": \"enters into force\",\n      \"to\": \"data publicării lui în Monitorul Oficial al României, Partea I.\",\n      \"evidence\": \"Prezentul statut intră în vigoare la data publicării lui în Monitorul Oficial al României, Partea I.\"\n    },\n    {\n      \"from\": \"Dosarele de executare aflate în curs de rezolvare la data intrării în vigoare a prezentului statut\",\n      \"type\": \"can be taken by\",\n      \"to\": \"executorii bancari\",\n      \"evidence\": \"Dosarele de executare aflate în curs de rezolvare la data intrării în vigoare a prezentului statut pot fi preluate de către executorii bancari, pe baza solicitării scrise adresate de banca preşedintelui instanţei de executare.\"\n    }\n  ],\n  \"units\": {\n    \"u41\": {\n      \"kind\": \"fact\",\n      \"subject\": \"Prezentul statut\"\n    },\n    \"u42\": {\n      \"kind\": \"permission\",\n      \"subject\": \"Dosarele de executare aflate în curs de rezolvare la data intrării în vigoare a prezentului statut\"\n    }\n  }\n}\n```",
+          "finish_reason": "stop",
+          "total_duration": 3747390200,
+          "load_duration": 2509800,
+          "prompt_eval_duration": 167075000,
+          "eval_duration": 3538298000,
+          "prompt_eval_count": 1182,
+          "eval_count": 488
+        }
+      ],
+      "fragments": [
+        {
+          "source": "19961#16",
+          "outcomes": [
+            {
+              "name": "Prezentul statut",
+              "characteristics": [],
+              "evidence": {
+                "status": "quoted",
+                "quote": "Prezentul statut intră în vigoare la data publicării lui în Monitorul Oficial al României, Partea I.",
+                "start": 13,
+                "end": 113
+              },
+              "origin": "quoted_relation_endpoint"
+            },
+            {
+              "name": "data publicării lui în Monitorul Oficial al României, Partea I.",
+              "characteristics": [],
+              "evidence": {
+                "status": "quoted",
+                "quote": "Prezentul statut intră în vigoare la data publicării lui în Monitorul Oficial al României, Partea I.",
+                "start": 13,
+                "end": 113
+              },
+              "origin": "quoted_relation_endpoint"
+            },
+            {
+              "name": "Dosarele de executare aflate în curs de rezolvare la data intrării în vigoare a prezentului statut",
+              "characteristics": [],
+              "evidence": {
+                "status": "quoted",
+                "quote": "Dosarele de executare aflate în curs de rezolvare la data intrării în vigoare a prezentului statut pot fi preluate de către executorii bancari, pe baza solicitării scrise adresate de banca preşedintelui instanţei de executare.",
+                "start": 129,
+                "end": 355
+              },
+              "origin": "quoted_relation_endpoint"
+            },
+            {
+              "name": "executorii bancari",
+              "characteristics": [],
+              "evidence": {
+                "status": "quoted",
+                "quote": "Dosarele de executare aflate în curs de rezolvare la data intrării în vigoare a prezentului statut pot fi preluate de către executorii bancari, pe baza solicitării scrise adresate de banca preşedintelui instanţei de executare.",
+                "start": 129,
+                "end": 355
+              },
+              "origin": "quoted_relation_endpoint"
+            }
+          ],
+          "relations": [],
+          "rejected_class_named": [],
+          "rejected_structural": [
+            "Articolul 24",
+            "Articolul 25"
+          ],
+          "rejected_class_edges": 0,
+          "rejected_evidence": 0,
+          "qualified_rules": [
+            {
+              "statement": "Prezentul statut intră în vigoare la data publicării lui în Monitorul Oficial al României, Partea I.",
+              "subject": "Prezentul statut",
+              "predicate": "",
+              "object": "",
+              "provision": "+ Articolul 24",
+              "scope": [],
+              "conditions": [],
+              "exceptions": [],
+              "dates": [],
+              "evidence": [
+                {
+                  "quote": "Prezentul statut intră în vigoare la data publicării lui în Monitorul Oficial al României, Partea I.",
+                  "start": 11359,
+                  "end": 11459
+                }
+              ],
+              "context_evidence": [
+                {
+                  "quote": "+ Articolul 24 Prezentul statut intră în vigoare la data publicării lui în Monitorul Oficial al României, Partea I. ",
+                  "start": 11344,
+                  "end": 11460
+                }
+              ],
+              "provision_evidence": {
+                "quote": "+ Articolul 24",
+                "start": 11344,
+                "end": 11358
+              },
+              "review_status": "proposed",
+              "scope_resolution": "unresolved",
+              "review_issues": [],
+              "subject_evidence": {
+                "quote": "Prezentul statut",
+                "start": 11359,
+                "end": 11375
+              },
+              "subject_method": "model-source-quote",
+              "kind": "fact",
+              "extraction_method": "source-statement-classification",
+              "classification_status": "classified",
+              "id": "5f2f27d1681c28f9967bd8739035efd021ec0f3c20ea9fbc3b90f31116f0301b",
+              "source": "19961#16",
+              "source_hash": "720ae30d6d7345a6a0771f03ade9a713e1dc3421fc0153719b6edfaa683a1ae9",
+              "source_file": "C:\\dev\\grap-rust\\real-data-law-ro\\19961.json",
+              "offset_basis": "document"
+            },
+            {
+              "statement": "Dosarele de executare aflate în curs de rezolvare la data intrării în vigoare a prezentului statut pot fi preluate de către executorii bancari, pe baza solicitării scrise adresate de banca preşedintelui instanţei de executare. -----------",
+              "subject": "Dosarele de executare aflate în curs de rezolvare la data intrării în vigoare a prezentului statut",
+              "predicate": "",
+              "object": "",
+              "provision": "+ Articolul 25",
+              "scope": [],
+              "conditions": [],
+              "exceptions": [],
+              "dates": [],
+              "evidence": [
+                {
+                  "quote": "Dosarele de executare aflate în curs de rezolvare la data intrării în vigoare a prezentului statut pot fi preluate de către executorii bancari, pe baza solicitării scrise adresate de banca preşedintelui instanţei de executare. -----------",
+                  "start": 11475,
+                  "end": 11713
+                }
+              ],
+              "context_evidence": [
+                {
+                  "quote": "+ Articolul 25 Dosarele de executare aflate în curs de rezolvare la data intrării în vigoare a prezentului statut pot fi preluate de către executorii bancari, pe baza solicitării scrise adresate de banca preşedintelui instanţei de executare. -----------",
+                  "start": 11460,
+                  "end": 11713
+                }
+              ],
+              "provision_evidence": {
+                "quote": "+ Articolul 25",
+                "start": 11460,
+                "end": 11474
+              },
+              "review_status": "proposed",
+              "scope_resolution": "unresolved",
+              "review_issues": [],
+              "subject_evidence": {
+                "quote": "Dosarele de executare aflate în curs de rezolvare la data intrării în vigoare a prezentului statut",
+                "start": 11475,
+                "end": 11573
+              },
+              "subject_method": "model-source-quote",
+              "kind": "permission",
+              "extraction_method": "source-statement-classification",
+              "classification_status": "classified",
+              "id": "1089b48b306194018df41d9b477d7a1ebfeb07ba38964886aed7d76751c12f91",
+              "source": "19961#16",
+              "source_hash": "720ae30d6d7345a6a0771f03ade9a713e1dc3421fc0153719b6edfaa683a1ae9",
+              "source_file": "C:\\dev\\grap-rust\\real-data-law-ro\\19961.json",
+              "offset_basis": "document"
+            }
+          ],
+          "rule_coverage": {
+            "version": "qualified-rules-v1",
+            "units": 2,
+            "unresolved": 0,
+            "nonassertions": 0,
+            "deferred_proposals": 4
+          },
+          "deferred_proposals": [
+            {
+              "kind": "relation",
+              "proposal": {
+                "from": "Prezentul statut",
+                "type": "enters into force",
+                "to": "data publicării lui în Monitorul Oficial al României, Partea I.",
+                "evidence": {
+                  "status": "quoted",
+                  "quote": "Prezentul statut intră în vigoare la data publicării lui în Monitorul Oficial al României, Partea I.",
+                  "start": 13,
+                  "end": 113
+                }
+              },
+              "reason": "requires qualified rule interpretation"
+            },
+            {
+              "kind": "relation",
+              "proposal": {
+                "from": "Dosarele de executare aflate în curs de rezolvare la data intrării în vigoare a prezentului statut",
+                "type": "can be taken by",
+                "to": "executorii bancari",
+                "evidence": {
+                  "status": "quoted",
+                  "quote": "Dosarele de executare aflate în curs de rezolvare la data intrării în vigoare a prezentului statut pot fi preluate de către executorii bancari, pe baza solicitării scrise adresate de banca preşedintelui instanţei de executare.",
+                  "start": 129,
+                  "end": 355
+                }
+              },
+              "reason": "requires qualified rule interpretation"
+            },
+            {
+              "kind": "outcome",
+              "proposal": {
+                "name": "Articolul 24",
+                "requirements": [],
+                "evidence": "Articolul 24 Prezentul statut intră în vigoare la data publicării lui în Monitorul Oficial al României, Partea I."
+              },
+              "reason": "article reference is not an entity identity"
+            },
+            {
+              "kind": "outcome",
+              "proposal": {
+                "name": "Articolul 25",
+                "requirements": [],
+                "evidence": "Articolul 25 Dosarele de executare aflate în curs de rezolvare la data intrării în vigoare a prezentului statut pot fi preluate de către executorii bancari, pe baza solicitării scrise adresate de banca preşedintelui instanţei de executare."
+              },
+              "reason": "article reference is not an entity identity"
+            }
+          ],
+          "extraction": {
+            "source_text": "Articolul 24 Prezentul statut intră în vigoare la data publicării lui în Monitorul Oficial al României, Partea I. + Articolul 25 Dosarele de executare aflate în curs de rezolvare la data intrării în vigoare a prezentului statut pot fi preluate de către executorii bancari, pe baza solicitării scrise adresate de banca preşedintelui instanţei de executare. -----------",
+            "prompt_version": "document-claims-v5-qualified",
+            "provider": "openai-compat",
+            "model": "grap-legal-gemma4"
+          }
+        }
+      ]
+    },
+    {
+      "case": "semantic-03",
+      "mode": "baseline",
+      "wall_s": 3.742239100000006,
+      "correct_target": true,
+      "failures": [],
+      "calls": [
+        {
+          "purpose": "extraction",
+          "wall_s": 3.7418079999997644,
+          "prompt_sha256": "a1e213ed406426ebb48cd5456789243d93f2652af670378a453e18ac084da3bc",
+          "prompt_chars": 5289,
+          "raw": "```json\n{\n  \"outcomes\": [\n    {\n      \"name\": \"Articolul 24\",\n      \"requirements\": [],\n      \"evidence\": \"Articolul 24 Prezentul statut intră în vigoare la data publicării lui în Monitorul Oficial al României, Partea I.\"\n    },\n    {\n      \"name\": \"Articolul 25\",\n      \"requirements\": [],\n      \"evidence\": \"Articolul 25 Dosarele de executare aflate în curs de rezolvare la data intrării în vigoare a prezentului statut pot fi preluate de către executorii bancari, pe baza solicitării scrise adresate de banca preşedintelui instanţei de executare.\"\n    }\n  ],\n  \"relations\": [\n    {\n      \"from\": \"Prezentul statut\",\n      \"type\": \"enters into force\",\n      \"to\": \"data publicării lui în Monitorul Oficial al României, Partea I.\",\n      \"evidence\": \"Prezentul statut intră în vigoare la data publicării lui în Monitorul Oficial al României, Partea I.\"\n    },\n    {\n      \"from\": \"Dosarele de executare aflate în curs de rezolvare la data intrării în vigoare a prezentului statut\",\n      \"type\": \"can be taken by\",\n      \"to\": \"executorii bancari\",\n      \"evidence\": \"Dosarele de executare aflate în curs de rezolvare la data intrării în vigoare a prezentului statut pot fi preluate de către executorii bancari, pe baza solicitării scrise adresate de banca preşedintelui instanţei de executare.\"\n    }\n  ],\n  \"units\": {\n    \"u41\": {\n      \"kind\": \"fact\",\n      \"subject\": \"Prezentul statut\"\n    },\n    \"u42\": {\n      \"kind\": \"permission\",\n      \"subject\": \"Dosarele de executare aflate în curs de rezolvare la data intrării în vigoare a prezentului statut\"\n    }\n  }\n}\n```",
+          "finish_reason": "stop",
+          "total_duration": 3728703000,
+          "load_duration": 2155000,
+          "prompt_eval_duration": 147559000,
+          "eval_duration": 3540902000,
+          "prompt_eval_count": 1155,
+          "eval_count": 488
+        }
+      ],
+      "fragments": [
+        {
+          "source": "19961#16",
+          "outcomes": [
+            {
+              "name": "Prezentul statut",
+              "characteristics": [],
+              "evidence": {
+                "status": "quoted",
+                "quote": "Prezentul statut intră în vigoare la data publicării lui în Monitorul Oficial al României, Partea I.",
+                "start": 13,
+                "end": 113
+              },
+              "origin": "quoted_relation_endpoint"
+            },
+            {
+              "name": "data publicării lui în Monitorul Oficial al României, Partea I.",
+              "characteristics": [],
+              "evidence": {
+                "status": "quoted",
+                "quote": "Prezentul statut intră în vigoare la data publicării lui în Monitorul Oficial al României, Partea I.",
+                "start": 13,
+                "end": 113
+              },
+              "origin": "quoted_relation_endpoint"
+            },
+            {
+              "name": "Dosarele de executare aflate în curs de rezolvare la data intrării în vigoare a prezentului statut",
+              "characteristics": [],
+              "evidence": {
+                "status": "quoted",
+                "quote": "Dosarele de executare aflate în curs de rezolvare la data intrării în vigoare a prezentului statut pot fi preluate de către executorii bancari, pe baza solicitării scrise adresate de banca preşedintelui instanţei de executare.",
+                "start": 129,
+                "end": 355
+              },
+              "origin": "quoted_relation_endpoint"
+            },
+            {
+              "name": "executorii bancari",
+              "characteristics": [],
+              "evidence": {
+                "status": "quoted",
+                "quote": "Dosarele de executare aflate în curs de rezolvare la data intrării în vigoare a prezentului statut pot fi preluate de către executorii bancari, pe baza solicitării scrise adresate de banca preşedintelui instanţei de executare.",
+                "start": 129,
+                "end": 355
+              },
+              "origin": "quoted_relation_endpoint"
+            }
+          ],
+          "relations": [],
+          "rejected_class_named": [],
+          "rejected_structural": [
+            "Articolul 24",
+            "Articolul 25"
+          ],
+          "rejected_class_edges": 0,
+          "rejected_evidence": 0,
+          "qualified_rules": [
+            {
+              "statement": "Prezentul statut intră în vigoare la data publicării lui în Monitorul Oficial al României, Partea I.",
+              "subject": "Prezentul statut",
+              "predicate": "",
+              "object": "",
+              "provision": "+ Articolul 24",
+              "scope": [],
+              "conditions": [],
+              "exceptions": [],
+              "dates": [],
+              "evidence": [
+                {
+                  "quote": "Prezentul statut intră în vigoare la data publicării lui în Monitorul Oficial al României, Partea I.",
+                  "start": 11359,
+                  "end": 11459
+                }
+              ],
+              "context_evidence": [
+                {
+                  "quote": "+ Articolul 24 Prezentul statut intră în vigoare la data publicării lui în Monitorul Oficial al României, Partea I. ",
+                  "start": 11344,
+                  "end": 11460
+                }
+              ],
+              "provision_evidence": {
+                "quote": "+ Articolul 24",
+                "start": 11344,
+                "end": 11358
+              },
+              "review_status": "proposed",
+              "scope_resolution": "unresolved",
+              "review_issues": [],
+              "subject_evidence": {
+                "quote": "Prezentul statut",
+                "start": 11359,
+                "end": 11375
+              },
+              "subject_method": "model-source-quote",
+              "kind": "fact",
+              "extraction_method": "source-statement-classification",
+              "classification_status": "classified",
+              "id": "5f2f27d1681c28f9967bd8739035efd021ec0f3c20ea9fbc3b90f31116f0301b",
+              "source": "19961#16",
+              "source_hash": "720ae30d6d7345a6a0771f03ade9a713e1dc3421fc0153719b6edfaa683a1ae9",
+              "source_file": "C:\\dev\\grap-rust\\real-data-law-ro\\19961.json",
+              "offset_basis": "document"
+            },
+            {
+              "statement": "Dosarele de executare aflate în curs de rezolvare la data intrării în vigoare a prezentului statut pot fi preluate de către executorii bancari, pe baza solicitării scrise adresate de banca preşedintelui instanţei de executare. -----------",
+              "subject": "Dosarele de executare aflate în curs de rezolvare la data intrării în vigoare a prezentului statut",
+              "predicate": "",
+              "object": "",
+              "provision": "+ Articolul 25",
+              "scope": [],
+              "conditions": [],
+              "exceptions": [],
+              "dates": [],
+              "evidence": [
+                {
+                  "quote": "Dosarele de executare aflate în curs de rezolvare la data intrării în vigoare a prezentului statut pot fi preluate de către executorii bancari, pe baza solicitării scrise adresate de banca preşedintelui instanţei de executare. -----------",
+                  "start": 11475,
+                  "end": 11713
+                }
+              ],
+              "context_evidence": [
+                {
+                  "quote": "+ Articolul 25 Dosarele de executare aflate în curs de rezolvare la data intrării în vigoare a prezentului statut pot fi preluate de către executorii bancari, pe baza solicitării scrise adresate de banca preşedintelui instanţei de executare. -----------",
+                  "start": 11460,
+                  "end": 11713
+                }
+              ],
+              "provision_evidence": {
+                "quote": "+ Articolul 25",
+                "start": 11460,
+                "end": 11474
+              },
+              "review_status": "proposed",
+              "scope_resolution": "unresolved",
+              "review_issues": [],
+              "subject_evidence": {
+                "quote": "Dosarele de executare aflate în curs de rezolvare la data intrării în vigoare a prezentului statut",
+                "start": 11475,
+                "end": 11573
+              },
+              "subject_method": "model-source-quote",
+              "kind": "permission",
+              "extraction_method": "source-statement-classification",
+              "classification_status": "classified",
+              "id": "1089b48b306194018df41d9b477d7a1ebfeb07ba38964886aed7d76751c12f91",
+              "source": "19961#16",
+              "source_hash": "720ae30d6d7345a6a0771f03ade9a713e1dc3421fc0153719b6edfaa683a1ae9",
+              "source_file": "C:\\dev\\grap-rust\\real-data-law-ro\\19961.json",
+              "offset_basis": "document"
+            }
+          ],
+          "rule_coverage": {
+            "version": "qualified-rules-v1",
+            "units": 2,
+            "unresolved": 0,
+            "nonassertions": 0,
+            "deferred_proposals": 4
+          },
+          "deferred_proposals": [
+            {
+              "kind": "relation",
+              "proposal": {
+                "from": "Prezentul statut",
+                "type": "enters into force",
+                "to": "data publicării lui în Monitorul Oficial al României, Partea I.",
+                "evidence": {
+                  "status": "quoted",
+                  "quote": "Prezentul statut intră în vigoare la data publicării lui în Monitorul Oficial al României, Partea I.",
+                  "start": 13,
+                  "end": 113
+                }
+              },
+              "reason": "requires qualified rule interpretation"
+            },
+            {
+              "kind": "relation",
+              "proposal": {
+                "from": "Dosarele de executare aflate în curs de rezolvare la data intrării în vigoare a prezentului statut",
+                "type": "can be taken by",
+                "to": "executorii bancari",
+                "evidence": {
+                  "status": "quoted",
+                  "quote": "Dosarele de executare aflate în curs de rezolvare la data intrării în vigoare a prezentului statut pot fi preluate de către executorii bancari, pe baza solicitării scrise adresate de banca preşedintelui instanţei de executare.",
+                  "start": 129,
+                  "end": 355
+                }
+              },
+              "reason": "requires qualified rule interpretation"
+            },
+            {
+              "kind": "outcome",
+              "proposal": {
+                "name": "Articolul 24",
+                "requirements": [],
+                "evidence": "Articolul 24 Prezentul statut intră în vigoare la data publicării lui în Monitorul Oficial al României, Partea I."
+              },
+              "reason": "article reference is not an entity identity"
+            },
+            {
+              "kind": "outcome",
+              "proposal": {
+                "name": "Articolul 25",
+                "requirements": [],
+                "evidence": "Articolul 25 Dosarele de executare aflate în curs de rezolvare la data intrării în vigoare a prezentului statut pot fi preluate de către executorii bancari, pe baza solicitării scrise adresate de banca preşedintelui instanţei de executare."
+              },
+              "reason": "article reference is not an entity identity"
+            }
+          ],
+          "extraction": {
+            "source_text": "Articolul 24 Prezentul statut intră în vigoare la data publicării lui în Monitorul Oficial al României, Partea I. + Articolul 25 Dosarele de executare aflate în curs de rezolvare la data intrării în vigoare a prezentului statut pot fi preluate de către executorii bancari, pe baza solicitării scrise adresate de banca preşedintelui instanţei de executare. -----------",
+            "prompt_version": "document-claims-v5-qualified",
+            "provider": "openai-compat",
+            "model": "grap-legal-gemma4"
+          }
+        }
+      ]
+    },
+    {
+      "case": "semantic-11",
+      "mode": "baseline",
+      "wall_s": 5.786517799999729,
+      "correct_target": true,
+      "failures": [],
+      "calls": [
+        {
+          "purpose": "extraction",
+          "wall_s": 5.7857420000000275,
+          "prompt_sha256": "52cadc2e21befc5778158389df7f993c83d1c72c5a8030da33ee036ad38b867a",
+          "prompt_chars": 5824,
+          "raw": "```json\n{\n  \"outcomes\": [\n    {\n      \"name\": \"NORME din 28 iunie 1999 privind verificarea tehnica a vehiculelor feroviare aparţinând agentilor economici EMITENT MINISTERUL TRANSPORTURILOR Publicat în MONITORUL OFICIAL nr. 396 din 19 august 1999 + Capitolul 1 Dispozitii generale\",\n      \"requirements\": [],\n      \"evidence\": \"NORME din 28 iunie 1999 privind verificarea tehnica a vehiculelor feroviare aparţinând agentilor economici EMITENT MINISTERUL TRANSPORTURILOR Publicat în MONITORUL OFICIAL nr. 396 din 19 august 1999 + Capitolul 1 Dispozitii generale\"\n    },\n    {\n      \"name\": \"vehiculele feroviare de orice tip aparţinând agentilor economici\",\n      \"requirements\": [\n        \"trebuie să indeplineasca condiţiile prevăzute în normele tehnice specifice în vigoare\"\n      ],\n      \"evidence\": \"vehiculele feroviare de orice tip aparţinând agentilor economici trebuie să indeplineasca condiţiile prevăzute în normele tehnice specifice în vigoare.\"\n    },\n    {\n      \"name\": \"Prezentele norme\",\n      \"requirements\": [],\n      \"evidence\": \"Prezentele norme nu se aplică operatorilor de transport feroviar şi gestionarului infrastructurii feroviare publice.\"\n    }\n  ],\n  \"relations\": [\n    {\n      \"from\": \"vehiculele feroviare de orice tip aparţinând agentilor economici\",\n      \"type\": \"must comply with\",\n      \"to\": \"normele tehnice specifice în vigoare\",\n      \"evidence\": \"vehiculele feroviare de orice tip aparţinând agentilor economici trebuie să indeplineasca condiţiile prevăzute în normele tehnice specifice în vigoare.\"\n    }\n  ],\n  \"units\": {\n    \"u0\": {\n      \"kind\": \"other\",\n      \"subject\": \"NORME din 28 iunie 1999 privind verificarea tehnica a vehiculelor feroviare aparţinând agentilor economici EMITENT MINISTERUL TRANSPORTURILOR Publicat în MONITORUL OFICIAL nr. 396 din 19 august 1999 + Capitolul 1 Dispozitii generale\",\n      \"subject_text\": \"NORME din 28 iunie 1999 privind verificarea tehnica a vehiculelor feroviare aparţinând agentilor economici EMITENT MINISTERUL TRANSPORTURILOR Publicat în MONITORUL OFICIAL nr. 396 din 19 august 1999 + Capitolul 1 Dispozitii generale\"\n    },\n    \"u1\": {\n      \"kind\": \"obligation\",\n      \"subject\": \"vehiculele feroviare de orice tip aparţinând agentilor economici\",\n      \"subject_text\": \"vehiculele feroviare de orice tip aparţinând agentilor economici\"\n    },\n    \"u2\": {\n      \"kind\": \"prohibition\",\n      \"subject\": \"Prezentele norme\",\n      \"subject_text\": \"Prezentele norme\"\n    }\n  }\n}\n```",
+          "finish_reason": "stop",
+          "total_duration": 5771508400,
+          "load_duration": 2421000,
+          "prompt_eval_duration": 187080000,
+          "eval_duration": 5542738000,
+          "prompt_eval_count": 1304,
+          "eval_count": 755
+        }
+      ],
+      "fragments": [
+        {
+          "source": "83906#0",
+          "outcomes": [
+            {
+              "name": "NORME din 28 iunie 1999 privind verificarea tehnica a vehiculelor feroviare aparţinând agentilor economici EMITENT MINISTERUL TRANSPORTURILOR Publicat în MONITORUL OFICIAL nr. 396 din 19 august 1999 + Capitolul 1 Dispozitii generale",
+              "characteristics": [],
+              "evidence": {
+                "status": "quoted",
+                "quote": "NORME din 28 iunie 1999 privind verificarea tehnica a vehiculelor feroviare aparţinând agentilor economici EMITENT MINISTERUL TRANSPORTURILOR Publicat în MONITORUL OFICIAL nr. 396 din 19 august 1999 + Capitolul 1 Dispozitii generale",
+                "start": 0,
+                "end": 232
+              }
+            },
+            {
+              "name": "vehiculele feroviare de orice tip aparţinând agentilor economici",
+              "characteristics": [],
+              "evidence": {
+                "status": "quoted",
+                "quote": "vehiculele feroviare de orice tip aparţinând agentilor economici trebuie să indeplineasca condiţiile prevăzute în normele tehnice specifice în vigoare.",
+                "start": 343,
+                "end": 494
+              }
+            },
+            {
+              "name": "Prezentele norme",
+              "characteristics": [],
+              "evidence": {
+                "status": "quoted",
+                "quote": "Prezentele norme nu se aplică operatorilor de transport feroviar şi gestionarului infrastructurii feroviare publice.",
+                "start": 503,
+                "end": 619
+              }
+            },
+            {
+              "name": "normele tehnice specifice în vigoare",
+              "characteristics": [],
+              "evidence": {
+                "status": "quoted",
+                "quote": "vehiculele feroviare de orice tip aparţinând agentilor economici trebuie să indeplineasca condiţiile prevăzute în normele tehnice specifice în vigoare.",
+                "start": 343,
+                "end": 494
+              },
+              "origin": "quoted_relation_endpoint"
+            }
+          ],
+          "relations": [],
+          "rejected_class_named": [],
+          "rejected_structural": [],
+          "rejected_class_edges": 0,
+          "rejected_evidence": 0,
+          "qualified_rules": [
+            {
+              "statement": "NORME din 28 iunie 1999 privind verificarea tehnica a vehiculelor feroviare aparţinând agentilor economici EMITENT MINISTERUL TRANSPORTURILOR Publicat în MONITORUL OFICIAL nr. 396 din 19 august 1999 + Capitolul 1 Dispozitii generale",
+              "subject": "",
+              "predicate": "",
+              "object": "",
+              "provision": "",
+              "scope": [],
+              "conditions": [],
+              "exceptions": [],
+              "dates": [
+                "28 iunie 1999",
+                "19 august 1999"
+              ],
+              "evidence": [
+                {
+                  "quote": "NORME din 28 iunie 1999 privind verificarea tehnica a vehiculelor feroviare aparţinând agentilor economici EMITENT MINISTERUL TRANSPORTURILOR Publicat în MONITORUL OFICIAL nr. 396 din 19 august 1999 + Capitolul 1 Dispozitii generale",
+                  "start": 0,
+                  "end": 232
+                }
+              ],
+              "context_evidence": [
+                {
+                  "quote": "NORME din 28 iunie 1999 privind verificarea tehnica a vehiculelor feroviare aparţinând agentilor economici EMITENT MINISTERUL TRANSPORTURILOR Publicat în MONITORUL OFICIAL nr. 396 din 19 august 1999 + Capitolul 1 Dispozitii generale ",
+                  "start": 0,
+                  "end": 233
+                }
+              ],
+              "provision_evidence": null,
+              "review_status": "proposed",
+              "scope_resolution": "unresolved",
+              "review_issues": [],
+              "kind": "other",
+              "classification_status": "classified",
+              "id": "03e9fae72ca4c04d60cc27163fb376183af8753d919975518232a348da01b443",
+              "source": "83906#0",
+              "source_hash": "b7430e4018ef42a40ebb42b80bc88a6cd855777e02787bccf8dc0886c6afd095",
+              "source_file": "C:\\dev\\grap-rust\\real-data-law-ro\\83906.json",
+              "offset_basis": "document"
+            },
+            {
+              "statement": "(1) Pentru asigurarea efectuării transportului feroviar în condiţii de siguranţă a circulaţiei, vehiculele feroviare de orice tip aparţinând agentilor economici trebuie să indeplineasca condiţiile prevăzute în normele tehnice specifice în vigoare. ...",
+              "subject": "vehiculele feroviare de orice tip aparţinând agentilor economici",
+              "predicate": "",
+              "object": "",
+              "provision": "+ Articolul 1",
+              "scope": [],
+              "conditions": [],
+              "exceptions": [],
+              "dates": [],
+              "evidence": [
+                {
+                  "quote": "(1) Pentru asigurarea efectuării transportului feroviar în condiţii de siguranţă a circulaţiei, vehiculele feroviare de orice tip aparţinând agentilor economici trebuie să indeplineasca condiţiile prevăzute în normele tehnice specifice în vigoare. ...",
+                  "start": 247,
+                  "end": 498
+                }
+              ],
+              "context_evidence": [
+                {
+                  "quote": "+ Articolul 1 (1) Pentru asigurarea efectuării transportului feroviar în condiţii de siguranţă a circulaţiei, vehiculele feroviare de orice tip aparţinând agentilor economici trebuie să indeplineasca condiţiile prevăzute în normele tehnice specifice în vigoare. ... (2) Prezentele norme nu se aplică operatorilor de transport feroviar şi gestionarului infrastructurii feroviare publice. ... ",
+                  "start": 233,
+                  "end": 624
+                }
+              ],
+              "provision_evidence": {
+                "quote": "+ Articolul 1",
+                "start": 233,
+                "end": 246
+              },
+              "review_status": "proposed",
+              "scope_resolution": "unresolved",
+              "review_issues": [],
+              "subject_evidence": {
+                "quote": "vehiculele feroviare de orice tip aparţinând agentilor economici",
+                "start": 343,
+                "end": 407
+              },
+              "subject_method": "model-source-quote",
+              "kind": "obligation",
+              "extraction_method": "source-statement-classification",
+              "classification_status": "classified",
+              "id": "d1b9ac1be9ff108ff6bb9c2072df9ee13806bb09251806e431ec4a2bd9722841",
+              "source": "83906#0",
+              "source_hash": "b7430e4018ef42a40ebb42b80bc88a6cd855777e02787bccf8dc0886c6afd095",
+              "source_file": "C:\\dev\\grap-rust\\real-data-law-ro\\83906.json",
+              "offset_basis": "document"
+            },
+            {
+              "statement": "(2) Prezentele norme nu se aplică operatorilor de transport feroviar şi gestionarului infrastructurii feroviare publice. ...",
+              "subject": "Prezentele norme",
+              "predicate": "",
+              "object": "",
+              "provision": "+ Articolul 1",
+              "scope": [],
+              "conditions": [],
+              "exceptions": [],
+              "dates": [],
+              "evidence": [
+                {
+                  "quote": "(2) Prezentele norme nu se aplică operatorilor de transport feroviar şi gestionarului infrastructurii feroviare publice. ...",
+                  "start": 499,
+                  "end": 623
+                }
+              ],
+              "context_evidence": [
+                {
+                  "quote": "+ Articolul 1 (1) Pentru asigurarea efectuării transportului feroviar în condiţii de siguranţă a circulaţiei, vehiculele feroviare de orice tip aparţinând agentilor economici trebuie să indeplineasca condiţiile prevăzute în normele tehnice specifice în vigoare. ... (2) Prezentele norme nu se aplică operatorilor de transport feroviar şi gestionarului infrastructurii feroviare publice. ... ",
+                  "start": 233,
+                  "end": 624
+                }
+              ],
+              "provision_evidence": {
+                "quote": "+ Articolul 1",
+                "start": 233,
+                "end": 246
+              },
+              "review_status": "proposed",
+              "scope_resolution": "unresolved",
+              "review_issues": [
+                "model labeled prohibition; explicit wording indicates fact"
+              ],
+              "subject_evidence": {
+                "quote": "Prezentele norme",
+                "start": 503,
+                "end": 519
+              },
+              "subject_method": "explicit-syntax",
+              "kind": "fact",
+              "extraction_method": "source-statement-classification",
+              "classification_status": "classified",
+              "id": "52b96afd85c608456c1a4846150eb2e301b2a397261d6fd4e2177a49f899d9f2",
+              "source": "83906#0",
+              "source_hash": "b7430e4018ef42a40ebb42b80bc88a6cd855777e02787bccf8dc0886c6afd095",
+              "source_file": "C:\\dev\\grap-rust\\real-data-law-ro\\83906.json",
+              "offset_basis": "document"
+            }
+          ],
+          "rule_coverage": {
+            "version": "qualified-rules-v1",
+            "units": 3,
+            "unresolved": 0,
+            "nonassertions": 1,
+            "deferred_proposals": 2
+          },
+          "deferred_proposals": [
+            {
+              "kind": "relation",
+              "proposal": {
+                "from": "vehiculele feroviare de orice tip aparţinând agentilor economici",
+                "type": "must comply with",
+                "to": "normele tehnice specifice în vigoare",
+                "evidence": {
+                  "status": "quoted",
+                  "quote": "vehiculele feroviare de orice tip aparţinând agentilor economici trebuie să indeplineasca condiţiile prevăzute în normele tehnice specifice în vigoare.",
+                  "start": 343,
+                  "end": 494
+                }
+              },
+              "reason": "requires qualified rule interpretation"
+            },
+            {
+              "kind": "requirements",
+              "proposal": {
+                "name": "vehiculele feroviare de orice tip aparţinând agentilor economici",
+                "characteristics": [
+                  "trebuie să indeplineasca condiţiile prevăzute în normele tehnice specifice în vigoare"
+                ],
+                "evidence": {
+                  "status": "quoted",
+                  "quote": "vehiculele feroviare de orice tip aparţinând agentilor economici trebuie să indeplineasca condiţiile prevăzute în normele tehnice specifice în vigoare.",
+                  "start": 343,
+                  "end": 494
+                }
+              },
+              "reason": "requirements retained in complete qualified rule"
+            }
+          ],
+          "extraction": {
+            "source_text": "NORME din 28 iunie 1999 privind verificarea tehnica a vehiculelor feroviare aparţinând agentilor economici EMITENT MINISTERUL TRANSPORTURILOR Publicat în MONITORUL OFICIAL nr. 396 din 19 august 1999 + Capitolul 1 Dispozitii generale + Articolul 1 (1) Pentru asigurarea efectuării transportului feroviar în condiţii de siguranţă a circulaţiei, vehiculele feroviare de orice tip aparţinând agentilor economici trebuie să indeplineasca condiţiile prevăzute în normele tehnice specifice în vigoare. ... (2) Prezentele norme nu se aplică operatorilor de transport feroviar şi gestionarului infrastructurii feroviare publice. ... +",
+            "prompt_version": "document-claims-v5-qualified",
+            "provider": "openai-compat",
+            "model": "grap-legal-gemma4"
+          }
+        }
+      ]
+    },
+    {
+      "case": "semantic-11",
+      "mode": "compact",
+      "wall_s": 4.998334600000362,
+      "correct_target": true,
+      "failures": [],
+      "calls": [
+        {
+          "purpose": "extraction",
+          "wall_s": 4.997668200000135,
+          "prompt_sha256": "f91eba781e273c39fe009a09da87b702b7c56aab8b98089ababe07e33a740021",
+          "prompt_chars": 5988,
+          "raw": "```json\n{\n  \"outcomes\": [\n    {\n      \"name\": \"NORME din 28 iunie 1999 privind verificarea tehnica a vehiculelor feroviare aparţinând agentilor economici EMITENT MINISTERUL TRANSPORTURILOR Publicat în MONITORUL OFICIAL nr. 396 din 19 august 1999 + Capitolul 1 Dispozitii generale\",\n      \"requirements\": [],\n      \"evidence\": \"NORME din 28 iunie 1999 privind verificarea tehnica a vehiculelor feroviare aparţinând agentilor economici EMITENT MINISTERUL TRANSPORTURILOR Publicat în MONITORUL OFICIAL nr. 396 din 19 august 1999 + Capitolul 1 Dispozitii generale\"\n    },\n    {\n      \"name\": \"vehiculele feroviare de orice tip aparţinând agentilor economici\",\n      \"requirements\": [\n        \"trebuie să indeplineasca condiţiile prevăzute în normele tehnice specifice în vigoare\"\n      ],\n      \"evidence\": \"vehiculele feroviare de orice tip aparţinând agentilor economici trebuie să indeplineasca condiţiile prevăzute în normele tehnice specifice în vigoare.\"\n    },\n    {\n      \"name\": \"operatorilor de transport feroviar şi gestionarului infrastructurii feroviare publice\",\n      \"requirements\": [],\n      \"evidence\": \"Prezentele norme nu se aplică operatorilor de transport feroviar şi gestionarului infrastructurii feroviare publice.\"\n    }\n  ],\n  \"relations\": [\n    {\n      \"from\": \"vehiculele feroviare de orice tip aparţinând agentilor economici\",\n      \"type\": \"must comply with\",\n      \"to\": \"normele tehnice specifice în vigoare\",\n      \"evidence\": \"vehiculele feroviare de orice tip aparţinând agentilor economici trebuie să indeplineasca condiţiile prevăzute în normele tehnice specifice în vigoare.\"\n    }\n  ],\n  \"units\": {\n    \"u0\": {\n      \"kind\": \"other\",\n      \"subject\": \"NORME din 28 iunie 1999 privind verificarea tehnica a vehiculelor feroviare aparţinând agentilor economici EMITENT MINISTERUL TRANSPORTURILOR Publicat în MONITORUL OFICIAL nr. 396 din 19 august 1999 + Capitolul 1 Dispozitii generale\"\n    },\n    \"u1\": {\n      \"kind\": \"obligation\",\n      \"subject\": \"vehiculele feroviare de orice tip aparţinând agentilor economici\"\n    },\n    \"u2\": {\n      \"kind\": \"fact\",\n      \"subject\": \"Prezentele norme\"\n    }\n  }\n}\n```",
+          "finish_reason": "stop",
+          "total_duration": 4996739100,
+          "load_duration": 1772600,
+          "prompt_eval_duration": 177467000,
+          "eval_duration": 4758465000,
+          "prompt_eval_count": 1331,
+          "eval_count": 647
+        }
+      ],
+      "fragments": [
+        {
+          "source": "83906#0",
+          "outcomes": [
+            {
+              "name": "NORME din 28 iunie 1999 privind verificarea tehnica a vehiculelor feroviare aparţinând agentilor economici EMITENT MINISTERUL TRANSPORTURILOR Publicat în MONITORUL OFICIAL nr. 396 din 19 august 1999 + Capitolul 1 Dispozitii generale",
+              "characteristics": [],
+              "evidence": {
+                "status": "quoted",
+                "quote": "NORME din 28 iunie 1999 privind verificarea tehnica a vehiculelor feroviare aparţinând agentilor economici EMITENT MINISTERUL TRANSPORTURILOR Publicat în MONITORUL OFICIAL nr. 396 din 19 august 1999 + Capitolul 1 Dispozitii generale",
+                "start": 0,
+                "end": 232
+              }
+            },
+            {
+              "name": "vehiculele feroviare de orice tip aparţinând agentilor economici",
+              "characteristics": [],
+              "evidence": {
+                "status": "quoted",
+                "quote": "vehiculele feroviare de orice tip aparţinând agentilor economici trebuie să indeplineasca condiţiile prevăzute în normele tehnice specifice în vigoare.",
+                "start": 343,
+                "end": 494
+              }
+            },
+            {
+              "name": "operatorilor de transport feroviar şi gestionarului infrastructurii feroviare publice",
+              "characteristics": [],
+              "evidence": {
+                "status": "quoted",
+                "quote": "Prezentele norme nu se aplică operatorilor de transport feroviar şi gestionarului infrastructurii feroviare publice.",
+                "start": 503,
+                "end": 619
+              }
+            },
+            {
+              "name": "normele tehnice specifice în vigoare",
+              "characteristics": [],
+              "evidence": {
+                "status": "quoted",
+                "quote": "vehiculele feroviare de orice tip aparţinând agentilor economici trebuie să indeplineasca condiţiile prevăzute în normele tehnice specifice în vigoare.",
+                "start": 343,
+                "end": 494
+              },
+              "origin": "quoted_relation_endpoint"
+            }
+          ],
+          "relations": [],
+          "rejected_class_named": [],
+          "rejected_structural": [],
+          "rejected_class_edges": 0,
+          "rejected_evidence": 0,
+          "qualified_rules": [
+            {
+              "statement": "NORME din 28 iunie 1999 privind verificarea tehnica a vehiculelor feroviare aparţinând agentilor economici EMITENT MINISTERUL TRANSPORTURILOR Publicat în MONITORUL OFICIAL nr. 396 din 19 august 1999 + Capitolul 1 Dispozitii generale",
+              "subject": "",
+              "predicate": "",
+              "object": "",
+              "provision": "",
+              "scope": [],
+              "conditions": [],
+              "exceptions": [],
+              "dates": [
+                "28 iunie 1999",
+                "19 august 1999"
+              ],
+              "evidence": [
+                {
+                  "quote": "NORME din 28 iunie 1999 privind verificarea tehnica a vehiculelor feroviare aparţinând agentilor economici EMITENT MINISTERUL TRANSPORTURILOR Publicat în MONITORUL OFICIAL nr. 396 din 19 august 1999 + Capitolul 1 Dispozitii generale",
+                  "start": 0,
+                  "end": 232
+                }
+              ],
+              "context_evidence": [
+                {
+                  "quote": "NORME din 28 iunie 1999 privind verificarea tehnica a vehiculelor feroviare aparţinând agentilor economici EMITENT MINISTERUL TRANSPORTURILOR Publicat în MONITORUL OFICIAL nr. 396 din 19 august 1999 + Capitolul 1 Dispozitii generale ",
+                  "start": 0,
+                  "end": 233
+                }
+              ],
+              "provision_evidence": null,
+              "review_status": "proposed",
+              "scope_resolution": "unresolved",
+              "review_issues": [],
+              "kind": "other",
+              "classification_status": "classified",
+              "id": "03e9fae72ca4c04d60cc27163fb376183af8753d919975518232a348da01b443",
+              "source": "83906#0",
+              "source_hash": "b7430e4018ef42a40ebb42b80bc88a6cd855777e02787bccf8dc0886c6afd095",
+              "source_file": "C:\\dev\\grap-rust\\real-data-law-ro\\83906.json",
+              "offset_basis": "document"
+            },
+            {
+              "statement": "(1) Pentru asigurarea efectuării transportului feroviar în condiţii de siguranţă a circulaţiei, vehiculele feroviare de orice tip aparţinând agentilor economici trebuie să indeplineasca condiţiile prevăzute în normele tehnice specifice în vigoare. ...",
+              "subject": "vehiculele feroviare de orice tip aparţinând agentilor economici",
+              "predicate": "",
+              "object": "",
+              "provision": "+ Articolul 1",
+              "scope": [],
+              "conditions": [],
+              "exceptions": [],
+              "dates": [],
+              "evidence": [
+                {
+                  "quote": "(1) Pentru asigurarea efectuării transportului feroviar în condiţii de siguranţă a circulaţiei, vehiculele feroviare de orice tip aparţinând agentilor economici trebuie să indeplineasca condiţiile prevăzute în normele tehnice specifice în vigoare. ...",
+                  "start": 247,
+                  "end": 498
+                }
+              ],
+              "context_evidence": [
+                {
+                  "quote": "+ Articolul 1 (1) Pentru asigurarea efectuării transportului feroviar în condiţii de siguranţă a circulaţiei, vehiculele feroviare de orice tip aparţinând agentilor economici trebuie să indeplineasca condiţiile prevăzute în normele tehnice specifice în vigoare. ... (2) Prezentele norme nu se aplică operatorilor de transport feroviar şi gestionarului infrastructurii feroviare publice. ... ",
+                  "start": 233,
+                  "end": 624
+                }
+              ],
+              "provision_evidence": {
+                "quote": "+ Articolul 1",
+                "start": 233,
+                "end": 246
+              },
+              "review_status": "proposed",
+              "scope_resolution": "unresolved",
+              "review_issues": [],
+              "subject_evidence": {
+                "quote": "vehiculele feroviare de orice tip aparţinând agentilor economici",
+                "start": 343,
+                "end": 407
+              },
+              "subject_method": "model-source-quote",
+              "kind": "obligation",
+              "extraction_method": "source-statement-classification",
+              "classification_status": "classified",
+              "id": "d1b9ac1be9ff108ff6bb9c2072df9ee13806bb09251806e431ec4a2bd9722841",
+              "source": "83906#0",
+              "source_hash": "b7430e4018ef42a40ebb42b80bc88a6cd855777e02787bccf8dc0886c6afd095",
+              "source_file": "C:\\dev\\grap-rust\\real-data-law-ro\\83906.json",
+              "offset_basis": "document"
+            },
+            {
+              "statement": "(2) Prezentele norme nu se aplică operatorilor de transport feroviar şi gestionarului infrastructurii feroviare publice. ...",
+              "subject": "Prezentele norme",
+              "predicate": "",
+              "object": "",
+              "provision": "+ Articolul 1",
+              "scope": [],
+              "conditions": [],
+              "exceptions": [],
+              "dates": [],
+              "evidence": [
+                {
+                  "quote": "(2) Prezentele norme nu se aplică operatorilor de transport feroviar şi gestionarului infrastructurii feroviare publice. ...",
+                  "start": 499,
+                  "end": 623
+                }
+              ],
+              "context_evidence": [
+                {
+                  "quote": "+ Articolul 1 (1) Pentru asigurarea efectuării transportului feroviar în condiţii de siguranţă a circulaţiei, vehiculele feroviare de orice tip aparţinând agentilor economici trebuie să indeplineasca condiţiile prevăzute în normele tehnice specifice în vigoare. ... (2) Prezentele norme nu se aplică operatorilor de transport feroviar şi gestionarului infrastructurii feroviare publice. ... ",
+                  "start": 233,
+                  "end": 624
+                }
+              ],
+              "provision_evidence": {
+                "quote": "+ Articolul 1",
+                "start": 233,
+                "end": 246
+              },
+              "review_status": "proposed",
+              "scope_resolution": "unresolved",
+              "review_issues": [],
+              "subject_evidence": {
+                "quote": "Prezentele norme",
+                "start": 503,
+                "end": 519
+              },
+              "subject_method": "explicit-syntax",
+              "kind": "fact",
+              "extraction_method": "source-statement-classification",
+              "classification_status": "classified",
+              "id": "52b96afd85c608456c1a4846150eb2e301b2a397261d6fd4e2177a49f899d9f2",
+              "source": "83906#0",
+              "source_hash": "b7430e4018ef42a40ebb42b80bc88a6cd855777e02787bccf8dc0886c6afd095",
+              "source_file": "C:\\dev\\grap-rust\\real-data-law-ro\\83906.json",
+              "offset_basis": "document"
+            }
+          ],
+          "rule_coverage": {
+            "version": "qualified-rules-v1",
+            "units": 3,
+            "unresolved": 0,
+            "nonassertions": 1,
+            "deferred_proposals": 2
+          },
+          "deferred_proposals": [
+            {
+              "kind": "relation",
+              "proposal": {
+                "from": "vehiculele feroviare de orice tip aparţinând agentilor economici",
+                "type": "must comply with",
+                "to": "normele tehnice specifice în vigoare",
+                "evidence": {
+                  "status": "quoted",
+                  "quote": "vehiculele feroviare de orice tip aparţinând agentilor economici trebuie să indeplineasca condiţiile prevăzute în normele tehnice specifice în vigoare.",
+                  "start": 343,
+                  "end": 494
+                }
+              },
+              "reason": "requires qualified rule interpretation"
+            },
+            {
+              "kind": "requirements",
+              "proposal": {
+                "name": "vehiculele feroviare de orice tip aparţinând agentilor economici",
+                "characteristics": [
+                  "trebuie să indeplineasca condiţiile prevăzute în normele tehnice specifice în vigoare"
+                ],
+                "evidence": {
+                  "status": "quoted",
+                  "quote": "vehiculele feroviare de orice tip aparţinând agentilor economici trebuie să indeplineasca condiţiile prevăzute în normele tehnice specifice în vigoare.",
+                  "start": 343,
+                  "end": 494
+                }
+              },
+              "reason": "requirements retained in complete qualified rule"
+            }
+          ],
+          "extraction": {
+            "source_text": "NORME din 28 iunie 1999 privind verificarea tehnica a vehiculelor feroviare aparţinând agentilor economici EMITENT MINISTERUL TRANSPORTURILOR Publicat în MONITORUL OFICIAL nr. 396 din 19 august 1999 + Capitolul 1 Dispozitii generale + Articolul 1 (1) Pentru asigurarea efectuării transportului feroviar în condiţii de siguranţă a circulaţiei, vehiculele feroviare de orice tip aparţinând agentilor economici trebuie să indeplineasca condiţiile prevăzute în normele tehnice specifice în vigoare. ... (2) Prezentele norme nu se aplică operatorilor de transport feroviar şi gestionarului infrastructurii feroviare publice. ... +",
+            "prompt_version": "document-claims-v5-qualified",
+            "provider": "openai-compat",
+            "model": "grap-legal-gemma4"
+          }
+        }
+      ]
+    },
+    {
+      "case": "semantic-16",
+      "mode": "compact",
+      "wall_s": 2.706997599999795,
+      "correct_target": true,
+      "failures": [],
+      "calls": [
+        {
+          "purpose": "extraction",
+          "wall_s": 2.7064203999998426,
+          "prompt_sha256": "d92c4bdae78895fb6aebaa752f346fde7e918048d8dd62d2d27dca207d87190f",
+          "prompt_chars": 5322,
+          "raw": "```json\n{\n  \"outcomes\": [\n    {\n      \"name\": \"Aceste sume\",\n      \"requirements\": [],\n      \"evidence\": \"Aceste sume se evidențiază prin contul de creditori.\"\n    },\n    {\n      \"name\": \"Sumele ce urmează a fi restituite beneficiarilor în condițiile art. III alin. (1)\",\n      \"requirements\": [],\n      \"evidence\": \"Sumele ce urmează a fi restituite beneficiarilor în condițiile art. III alin. (1) nu se actualizează cu indicele de inflație și nu sunt purtătoare de dobânzi, penalități de întârziere sau majorări de întârziere, după caz.\"\n    }\n  ],\n  \"relations\": [\n    {\n      \"from\": \"Aceste sume\",\n      \"type\": \"se evidențiază prin\",\n      \"to\": \"contul de creditori\",\n      \"evidence\": \"Aceste sume se evidențiază prin contul de creditori.\"\n    }\n  ],\n  \"units\": {\n    \"u71\": {\n      \"kind\": \"fact\",\n      \"subject\": \"Aceste sume\"\n    },\n    \"u72\": {\n      \"kind\": \"fact\",\n      \"subject\": \"Sumele ce urmează a fi restituite beneficiarilor în condițiile art. III alin. (1)\"\n    }\n  }\n}\n```",
+          "finish_reason": "stop",
+          "total_duration": 2704966900,
+          "load_duration": 2147300,
+          "prompt_eval_duration": 170404000,
+          "eval_duration": 2491403000,
+          "prompt_eval_count": 1164,
+          "eval_count": 339
+        }
+      ],
+      "fragments": [
+        {
+          "source": "19161#53",
+          "outcomes": [
+            {
+              "name": "Aceste sume",
+              "characteristics": [],
+              "evidence": {
+                "status": "quoted",
+                "quote": "Aceste sume se evidențiază prin contul de creditori.",
+                "start": 0,
+                "end": 52
+              }
+            },
+            {
+              "name": "Sumele ce urmează a fi restituite beneficiarilor în condițiile art. III alin. (1)",
+              "characteristics": [],
+              "evidence": {
+                "status": "quoted",
+                "quote": "Sumele ce urmează a fi restituite beneficiarilor în condițiile art. III alin. (1) nu se actualizează cu indicele de inflație și nu sunt purtătoare de dobânzi, penalități de întârziere sau majorări de întârziere, după caz.",
+                "start": 68,
+                "end": 289
+              }
+            },
+            {
+              "name": "contul de creditori",
+              "characteristics": [],
+              "evidence": {
+                "status": "quoted",
+                "quote": "Aceste sume se evidențiază prin contul de creditori.",
+                "start": 0,
+                "end": 52
+              },
+              "origin": "quoted_relation_endpoint"
+            }
+          ],
+          "relations": [],
+          "rejected_class_named": [],
+          "rejected_structural": [],
+          "rejected_class_edges": 0,
+          "rejected_evidence": 0,
+          "qualified_rules": [
+            {
+              "statement": "Aceste sume se evidențiază prin contul de creditori.",
+              "subject": "Aceste sume",
+              "predicate": "",
+              "object": "",
+              "provision": "+ Articolul V",
+              "scope": [],
+              "conditions": [],
+              "exceptions": [],
+              "dates": [],
+              "evidence": [
+                {
+                  "quote": "Aceste sume se evidențiază prin contul de creditori.",
+                  "start": 36972,
+                  "end": 37024
+                }
+              ],
+              "context_evidence": [
+                {
+                  "quote": "+ Articolul V Sumele care fac obiectul restituirii sunt cele provenite din debite constituite anterior sau ulterior datei de 1 ianuarie 2015 și recuperate, total sau parțial, după caz, începând cu data de 1 ianuarie 2015 și până la data de 1 martie 2019. Aceste sume se evidențiază prin contul de creditori. ",
+                  "start": 36717,
+                  "end": 37025
+                }
+              ],
+              "provision_evidence": {
+                "quote": "+ Articolul V",
+                "start": 36717,
+                "end": 36730
+              },
+              "review_status": "proposed",
+              "scope_resolution": "unresolved",
+              "review_issues": [],
+              "subject_evidence": {
+                "quote": "Aceste sume",
+                "start": 36972,
+                "end": 36983
+              },
+              "subject_method": "model-source-quote",
+              "kind": "fact",
+              "extraction_method": "source-statement-classification",
+              "classification_status": "classified",
+              "id": "f9aa058c190d8a8685232509168c0c5c37bdd90b71c1dff0984fda4cbe216d5c",
+              "source": "19161#53",
+              "source_hash": "a22524e4c38ca76b07deabeef6aed84488012f00bf78d9f79c7417ff06d3c82e",
+              "source_file": "C:\\dev\\grap-rust\\real-data-law-ro\\19161.json",
+              "offset_basis": "document"
+            },
+            {
+              "statement": "Sumele ce urmează a fi restituite beneficiarilor în condițiile art. III alin. (1) nu se actualizează cu indicele de inflație și nu sunt purtătoare de dobânzi, penalități de întârziere sau majorări de întârziere, după caz. -----",
+              "subject": "Sumele ce urmează a fi restituite beneficiarilor în condițiile art. III alin. (1)",
+              "predicate": "",
+              "object": "",
+              "provision": "+ Articolul VI",
+              "scope": [],
+              "conditions": [
+                "în condițiile art. III alin. (1) nu se actualizează cu indicele de inflație și nu sunt purtătoare de dobânzi, penalități de întârziere sau majorări de întârziere, după caz. -----"
+              ],
+              "exceptions": [],
+              "dates": [],
+              "evidence": [
+                {
+                  "quote": "Sumele ce urmează a fi restituite beneficiarilor în condițiile art. III alin. (1) nu se actualizează cu indicele de inflație și nu sunt purtătoare de dobânzi, penalități de întârziere sau majorări de întârziere, după caz. -----",
+                  "start": 37040,
+                  "end": 37267
+                }
+              ],
+              "context_evidence": [
+                {
+                  "quote": "+ Articolul VI Sumele ce urmează a fi restituite beneficiarilor în condițiile art. III alin. (1) nu se actualizează cu indicele de inflație și nu sunt purtătoare de dobânzi, penalități de întârziere sau majorări de întârziere, după caz. -----",
+                  "start": 37025,
+                  "end": 37267
+                }
+              ],
+              "provision_evidence": {
+                "quote": "+ Articolul VI",
+                "start": 37025,
+                "end": 37039
+              },
+              "review_status": "proposed",
+              "scope_resolution": "unresolved",
+              "review_issues": [],
+              "subject_evidence": {
+                "quote": "Sumele ce urmează a fi restituite beneficiarilor în condițiile art. III alin. (1)",
+                "start": 37040,
+                "end": 37121
+              },
+              "subject_method": "model-source-quote",
+              "kind": "fact",
+              "extraction_method": "source-statement-classification",
+              "classification_status": "classified",
+              "id": "dd84e778b7fd72a9384623439f1a3e6676fa93870230de2eb8e85014fea41494",
+              "source": "19161#53",
+              "source_hash": "a22524e4c38ca76b07deabeef6aed84488012f00bf78d9f79c7417ff06d3c82e",
+              "source_file": "C:\\dev\\grap-rust\\real-data-law-ro\\19161.json",
+              "offset_basis": "document"
+            }
+          ],
+          "rule_coverage": {
+            "version": "qualified-rules-v1",
+            "units": 2,
+            "unresolved": 0,
+            "nonassertions": 0,
+            "deferred_proposals": 1
+          },
+          "deferred_proposals": [
+            {
+              "kind": "relation",
+              "proposal": {
+                "from": "Aceste sume",
+                "type": "se evidențiază prin",
+                "to": "contul de creditori",
+                "evidence": {
+                  "status": "quoted",
+                  "quote": "Aceste sume se evidențiază prin contul de creditori.",
+                  "start": 0,
+                  "end": 52
+                }
+              },
+              "reason": "requires qualified rule interpretation"
+            }
+          ],
+          "extraction": {
+            "source_text": "Aceste sume se evidențiază prin contul de creditori. + Articolul VI Sumele ce urmează a fi restituite beneficiarilor în condițiile art. III alin. (1) nu se actualizează cu indicele de inflație și nu sunt purtătoare de dobânzi, penalități de întârziere sau majorări de întârziere, după caz. -----",
+            "prompt_version": "document-claims-v5-qualified",
+            "provider": "openai-compat",
+            "model": "grap-legal-gemma4"
+          }
+        }
+      ]
+    },
+    {
+      "case": "semantic-16",
+      "mode": "baseline",
+      "wall_s": 2.676358799999889,
+      "correct_target": true,
+      "failures": [],
+      "calls": [
+        {
+          "purpose": "extraction",
+          "wall_s": 2.6759212000001753,
+          "prompt_sha256": "3dce4fdaa6e4021332c7f68be67c2e30e5d823b1e838a9e1812c7335bd91e790",
+          "prompt_chars": 5158,
+          "raw": "```json\n{\n  \"outcomes\": [\n    {\n      \"name\": \"Aceste sume\",\n      \"requirements\": [],\n      \"evidence\": \"Aceste sume se evidențiază prin contul de creditori.\"\n    },\n    {\n      \"name\": \"Sumele ce urmează a fi restituite beneficiarilor în condițiile art. III alin. (1)\",\n      \"requirements\": [],\n      \"evidence\": \"Sumele ce urmează a fi restituite beneficiarilor în condițiile art. III alin. (1) nu se actualizează cu indicele de inflație și nu sunt purtătoare de dobânzi, penalități de întârziere sau majorări de întârziere, după caz.\"\n    }\n  ],\n  \"relations\": [\n    {\n      \"from\": \"Aceste sume\",\n      \"type\": \"se evidențiază prin\",\n      \"to\": \"contul de creditori\",\n      \"evidence\": \"Aceste sume se evidențiază prin contul de creditori.\"\n    }\n  ],\n  \"units\": {\n    \"u71\": {\n      \"kind\": \"fact\",\n      \"subject\": \"Aceste sume\"\n    },\n    \"u72\": {\n      \"kind\": \"fact\",\n      \"subject\": \"Sumele ce urmează a fi restituite beneficiarilor în condițiile art. III alin. (1)\"\n    }\n  }\n}\n```",
+          "finish_reason": "stop",
+          "total_duration": 2675056600,
+          "load_duration": 3742100,
+          "prompt_eval_duration": 145624000,
+          "eval_duration": 2484982000,
+          "prompt_eval_count": 1137,
+          "eval_count": 339
+        }
+      ],
+      "fragments": [
+        {
+          "source": "19161#53",
+          "outcomes": [
+            {
+              "name": "Aceste sume",
+              "characteristics": [],
+              "evidence": {
+                "status": "quoted",
+                "quote": "Aceste sume se evidențiază prin contul de creditori.",
+                "start": 0,
+                "end": 52
+              }
+            },
+            {
+              "name": "Sumele ce urmează a fi restituite beneficiarilor în condițiile art. III alin. (1)",
+              "characteristics": [],
+              "evidence": {
+                "status": "quoted",
+                "quote": "Sumele ce urmează a fi restituite beneficiarilor în condițiile art. III alin. (1) nu se actualizează cu indicele de inflație și nu sunt purtătoare de dobânzi, penalități de întârziere sau majorări de întârziere, după caz.",
+                "start": 68,
+                "end": 289
+              }
+            },
+            {
+              "name": "contul de creditori",
+              "characteristics": [],
+              "evidence": {
+                "status": "quoted",
+                "quote": "Aceste sume se evidențiază prin contul de creditori.",
+                "start": 0,
+                "end": 52
+              },
+              "origin": "quoted_relation_endpoint"
+            }
+          ],
+          "relations": [],
+          "rejected_class_named": [],
+          "rejected_structural": [],
+          "rejected_class_edges": 0,
+          "rejected_evidence": 0,
+          "qualified_rules": [
+            {
+              "statement": "Aceste sume se evidențiază prin contul de creditori.",
+              "subject": "Aceste sume",
+              "predicate": "",
+              "object": "",
+              "provision": "+ Articolul V",
+              "scope": [],
+              "conditions": [],
+              "exceptions": [],
+              "dates": [],
+              "evidence": [
+                {
+                  "quote": "Aceste sume se evidențiază prin contul de creditori.",
+                  "start": 36972,
+                  "end": 37024
+                }
+              ],
+              "context_evidence": [
+                {
+                  "quote": "+ Articolul V Sumele care fac obiectul restituirii sunt cele provenite din debite constituite anterior sau ulterior datei de 1 ianuarie 2015 și recuperate, total sau parțial, după caz, începând cu data de 1 ianuarie 2015 și până la data de 1 martie 2019. Aceste sume se evidențiază prin contul de creditori. ",
+                  "start": 36717,
+                  "end": 37025
+                }
+              ],
+              "provision_evidence": {
+                "quote": "+ Articolul V",
+                "start": 36717,
+                "end": 36730
+              },
+              "review_status": "proposed",
+              "scope_resolution": "unresolved",
+              "review_issues": [],
+              "subject_evidence": {
+                "quote": "Aceste sume",
+                "start": 36972,
+                "end": 36983
+              },
+              "subject_method": "model-source-quote",
+              "kind": "fact",
+              "extraction_method": "source-statement-classification",
+              "classification_status": "classified",
+              "id": "f9aa058c190d8a8685232509168c0c5c37bdd90b71c1dff0984fda4cbe216d5c",
+              "source": "19161#53",
+              "source_hash": "a22524e4c38ca76b07deabeef6aed84488012f00bf78d9f79c7417ff06d3c82e",
+              "source_file": "C:\\dev\\grap-rust\\real-data-law-ro\\19161.json",
+              "offset_basis": "document"
+            },
+            {
+              "statement": "Sumele ce urmează a fi restituite beneficiarilor în condițiile art. III alin. (1) nu se actualizează cu indicele de inflație și nu sunt purtătoare de dobânzi, penalități de întârziere sau majorări de întârziere, după caz. -----",
+              "subject": "Sumele ce urmează a fi restituite beneficiarilor în condițiile art. III alin. (1)",
+              "predicate": "",
+              "object": "",
+              "provision": "+ Articolul VI",
+              "scope": [],
+              "conditions": [
+                "în condițiile art. III alin. (1) nu se actualizează cu indicele de inflație și nu sunt purtătoare de dobânzi, penalități de întârziere sau majorări de întârziere, după caz. -----"
+              ],
+              "exceptions": [],
+              "dates": [],
+              "evidence": [
+                {
+                  "quote": "Sumele ce urmează a fi restituite beneficiarilor în condițiile art. III alin. (1) nu se actualizează cu indicele de inflație și nu sunt purtătoare de dobânzi, penalități de întârziere sau majorări de întârziere, după caz. -----",
+                  "start": 37040,
+                  "end": 37267
+                }
+              ],
+              "context_evidence": [
+                {
+                  "quote": "+ Articolul VI Sumele ce urmează a fi restituite beneficiarilor în condițiile art. III alin. (1) nu se actualizează cu indicele de inflație și nu sunt purtătoare de dobânzi, penalități de întârziere sau majorări de întârziere, după caz. -----",
+                  "start": 37025,
+                  "end": 37267
+                }
+              ],
+              "provision_evidence": {
+                "quote": "+ Articolul VI",
+                "start": 37025,
+                "end": 37039
+              },
+              "review_status": "proposed",
+              "scope_resolution": "unresolved",
+              "review_issues": [],
+              "subject_evidence": {
+                "quote": "Sumele ce urmează a fi restituite beneficiarilor în condițiile art. III alin. (1)",
+                "start": 37040,
+                "end": 37121
+              },
+              "subject_method": "model-source-quote",
+              "kind": "fact",
+              "extraction_method": "source-statement-classification",
+              "classification_status": "classified",
+              "id": "dd84e778b7fd72a9384623439f1a3e6676fa93870230de2eb8e85014fea41494",
+              "source": "19161#53",
+              "source_hash": "a22524e4c38ca76b07deabeef6aed84488012f00bf78d9f79c7417ff06d3c82e",
+              "source_file": "C:\\dev\\grap-rust\\real-data-law-ro\\19161.json",
+              "offset_basis": "document"
+            }
+          ],
+          "rule_coverage": {
+            "version": "qualified-rules-v1",
+            "units": 2,
+            "unresolved": 0,
+            "nonassertions": 0,
+            "deferred_proposals": 1
+          },
+          "deferred_proposals": [
+            {
+              "kind": "relation",
+              "proposal": {
+                "from": "Aceste sume",
+                "type": "se evidențiază prin",
+                "to": "contul de creditori",
+                "evidence": {
+                  "status": "quoted",
+                  "quote": "Aceste sume se evidențiază prin contul de creditori.",
+                  "start": 0,
+                  "end": 52
+                }
+              },
+              "reason": "requires qualified rule interpretation"
+            }
+          ],
+          "extraction": {
+            "source_text": "Aceste sume se evidențiază prin contul de creditori. + Articolul VI Sumele ce urmează a fi restituite beneficiarilor în condițiile art. III alin. (1) nu se actualizează cu indicele de inflație și nu sunt purtătoare de dobânzi, penalități de întârziere sau majorări de întârziere, după caz. -----",
+            "prompt_version": "document-claims-v5-qualified",
+            "provider": "openai-compat",
+            "model": "grap-legal-gemma4"
+          }
+        }
+      ]
+    },
+    {
+      "case": "semantic-17",
+      "mode": "baseline",
+      "wall_s": 2.754990199999611,
+      "correct_target": true,
+      "failures": [],
+      "calls": [
+        {
+          "purpose": "extraction",
+          "wall_s": 2.7543523999997888,
+          "prompt_sha256": "e0dbf50200f4dd8f8b9e8086b96628369e4808346c591c49ec470133e882819c",
+          "prompt_chars": 5623,
+          "raw": "```json\n{\n  \"outcomes\": [\n    {\n      \"name\": \"Articolul 7\",\n      \"requirements\": [],\n      \"evidence\": \"Articolul 7\"\n    }\n  ],\n  \"relations\": [\n    {\n      \"from\": \"toate societățile comerciale, companiile și societățile naționale, regiile autonome din subordinea F.P.S. sau a ministerelor, precum și instituțiile publice și agențiile subordonate Guvernului\",\n      \"type\": \"au obligația sa pună imediat la dispoziție\",\n      \"to\": \"structurilor locale și centrale ale RICOP toate documentele și informațiile solicitate\",\n      \"evidence\": \"toate societățile comerciale, companiile și societățile naționale, regiile autonome din subordinea F.P.S. sau a ministerelor, precum și instituțiile publice și agențiile subordonate Guvernului au obligația sa pună imediat la dispoziție structurilor locale și centrale ale RICOP toate documentele și informațiile solicitate.\"\n    }\n  ],\n  \"units\": {\n    \"u28\": {\n      \"kind\": \"obligation\",\n      \"subject\": \"toate societățile comerciale, companiile și societățile naționale, regiile autonome din subordinea F.P.S. sau a ministerelor, precum și instituțiile publice și agențiile subordonate Guvernului\"\n    }\n  }\n}\n```",
+          "finish_reason": "stop",
+          "total_duration": 2740828700,
+          "load_duration": 2702200,
+          "prompt_eval_duration": 182682000,
+          "eval_duration": 2511870000,
+          "prompt_eval_count": 1222,
+          "eval_count": 339
+        }
+      ],
+      "fragments": [
+        {
+          "source": "20030#10",
+          "outcomes": [
+            {
+              "name": "toate societățile comerciale, companiile și societățile naționale, regiile autonome din subordinea F.P.S. sau a ministerelor, precum și instituțiile publice și agențiile subordonate Guvernului",
+              "characteristics": [],
+              "evidence": {
+                "status": "quoted",
+                "quote": "toate societățile comerciale, companiile și societățile naționale, regiile autonome din subordinea F.P.S. sau a ministerelor, precum și instituțiile publice și agențiile subordonate Guvernului au obligația sa pună imediat la dispoziție structurilor locale și centrale ale RICOP toate documentele și informațiile solicitate.",
+                "start": 207,
+                "end": 530
+              },
+              "origin": "quoted_relation_endpoint"
+            },
+            {
+              "name": "structurilor locale și centrale ale RICOP toate documentele și informațiile solicitate",
+              "characteristics": [],
+              "evidence": {
+                "status": "quoted",
+                "quote": "toate societățile comerciale, companiile și societățile naționale, regiile autonome din subordinea F.P.S. sau a ministerelor, precum și instituțiile publice și agențiile subordonate Guvernului au obligația sa pună imediat la dispoziție structurilor locale și centrale ale RICOP toate documentele și informațiile solicitate.",
+                "start": 207,
+                "end": 530
+              },
+              "origin": "quoted_relation_endpoint"
+            }
+          ],
+          "relations": [],
+          "rejected_class_named": [],
+          "rejected_structural": [
+            "Articolul 7"
+          ],
+          "rejected_class_edges": 0,
+          "rejected_evidence": 0,
+          "qualified_rules": [
+            {
+              "statement": "Pentru a sprijini actul decizional la nivel local și central, în scopul implementarii eficiente și corecte a RICOP, precum și al corelării măsurilor luate în cadrul acestuia cu obiectivele PSAL, toate societățile comerciale, companiile și societățile naționale, regiile autonome din subordinea F.P.S. sau a ministerelor, precum și instituțiile publice și agențiile subordonate Guvernului au obligația sa pună imediat la dispoziție structurilor locale și centrale ale RICOP toate documentele și informațiile solicitate.",
+              "subject": "toate societățile comerciale, companiile și societățile naționale, regiile autonome din subordinea F.P.S. sau a ministerelor, precum și instituțiile publice și agențiile subordonate Guvernului",
+              "predicate": "",
+              "object": "",
+              "provision": "+ Articolul 7",
+              "scope": [],
+              "conditions": [],
+              "exceptions": [],
+              "dates": [],
+              "evidence": [
+                {
+                  "quote": "Pentru a sprijini actul decizional la nivel local și central, în scopul implementarii eficiente și corecte a RICOP, precum și al corelării măsurilor luate în cadrul acestuia cu obiectivele PSAL, toate societățile comerciale, companiile și societățile naționale, regiile autonome din subordinea F.P.S. sau a ministerelor, precum și instituțiile publice și agențiile subordonate Guvernului au obligația sa pună imediat la dispoziție structurilor locale și centrale ale RICOP toate documentele și informațiile solicitate.",
+                  "start": 7182,
+                  "end": 7700
+                }
+              ],
+              "context_evidence": [
+                {
+                  "quote": "+ Articolul 7 Pentru a sprijini actul decizional la nivel local și central, în scopul implementarii eficiente și corecte a RICOP, precum și al corelării măsurilor luate în cadrul acestuia cu obiectivele PSAL, toate societățile comerciale, companiile și societățile naționale, regiile autonome din subordinea F.P.S. sau a ministerelor, precum și instituțiile publice și agențiile subordonate Guvernului au obligația sa pună imediat la dispoziție structurilor locale și centrale ale RICOP toate documentele și informațiile solicitate. ",
+                  "start": 7168,
+                  "end": 7701
+                }
+              ],
+              "provision_evidence": {
+                "quote": "+ Articolul 7",
+                "start": 7168,
+                "end": 7181
+              },
+              "review_status": "proposed",
+              "scope_resolution": "unresolved",
+              "review_issues": [],
+              "subject_evidence": {
+                "quote": "toate societățile comerciale, companiile și societățile naționale, regiile autonome din subordinea F.P.S. sau a ministerelor, precum și instituțiile publice și agențiile subordonate Guvernului",
+                "start": 7377,
+                "end": 7569
+              },
+              "subject_method": "model-source-quote",
+              "kind": "obligation",
+              "extraction_method": "source-statement-classification",
+              "classification_status": "classified",
+              "id": "b6233efcd6c5d34a00c41d48b2503260dcf2a8d3f5b9ef9bc4b2dab9dee7be04",
+              "source": "20030#10",
+              "source_hash": "f1681eb80924ba5bcb8346f2da90f4ad10e06722c2f7a27ff1d26d7d92f9800f",
+              "source_file": "C:\\dev\\grap-rust\\real-data-law-ro\\20030.json",
+              "offset_basis": "document"
+            }
+          ],
+          "rule_coverage": {
+            "version": "qualified-rules-v1",
+            "units": 1,
+            "unresolved": 0,
+            "nonassertions": 0,
+            "deferred_proposals": 2
+          },
+          "deferred_proposals": [
+            {
+              "kind": "relation",
+              "proposal": {
+                "from": "toate societățile comerciale, companiile și societățile naționale, regiile autonome din subordinea F.P.S. sau a ministerelor, precum și instituțiile publice și agențiile subordonate Guvernului",
+                "type": "au obligația sa pună imediat la dispoziție",
+                "to": "structurilor locale și centrale ale RICOP toate documentele și informațiile solicitate",
+                "evidence": {
+                  "status": "quoted",
+                  "quote": "toate societățile comerciale, companiile și societățile naționale, regiile autonome din subordinea F.P.S. sau a ministerelor, precum și instituțiile publice și agențiile subordonate Guvernului au obligația sa pună imediat la dispoziție structurilor locale și centrale ale RICOP toate documentele și informațiile solicitate.",
+                  "start": 207,
+                  "end": 530
+                }
+              },
+              "reason": "requires qualified rule interpretation"
+            },
+            {
+              "kind": "outcome",
+              "proposal": {
+                "name": "Articolul 7",
+                "requirements": [],
+                "evidence": "Articolul 7"
+              },
+              "reason": "article reference is not an entity identity"
+            }
+          ],
+          "extraction": {
+            "source_text": "Articolul 7 Pentru a sprijini actul decizional la nivel local și central, în scopul implementarii eficiente și corecte a RICOP, precum și al corelării măsurilor luate în cadrul acestuia cu obiectivele PSAL, toate societățile comerciale, companiile și societățile naționale, regiile autonome din subordinea F.P.S. sau a ministerelor, precum și instituțiile publice și agențiile subordonate Guvernului au obligația sa pună imediat la dispoziție structurilor locale și centrale ale RICOP toate documentele și informațiile solicitate. +",
+            "prompt_version": "document-claims-v5-qualified",
+            "provider": "openai-compat",
+            "model": "grap-legal-gemma4"
+          }
+        }
+      ]
+    },
+    {
+      "case": "semantic-17",
+      "mode": "compact",
+      "wall_s": 2.7735545999998976,
+      "correct_target": true,
+      "failures": [],
+      "calls": [
+        {
+          "purpose": "extraction",
+          "wall_s": 2.7731567999999243,
+          "prompt_sha256": "fe64c2cf7ae8276357750c346f5d3530c5bf2fbb81cdb465da6d8fc1fe18ec74",
+          "prompt_chars": 5787,
+          "raw": "```json\n{\n  \"outcomes\": [\n    {\n      \"name\": \"Articolul 7\",\n      \"requirements\": [],\n      \"evidence\": \"Articolul 7\"\n    }\n  ],\n  \"relations\": [\n    {\n      \"from\": \"toate societățile comerciale, companiile și societățile naționale, regiile autonome din subordinea F.P.S. sau a ministerelor, precum și instituțiile publice și agențiile subordonate Guvernului\",\n      \"type\": \"au obligația sa pună imediat la dispoziție\",\n      \"to\": \"structurilor locale și centrale ale RICOP toate documentele și informațiile solicitate\",\n      \"evidence\": \"toate societățile comerciale, companiile și societățile naționale, regiile autonome din subordinea F.P.S. sau a ministerelor, precum și instituțiile publice și agențiile subordonate Guvernului au obligația sa pună imediat la dispoziție structurilor locale și centrale ale RICOP toate documentele și informațiile solicitate.\"\n    }\n  ],\n  \"units\": {\n    \"u28\": {\n      \"kind\": \"obligation\",\n      \"subject\": \"toate societățile comerciale, companiile și societățile naționale, regiile autonome din subordinea F.P.S. sau a ministerelor, precum și instituțiile publice și agențiile subordonate Guvernului\"\n    }\n  }\n}\n```",
+          "finish_reason": "stop",
+          "total_duration": 2761744200,
+          "load_duration": 2637400,
+          "prompt_eval_duration": 165248000,
+          "eval_duration": 2545075000,
+          "prompt_eval_count": 1249,
+          "eval_count": 339
+        }
+      ],
+      "fragments": [
+        {
+          "source": "20030#10",
+          "outcomes": [
+            {
+              "name": "toate societățile comerciale, companiile și societățile naționale, regiile autonome din subordinea F.P.S. sau a ministerelor, precum și instituțiile publice și agențiile subordonate Guvernului",
+              "characteristics": [],
+              "evidence": {
+                "status": "quoted",
+                "quote": "toate societățile comerciale, companiile și societățile naționale, regiile autonome din subordinea F.P.S. sau a ministerelor, precum și instituțiile publice și agențiile subordonate Guvernului au obligația sa pună imediat la dispoziție structurilor locale și centrale ale RICOP toate documentele și informațiile solicitate.",
+                "start": 207,
+                "end": 530
+              },
+              "origin": "quoted_relation_endpoint"
+            },
+            {
+              "name": "structurilor locale și centrale ale RICOP toate documentele și informațiile solicitate",
+              "characteristics": [],
+              "evidence": {
+                "status": "quoted",
+                "quote": "toate societățile comerciale, companiile și societățile naționale, regiile autonome din subordinea F.P.S. sau a ministerelor, precum și instituțiile publice și agențiile subordonate Guvernului au obligația sa pună imediat la dispoziție structurilor locale și centrale ale RICOP toate documentele și informațiile solicitate.",
+                "start": 207,
+                "end": 530
+              },
+              "origin": "quoted_relation_endpoint"
+            }
+          ],
+          "relations": [],
+          "rejected_class_named": [],
+          "rejected_structural": [
+            "Articolul 7"
+          ],
+          "rejected_class_edges": 0,
+          "rejected_evidence": 0,
+          "qualified_rules": [
+            {
+              "statement": "Pentru a sprijini actul decizional la nivel local și central, în scopul implementarii eficiente și corecte a RICOP, precum și al corelării măsurilor luate în cadrul acestuia cu obiectivele PSAL, toate societățile comerciale, companiile și societățile naționale, regiile autonome din subordinea F.P.S. sau a ministerelor, precum și instituțiile publice și agențiile subordonate Guvernului au obligația sa pună imediat la dispoziție structurilor locale și centrale ale RICOP toate documentele și informațiile solicitate.",
+              "subject": "toate societățile comerciale, companiile și societățile naționale, regiile autonome din subordinea F.P.S. sau a ministerelor, precum și instituțiile publice și agențiile subordonate Guvernului",
+              "predicate": "",
+              "object": "",
+              "provision": "+ Articolul 7",
+              "scope": [],
+              "conditions": [],
+              "exceptions": [],
+              "dates": [],
+              "evidence": [
+                {
+                  "quote": "Pentru a sprijini actul decizional la nivel local și central, în scopul implementarii eficiente și corecte a RICOP, precum și al corelării măsurilor luate în cadrul acestuia cu obiectivele PSAL, toate societățile comerciale, companiile și societățile naționale, regiile autonome din subordinea F.P.S. sau a ministerelor, precum și instituțiile publice și agențiile subordonate Guvernului au obligația sa pună imediat la dispoziție structurilor locale și centrale ale RICOP toate documentele și informațiile solicitate.",
+                  "start": 7182,
+                  "end": 7700
+                }
+              ],
+              "context_evidence": [
+                {
+                  "quote": "+ Articolul 7 Pentru a sprijini actul decizional la nivel local și central, în scopul implementarii eficiente și corecte a RICOP, precum și al corelării măsurilor luate în cadrul acestuia cu obiectivele PSAL, toate societățile comerciale, companiile și societățile naționale, regiile autonome din subordinea F.P.S. sau a ministerelor, precum și instituțiile publice și agențiile subordonate Guvernului au obligația sa pună imediat la dispoziție structurilor locale și centrale ale RICOP toate documentele și informațiile solicitate. ",
+                  "start": 7168,
+                  "end": 7701
+                }
+              ],
+              "provision_evidence": {
+                "quote": "+ Articolul 7",
+                "start": 7168,
+                "end": 7181
+              },
+              "review_status": "proposed",
+              "scope_resolution": "unresolved",
+              "review_issues": [],
+              "subject_evidence": {
+                "quote": "toate societățile comerciale, companiile și societățile naționale, regiile autonome din subordinea F.P.S. sau a ministerelor, precum și instituțiile publice și agențiile subordonate Guvernului",
+                "start": 7377,
+                "end": 7569
+              },
+              "subject_method": "model-source-quote",
+              "kind": "obligation",
+              "extraction_method": "source-statement-classification",
+              "classification_status": "classified",
+              "id": "b6233efcd6c5d34a00c41d48b2503260dcf2a8d3f5b9ef9bc4b2dab9dee7be04",
+              "source": "20030#10",
+              "source_hash": "f1681eb80924ba5bcb8346f2da90f4ad10e06722c2f7a27ff1d26d7d92f9800f",
+              "source_file": "C:\\dev\\grap-rust\\real-data-law-ro\\20030.json",
+              "offset_basis": "document"
+            }
+          ],
+          "rule_coverage": {
+            "version": "qualified-rules-v1",
+            "units": 1,
+            "unresolved": 0,
+            "nonassertions": 0,
+            "deferred_proposals": 2
+          },
+          "deferred_proposals": [
+            {
+              "kind": "relation",
+              "proposal": {
+                "from": "toate societățile comerciale, companiile și societățile naționale, regiile autonome din subordinea F.P.S. sau a ministerelor, precum și instituțiile publice și agențiile subordonate Guvernului",
+                "type": "au obligația sa pună imediat la dispoziție",
+                "to": "structurilor locale și centrale ale RICOP toate documentele și informațiile solicitate",
+                "evidence": {
+                  "status": "quoted",
+                  "quote": "toate societățile comerciale, companiile și societățile naționale, regiile autonome din subordinea F.P.S. sau a ministerelor, precum și instituțiile publice și agențiile subordonate Guvernului au obligația sa pună imediat la dispoziție structurilor locale și centrale ale RICOP toate documentele și informațiile solicitate.",
+                  "start": 207,
+                  "end": 530
+                }
+              },
+              "reason": "requires qualified rule interpretation"
+            },
+            {
+              "kind": "outcome",
+              "proposal": {
+                "name": "Articolul 7",
+                "requirements": [],
+                "evidence": "Articolul 7"
+              },
+              "reason": "article reference is not an entity identity"
+            }
+          ],
+          "extraction": {
+            "source_text": "Articolul 7 Pentru a sprijini actul decizional la nivel local și central, în scopul implementarii eficiente și corecte a RICOP, precum și al corelării măsurilor luate în cadrul acestuia cu obiectivele PSAL, toate societățile comerciale, companiile și societățile naționale, regiile autonome din subordinea F.P.S. sau a ministerelor, precum și instituțiile publice și agențiile subordonate Guvernului au obligația sa pună imediat la dispoziție structurilor locale și centrale ale RICOP toate documentele și informațiile solicitate. +",
+            "prompt_version": "document-claims-v5-qualified",
+            "provider": "openai-compat",
+            "model": "grap-legal-gemma4"
+          }
+        }
+      ]
+    }
+  ]
+}
