@@ -21,16 +21,23 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 class ProfileProvider(OpenAICompatProvider):
-    def __init__(self, model):
+    def __init__(self, model, options=None, think=False):
         super().__init__(model=model, extra_body={"reasoning_effort": "none"}, timeout=180)
         self.calls = []
         self.max_tokens = 2048
         self.retries = 0
+        self.runtime_options = dict(options or {})
+        self.think = think
+
+    def generation_config(self):
+        return {"model": self.model, "think": self.think,
+                "native_options": {"temperature": 0, "seed": 42, "num_predict": self.max_tokens,
+                                   **self.runtime_options}}
 
     def complete(self, system, user):
-        payload = {"model": self.model, "stream": False, "think": False,
+        payload = {"model": self.model, "stream": False, "think": self.think,
                    "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
-                   "options": {"temperature": 0, "seed": 42, "num_predict": self.max_tokens}}
+                   "options": {"temperature": 0, "seed": 42, "num_predict": self.max_tokens, **self.runtime_options}}
         response_format = self.extra_body.get("response_format", {})
         if response_format.get("type") == "json_schema":
             payload["format"] = response_format["json_schema"]["schema"]
@@ -44,6 +51,8 @@ class ProfileProvider(OpenAICompatProvider):
                "prompt_sha256": hashlib.sha256((system + "\0" + user).encode()).hexdigest(),
                "prompt_chars": len(system) + len(user), "raw": body["message"]["content"],
                "finish_reason": body.get("done_reason"),
+               "options": payload["options"], "think": self.think,
+               "thinking_characters": len(body["message"].get("thinking", "")),
                **{key: body.get(key) for key in ("total_duration", "load_duration", "prompt_eval_duration", "eval_duration", "prompt_eval_count", "eval_count")}}
         self.calls.append(row)
         _check_finish_reason({"finish_reason": body.get("done_reason")})
