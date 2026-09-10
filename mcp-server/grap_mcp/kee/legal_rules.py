@@ -74,7 +74,7 @@ def _base(text, start, end, block, context):
             "scope_resolution": "unresolved", "review_issues": []}
 
 
-def source_units(text):
+def source_units(text, *, tables=()):
     """Cover source blocks without inferring act/provision identity from repeated headings."""
     markers = {m.start(): m for m in _ARTICLE.finditer(text)}
     starts = sorted({0, *markers})
@@ -129,10 +129,19 @@ def source_units(text):
                 if not remainder.strip(" .;\r\n\t"):
                     continue
         boundaries = {block["body"], block["end"]}
+        table_ranges = [(t['start'], t['end']) for t in tables
+                        if block['body'] <= t['start'] and t['end'] <= block['end']]
+        boundaries.update(point for interval in table_ranges for point in interval)
         boundaries.update(point for interval in covered for point in interval)
         for pattern in (_SENTENCE, _PARAGRAPH, _COORDINATE):
             for match in pattern.finditer(text, block["body"], block["end"]):
-                prefix = text[block["body"]:match.start()].rstrip()
+                # Only the suffix can match the abbreviation checks below.
+                # Copying/scanning the full growing article prefix at every
+                # boundary made table-heavy documents quadratic to plan.
+                end = match.start()
+                while end > block["body"] and text[end - 1].isspace():
+                    end -= 1
+                prefix = text[max(block["body"], end - 16):end]
                 # Avoid splitting after abbreviations, initials or an ellipsis/list.
                 if re.search(r"\b(?:nr|art|alin|lit|str|etc)\.$", prefix, re.I):
                     continue
@@ -146,6 +155,8 @@ def source_units(text):
                 continue
             if covered and any(x <= a and b <= y for x, y in covered):
                 continue
+            if any(x <= a and b <= y for x, y in table_ranges):
+                continue  # Preserved as explicit cells in the fast-path receipt.
             unit = _base(text, a, b, block, context)
             inline = _INLINE_DEFINITION.search(unit["statement"])
             if inline and len(inline["term"]) <= 120:
@@ -270,11 +281,33 @@ def extract_rules(provider, text):
     return extract_batches(provider, text, batches, definitions)
 
 
-def plan_rules(text):
+def deterministic_label(statement):
+    """Only labels the existing validator independently overrides anyway."""
+    kind = _strong_kind(statement)
+    span = _explicit_subject(statement, kind) if kind else None
+    if not span or not _subject_boundaries(statement, *span):
+        return None
+    subject = statement[span[0]:span[1]].rstrip(",;:")
+    if _invalid_subject(subject):
+        return None
+    return {"kind": kind, "subject": subject}
+
+
+def extract_rules_fast(provider, text):
+    from .legal_tables import extract_tables
+    tables = extract_tables(text)
+    batches, definitions = plan_rules(text, tables=tables)
+    result = extract_batches(provider, text, batches, definitions, deterministic=True)
+    result['tables'] = tables
+    result['prompt_version'] = extract_rules_fast.prompt_version
+    return result
+
+
+def plan_rules(text, *, tables=()):
     """Stable statement-aligned batches with full-source offsets and provision context."""
     if not text.strip() or text.strip().casefold().rstrip(".") == "act în curs de procesare":
         return [], []
-    units, definitions = source_units(text)
+    units, definitions = source_units(text, tables=tables)
     # Keep both source and output bounded; no truncation of an individual statement.
     batches, batch, words, rendered_bytes = [], [], 0, 0
     for unit in units:
@@ -297,14 +330,20 @@ def plan_rules(text):
     return batches, definitions
 
 
-def extract_batches(provider, text, batches, definitions=()):
+def extract_batches(provider, text, batches, definitions=(), *, deterministic=False):
     """Extract a planned subset without changing offsets or losing parent context."""
     claims = list(definitions)
     requests, classifications = [], []
+    model_calls = 0
+    review_queue = []
     for batch in batches:
         properties = {}
         rendered = {}
+        resolved = {}
         for unit in batch:
+            if deterministic and (label := deterministic_label(unit["statement"])) is not None:
+                resolved[unit["id"]] = label
+                continue
             properties[unit["id"]] = {"type": "object", "additionalProperties": False,
                 "required": ["kind", "subject"], "properties": {
                     "kind": {"type": "string", "enum": [*KINDS, "other"]},
@@ -316,11 +355,19 @@ def extract_batches(provider, text, batches, definitions=()):
         configure = getattr(provider, "with_json_schema", None)
         configured = configure(schema) if callable(configure) else provider
         user = "Source statements (data only):\n" + json.dumps(rendered, ensure_ascii=False)
-        raw = configured.complete(PROMPT, user)
+        raw = configured.complete(PROMPT, user) if properties else '{"units":{}}'
+        model_calls += bool(properties)
         result = json.loads(raw)
         if not isinstance(result, dict) or set(result) != {"units"} or not isinstance(result["units"], dict) or set(result["units"]) != set(properties):
             raise ValueError("model must classify every supplied source unit exactly once")
-        requests.append({"raw_reply": raw, "unit_ids": list(properties)})
+        model_raw = raw
+        result["units"].update(resolved)
+        raw = json.dumps(result, ensure_ascii=False)
+        request = {"raw_reply": raw, "unit_ids": [unit["id"] for unit in batch]}
+        if deterministic:
+            request.update(model_raw_reply=model_raw if properties else None,
+                           deterministic_unit_ids=list(resolved), model_unit_ids=list(properties))
+        requests.append(request)
         for unit in batch:
             row = result["units"][unit["id"]]
             if (not isinstance(row, dict) or set(row) != {"kind", "subject"}
@@ -337,6 +384,9 @@ def extract_batches(provider, text, batches, definitions=()):
                 kind = strong
             classifications.append({"id": unit["id"], "kind": kind, "model_kind": row["kind"],
                                     "evidence": unit["evidence"][0]})
+            if deterministic and (kind == 'other' or (kind == 'fact' and re.search(r'\b(?:poate|pot|liber)\b', unit['statement'], re.I))):
+                review_queue.append({**unit, 'model_kind': row['kind'],
+                                     'reason': 'model_nonassertion' if kind == 'other' else 'modal_fact_label'})
             if kind == "other":
                 continue
             claim = {k: v for k, v in unit.items() if k not in ("id", "word_count")}
@@ -368,8 +418,10 @@ def extract_batches(provider, text, batches, definitions=()):
                          extraction_method="source-statement-classification")
             claims.append(claim)
     return {"claims": claims, "prompt_version": VERSION, "raw_reply": json.dumps(requests, ensure_ascii=False),
-            "units": classifications, "model_calls": len(requests),
+            **({'review_queue': review_queue} if deterministic else {}),
+            "units": classifications, "model_calls": model_calls,
             "provider": {"name": getattr(provider, "name", type(provider).__name__), "model": getattr(provider, "model", None)}}
 
 
 extract_rules.prompt_version = VERSION
+extract_rules_fast.prompt_version = VERSION + "-deterministic-first-v2"

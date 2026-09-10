@@ -228,9 +228,11 @@ class LegalClaimStore:
                 (digest, reason, source_id, attempt_id)).rowcount == 1
 
     def _resume_rules(self, source_id, attempt_id, digest, file, text, provider, budget, refresh):
-        from .legal_rules import plan_rules, extract_batches
+        from .legal_rules import plan_rules, extract_batches, extract_rules_fast
 
-        batches, definitions = plan_rules(text)
+        from .legal_tables import extract_tables
+        tables = extract_tables(text) if self.extractor is extract_rules_fast else []
+        batches, definitions = plan_rules(text, tables=tables)
         # Persist only a hash of generation configuration, never credentials.
         provider_key = _hash(_json({"provider": {key: getattr(provider, key, None) for key in
             ("name", "model", "base_url", "temperature", "max_tokens", "extra_body")},
@@ -266,7 +268,7 @@ class LegalClaimStore:
                                    (source_id, attempt_id)).fetchone():
                 raise RuntimeError("extraction superseded before batch")
             budget["attempted"] += 1
-            part = extract_batches(provider, text, [batch])
+            part = extract_batches(provider, text, [batch], deterministic=self.extractor is extract_rules_fast)
             if hashlib.sha256(file.read_bytes()).hexdigest() != digest:
                 raise ValueError("source changed during extraction; resume the new source")
             with self.db:
@@ -291,10 +293,14 @@ class LegalClaimStore:
                     raise RuntimeError("extraction superseded before pause")
             return None
         receipt = extract_batches(provider, text, [], definitions)
+        receipt['prompt_version'] = self.prompt_version
+        if self.extractor is extract_rules_fast:
+            receipt['tables'] = tables
+            receipt['review_queue'] = [unit for part in parts for unit in part.get('review_queue', [])]
         receipt["claims"].extend(claim for part in parts for claim in part["claims"])
         receipt["units"] = [unit for part in parts for unit in part["units"]]
         receipt["raw_reply"] = _json([request for part in parts for request in json.loads(part["raw_reply"])])
-        receipt["model_calls"] = len(parts)
+        receipt["model_calls"] = sum(part["model_calls"] for part in parts)
         receipt["completion"] = {"strategy": "statement-batches-v1", "work_id": work_id,
             "source_sha256": digest, "total_batches": len(batches), "completed_batches": len(parts)}
         return receipt
@@ -318,10 +324,10 @@ class LegalClaimStore:
         if max_files < 0 or max_chars < 1:
             raise ValueError("max_files must be nonnegative and max_chars positive")
         if max_batches is not None:
-            from .legal_rules import extract_rules
+            from .legal_rules import extract_rules, extract_rules_fast
             if type(max_batches) is not int or max_batches < 0:
                 raise ValueError("max_batches must be a nonnegative integer or None")
-            if self.extractor is not extract_rules:
+            if self.extractor not in (extract_rules, extract_rules_fast):
                 raise ValueError("resumable batches require the source-statement extractor")
         budget = {"limit": max_batches, "attempted": 0, "completed": 0, "reused": 0}
         root = Path(path).resolve()
@@ -573,6 +579,7 @@ class LegalClaimStore:
             LEFT JOIN claims c ON c.revision_id=r.revision_id WHERE s.status='ready'
             ORDER BY r.revision_id, c.claim_id""")
         receipts = {}
+        table_rows = 0
         for row in rows:
             revision_id = row["revision_id"]
             if revision_id not in sources:
@@ -582,6 +589,19 @@ class LegalClaimStore:
                                                    label="legal-source:" + revision_id)
                 receipts[revision_id] = {k: v for k, v in receipt.items() if k != "raw_reply"} | {
                     "revision_id": revision_id, "source_node_id": sources[revision_id]}
+                for index, unit in enumerate(receipt.get('review_queue', [])):
+                    pending_node = kg.add_node(text=_json(unit), label=f'legal-review:{revision_id}:{index}')
+                    kg.add_edge(pending_node, sources[revision_id], 1.0,
+                                {'relation_type': 'needs_classification_review', 'review_status': 'unresolved'})
+                for index, table in enumerate(receipt.get('tables', [])):
+                    table_node = kg.add_node(text=_json({k: v for k, v in table.items() if k not in ('rows', 'tsv')}),
+                                             label=f'legal-table:{revision_id}:{index}')
+                    kg.add_edge(table_node, sources[revision_id], 1.0, {'relation_type': 'table_in_source'})
+                    for ordinal, cells in enumerate(table['rows']):
+                        node = kg.add_node(text=_json({'cells': cells, 'row': ordinal,
+                            'interpretation': table['interpretation']}), label=f'legal-table-row:{revision_id}:{index}:{ordinal}')
+                        kg.add_edge(node, table_node, 1.0, {'relation_type': 'row_in_table'})
+                        table_rows += 1
             if row["claim_id"] is None:
                 continue
             claim = json.loads(row["claim_record"])
@@ -592,6 +612,7 @@ class LegalClaimStore:
                              "source_id": row["source_id"], "node_id": nid})
         kg.save_to_dir(str(path / "graph"))
         result = {"graph_path": str(path / "graph"), "claims": len(manifest), "sources": len(sources),
+                  "table_rows": table_rows,
                   "created_at": datetime.now(timezone.utc).isoformat(), "coverage": self.coverage(),
                   "meaning": "Snapshot of proposed claims; does not establish current law. Re-export after ingestion."}
         (path / "legal-claims.json").write_text(_json({"snapshot": result, "claims": manifest,
