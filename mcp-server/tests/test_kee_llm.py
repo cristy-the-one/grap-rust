@@ -79,6 +79,7 @@ def test_structured_extraction_does_not_change_shared_provider(monkeypatch):
     assert payloads[0]["response_format"]["json_schema"]["schema"] == extract.OUTPUT_SCHEMA
     assert payloads[0]["reasoning_effort"] == "none"
     assert frag["extraction"]["response_format"] == "json_schema"
+    assert frag["extraction"]["generation_config"]["temperature"] == 0.0
     provider.complete("An unrelated task", "Reply freely")
     assert "response_format" not in payloads[1]
     monkeypatch.delenv("GRAP_KEE_STRUCTURED_OUTPUT")

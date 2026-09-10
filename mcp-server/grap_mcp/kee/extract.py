@@ -534,6 +534,10 @@ def parse_reply(raw, source: str, text: str, provider, rule_context=None) -> Tup
     frag["extraction"] = {"source_text": text, "prompt_version": PROMPT_VERSION,
                           "provider": getattr(provider, "name", type(provider).__qualname__),
                           "model": getattr(provider, "model", None)}
+    configuration = getattr(provider, "generation_config", None)
+    if callable(configuration):
+        frag["extraction"]["generation_config"] = configuration()
+        frag["extraction"]["model"] = frag["extraction"]["generation_config"].get("model", frag["extraction"]["model"])
     response_format = getattr(provider, "extra_body", {}).get("response_format")
     if response_format:
         # Receipts identify the mode without repeating the entire schema per chunk.

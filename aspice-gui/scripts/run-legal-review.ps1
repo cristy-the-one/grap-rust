@@ -1,7 +1,8 @@
 param(
     [int]$Port = 8766,
     [string]$Workspace,
-    [switch]$LocalLegalProfile
+    [switch]$LocalLegalProfile,
+    [switch]$WarmModels
 )
 $ErrorActionPreference = 'Stop'
 $GuiRoot = Split-Path $PSScriptRoot -Parent
@@ -21,6 +22,11 @@ if ($LocalLegalProfile) {
     $env:GRAP_EMBED_MODEL = 'bge-m3'
     $env:GRAP_KEE_STRUCTURED_OUTPUT = '1'
     Write-Host 'Local legal profile: Gemma + BGE-M3; structured source-grounded extraction'
+}
+if ($WarmModels) {
+    if (-not $LocalLegalProfile) { throw '-WarmModels requires -LocalLegalProfile so the warmed models match this server.' }
+    & $Python -m grap_mcp.kee.warmup --model $env:GRAP_LLM_MODEL --embedding-model $env:GRAP_EMBED_MODEL
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 }
 Write-Host "Legal source review -> http://127.0.0.1:$Port/legal-review"
 Write-Host "Workspace: $env:GRAP_WORKSPACE"

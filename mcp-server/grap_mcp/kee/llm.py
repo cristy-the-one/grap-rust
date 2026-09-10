@@ -168,6 +168,17 @@ class OpenAICompatProvider:
             payload.update(self.extra_body)
         return payload
 
+    def generation_config(self) -> dict:
+        """Actual client generation fields after overrides, not server defaults.
+
+        Excludes credentials, messages and arbitrary extra-body data. Runtime
+        defaults and model weights must be recorded separately by evaluations.
+        """
+        payload = self._payload("", "", stream=False)
+        keys = ("model", "temperature", "top_p", "seed", "max_tokens",
+                "frequency_penalty", "presence_penalty", "reasoning_effort")
+        return {key: copy.deepcopy(payload[key]) for key in keys if key in payload}
+
     def complete(self, system: str, user: str) -> str:
         url = f"{self.base_url}/chat/completions"
         data = json.dumps(self._payload(system, user, stream=False)).encode("utf-8")
