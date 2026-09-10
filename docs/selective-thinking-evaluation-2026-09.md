@@ -1,5 +1,8 @@
 # Selective thinking for legal repairs
 
+Follow-up: [dependency-aware revisit](runtime-revisit-2026-09.md) repeats this
+comparison with current validation and fresh as well as historical first outputs.
+
 ## Decision
 
 Do not enable selective thinking in production on this evidence. It increased

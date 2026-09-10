@@ -1,0 +1,1791 @@
+{
+  "model": "grap-legal-gemma4",
+  "prompt_file_sha256": "54338a33310ff814ad69952f09113a302784a4c8021761494eb47aef957d6775",
+  "mode": "screen",
+  "provenance": {
+    "python": "3.13.14",
+    "code_sha256": {
+      "mcp-server/grap_mcp/kee/__init__.py": "07421a828213edbe0ff0535d17737a0cd9ee7d5a8cc940ab1eba0d1184c044f7",
+      "mcp-server/grap_mcp/kee/chunking.py": "a72478c3629d115fb9d28892d7746e392bce9b2640771badbe630fc0d7f467dc",
+      "mcp-server/grap_mcp/kee/distill.py": "64b5116f4a96863741de89a58277cf1119ca1211aaef9604c1cf13cbe764b9b3",
+      "mcp-server/grap_mcp/kee/embeddings.py": "aa2af282aa4aa08b61423141e9b9c7fc1179376c45e1ba8555193912d936de5e",
+      "mcp-server/grap_mcp/kee/extract.py": "a135cdbdd3c339299857b79f94eaa816e6790076105737638b5a446d3858890a",
+      "mcp-server/grap_mcp/kee/extract_quality.py": "3b919e8b93ce7364025f17e9d66a36518399061fcb70078dc598170fa92a78a3",
+      "mcp-server/grap_mcp/kee/graph_extract.py": "daa68e168934c0b04a064a4f75024062c4bd900ce2f73aaa00c04a0ac33e9c04",
+      "mcp-server/grap_mcp/kee/graph_store.py": "761d1e585759df78cade949ef68a56fe2624b8035923a552e868afa11f38a5db",
+      "mcp-server/grap_mcp/kee/legal.py": "92230ecfed83fbbc737d560ba1a86436681d5f0fcaae4b075c0251b92a4b1191",
+      "mcp-server/grap_mcp/kee/legal_claims.py": "727848fafbcc6d97bc1c0ed553b5fe23f76f6e336d428bc4652e01890169bf36",
+      "mcp-server/grap_mcp/kee/legal_review.py": "2ba9551f171b3ac9938bf863f4c1b9baa10a17de4af949a508a9e08430a4a815",
+      "mcp-server/grap_mcp/kee/legal_rules.py": "7559f4ade2b1206eb9f7f63ed86d75867f8a79f805304de60c7d17251bae3841",
+      "mcp-server/grap_mcp/kee/llm.py": "e664bcffce1026bc198223e76000b3a0424618b7aea3dbb27d1bfdb4a112019c",
+      "mcp-server/grap_mcp/kee/pipeline.py": "efb0e25db081b74677809f0540b2b37397723a8a8ab273e3b8b6b8f8219b024e",
+      "mcp-server/grap_mcp/kee/qualified.py": "fcacca9ae842c0b069f0386e8c662733351ed5b40cebc5c5d9acc70c8b57bcee",
+      "mcp-server/grap_mcp/kee/reconcile.py": "134f2609e84d9dac8723bf45f37e3099ec6f74e7a2fe23d10519a236d9a69a48",
+      "mcp-server/grap_mcp/kee/registry.py": "c832a6c2f2d2116d82de4538ca689fce2693ec83036a5d1724ad8ace54aa721a",
+      "mcp-server/grap_mcp/kee/tabular.py": "3305a56fe97f7fcb259cba6c7ea1a197af6056181f6ce21e0cd94184a596eada",
+      "mcp-server/grap_mcp/kee/validate.py": "0cc592fc2ff184566ad476c0f4bb371dfafb3d34c6fa3531bdf166d5e985f2d1",
+      "mcp-server/grap_mcp/kee/warmup.py": "22934b6211166b0345d3452b1b19cdb2f543efffd37de6fcd872360fd4cffb33",
+      "mcp-server/grap_mcp/kee/working_graph.py": "78c7ae9fc16038c3d49f93c17e77e7f3d89dfe9b476731ff730628d981a013b9",
+      "docs/experiments/runtime_provenance.py": "8c81ca133c1de74f649826fa921cb040b52ef05ec5d9020fec042dc49e0b7b46",
+      "docs/experiments/profile_llm_ingestion.py": "8068b346f4fcd7b610693a751c76f0ca93ae63620158a627f482395aadc14883",
+      "docs/experiments/evaluate_gemma_runtime.py": "08229d1d197870d69f8007046a87bde6f504c3589b44ec9f78c38d3b16f4c339",
+      "docs/experiments/evaluate_selective_thinking.py": "af4c47f81e9db049c6fc119f75c8364e20cc4127e6ec384cccc9c8314bad8c9f"
+    },
+    "code_fingerprint": "071b9833add951df5ab0bb5421f95c49c91d4e9fb9a1fd7bcfb0436b4818fcb1",
+    "version": {
+      "version": "0.33.3"
+    },
+    "tags": [
+      {
+        "name": "grap-legal-qwen9b:latest",
+        "digest": "2e397889ee4f0fb677c29438cacb02108d3a7c2109fc85108e68710623ef9b15"
+      },
+      {
+        "name": "grap-legal-gemma4:latest",
+        "digest": "75afe35a779b9f5c3d7cee8346478f36bb7bb6e63c0c35d13f4894fc4fec2ec1"
+      },
+      {
+        "name": "thinkingcap-qwen36-27b:latest",
+        "digest": "d3912745176e2d9a430560e4ec6a4e08f04b3b2a287bd75432b4730fd7652fa4"
+      },
+      {
+        "name": "qwen3.5:4b-q8_0",
+        "digest": "8722f47c2791e6554c3244d2444b433c6241eed92d2093b53ef105626a6dcb36"
+      },
+      {
+        "name": "qwen3-embedding:0.6b",
+        "digest": "ac6da0dfba84a81fdbfbaf330198c33cd77c4cdfc53e8bc50eb581914a15621d"
+      },
+      {
+        "name": "gpt-oss:20b",
+        "digest": "17052f91a42e97930aa6e28a6c6c06a983e6a58dbb00434885a0cf5313e376f7"
+      },
+      {
+        "name": "qwen3.5:9b-q4_K_M",
+        "digest": "6488c96fa5faab64bb65cbd30d4289e20e6130ef535a93ef9a49f42eda893ea7"
+      },
+      {
+        "name": "vibethinker-3b:latest",
+        "digest": "b3871e2699a95fda5315ae345e793bd3ff312647fe072b94ba3229a594d23f7a"
+      },
+      {
+        "name": "qwen2.5:32b-instruct-q4_K_M",
+        "digest": "9f13ba1299afea09d9a956fc6a85becc99115a6d596fae201a5487a03bdc4368"
+      },
+      {
+        "name": "llama3.1:8b-instruct-q4_K_M",
+        "digest": "46e0c10c039e019119339687c3c1757cc81b9da49709a3b3924863ba87ca666e"
+      },
+      {
+        "name": "gemma2:9b",
+        "digest": "ff02c3702f322b9e075e9568332d96c0a7028002f1a5a056e0a6784320a4db0b"
+      },
+      {
+        "name": "bge-m3:latest",
+        "digest": "7907646426070047a77226ac3e684fbbe8410524f7b4a74d02837e43f2146bab"
+      },
+      {
+        "name": "qwen2.5:14b-instruct-q4_K_M",
+        "digest": "7cdf5a0187d5c58cc5d369b255592f7841d1c4696d45a8c8a9489440385b22f6"
+      },
+      {
+        "name": "gemma4:latest",
+        "digest": "c6eb396dbd5992bbe3f5cdb947e8bbc0ee413d7c17e2beaae69f5d569cf982eb"
+      }
+    ]
+  },
+  "rows": [
+    {
+      "config": "greedy",
+      "condition": "resident",
+      "seed": 42,
+      "case": "semantic-02",
+      "wall_s": 20.20625309999741,
+      "first_pass": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "executorul bancar",
+          "Răspunderea civilă a executorului bancar",
+          "obligaţiilor sale profesionale",
+          "Asigurarea de răspundere profesională a executorului bancar",
+          "băncii",
+          "regulamentul intern al băncii",
+          "convenţia încheiată de banca cu executorul bancar",
+          "bunurile ce au format obiectul activităţii de executare silită",
+          "rudele şi afinii până la gradul al patrulea inclusiv",
+          "cauzarea de prejudiciu prin încălcarea obligaţiilor sale profesionale",
+          "băncii în care îşi desfăşoară activitatea",
+          "regulamentul intern al băncii sau în convenţia încheiată de banca cu executorul bancar",
+          "executorilor bancari",
+          "bunurile ce au format obiectul activităţii de executare silită sau să facă acte de executare în propria lor cauza ori în cauzele privind rudele şi afinii până la gradul al patrulea inclusiv."
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "score": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "executorul bancar",
+          "Răspunderea civilă a executorului bancar",
+          "obligaţiilor sale profesionale",
+          "Asigurarea de răspundere profesională a executorului bancar",
+          "băncii",
+          "regulamentul intern al băncii",
+          "convenţia încheiată de banca cu executorul bancar",
+          "bunurile ce au format obiectul activităţii de executare silită",
+          "rudele şi afinii până la gradul al patrulea inclusiv",
+          "cauzarea de prejudiciu prin încălcarea obligaţiilor sale profesionale",
+          "băncii în care îşi desfăşoară activitatea",
+          "regulamentul intern al băncii sau în convenţia încheiată de banca cu executorul bancar",
+          "executorilor bancari",
+          "bunurile ce au format obiectul activităţii de executare silită sau să facă acte de executare în propria lor cauza ori în cauzele privind rudele şi afinii până la gradul al patrulea inclusiv."
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "failure": null,
+      "calls": [
+        {
+          "purpose": "extraction",
+          "wall_s": 20.20159149999381,
+          "prompt_sha256": "dabe692f3c40c7733f90f5f05c21e92f52a6d90c6a6b9ad3fefd78d18ee46a3d",
+          "prompt_chars": 5681,
+          "raw": "{\n  \"outcomes\": [\n    {\n      \"name\": \"executorul bancar\",\n      \"requirements\": [],\n      \"evidence\": \"Răspunderea civilă a executorului bancar poate fi angajata\"\n    },\n    {\n      \"name\": \"Răspunderea civilă a executorului bancar\",\n      \"requirements\": [],\n      \"evidence\": \"Răspunderea civilă a executorului bancar poate fi angajata\"\n    },\n    {\n      \"name\": \"obligaţiilor sale profesionale\",\n      \"requirements\": [],\n      \"evidence\": \"prin încălcarea obligaţiilor sale profesionale\"\n    },\n    {\n      \"name\": \"Asigurarea de răspundere profesională a executorului bancar\",\n      \"requirements\": [],\n      \"evidence\": \"Asigurarea de răspundere profesională a executorului bancar se poate realiza\"\n    },\n    {\n      \"name\": \"băncii\",\n      \"requirements\": [],\n      \"evidence\": \"în contul băncii în care îşi desfăşoară activitatea\"\n    },\n    {\n      \"name\": \"regulamentul intern al băncii\",\n      \"requirements\": [],\n      \"evidence\": \"în regulamentul intern al băncii\"\n    },\n    {\n      \"name\": \"convenţia încheiată de banca cu executorul bancar\",\n      \"requirements\": [],\n      \"evidence\": \"în convenţia încheiată de banca cu executorul bancar\"\n    },\n    {\n      \"name\": \"bunurile ce au format obiectul activităţii de executare silită\",\n      \"requirements\": [],\n      \"evidence\": \"bunurile ce au format obiectul activităţii de executare silită\"\n    },\n    {\n      \"name\": \"rudele şi afinii până la gradul al patrulea inclusiv\",\n      \"requirements\": [],\n      \"evidence\": \"cauzele privind rudele şi afinii până la gradul al patrulea inclusiv\"\n    }\n  ],\n  \"units\": {\n    \"u21\": {\n      \"kind\": \"fact\",\n      \"subject\": \"Răspunderea civilă a executorului bancar\"\n    },\n    \"u22\": {\n      \"kind\": \"permission\",\n      \"subject\": \"Asigurarea de răspundere profesională a executorului bancar\"\n    },\n    \"u23\": {\n      \"kind\": \"prohibition\",\n      \"subject\": \"executorilor bancari\"\n    }\n  },\n  \"relations\": [\n    {\n      \"from\": \"executorul bancar\",\n      \"type\": \"poate fi angajata pentru\",\n      \"to\": \"cauzarea de prejudiciu prin încălcarea obligaţiilor sale profesionale\",\n      \"evidence\": \"Răspunderea civilă a executorului bancar poate fi angajata, în condiţiile legii, pentru cauzarea de prejudiciu prin încălcarea obligaţiilor sale profesionale.\"\n    },\n    {\n      \"from\": \"Asigurarea de răspundere profesională a executorului bancar\",\n      \"type\": \"se poate realiza de către şi în contul\",\n      \"to\": \"băncii în care îşi desfăşoară activitatea\",\n      \"evidence\": \"Asigurarea de răspundere profesională a executorului bancar se poate realiza de către şi în contul băncii în care îşi desfăşoară activitatea\"\n    },\n    {\n      \"from\": \"Asigurarea de răspundere profesională a executorului bancar\",\n      \"type\": \"se poate realiza dacă este stipulată în\",\n      \"to\": \"regulamentul intern al băncii sau în convenţia încheiată de banca cu executorul bancar\",\n      \"evidence\": \"dacă aceasta este expres stipulată, după caz, în regulamentul intern al băncii sau în convenţia încheiată de banca cu executorul bancar.\"\n    },\n    {\n      \"from\": \"executorilor bancari\",\n      \"type\": \"este interzis să achiziționeze sau să facă acte de executare în\",\n      \"to\": \"bunurile ce au format obiectul activităţii de executare silită sau să facă acte de executare în propria lor cauza ori în cauzele privind rudele şi afinii până la gradul al patrulea inclusiv.\",\n      \"evidence\": \"Este interzis executorilor bancari sa achizitioneze, direct sau prin interpusi, pentru ei sau pentru alţii, bunurile ce au format obiectul activităţii de executare silită sau să facă acte de executare în propria lor cauza ori în cauzele privind rudele şi afinii până la gradul al patrulea inclusiv.\"\n    }\n  ]\n}",
+          "finish_reason": "stop",
+          "options": {
+            "temperature": 0,
+            "seed": 42,
+            "num_predict": 2048,
+            "top_p": 0.95,
+            "num_ctx": 16384
+          },
+          "think": true,
+          "thinking_characters": 5500,
+          "total_duration": 20190727800,
+          "load_duration": 2212900,
+          "prompt_eval_duration": 219621000,
+          "eval_duration": 19941572000,
+          "prompt_eval_count": 1239,
+          "eval_count": 2582
+        }
+      ],
+      "fragment": {
+        "source": "semantic-02:19961#11",
+        "outcomes": [
+          {
+            "name": "executorul bancar",
+            "characteristics": [],
+            "evidence": {
+              "status": "quoted",
+              "quote": "Răspunderea civilă a executorului bancar poate fi angajata",
+              "start": 13,
+              "end": 71
+            }
+          },
+          {
+            "name": "Răspunderea civilă a executorului bancar",
+            "characteristics": [],
+            "evidence": {
+              "status": "quoted",
+              "quote": "Răspunderea civilă a executorului bancar poate fi angajata",
+              "start": 13,
+              "end": 71
+            }
+          },
+          {
+            "name": "obligaţiilor sale profesionale",
+            "characteristics": [],
+            "evidence": {
+              "status": "quoted",
+              "quote": "prin încălcarea obligaţiilor sale profesionale",
+              "start": 124,
+              "end": 170
+            }
+          },
+          {
+            "name": "Asigurarea de răspundere profesională a executorului bancar",
+            "characteristics": [],
+            "evidence": {
+              "status": "quoted",
+              "quote": "Asigurarea de răspundere profesională a executorului bancar se poate realiza",
+              "start": 172,
+              "end": 248
+            }
+          },
+          {
+            "name": "băncii",
+            "characteristics": [],
+            "evidence": {
+              "status": "quoted",
+              "quote": "în contul băncii în care îşi desfăşoară activitatea",
+              "start": 261,
+              "end": 312
+            }
+          },
+          {
+            "name": "regulamentul intern al băncii",
+            "characteristics": [],
+            "evidence": {
+              "status": "quoted",
+              "quote": "în regulamentul intern al băncii",
+              "start": 360,
+              "end": 392
+            }
+          },
+          {
+            "name": "convenţia încheiată de banca cu executorul bancar",
+            "characteristics": [],
+            "evidence": {
+              "status": "quoted",
+              "quote": "în convenţia încheiată de banca cu executorul bancar",
+              "start": 397,
+              "end": 449
+            }
+          },
+          {
+            "name": "bunurile ce au format obiectul activităţii de executare silită",
+            "characteristics": [],
+            "evidence": {
+              "status": "quoted",
+              "quote": "bunurile ce au format obiectul activităţii de executare silită",
+              "start": 574,
+              "end": 636
+            }
+          },
+          {
+            "name": "rudele şi afinii până la gradul al patrulea inclusiv",
+            "characteristics": [],
+            "evidence": {
+              "status": "quoted",
+              "quote": "cauzele privind rudele şi afinii până la gradul al patrulea inclusiv",
+              "start": 695,
+              "end": 763
+            }
+          },
+          {
+            "name": "cauzarea de prejudiciu prin încălcarea obligaţiilor sale profesionale",
+            "characteristics": [],
+            "evidence": {
+              "status": "quoted",
+              "quote": "Răspunderea civilă a executorului bancar poate fi angajata, în condiţiile legii, pentru cauzarea de prejudiciu prin încălcarea obligaţiilor sale profesionale.",
+              "start": 13,
+              "end": 171
+            },
+            "origin": "quoted_relation_endpoint"
+          },
+          {
+            "name": "băncii în care îşi desfăşoară activitatea",
+            "characteristics": [],
+            "evidence": {
+              "status": "quoted",
+              "quote": "Asigurarea de răspundere profesională a executorului bancar se poate realiza de către şi în contul băncii în care îşi desfăşoară activitatea",
+              "start": 172,
+              "end": 312
+            },
+            "origin": "quoted_relation_endpoint"
+          },
+          {
+            "name": "regulamentul intern al băncii sau în convenţia încheiată de banca cu executorul bancar",
+            "characteristics": [],
+            "evidence": {
+              "status": "quoted",
+              "quote": "dacă aceasta este expres stipulată, după caz, în regulamentul intern al băncii sau în convenţia încheiată de banca cu executorul bancar.",
+              "start": 314,
+              "end": 450
+            },
+            "origin": "quoted_relation_endpoint"
+          },
+          {
+            "name": "executorilor bancari",
+            "characteristics": [],
+            "evidence": {
+              "status": "quoted",
+              "quote": "Este interzis executorilor bancari sa achizitioneze, direct sau prin interpusi, pentru ei sau pentru alţii, bunurile ce au format obiectul activităţii de executare silită sau să facă acte de executare în propria lor cauza ori în cauzele privind rudele şi afinii până la gradul al patrulea inclusiv.",
+              "start": 466,
+              "end": 764
+            },
+            "origin": "quoted_relation_endpoint"
+          },
+          {
+            "name": "bunurile ce au format obiectul activităţii de executare silită sau să facă acte de executare în propria lor cauza ori în cauzele privind rudele şi afinii până la gradul al patrulea inclusiv.",
+            "characteristics": [],
+            "evidence": {
+              "status": "quoted",
+              "quote": "Este interzis executorilor bancari sa achizitioneze, direct sau prin interpusi, pentru ei sau pentru alţii, bunurile ce au format obiectul activităţii de executare silită sau să facă acte de executare în propria lor cauza ori în cauzele privind rudele şi afinii până la gradul al patrulea inclusiv.",
+              "start": 466,
+              "end": 764
+            },
+            "origin": "quoted_relation_endpoint"
+          }
+        ],
+        "relations": [],
+        "rejected_class_named": [],
+        "rejected_structural": [],
+        "rejected_class_edges": 0,
+        "rejected_evidence": 0,
+        "rejected_proposals": [],
+        "qualified_rules": [
+          {
+            "statement": "Răspunderea civilă a executorului bancar poate fi angajata, în condiţiile legii, pentru cauzarea de prejudiciu prin încălcarea obligaţiilor sale profesionale.",
+            "subject": "Răspunderea civilă a executorului bancar",
+            "predicate": "",
+            "object": "",
+            "provision": "+ Articolul 14",
+            "scope": [],
+            "conditions": [
+              "în condiţiile legii, pentru cauzarea de prejudiciu prin încălcarea obligaţiilor sale profesionale."
+            ],
+            "exceptions": [],
+            "dates": [],
+            "evidence": [
+              {
+                "quote": "Răspunderea civilă a executorului bancar poate fi angajata, în condiţiile legii, pentru cauzarea de prejudiciu prin încălcarea obligaţiilor sale profesionale.",
+                "start": 7464,
+                "end": 7622
+              }
+            ],
+            "context_evidence": [
+              {
+                "quote": "+ Articolul 14 Răspunderea civilă a executorului bancar poate fi angajata, în condiţiile legii, pentru cauzarea de prejudiciu prin încălcarea obligaţiilor sale profesionale. Asigurarea de răspundere profesională a executorului bancar se poate realiza de către şi în contul băncii în care îşi desfăşoară activitatea, dacă aceasta este expres stipulată, după caz, în regulamentul intern al băncii sau în convenţia încheiată de banca cu executorul bancar. ",
+                "start": 7449,
+                "end": 7902
+              }
+            ],
+            "provision_evidence": {
+              "quote": "+ Articolul 14",
+              "start": 7449,
+              "end": 7463
+            },
+            "review_status": "proposed",
+            "scope_resolution": "unresolved",
+            "review_issues": [],
+            "subject_evidence": {
+              "quote": "Răspunderea civilă a executorului bancar",
+              "start": 7464,
+              "end": 7504
+            },
+            "subject_method": "model-source-quote",
+            "kind": "fact",
+            "extraction_method": "source-statement-classification",
+            "classification_status": "classified",
+            "id": "3e8ea9334d0f7893f8bb5e5c0ee65097b4f7485c93aa0af08adaf5b0485f9713",
+            "source": "semantic-02:19961#11",
+            "source_hash": "720ae30d6d7345a6a0771f03ade9a713e1dc3421fc0153719b6edfaa683a1ae9",
+            "source_file": "C:\\dev\\grap-rust\\real-data-law-ro\\19961.json",
+            "offset_basis": "document"
+          },
+          {
+            "statement": "Asigurarea de răspundere profesională a executorului bancar se poate realiza de către şi în contul băncii în care îşi desfăşoară activitatea, dacă aceasta este expres stipulată, după caz, în regulamentul intern al băncii sau în convenţia încheiată de banca cu executorul bancar.",
+            "subject": "Asigurarea de răspundere profesională a executorului bancar",
+            "predicate": "",
+            "object": "",
+            "provision": "+ Articolul 14",
+            "scope": [],
+            "conditions": [
+              "dacă aceasta este expres stipulată, după caz, în regulamentul intern al băncii sau în convenţia încheiată de banca cu executorul bancar."
+            ],
+            "exceptions": [],
+            "dates": [],
+            "evidence": [
+              {
+                "quote": "Asigurarea de răspundere profesională a executorului bancar se poate realiza de către şi în contul băncii în care îşi desfăşoară activitatea, dacă aceasta este expres stipulată, după caz, în regulamentul intern al băncii sau în convenţia încheiată de banca cu executorul bancar.",
+                "start": 7623,
+                "end": 7901
+              }
+            ],
+            "context_evidence": [
+              {
+                "quote": "+ Articolul 14 Răspunderea civilă a executorului bancar poate fi angajata, în condiţiile legii, pentru cauzarea de prejudiciu prin încălcarea obligaţiilor sale profesionale. Asigurarea de răspundere profesională a executorului bancar se poate realiza de către şi în contul băncii în care îşi desfăşoară activitatea, dacă aceasta este expres stipulată, după caz, în regulamentul intern al băncii sau în convenţia încheiată de banca cu executorul bancar. ",
+                "start": 7449,
+                "end": 7902
+              }
+            ],
+            "provision_evidence": {
+              "quote": "+ Articolul 14",
+              "start": 7449,
+              "end": 7463
+            },
+            "review_status": "proposed",
+            "scope_resolution": "unresolved",
+            "review_issues": [],
+            "subject_evidence": {
+              "quote": "Asigurarea de răspundere profesională a executorului bancar",
+              "start": 7623,
+              "end": 7682
+            },
+            "subject_method": "model-source-quote",
+            "kind": "permission",
+            "extraction_method": "source-statement-classification",
+            "classification_status": "classified",
+            "id": "7da0e3e02737c227eccfb4d876a003440d81ba282680954339401af3189ba424",
+            "source": "semantic-02:19961#11",
+            "source_hash": "720ae30d6d7345a6a0771f03ade9a713e1dc3421fc0153719b6edfaa683a1ae9",
+            "source_file": "C:\\dev\\grap-rust\\real-data-law-ro\\19961.json",
+            "offset_basis": "document"
+          },
+          {
+            "statement": "Este interzis executorilor bancari sa achizitioneze, direct sau prin interpusi, pentru ei sau pentru alţii, bunurile ce au format obiectul activităţii de executare silită sau să facă acte de executare în propria lor cauza ori în cauzele privind rudele şi afinii până la gradul al patrulea inclusiv.",
+            "subject": "executorilor bancari",
+            "predicate": "",
+            "object": "",
+            "provision": "+ Articolul 15",
+            "scope": [],
+            "conditions": [],
+            "exceptions": [],
+            "dates": [],
+            "evidence": [
+              {
+                "quote": "Este interzis executorilor bancari sa achizitioneze, direct sau prin interpusi, pentru ei sau pentru alţii, bunurile ce au format obiectul activităţii de executare silită sau să facă acte de executare în propria lor cauza ori în cauzele privind rudele şi afinii până la gradul al patrulea inclusiv.",
+                "start": 7917,
+                "end": 8215
+              }
+            ],
+            "context_evidence": [
+              {
+                "quote": "+ Articolul 15 Este interzis executorilor bancari sa achizitioneze, direct sau prin interpusi, pentru ei sau pentru alţii, bunurile ce au format obiectul activităţii de executare silită sau să facă acte de executare în propria lor cauza ori în cauzele privind rudele şi afinii până la gradul al patrulea inclusiv. ",
+                "start": 7902,
+                "end": 8216
+              }
+            ],
+            "provision_evidence": {
+              "quote": "+ Articolul 15",
+              "start": 7902,
+              "end": 7916
+            },
+            "review_status": "proposed",
+            "scope_resolution": "unresolved",
+            "review_issues": [],
+            "subject_evidence": {
+              "quote": "executorilor bancari",
+              "start": 7931,
+              "end": 7951
+            },
+            "subject_method": "model-source-quote",
+            "kind": "prohibition",
+            "extraction_method": "source-statement-classification",
+            "classification_status": "classified",
+            "id": "3a5efb4ae1317c81635cf3df2b0ac1622e13f0923656bd8b09a31149fa2f09b3",
+            "source": "semantic-02:19961#11",
+            "source_hash": "720ae30d6d7345a6a0771f03ade9a713e1dc3421fc0153719b6edfaa683a1ae9",
+            "source_file": "C:\\dev\\grap-rust\\real-data-law-ro\\19961.json",
+            "offset_basis": "document"
+          }
+        ],
+        "rule_coverage": {
+          "version": "qualified-rules-v2",
+          "units": 3,
+          "unresolved": 0,
+          "nonassertions": 0,
+          "deferred_proposals": 4
+        },
+        "deferred_proposals": [
+          {
+            "kind": "relation",
+            "proposal": {
+              "from": "executorul bancar",
+              "type": "poate fi angajata pentru",
+              "to": "cauzarea de prejudiciu prin încălcarea obligaţiilor sale profesionale",
+              "evidence": {
+                "status": "quoted",
+                "quote": "Răspunderea civilă a executorului bancar poate fi angajata, în condiţiile legii, pentru cauzarea de prejudiciu prin încălcarea obligaţiilor sale profesionale.",
+                "start": 13,
+                "end": 171
+              }
+            },
+            "reason": "requires qualified rule interpretation"
+          },
+          {
+            "kind": "relation",
+            "proposal": {
+              "from": "Asigurarea de răspundere profesională a executorului bancar",
+              "type": "se poate realiza de către şi în contul",
+              "to": "băncii în care îşi desfăşoară activitatea",
+              "evidence": {
+                "status": "quoted",
+                "quote": "Asigurarea de răspundere profesională a executorului bancar se poate realiza de către şi în contul băncii în care îşi desfăşoară activitatea",
+                "start": 172,
+                "end": 312
+              }
+            },
+            "reason": "requires qualified rule interpretation"
+          },
+          {
+            "kind": "relation",
+            "proposal": {
+              "from": "Asigurarea de răspundere profesională a executorului bancar",
+              "type": "se poate realiza dacă este stipulată în",
+              "to": "regulamentul intern al băncii sau în convenţia încheiată de banca cu executorul bancar",
+              "evidence": {
+                "status": "quoted",
+                "quote": "dacă aceasta este expres stipulată, după caz, în regulamentul intern al băncii sau în convenţia încheiată de banca cu executorul bancar.",
+                "start": 314,
+                "end": 450
+              }
+            },
+            "reason": "requires qualified rule interpretation"
+          },
+          {
+            "kind": "relation",
+            "proposal": {
+              "from": "executorilor bancari",
+              "type": "este interzis să achiziționeze sau să facă acte de executare în",
+              "to": "bunurile ce au format obiectul activităţii de executare silită sau să facă acte de executare în propria lor cauza ori în cauzele privind rudele şi afinii până la gradul al patrulea inclusiv.",
+              "evidence": {
+                "status": "quoted",
+                "quote": "Este interzis executorilor bancari sa achizitioneze, direct sau prin interpusi, pentru ei sau pentru alţii, bunurile ce au format obiectul activităţii de executare silită sau să facă acte de executare în propria lor cauza ori în cauzele privind rudele şi afinii până la gradul al patrulea inclusiv.",
+                "start": 466,
+                "end": 764
+              }
+            },
+            "reason": "requires qualified rule interpretation"
+          }
+        ],
+        "extraction": {
+          "source_text": "Articolul 14 Răspunderea civilă a executorului bancar poate fi angajata, în condiţiile legii, pentru cauzarea de prejudiciu prin încălcarea obligaţiilor sale profesionale. Asigurarea de răspundere profesională a executorului bancar se poate realiza de către şi în contul băncii în care îşi desfăşoară activitatea, dacă aceasta este expres stipulată, după caz, în regulamentul intern al băncii sau în convenţia încheiată de banca cu executorul bancar. + Articolul 15 Este interzis executorilor bancari sa achizitioneze, direct sau prin interpusi, pentru ei sau pentru alţii, bunurile ce au format obiectul activităţii de executare silită sau să facă acte de executare în propria lor cauza ori în cauzele privind rudele şi afinii până la gradul al patrulea inclusiv. +",
+          "prompt_version": "document-claims-v6-legal-grounded",
+          "provider": "openai-compat",
+          "model": "grap-legal-gemma4",
+          "generation_config": {
+            "model": "grap-legal-gemma4",
+            "think": true,
+            "native_options": {
+              "temperature": 0,
+              "seed": 42,
+              "num_predict": 2048,
+              "top_p": 0.95,
+              "num_ctx": 16384
+            }
+          },
+          "response_format": "json_schema",
+          "response_format_sha256": "310f817928ad2846b98d1cd6ba22ececfedacaeb96883f4b5a3e4c0dd53880c3"
+        }
+      },
+      "schema_wire_sha256": "65e41b6640c59546c7a92471f94dceac0da57bd47a589b3d4868340bf5459dcb",
+      "preparation": {
+        "model": "grap-legal-gemma4",
+        "created_at": "2026-09-10T03:58:58.6042323Z",
+        "done": true,
+        "done_reason": "load",
+        "client_wall_s": 0.015865500005020294
+      }
+    },
+    {
+      "config": "greedy",
+      "condition": "resident",
+      "seed": 42,
+      "case": "semantic-06",
+      "wall_s": 20.033062100003008,
+      "first_pass": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "HOTĂRÂRE nr. 55 din 29 ianuarie 1999 privind organizarea şi funcţionarea Direcţiei generale de prognoza în subordinea Ministerului Finanţelor",
+          "MONITORUL OFICIAL nr. 48 din 30 ianuarie 1999",
+          "Constituţia României",
+          "Ministerul Finanţelor",
+          "Guvernul",
+          "Direcţia generală de prognoza",
+          "Comisia Naţională de Prognoză"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "score": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "HOTĂRÂRE nr. 55 din 29 ianuarie 1999 privind organizarea şi funcţionarea Direcţiei generale de prognoza în subordinea Ministerului Finanţelor",
+          "MONITORUL OFICIAL nr. 48 din 30 ianuarie 1999",
+          "Constituţia României",
+          "Ministerul Finanţelor",
+          "Guvernul",
+          "Direcţia generală de prognoza",
+          "Comisia Naţională de Prognoză"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "failure": null,
+      "calls": [
+        {
+          "purpose": "extraction",
+          "wall_s": 20.03196229999594,
+          "prompt_sha256": "f453d5ea3406c02f236303eae4c47cb89f75c9d66163f4374df2143295eaa11e",
+          "prompt_chars": 7175,
+          "raw": "{\n  \"outcomes\": [\n    {\n      \"name\": \"HOTĂRÂRE nr. 55 din 29 ianuarie 1999 privind organizarea şi funcţionarea Direcţiei generale de prognoza în subordinea Ministerului Finanţelor\",\n      \"requirements\": [],\n      \"evidence\": \"HOTĂRÂRE nr. 55 din 29 ianuarie 1999 privind organizarea şi funcţionarea Direcţiei generale de prognoza în subordinea Ministerului Finanţelor\"\n    },\n    {\n      \"name\": \"MONITORUL OFICIAL nr. 48 din 30 ianuarie 1999\",\n      \"requirements\": [],\n      \"evidence\": \"MONITORUL OFICIAL nr. 48 din 30 ianuarie 1999\"\n    },\n    {\n      \"name\": \"Constituţia României\",\n      \"requirements\": [],\n      \"evidence\": \"Constituţia României\"\n    },\n    {\n      \"name\": \"Ministerul Finanţelor\",\n      \"requirements\": [],\n      \"evidence\": \"Ministerului Finanţelor\"\n    },\n    {\n      \"name\": \"Guvernul\",\n      \"requirements\": [],\n      \"evidence\": \"Guvernul României\"\n    },\n    {\n      \"name\": \"Direcţia generală de prognoza\",\n      \"requirements\": [],\n      \"evidence\": \"Direcţia generală de prognoza\"\n    },\n    {\n      \"name\": \"Comisia Naţională de Prognoză\",\n      \"requirements\": [],\n      \"evidence\": \"Comisiei Naţionale de Prognoza\"\n    }\n  ],\n  \"units\": {\n    \"u0\": {\n      \"kind\": \"other\",\n      \"subject\": \"HOTĂRÂRE nr. 55 din 29 ianuarie 1999 privind organizarea şi funcţionarea Direcţiei generale de prognoza în subordinea Ministerului Finanţelor EMITENT GUVERNUL Publicat în MONITORUL OFICIAL nr. 48 din 30 ianuarie 1999 În temeiul prevederilor art. 115 din Constituţia României, Guvernul României hotărăşte:\"\n    },\n    \"u1\": {\n      \"kind\": \"fact\",\n      \"subject\": \"Direcţia generală de prognoza\"\n    },\n    \"u2\": {\n      \"kind\": \"fact\",\n      \"subject\": \"Direcţia generală de prognoza\"\n    }\n  },\n  \"relations\": [\n    {\n      \"from\": \"Direcţia generală de prognoza\",\n      \"type\": \"în subordinea\",\n      \"to\": \"Ministerul Finanţelor\",\n      \"evidence\": \"Direcţia generală de prognoza se organizează şi funcţionează ca organ de specialitate cu personalitate juridică în subordinea Ministerului Finanţelor\"\n    },\n    {\n      \"from\": \"Comisia Naţională de Prognoză\",\n      \"type\": \"se desfiinţează\",\n      \"to\": \"\",\n      \"evidence\": \"Comisiei Naţionale de Prognoza, care se desfiinţează.\"\n    }\n  ]\n}",
+          "finish_reason": "stop",
+          "options": {
+            "temperature": 0,
+            "seed": 42,
+            "num_predict": 2048,
+            "top_p": 0.95,
+            "num_ctx": 16384
+          },
+          "think": true,
+          "thinking_characters": 5818,
+          "total_duration": 20030632200,
+          "load_duration": 2571500,
+          "prompt_eval_duration": 272789000,
+          "eval_duration": 19674578000,
+          "prompt_eval_count": 1700,
+          "eval_count": 2527
+        }
+      ],
+      "fragment": {
+        "source": "semantic-06:16861#0",
+        "outcomes": [
+          {
+            "name": "HOTĂRÂRE nr. 55 din 29 ianuarie 1999 privind organizarea şi funcţionarea Direcţiei generale de prognoza în subordinea Ministerului Finanţelor",
+            "characteristics": [],
+            "evidence": {
+              "status": "quoted",
+              "quote": "HOTĂRÂRE nr. 55 din 29 ianuarie 1999 privind organizarea şi funcţionarea Direcţiei generale de prognoza în subordinea Ministerului Finanţelor",
+              "start": 0,
+              "end": 141
+            }
+          },
+          {
+            "name": "MONITORUL OFICIAL nr. 48 din 30 ianuarie 1999",
+            "characteristics": [],
+            "evidence": {
+              "status": "quoted",
+              "quote": "MONITORUL OFICIAL nr. 48 din 30 ianuarie 1999",
+              "start": 171,
+              "end": 216
+            }
+          },
+          {
+            "name": "Constituţia României",
+            "characteristics": [],
+            "evidence": {
+              "status": "quoted",
+              "quote": "Constituţia României",
+              "start": 254,
+              "end": 274
+            }
+          },
+          {
+            "name": "Ministerul Finanţelor",
+            "characteristics": [],
+            "evidence": {
+              "status": "quoted",
+              "quote": "Ministerului Finanţelor",
+              "start": 118,
+              "end": 141
+            }
+          },
+          {
+            "name": "Guvernul",
+            "characteristics": [],
+            "evidence": {
+              "status": "quoted",
+              "quote": "Guvernul României",
+              "start": 276,
+              "end": 293
+            }
+          },
+          {
+            "name": "Direcţia generală de prognoza",
+            "characteristics": [],
+            "evidence": {
+              "status": "quoted",
+              "quote": "Direcţia generală de prognoza",
+              "start": 319,
+              "end": 348
+            }
+          },
+          {
+            "name": "Comisia Naţională de Prognoză",
+            "characteristics": [],
+            "evidence": {
+              "status": "quoted",
+              "quote": "Comisiei Naţionale de Prognoza",
+              "start": 489,
+              "end": 519
+            }
+          }
+        ],
+        "relations": [],
+        "rejected_class_named": [],
+        "rejected_structural": [],
+        "rejected_class_edges": 0,
+        "rejected_evidence": 0,
+        "rejected_proposals": [],
+        "qualified_rules": [
+          {
+            "statement": "HOTĂRÂRE nr. 55 din 29 ianuarie 1999 privind organizarea şi funcţionarea Direcţiei generale de prognoza în subordinea Ministerului Finanţelor EMITENT GUVERNUL Publicat în MONITORUL OFICIAL nr. 48 din 30 ianuarie 1999 În temeiul prevederilor art. 115 din Constituţia României, Guvernul României hotărăşte:",
+            "subject": "",
+            "predicate": "",
+            "object": "",
+            "provision": "",
+            "scope": [],
+            "conditions": [],
+            "exceptions": [],
+            "dates": [
+              "29 ianuarie 1999",
+              "30 ianuarie 1999"
+            ],
+            "evidence": [
+              {
+                "quote": "HOTĂRÂRE nr. 55 din 29 ianuarie 1999 privind organizarea şi funcţionarea Direcţiei generale de prognoza în subordinea Ministerului Finanţelor EMITENT GUVERNUL Publicat în MONITORUL OFICIAL nr. 48 din 30 ianuarie 1999 În temeiul prevederilor art. 115 din Constituţia României, Guvernul României hotărăşte:",
+                "start": 0,
+                "end": 304
+              }
+            ],
+            "context_evidence": [
+              {
+                "quote": "HOTĂRÂRE nr. 55 din 29 ianuarie 1999 privind organizarea şi funcţionarea Direcţiei generale de prognoza în subordinea Ministerului Finanţelor EMITENT GUVERNUL Publicat în MONITORUL OFICIAL nr. 48 din 30 ianuarie 1999 În temeiul prevederilor art. 115 din Constituţia României, Guvernul României hotărăşte: ",
+                "start": 0,
+                "end": 305
+              }
+            ],
+            "provision_evidence": null,
+            "review_status": "proposed",
+            "scope_resolution": "unresolved",
+            "review_issues": [],
+            "kind": "other",
+            "classification_status": "classified",
+            "id": "69935d3e93e3eefdb36d9422f609a197a38502a928093c7b50447181169997e1",
+            "source": "semantic-06:16861#0",
+            "source_hash": "973e9823104e88daeaa10633eedb334c0f555bce0e2cb62d44ce0b9ff4d77315",
+            "source_file": "C:\\dev\\grap-rust\\real-data-law-ro\\16861.json",
+            "offset_basis": "document"
+          },
+          {
+            "statement": "Direcţia generală de prognoza se organizează şi funcţionează ca organ de specialitate cu personalitate juridică în subordinea Ministerului Finanţelor, prin reorganizarea Comisiei Naţionale de Prognoza, care se desfiinţează.",
+            "subject": "Direcţia generală de prognoza",
+            "predicate": "",
+            "object": "",
+            "provision": "+ Articolul 1",
+            "scope": [],
+            "conditions": [],
+            "exceptions": [],
+            "dates": [],
+            "evidence": [
+              {
+                "quote": "Direcţia generală de prognoza se organizează şi funcţionează ca organ de specialitate cu personalitate juridică în subordinea Ministerului Finanţelor, prin reorganizarea Comisiei Naţionale de Prognoza, care se desfiinţează.",
+                "start": 319,
+                "end": 542
+              }
+            ],
+            "context_evidence": [
+              {
+                "quote": "+ Articolul 1 Direcţia generală de prognoza se organizează şi funcţionează ca organ de specialitate cu personalitate juridică în subordinea Ministerului Finanţelor, prin reorganizarea Comisiei Naţionale de Prognoza, care se desfiinţează. Direcţia generală de prognoza fundamentează şi elaborează studii şi prognoze pe termen scurt, mediu şi lung, privind evoluţia economiei româneşti în ansamblu şi a sectoarelor acesteia, necesare fundamentarii strategiei programului de guvernare. ",
+                "start": 305,
+                "end": 788
+              }
+            ],
+            "provision_evidence": {
+              "quote": "+ Articolul 1",
+              "start": 305,
+              "end": 318
+            },
+            "review_status": "proposed",
+            "scope_resolution": "unresolved",
+            "review_issues": [],
+            "subject_evidence": {
+              "quote": "Direcţia generală de prognoza",
+              "start": 319,
+              "end": 348
+            },
+            "subject_method": "model-source-quote",
+            "kind": "fact",
+            "extraction_method": "source-statement-classification",
+            "classification_status": "classified",
+            "id": "6f135cf1df04d5d8e38ce1fe71ac1bdd7f7d5c1f2175b0d7c37d6762508e973e",
+            "source": "semantic-06:16861#0",
+            "source_hash": "973e9823104e88daeaa10633eedb334c0f555bce0e2cb62d44ce0b9ff4d77315",
+            "source_file": "C:\\dev\\grap-rust\\real-data-law-ro\\16861.json",
+            "offset_basis": "document"
+          },
+          {
+            "statement": "Direcţia generală de prognoza fundamentează şi elaborează studii şi prognoze pe termen scurt, mediu şi lung, privind evoluţia economiei româneşti în ansamblu şi a sectoarelor acesteia, necesare fundamentarii strategiei programului de guvernare.",
+            "subject": "Direcţia generală de prognoza",
+            "predicate": "",
+            "object": "",
+            "provision": "+ Articolul 1",
+            "scope": [],
+            "conditions": [],
+            "exceptions": [],
+            "dates": [],
+            "evidence": [
+              {
+                "quote": "Direcţia generală de prognoza fundamentează şi elaborează studii şi prognoze pe termen scurt, mediu şi lung, privind evoluţia economiei româneşti în ansamblu şi a sectoarelor acesteia, necesare fundamentarii strategiei programului de guvernare.",
+                "start": 543,
+                "end": 787
+              }
+            ],
+            "context_evidence": [
+              {
+                "quote": "+ Articolul 1 Direcţia generală de prognoza se organizează şi funcţionează ca organ de specialitate cu personalitate juridică în subordinea Ministerului Finanţelor, prin reorganizarea Comisiei Naţionale de Prognoza, care se desfiinţează. Direcţia generală de prognoza fundamentează şi elaborează studii şi prognoze pe termen scurt, mediu şi lung, privind evoluţia economiei româneşti în ansamblu şi a sectoarelor acesteia, necesare fundamentarii strategiei programului de guvernare. ",
+                "start": 305,
+                "end": 788
+              }
+            ],
+            "provision_evidence": {
+              "quote": "+ Articolul 1",
+              "start": 305,
+              "end": 318
+            },
+            "review_status": "proposed",
+            "scope_resolution": "unresolved",
+            "review_issues": [],
+            "subject_evidence": {
+              "quote": "Direcţia generală de prognoza",
+              "start": 543,
+              "end": 572
+            },
+            "subject_method": "model-source-quote",
+            "kind": "fact",
+            "extraction_method": "source-statement-classification",
+            "classification_status": "classified",
+            "id": "acc0d4cf85e33b2f16f0e0d0ea56196db009542db89c7a3bff8f0616b0f3a169",
+            "source": "semantic-06:16861#0",
+            "source_hash": "973e9823104e88daeaa10633eedb334c0f555bce0e2cb62d44ce0b9ff4d77315",
+            "source_file": "C:\\dev\\grap-rust\\real-data-law-ro\\16861.json",
+            "offset_basis": "document"
+          }
+        ],
+        "rule_coverage": {
+          "version": "qualified-rules-v2",
+          "units": 3,
+          "unresolved": 0,
+          "nonassertions": 1,
+          "deferred_proposals": 1
+        },
+        "deferred_proposals": [
+          {
+            "kind": "relation",
+            "proposal": {
+              "from": "Direcţia generală de prognoza",
+              "type": "în subordinea",
+              "to": "Ministerul Finanţelor",
+              "evidence": {
+                "status": "quoted",
+                "quote": "Direcţia generală de prognoza se organizează şi funcţionează ca organ de specialitate cu personalitate juridică în subordinea Ministerului Finanţelor",
+                "start": 319,
+                "end": 468
+              }
+            },
+            "reason": "requires qualified rule interpretation"
+          }
+        ],
+        "extraction": {
+          "source_text": "HOTĂRÂRE nr. 55 din 29 ianuarie 1999 privind organizarea şi funcţionarea Direcţiei generale de prognoza în subordinea Ministerului Finanţelor EMITENT GUVERNUL Publicat în MONITORUL OFICIAL nr. 48 din 30 ianuarie 1999 În temeiul prevederilor art. 115 din Constituţia României, Guvernul României hotărăşte: + Articolul 1 Direcţia generală de prognoza se organizează şi funcţionează ca organ de specialitate cu personalitate juridică în subordinea Ministerului Finanţelor, prin reorganizarea Comisiei Naţionale de Prognoza, care se desfiinţează. Direcţia generală de prognoza fundamentează şi elaborează studii şi prognoze pe termen scurt, mediu şi lung, privind evoluţia economiei româneşti în ansamblu şi a sectoarelor acesteia, necesare fundamentarii strategiei programului de guvernare. +",
+          "prompt_version": "document-claims-v6-legal-grounded",
+          "provider": "openai-compat",
+          "model": "grap-legal-gemma4",
+          "generation_config": {
+            "model": "grap-legal-gemma4",
+            "think": true,
+            "native_options": {
+              "temperature": 0,
+              "seed": 42,
+              "num_predict": 2048,
+              "top_p": 0.95,
+              "num_ctx": 16384
+            }
+          },
+          "response_format": "json_schema",
+          "response_format_sha256": "9a6421e204769bead70c1147c980f0b16347684efd25159dafd5ed851dbc5010"
+        }
+      },
+      "schema_wire_sha256": "af0180de25f6f9c3408f455269379d480ffa97e7a9127c5cd33e67a56b376e8f"
+    },
+    {
+      "config": "greedy",
+      "condition": "resident",
+      "seed": 42,
+      "case": "semantic-09",
+      "wall_s": 27.796366799993848,
+      "first_pass": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "Consiliul de administraţie al A.N.L.",
+          "directorul general al A.N.L.",
+          "Consiliul naţional de coordonare al A.N.L.",
+          "indemnizaţie lunară",
+          "antecedente penale",
+          "Membrii Consiliului de administraţie al A.N.L.",
+          "A.N.L.",
+          "o indemnizaţie lunară în cuantum de 20% din salariul de baza brut lunar al directorului general al A.N.L.",
+          "membri ai Consiliului de administraţie al A.N.L."
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 2
+      },
+      "score": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "Consiliul de administraţie al A.N.L.",
+          "directorul general al A.N.L.",
+          "Consiliul naţional de coordonare al A.N.L.",
+          "indemnizaţie lunară",
+          "antecedente penale",
+          "Membrii Consiliului de administraţie al A.N.L.",
+          "A.N.L.",
+          "o indemnizaţie lunară în cuantum de 20% din salariul de baza brut lunar al directorului general al A.N.L.",
+          "membri ai Consiliului de administraţie al A.N.L."
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 2
+      },
+      "failure": null,
+      "calls": [
+        {
+          "purpose": "extraction",
+          "wall_s": 27.79263809999975,
+          "prompt_sha256": "bf919612313730e14ce59b7b37ca94bde1c412c2c7a21b24d8a1622ec8a8def3",
+          "prompt_chars": 7069,
+          "raw": "{\n  \"outcomes\": [\n    {\n      \"name\": \"Consiliul de administraţie al A.N.L.\",\n      \"requirements\": [],\n      \"evidence\": \"Consiliul de administraţie al A.N.L. are atribuţiile prevăzute de lege şi aplica hotărârile Consiliului naţional de coordonare al A.N.L.\"\n    },\n    {\n      \"name\": \"directorul general al A.N.L.\",\n      \"requirements\": [],\n      \"evidence\": \"Membrii Consiliului de administraţie al A.N.L., cu excepţia directorului general al A.N.L., nu sunt salariaţi ai A.N.L. şi beneficiază de o indemnizaţie lunară în cuantum de 20% din salariul de baza brut lunar al directorului general al A.N.L.\"\n    },\n    {\n      \"name\": \"Consiliul naţional de coordonare al A.N.L.\",\n      \"requirements\": [],\n      \"evidence\": \"Consiliul de administraţie al A.N.L. are atribuţiile prevăzute de lege şi aplica hotărârile Consiliului naţional de coordonare al A.N.L.\"\n    },\n    {\n      \"name\": \"indemnizaţie lunară\",\n      \"requirements\": [],\n      \"evidence\": \"Membrii Consiliului de administraţie al A.N.L., cu excepţia directorului general al A.N.L., nu sunt salariaţi ai A.N.L. şi beneficiază de o indemnizaţie lunară în cuantum de 20% din salariul de baza brut lunar al directorului general al A.N.L.\"\n    },\n    {\n      \"name\": \"antecedente penale\",\n      \"requirements\": [],\n      \"evidence\": \"Nu pot fi desemnaţi membri ai Consiliului de administraţie al A.N.L. sau vor fi revocaţi de drept acei membri care se găsesc în una dintre următoarele situaţii: a) au antecedente penale; ...\"\n    },\n    {\n      \"name\": \"interdicţii, stabilite potrivit legii, de a conduce, controla, gestiona sau administra o societate sau instituţie publică\",\n      \"requirements\": [],\n      \"evidence\": \"Nu pot fi desemnaţi membri ai Consiliului de administraţie al A.N.L. sau vor fi revocaţi de drept acei membri care se găsesc în una dintre următoarele situaţii: ... b) au interdicţii, stabilite potrivit legii, de a conduce, controla, gestiona sau administra o societate sau instituţie publică. ...\"\n    }\n  ],\n  \"units\": {\n    \"u27\": {\n      \"kind\": \"right\",\n      \"subject\": \"Membrii Consiliului de administraţie al A.N.L., cu excepţia directorului general al A.N.L.\"\n    },\n    \"u28\": {\n      \"kind\": \"fact\",\n      \"subject\": \"Consiliul de administraţie al A.N.L.\"\n    },\n    \"u29\": {\n      \"kind\": \"prohibition\",\n      \"subject\": \"membri ai Consiliului de administraţie al A.N.L.\"\n    }\n  },\n  \"relations\": [\n    {\n      \"from\": \"Membrii Consiliului de administraţie al A.N.L.\",\n      \"type\": \"nu sunt salariaţi ai\",\n      \"to\": \"A.N.L.\",\n      \"evidence\": \"Membrii Consiliului de administraţie al A.N.L., cu excepţia directorului general al A.N.L., nu sunt salariaţi ai A.N.L.\"\n    },\n    {\n      \"from\": \"Membrii Consiliului de administraţie al A.N.L.\",\n      \"type\": \"beneficiază de\",\n      \"to\": \"o indemnizaţie lunară în cuantum de 20% din salariul de baza brut lunar al directorului general al A.N.L.\",\n      \"evidence\": \"Membrii Consiliului de administraţie al A.N.L., cu excepţia directorului general al A.N.L., nu sunt salariaţi ai A.N.L. şi beneficiază de o indemnizaţie lunară în cuantum de 20% din salariul de baza brut lunar al directorului general al A.N.L.\"\n    },\n    {\n      \"from\": \"Consiliul de administraţie al A.N.L.\",\n      \"type\": \"are atribuţiile prevăzute de lege şi aplica hotărârile\",\n      \"to\": \"Consiliul naţional de coordonare al A.N.L.\",\n      \"evidence\": \"Consiliul de administraţie al A.N.L. are atribuţiile prevăzute de lege şi aplica hotărârile Consiliului naţional de coordonare al A.N.L.\"\n    },\n    {\n      \"from\": \"membri ai Consiliului de administraţie al A.N.L.\",\n      \"type\": \"nu pot fi desemnaţi sau vor fi revocaţi de drept dacă se găsesc în una dintre următoarele situaţii: a) au antecedente penale;\",\n      \"to\": \"antecedente penale\",\n      \"evidence\": \"Nu pot fi desemnaţi membri ai Consiliului de administraţie al A.N.L. sau vor fi revocaţi de drept acei membri care se găsesc în una dintre următoarele situaţii: a) au antecedente penale; ...\"\n    },\n    {\n      \"from\": \"membri ai Consiliului de administraţie al A.N.L.\",\n      \"type\": \"nu pot fi desemnaţi sau vor fi revocaţi de drept dacă se găsesc în una dintre următoarele situaţii: b) au interdicţii, stabilite potrivit legii, de a conduce, controla, gestiona sau administra o societate sau instituţie publică. ...\",\n      \"to\": \"interdicţii, stabilite potrivit legii, de a conduce, controla, gestiona sau administra o societate sau instituţie publică\",\n      \"evidence\": \"Nu pot fi desemnaţi membri ai Consiliului de administraţie al A.N.L. sau vor fi revocaţi de drept acei membri care se găsesc în una dintre următoarele situaţii: ... b) au interdicţii, stabilite potrivit legii, de a conduce, controla, gestiona sau administra o societate sau instituţie publică. ...\"\n    }\n  ]\n}",
+          "finish_reason": "stop",
+          "options": {
+            "temperature": 0,
+            "seed": 42,
+            "num_predict": 2048,
+            "top_p": 0.95,
+            "num_ctx": 16384
+          },
+          "think": true,
+          "thinking_characters": 6709,
+          "total_duration": 27779616500,
+          "load_duration": 2448600,
+          "prompt_eval_duration": 262087000,
+          "eval_duration": 27439140000,
+          "prompt_eval_count": 1665,
+          "eval_count": 3496
+        }
+      ],
+      "fragment": {
+        "source": "semantic-09:18860#13",
+        "outcomes": [
+          {
+            "name": "Consiliul de administraţie al A.N.L.",
+            "characteristics": [],
+            "evidence": {
+              "status": "quoted",
+              "quote": "Consiliul de administraţie al A.N.L. are atribuţiile prevăzute de lege şi aplica hotărârile Consiliului naţional de coordonare al A.N.L.",
+              "start": 272,
+              "end": 408
+            }
+          },
+          {
+            "name": "directorul general al A.N.L.",
+            "characteristics": [],
+            "evidence": {
+              "status": "quoted",
+              "quote": "Membrii Consiliului de administraţie al A.N.L., cu excepţia directorului general al A.N.L., nu sunt salariaţi ai A.N.L. şi beneficiază de o indemnizaţie lunară în cuantum de 20% din salariul de baza brut lunar al directorului general al A.N.L.",
+              "start": 13,
+              "end": 256
+            }
+          },
+          {
+            "name": "Consiliul naţional de coordonare al A.N.L.",
+            "characteristics": [],
+            "evidence": {
+              "status": "quoted",
+              "quote": "Consiliul de administraţie al A.N.L. are atribuţiile prevăzute de lege şi aplica hotărârile Consiliului naţional de coordonare al A.N.L.",
+              "start": 272,
+              "end": 408
+            }
+          },
+          {
+            "name": "indemnizaţie lunară",
+            "characteristics": [],
+            "evidence": {
+              "status": "quoted",
+              "quote": "Membrii Consiliului de administraţie al A.N.L., cu excepţia directorului general al A.N.L., nu sunt salariaţi ai A.N.L. şi beneficiază de o indemnizaţie lunară în cuantum de 20% din salariul de baza brut lunar al directorului general al A.N.L.",
+              "start": 13,
+              "end": 256
+            }
+          },
+          {
+            "name": "antecedente penale",
+            "characteristics": [],
+            "evidence": {
+              "status": "quoted",
+              "quote": "Nu pot fi desemnaţi membri ai Consiliului de administraţie al A.N.L. sau vor fi revocaţi de drept acei membri care se găsesc în una dintre următoarele situaţii: a) au antecedente penale; ...",
+              "start": 424,
+              "end": 614
+            }
+          },
+          {
+            "name": "Membrii Consiliului de administraţie al A.N.L.",
+            "characteristics": [],
+            "evidence": {
+              "status": "quoted",
+              "quote": "Membrii Consiliului de administraţie al A.N.L., cu excepţia directorului general al A.N.L., nu sunt salariaţi ai A.N.L.",
+              "start": 13,
+              "end": 132
+            },
+            "origin": "quoted_relation_endpoint"
+          },
+          {
+            "name": "A.N.L.",
+            "characteristics": [],
+            "evidence": {
+              "status": "quoted",
+              "quote": "Membrii Consiliului de administraţie al A.N.L., cu excepţia directorului general al A.N.L., nu sunt salariaţi ai A.N.L.",
+              "start": 13,
+              "end": 132
+            },
+            "origin": "quoted_relation_endpoint"
+          },
+          {
+            "name": "o indemnizaţie lunară în cuantum de 20% din salariul de baza brut lunar al directorului general al A.N.L.",
+            "characteristics": [],
+            "evidence": {
+              "status": "quoted",
+              "quote": "Membrii Consiliului de administraţie al A.N.L., cu excepţia directorului general al A.N.L., nu sunt salariaţi ai A.N.L. şi beneficiază de o indemnizaţie lunară în cuantum de 20% din salariul de baza brut lunar al directorului general al A.N.L.",
+              "start": 13,
+              "end": 256
+            },
+            "origin": "quoted_relation_endpoint"
+          },
+          {
+            "name": "membri ai Consiliului de administraţie al A.N.L.",
+            "characteristics": [],
+            "evidence": {
+              "status": "quoted",
+              "quote": "Nu pot fi desemnaţi membri ai Consiliului de administraţie al A.N.L. sau vor fi revocaţi de drept acei membri care se găsesc în una dintre următoarele situaţii: a) au antecedente penale; ...",
+              "start": 424,
+              "end": 614
+            },
+            "origin": "quoted_relation_endpoint"
+          }
+        ],
+        "relations": [],
+        "rejected_class_named": [],
+        "rejected_structural": [],
+        "rejected_class_edges": 0,
+        "rejected_evidence": 2,
+        "rejected_proposals": [
+          {
+            "kind": "outcome",
+            "proposal": {
+              "name": "interdicţii, stabilite potrivit legii, de a conduce, controla, gestiona sau administra o societate sau instituţie publică",
+              "requirements": [],
+              "evidence": "Nu pot fi desemnaţi membri ai Consiliului de administraţie al A.N.L. sau vor fi revocaţi de drept acei membri care se găsesc în una dintre următoarele situaţii: ... b) au interdicţii, stabilite potrivit legii, de a conduce, controla, gestiona sau administra o societate sau instituţie publică. ..."
+            },
+            "reason": "source evidence invalid"
+          },
+          {
+            "kind": "relation",
+            "proposal": {
+              "from": "membri ai Consiliului de administraţie al A.N.L.",
+              "type": "nu pot fi desemnaţi sau vor fi revocaţi de drept dacă se găsesc în una dintre următoarele situaţii: b) au interdicţii, stabilite potrivit legii, de a conduce, controla, gestiona sau administra o societate sau instituţie publică. ...",
+              "to": "interdicţii, stabilite potrivit legii, de a conduce, controla, gestiona sau administra o societate sau instituţie publică",
+              "evidence": "Nu pot fi desemnaţi membri ai Consiliului de administraţie al A.N.L. sau vor fi revocaţi de drept acei membri care se găsesc în una dintre următoarele situaţii: ... b) au interdicţii, stabilite potrivit legii, de a conduce, controla, gestiona sau administra o societate sau instituţie publică. ..."
+            },
+            "reason": "source evidence invalid"
+          }
+        ],
+        "qualified_rules": [
+          {
+            "statement": "Membrii Consiliului de administraţie al A.N.L., cu excepţia directorului general al A.N.L., nu sunt salariaţi ai A.N.L. şi beneficiază de o indemnizaţie lunară în cuantum de 20% din salariul de baza brut lunar al directorului general al A.N.L.",
+            "subject": "Membrii Consiliului de administraţie al A.N.L., cu excepţia directorului general al A.N.L.",
+            "predicate": "",
+            "object": "",
+            "provision": "+ Articolul 18",
+            "scope": [],
+            "conditions": [],
+            "exceptions": [
+              "cu excepţia directorului general al A.N.L., nu sunt salariaţi ai A.N.L. şi beneficiază de o indemnizaţie lunară în cuantum de 20% din salariul de baza brut lunar al directorului general al A.N.L."
+            ],
+            "dates": [
+              "lunar"
+            ],
+            "evidence": [
+              {
+                "quote": "Membrii Consiliului de administraţie al A.N.L., cu excepţia directorului general al A.N.L., nu sunt salariaţi ai A.N.L. şi beneficiază de o indemnizaţie lunară în cuantum de 20% din salariul de baza brut lunar al directorului general al A.N.L.",
+                "start": 9854,
+                "end": 10097
+              }
+            ],
+            "context_evidence": [
+              {
+                "quote": "+ Articolul 18 Membrii Consiliului de administraţie al A.N.L., cu excepţia directorului general al A.N.L., nu sunt salariaţi ai A.N.L. şi beneficiază de o indemnizaţie lunară în cuantum de 20% din salariul de baza brut lunar al directorului general al A.N.L. ",
+                "start": 9839,
+                "end": 10098
+              }
+            ],
+            "provision_evidence": {
+              "quote": "+ Articolul 18",
+              "start": 9839,
+              "end": 9853
+            },
+            "review_status": "proposed",
+            "scope_resolution": "unresolved",
+            "review_issues": [],
+            "subject_evidence": {
+              "quote": "Membrii Consiliului de administraţie al A.N.L., cu excepţia directorului general al A.N.L.",
+              "start": 9854,
+              "end": 9944
+            },
+            "subject_method": "model-source-quote",
+            "kind": "right",
+            "extraction_method": "source-statement-classification",
+            "classification_status": "classified",
+            "id": "a47af3b295df98046429eeb023b6412d8b7d40d865118817e99676c1bef6b093",
+            "source": "semantic-09:18860#13",
+            "source_hash": "0f46b9ff7cc1b9c0d346f2ac0fe6cc71ff8d20d26adf858cd90f6bebb3ec7245",
+            "source_file": "C:\\dev\\grap-rust\\real-data-law-ro\\18860.json",
+            "offset_basis": "document"
+          },
+          {
+            "statement": "Consiliul de administraţie al A.N.L. are atribuţiile prevăzute de lege şi aplica hotărârile Consiliului naţional de coordonare al A.N.L.",
+            "subject": "Consiliul de administraţie al A.N.L.",
+            "predicate": "",
+            "object": "",
+            "provision": "+ Articolul 19",
+            "scope": [],
+            "conditions": [],
+            "exceptions": [],
+            "dates": [],
+            "evidence": [
+              {
+                "quote": "Consiliul de administraţie al A.N.L. are atribuţiile prevăzute de lege şi aplica hotărârile Consiliului naţional de coordonare al A.N.L.",
+                "start": 10113,
+                "end": 10249
+              }
+            ],
+            "context_evidence": [
+              {
+                "quote": "+ Articolul 19 Consiliul de administraţie al A.N.L. are atribuţiile prevăzute de lege şi aplica hotărârile Consiliului naţional de coordonare al A.N.L. ",
+                "start": 10098,
+                "end": 10250
+              }
+            ],
+            "provision_evidence": {
+              "quote": "+ Articolul 19",
+              "start": 10098,
+              "end": 10112
+            },
+            "review_status": "proposed",
+            "scope_resolution": "unresolved",
+            "review_issues": [],
+            "subject_evidence": {
+              "quote": "Consiliul de administraţie al A.N.L.",
+              "start": 10113,
+              "end": 10149
+            },
+            "subject_method": "model-source-quote",
+            "kind": "fact",
+            "extraction_method": "source-statement-classification",
+            "classification_status": "classified",
+            "id": "82f8c22bd6ce9128d66943a389beecdce2d15002d9c70f1705b4a78fc84c86bc",
+            "source": "semantic-09:18860#13",
+            "source_hash": "0f46b9ff7cc1b9c0d346f2ac0fe6cc71ff8d20d26adf858cd90f6bebb3ec7245",
+            "source_file": "C:\\dev\\grap-rust\\real-data-law-ro\\18860.json",
+            "offset_basis": "document"
+          },
+          {
+            "statement": "Nu pot fi desemnaţi membri ai Consiliului de administraţie al A.N.L. sau vor fi revocaţi de drept acei membri care se găsesc în una dintre următoarele situaţii: a) au antecedente penale; ... b) au interdicţii, stabilite potrivit legii, de a conduce, controla, gestiona sau administra o societate sau instituţie publică. ...",
+            "subject": "membri ai Consiliului de administraţie al A.N.L.",
+            "predicate": "",
+            "object": "",
+            "provision": "+ Articolul 20",
+            "scope": [],
+            "conditions": [],
+            "exceptions": [],
+            "dates": [],
+            "evidence": [
+              {
+                "quote": "Nu pot fi desemnaţi membri ai Consiliului de administraţie al A.N.L. sau vor fi revocaţi de drept acei membri care se găsesc în una dintre următoarele situaţii: a) au antecedente penale; ... b) au interdicţii, stabilite potrivit legii, de a conduce, controla, gestiona sau administra o societate sau instituţie publică. ...",
+                "start": 10265,
+                "end": 10588
+              }
+            ],
+            "context_evidence": [
+              {
+                "quote": "+ Articolul 20 Nu pot fi desemnaţi membri ai Consiliului de administraţie al A.N.L. sau vor fi revocaţi de drept acei membri care se găsesc în una dintre următoarele situaţii: a) au antecedente penale; ... b) au interdicţii, stabilite potrivit legii, de a conduce, controla, gestiona sau administra o societate sau instituţie publică. ... ",
+                "start": 10250,
+                "end": 10589
+              }
+            ],
+            "provision_evidence": {
+              "quote": "+ Articolul 20",
+              "start": 10250,
+              "end": 10264
+            },
+            "review_status": "proposed",
+            "scope_resolution": "unresolved",
+            "review_issues": [],
+            "subject_evidence": {
+              "quote": "membri ai Consiliului de administraţie al A.N.L.",
+              "start": 10285,
+              "end": 10333
+            },
+            "subject_method": "model-source-quote",
+            "kind": "prohibition",
+            "extraction_method": "source-statement-classification",
+            "classification_status": "classified",
+            "id": "a31de9bafbb501c0808068a8c130d0e9e5a872e94f83ac4f2beeb43262cc0378",
+            "source": "semantic-09:18860#13",
+            "source_hash": "0f46b9ff7cc1b9c0d346f2ac0fe6cc71ff8d20d26adf858cd90f6bebb3ec7245",
+            "source_file": "C:\\dev\\grap-rust\\real-data-law-ro\\18860.json",
+            "offset_basis": "document"
+          }
+        ],
+        "rule_coverage": {
+          "version": "qualified-rules-v2",
+          "units": 3,
+          "unresolved": 0,
+          "nonassertions": 0,
+          "deferred_proposals": 4
+        },
+        "deferred_proposals": [
+          {
+            "kind": "relation",
+            "proposal": {
+              "from": "Membrii Consiliului de administraţie al A.N.L.",
+              "type": "nu sunt salariaţi ai",
+              "to": "A.N.L.",
+              "evidence": {
+                "status": "quoted",
+                "quote": "Membrii Consiliului de administraţie al A.N.L., cu excepţia directorului general al A.N.L., nu sunt salariaţi ai A.N.L.",
+                "start": 13,
+                "end": 132
+              }
+            },
+            "reason": "requires qualified rule interpretation"
+          },
+          {
+            "kind": "relation",
+            "proposal": {
+              "from": "Membrii Consiliului de administraţie al A.N.L.",
+              "type": "beneficiază de",
+              "to": "o indemnizaţie lunară în cuantum de 20% din salariul de baza brut lunar al directorului general al A.N.L.",
+              "evidence": {
+                "status": "quoted",
+                "quote": "Membrii Consiliului de administraţie al A.N.L., cu excepţia directorului general al A.N.L., nu sunt salariaţi ai A.N.L. şi beneficiază de o indemnizaţie lunară în cuantum de 20% din salariul de baza brut lunar al directorului general al A.N.L.",
+                "start": 13,
+                "end": 256
+              }
+            },
+            "reason": "requires qualified rule interpretation"
+          },
+          {
+            "kind": "relation",
+            "proposal": {
+              "from": "Consiliul de administraţie al A.N.L.",
+              "type": "are atribuţiile prevăzute de lege şi aplica hotărârile",
+              "to": "Consiliul naţional de coordonare al A.N.L.",
+              "evidence": {
+                "status": "quoted",
+                "quote": "Consiliul de administraţie al A.N.L. are atribuţiile prevăzute de lege şi aplica hotărârile Consiliului naţional de coordonare al A.N.L.",
+                "start": 272,
+                "end": 408
+              }
+            },
+            "reason": "requires qualified rule interpretation"
+          },
+          {
+            "kind": "relation",
+            "proposal": {
+              "from": "membri ai Consiliului de administraţie al A.N.L.",
+              "type": "nu pot fi desemnaţi sau vor fi revocaţi de drept dacă se găsesc în una dintre următoarele situaţii: a) au antecedente penale;",
+              "to": "antecedente penale",
+              "evidence": {
+                "status": "quoted",
+                "quote": "Nu pot fi desemnaţi membri ai Consiliului de administraţie al A.N.L. sau vor fi revocaţi de drept acei membri care se găsesc în una dintre următoarele situaţii: a) au antecedente penale; ...",
+                "start": 424,
+                "end": 614
+              }
+            },
+            "reason": "requires qualified rule interpretation"
+          }
+        ],
+        "extraction": {
+          "source_text": "Articolul 18 Membrii Consiliului de administraţie al A.N.L., cu excepţia directorului general al A.N.L., nu sunt salariaţi ai A.N.L. şi beneficiază de o indemnizaţie lunară în cuantum de 20% din salariul de baza brut lunar al directorului general al A.N.L. + Articolul 19 Consiliul de administraţie al A.N.L. are atribuţiile prevăzute de lege şi aplica hotărârile Consiliului naţional de coordonare al A.N.L. + Articolul 20 Nu pot fi desemnaţi membri ai Consiliului de administraţie al A.N.L. sau vor fi revocaţi de drept acei membri care se găsesc în una dintre următoarele situaţii: a) au antecedente penale; ... b) au interdicţii, stabilite potrivit legii, de a conduce, controla, gestiona sau administra o societate sau instituţie publică. ... +",
+          "prompt_version": "document-claims-v6-legal-grounded",
+          "provider": "openai-compat",
+          "model": "grap-legal-gemma4",
+          "generation_config": {
+            "model": "grap-legal-gemma4",
+            "think": true,
+            "native_options": {
+              "temperature": 0,
+              "seed": 42,
+              "num_predict": 2048,
+              "top_p": 0.95,
+              "num_ctx": 16384
+            }
+          },
+          "response_format": "json_schema",
+          "response_format_sha256": "d8db443ad47e021736ceac097f763fc5f32ef499a8eb4d50129f02e40bd57918"
+        }
+      },
+      "schema_wire_sha256": "bd3eda20c38ab8c69f46a219422c202757a177af551b0dd49a97fe71db7fb3b9"
+    },
+    {
+      "config": "greedy",
+      "condition": "resident",
+      "seed": 42,
+      "case": "semantic-13",
+      "wall_s": 21.720574499995564,
+      "first_pass": {
+        "target_correct": true,
+        "unresolved": 1,
+        "entity_names": [
+          "ordonanţa",
+          "norme metodologice",
+          "sancţiunile civile",
+          "bugetul de stat",
+          "beneficiarul de credite",
+          "banca comercială creditoare",
+          "înstrăinării",
+          "sancţiunile civile prevăzute la art. 6 din ordonanţa",
+          "Beneficiarul de credite"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "score": {
+        "target_correct": true,
+        "unresolved": 1,
+        "entity_names": [
+          "ordonanţa",
+          "norme metodologice",
+          "sancţiunile civile",
+          "bugetul de stat",
+          "beneficiarul de credite",
+          "banca comercială creditoare",
+          "înstrăinării",
+          "sancţiunile civile prevăzute la art. 6 din ordonanţa",
+          "Beneficiarul de credite"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "failure": null,
+      "calls": [
+        {
+          "purpose": "extraction",
+          "wall_s": 17.768909500002337,
+          "prompt_sha256": "548749ac1cbcbcf5d1117dfdd8c7494b2ec777d083bddaf104bc6e62182a58ee",
+          "prompt_chars": 7060,
+          "raw": "{\n  \"outcomes\": [\n    {\n      \"name\": \"ordonanţa\",\n      \"requirements\": [],\n      \"evidence\": \"ordonanţei\"\n    },\n    {\n      \"name\": \"norme metodologice\",\n      \"requirements\": [],\n      \"evidence\": \"prezentelor norme metodologice\"\n    },\n    {\n      \"name\": \"sancţiunile civile\",\n      \"requirements\": [],\n      \"evidence\": \"sancţiunile civile prevăzute la art. 6 din ordonanţa\"\n    },\n    {\n      \"name\": \"bugetul de stat\",\n      \"requirements\": [],\n      \"evidence\": \"bugetul de stat\"\n    },\n    {\n      \"name\": \"beneficiarul de credite\",\n      \"requirements\": [],\n      \"evidence\": \"Beneficiarul de credite\"\n    },\n    {\n      \"name\": \"banca comercială creditoare\",\n      \"requirements\": [],\n      \"evidence\": \"banca comercială creditoare\"\n    }\n  ],\n  \"units\": {\n    \"u18\": {\n      \"kind\": \"prohibition\",\n      \"subject\": \"înstrăinarea tractoarelor, combinelor, maşinilor şi utilajelor agricole, precum şi a instalaţiilor pentru irigat, achiziţionate în condiţiile ordonanţei şi ale prezentelor norme metodologice\"\n    },\n    \"u19\": {\n      \"kind\": \"fact\",\n      \"subject\": \"în cazul înstrăinării\"\n    },\n    \"u20\": {\n      \"kind\": \"fact\",\n      \"subject\": \"Subvenţia\"\n    },\n    \"u21\": {\n      \"kind\": \"right\",\n      \"subject\": \"Beneficiarul de credite\"\n    }\n  },\n  \"relations\": [\n    {\n      \"from\": \"înstrăinării\",\n      \"type\": \"sunt aplicabile\",\n      \"to\": \"sancţiunile civile prevăzute la art. 6 din ordonanţa\",\n      \"evidence\": \"În cazul înstrăinării sunt aplicabile sancţiunile civile prevăzute la art. 6 din ordonanţa.\"\n    },\n    {\n      \"from\": \"Beneficiarul de credite\",\n      \"type\": \"primeşte subvenţia de\",\n      \"to\": \"bugetul de stat\",\n      \"evidence\": \"Beneficiarul de credite primeşte de la bugetul de stat, prin banca comercială creditoare, subvenţia de 70% din dobânda calculată la creditul curent, după plata cotei de 30% din dobânda.\"\n    }\n  ]\n}",
+          "finish_reason": "stop",
+          "options": {
+            "temperature": 0,
+            "seed": 42,
+            "num_predict": 2048,
+            "top_p": 0.95,
+            "num_ctx": 16384
+          },
+          "think": true,
+          "thinking_characters": 5190,
+          "total_duration": 17767814000,
+          "load_duration": 3135500,
+          "prompt_eval_duration": 281780000,
+          "eval_duration": 17383916000,
+          "prompt_eval_count": 1645,
+          "eval_count": 2143
+        },
+        {
+          "purpose": "classification",
+          "wall_s": 3.948910300001444,
+          "prompt_sha256": "80ed72f86242a980bda29b84a9ca52c2e71a2810fe41db2c9f3508259494a32b",
+          "prompt_chars": 2406,
+          "raw": "{\"units\": {\"u21\": {\"kind\": \"right\", \"subject\": \"Beneficiarul de credite\"}}}",
+          "finish_reason": "stop",
+          "options": {
+            "temperature": 0,
+            "seed": 42,
+            "num_predict": 2048,
+            "top_p": 0.95,
+            "num_ctx": 16384
+          },
+          "think": true,
+          "thinking_characters": 1628,
+          "total_duration": 3937778800,
+          "load_duration": 2573500,
+          "prompt_eval_duration": 52796000,
+          "eval_duration": 3803678000,
+          "prompt_eval_count": 545,
+          "eval_count": 463
+        }
+      ],
+      "fragment": {
+        "source": "semantic-13:17438#8",
+        "outcomes": [
+          {
+            "name": "ordonanţa",
+            "characteristics": [],
+            "evidence": {
+              "status": "quoted",
+              "quote": "ordonanţei",
+              "start": 173,
+              "end": 183
+            }
+          },
+          {
+            "name": "norme metodologice",
+            "characteristics": [],
+            "evidence": {
+              "status": "quoted",
+              "quote": "prezentelor norme metodologice",
+              "start": 191,
+              "end": 221
+            }
+          },
+          {
+            "name": "sancţiunile civile",
+            "characteristics": [],
+            "evidence": {
+              "status": "quoted",
+              "quote": "sancţiunile civile prevăzute la art. 6 din ordonanţa",
+              "start": 314,
+              "end": 366
+            }
+          },
+          {
+            "name": "bugetul de stat",
+            "characteristics": [],
+            "evidence": {
+              "status": "quoted",
+              "quote": "bugetul de stat",
+              "start": 571,
+              "end": 586
+            }
+          },
+          {
+            "name": "beneficiarul de credite",
+            "characteristics": [],
+            "evidence": {
+              "status": "quoted",
+              "quote": "Beneficiarul de credite",
+              "start": 532,
+              "end": 555
+            }
+          },
+          {
+            "name": "banca comercială creditoare",
+            "characteristics": [],
+            "evidence": {
+              "status": "quoted",
+              "quote": "banca comercială creditoare",
+              "start": 593,
+              "end": 620
+            }
+          },
+          {
+            "name": "înstrăinării",
+            "characteristics": [],
+            "evidence": {
+              "status": "quoted",
+              "quote": "În cazul înstrăinării sunt aplicabile sancţiunile civile prevăzute la art. 6 din ordonanţa.",
+              "start": 276,
+              "end": 367
+            },
+            "origin": "quoted_relation_endpoint"
+          },
+          {
+            "name": "sancţiunile civile prevăzute la art. 6 din ordonanţa",
+            "characteristics": [],
+            "evidence": {
+              "status": "quoted",
+              "quote": "În cazul înstrăinării sunt aplicabile sancţiunile civile prevăzute la art. 6 din ordonanţa.",
+              "start": 276,
+              "end": 367
+            },
+            "origin": "quoted_relation_endpoint"
+          },
+          {
+            "name": "Beneficiarul de credite",
+            "characteristics": [],
+            "evidence": {
+              "status": "quoted",
+              "quote": "Beneficiarul de credite primeşte de la bugetul de stat, prin banca comercială creditoare, subvenţia de 70% din dobânda calculată la creditul curent, după plata cotei de 30% din dobânda.",
+              "start": 532,
+              "end": 717
+            },
+            "origin": "quoted_relation_endpoint"
+          }
+        ],
+        "relations": [],
+        "rejected_class_named": [],
+        "rejected_structural": [],
+        "rejected_class_edges": 0,
+        "rejected_evidence": 0,
+        "rejected_proposals": [],
+        "qualified_rules": [
+          {
+            "statement": "(1) Este interzisă înstrăinarea tractoarelor, combinelor, maşinilor şi utilajelor agricole, precum şi a instalaţiilor pentru irigat, achiziţionate în condiţiile ordonanţei şi ale prezentelor norme metodologice, înainte de achitarea integrală a creditului. ...",
+            "subject": "înstrăinarea tractoarelor, combinelor, maşinilor şi utilajelor agricole, precum şi a instalaţiilor pentru irigat, achiziţionate în condiţiile ordonanţei şi ale prezentelor norme metodologice",
+            "predicate": "",
+            "object": "",
+            "provision": "+ Articolul 9",
+            "scope": [],
+            "conditions": [
+              "în condiţiile ordonanţei şi ale prezentelor norme metodologice, înainte de achitarea integrală a creditului. ..."
+            ],
+            "exceptions": [],
+            "dates": [],
+            "evidence": [
+              {
+                "quote": "(1) Este interzisă înstrăinarea tractoarelor, combinelor, maşinilor şi utilajelor agricole, precum şi a instalaţiilor pentru irigat, achiziţionate în condiţiile ordonanţei şi ale prezentelor norme metodologice, înainte de achitarea integrală a creditului. ...",
+                "start": 6319,
+                "end": 6578
+              }
+            ],
+            "context_evidence": [
+              {
+                "quote": "+ Articolul 9 (1) Este interzisă înstrăinarea tractoarelor, combinelor, maşinilor şi utilajelor agricole, precum şi a instalaţiilor pentru irigat, achiziţionate în condiţiile ordonanţei şi ale prezentelor norme metodologice, înainte de achitarea integrală a creditului. ... (2) În cazul înstrăinării sunt aplicabile sancţiunile civile prevăzute la art. 6 din ordonanţa. ... ",
+                "start": 6305,
+                "end": 6679
+              }
+            ],
+            "provision_evidence": {
+              "quote": "+ Articolul 9",
+              "start": 6305,
+              "end": 6318
+            },
+            "review_status": "proposed",
+            "scope_resolution": "unresolved",
+            "review_issues": [],
+            "subject_evidence": {
+              "quote": "înstrăinarea tractoarelor, combinelor, maşinilor şi utilajelor agricole, precum şi a instalaţiilor pentru irigat, achiziţionate în condiţiile ordonanţei şi ale prezentelor norme metodologice",
+              "start": 6338,
+              "end": 6528
+            },
+            "subject_method": "explicit-syntax",
+            "kind": "prohibition",
+            "extraction_method": "source-statement-classification",
+            "classification_status": "classified",
+            "id": "7affcbeab90abcd14d5377d5826ee6b93aa8578e4f5adcbc65d413f717c953e8",
+            "source": "semantic-13:17438#8",
+            "source_hash": "b2d83c6cc472743a2aa9a1d37c1dfd4ab7c40137e18b755126935432c62cbeaf",
+            "source_file": "C:\\dev\\grap-rust\\real-data-law-ro\\17438.json",
+            "offset_basis": "document"
+          },
+          {
+            "statement": "(2) În cazul înstrăinării sunt aplicabile sancţiunile civile prevăzute la art. 6 din ordonanţa. ...",
+            "subject": "sancţiunile civile prevăzute la art. 6 din ordonanţa",
+            "predicate": "",
+            "object": "",
+            "provision": "+ Articolul 9",
+            "scope": [],
+            "conditions": [
+              "În cazul înstrăinării sunt aplicabile sancţiunile civile prevăzute la art. 6 din ordonanţa. ..."
+            ],
+            "exceptions": [],
+            "dates": [],
+            "evidence": [
+              {
+                "quote": "(2) În cazul înstrăinării sunt aplicabile sancţiunile civile prevăzute la art. 6 din ordonanţa. ...",
+                "start": 6579,
+                "end": 6678
+              }
+            ],
+            "context_evidence": [
+              {
+                "quote": "+ Articolul 9 (1) Este interzisă înstrăinarea tractoarelor, combinelor, maşinilor şi utilajelor agricole, precum şi a instalaţiilor pentru irigat, achiziţionate în condiţiile ordonanţei şi ale prezentelor norme metodologice, înainte de achitarea integrală a creditului. ... (2) În cazul înstrăinării sunt aplicabile sancţiunile civile prevăzute la art. 6 din ordonanţa. ... ",
+                "start": 6305,
+                "end": 6679
+              }
+            ],
+            "provision_evidence": {
+              "quote": "+ Articolul 9",
+              "start": 6305,
+              "end": 6318
+            },
+            "review_status": "proposed",
+            "scope_resolution": "unresolved",
+            "review_issues": [],
+            "subject_evidence": {
+              "quote": "sancţiunile civile prevăzute la art. 6 din ordonanţa",
+              "start": 6621,
+              "end": 6673
+            },
+            "subject_method": "explicit-syntax",
+            "kind": "fact",
+            "extraction_method": "source-statement-classification",
+            "classification_status": "classified",
+            "id": "764d0ef07ce36e44e838fdaa301810f912f9e0df0d3c40cbeaf6c35cbce7659c",
+            "source": "semantic-13:17438#8",
+            "source_hash": "b2d83c6cc472743a2aa9a1d37c1dfd4ab7c40137e18b755126935432c62cbeaf",
+            "source_file": "C:\\dev\\grap-rust\\real-data-law-ro\\17438.json",
+            "offset_basis": "document"
+          },
+          {
+            "statement": "(1) Subvenţia se acordă la dobânzile calculate şi datorate de beneficiarul de credite numai la soldul creditului curent, calculat lunar. ...",
+            "subject": "Subvenţia",
+            "predicate": "",
+            "object": "",
+            "provision": "+ Articolul 10",
+            "scope": [],
+            "conditions": [
+              "numai la soldul creditului curent, calculat lunar. ..."
+            ],
+            "exceptions": [],
+            "dates": [
+              "lunar"
+            ],
+            "evidence": [
+              {
+                "quote": "(1) Subvenţia se acordă la dobânzile calculate şi datorate de beneficiarul de credite numai la soldul creditului curent, calculat lunar. ...",
+                "start": 6694,
+                "end": 6834
+              }
+            ],
+            "context_evidence": [
+              {
+                "quote": "+ Articolul 10 (1) Subvenţia se acordă la dobânzile calculate şi datorate de beneficiarul de credite numai la soldul creditului curent, calculat lunar. ... (2) Beneficiarul de credite primeşte de la bugetul de stat, prin banca comercială creditoare, subvenţia de 70% din dobânda calculată la creditul curent, după plata cotei de 30% din dobânda. ... (3) În cazul în care beneficiarul de credite nu îşi plăteşte cota de 30% care îi revine conform graficului de rambursare, el nu beneficiază de subvenţie decât după data achitării acesteia şi numai la perioadele următoare. ... ",
+                "start": 6679,
+                "end": 7255
+              }
+            ],
+            "provision_evidence": {
+              "quote": "+ Articolul 10",
+              "start": 6679,
+              "end": 6693
+            },
+            "review_status": "proposed",
+            "scope_resolution": "unresolved",
+            "review_issues": [],
+            "subject_evidence": {
+              "quote": "Subvenţia",
+              "start": 6698,
+              "end": 6707
+            },
+            "subject_method": "model-source-quote",
+            "kind": "fact",
+            "extraction_method": "source-statement-classification",
+            "classification_status": "classified",
+            "id": "a86931560796c08ccb4fb4a9bcc774b356d9b8a90015963293fe058b20596849",
+            "source": "semantic-13:17438#8",
+            "source_hash": "b2d83c6cc472743a2aa9a1d37c1dfd4ab7c40137e18b755126935432c62cbeaf",
+            "source_file": "C:\\dev\\grap-rust\\real-data-law-ro\\17438.json",
+            "offset_basis": "document"
+          },
+          {
+            "statement": "(2) Beneficiarul de credite primeşte de la bugetul de stat, prin banca comercială creditoare, subvenţia de 70% din dobânda calculată la creditul curent, după plata cotei de 30% din dobânda. ...",
+            "subject": "Beneficiarul de credite",
+            "predicate": "",
+            "object": "",
+            "provision": "+ Articolul 10",
+            "scope": [],
+            "conditions": [],
+            "exceptions": [],
+            "dates": [],
+            "evidence": [
+              {
+                "quote": "(2) Beneficiarul de credite primeşte de la bugetul de stat, prin banca comercială creditoare, subvenţia de 70% din dobânda calculată la creditul curent, după plata cotei de 30% din dobânda. ...",
+                "start": 6835,
+                "end": 7028
+              }
+            ],
+            "context_evidence": [
+              {
+                "quote": "+ Articolul 10 (1) Subvenţia se acordă la dobânzile calculate şi datorate de beneficiarul de credite numai la soldul creditului curent, calculat lunar. ... (2) Beneficiarul de credite primeşte de la bugetul de stat, prin banca comercială creditoare, subvenţia de 70% din dobânda calculată la creditul curent, după plata cotei de 30% din dobânda. ... (3) În cazul în care beneficiarul de credite nu îşi plăteşte cota de 30% care îi revine conform graficului de rambursare, el nu beneficiază de subvenţie decât după data achitării acesteia şi numai la perioadele următoare. ... ",
+                "start": 6679,
+                "end": 7255
+              }
+            ],
+            "provision_evidence": {
+              "quote": "+ Articolul 10",
+              "start": 6679,
+              "end": 6693
+            },
+            "review_status": "proposed",
+            "scope_resolution": "unresolved",
+            "review_issues": [
+              "right label lacks explicit entitlement wording"
+            ],
+            "subject_evidence": {
+              "quote": "Beneficiarul de credite",
+              "start": 6839,
+              "end": 6862
+            },
+            "subject_method": "model-source-quote",
+            "kind": "right",
+            "extraction_method": "source-statement-classification",
+            "classification_status": "unresolved",
+            "id": "93e6a7b1923e851a7bb104aeeaf09bdcdb415fa1278f83cb996ac4dbd0962620",
+            "source": "semantic-13:17438#8",
+            "source_hash": "b2d83c6cc472743a2aa9a1d37c1dfd4ab7c40137e18b755126935432c62cbeaf",
+            "source_file": "C:\\dev\\grap-rust\\real-data-law-ro\\17438.json",
+            "offset_basis": "document"
+          }
+        ],
+        "rule_coverage": {
+          "version": "qualified-rules-v2",
+          "units": 4,
+          "unresolved": 1,
+          "nonassertions": 0,
+          "deferred_proposals": 2
+        },
+        "deferred_proposals": [
+          {
+            "kind": "relation",
+            "proposal": {
+              "from": "înstrăinării",
+              "type": "sunt aplicabile",
+              "to": "sancţiunile civile prevăzute la art. 6 din ordonanţa",
+              "evidence": {
+                "status": "quoted",
+                "quote": "În cazul înstrăinării sunt aplicabile sancţiunile civile prevăzute la art. 6 din ordonanţa.",
+                "start": 276,
+                "end": 367
+              }
+            },
+            "reason": "requires qualified rule interpretation"
+          },
+          {
+            "kind": "relation",
+            "proposal": {
+              "from": "Beneficiarul de credite",
+              "type": "primeşte subvenţia de",
+              "to": "bugetul de stat",
+              "evidence": {
+                "status": "quoted",
+                "quote": "Beneficiarul de credite primeşte de la bugetul de stat, prin banca comercială creditoare, subvenţia de 70% din dobânda calculată la creditul curent, după plata cotei de 30% din dobânda.",
+                "start": 532,
+                "end": 717
+              }
+            },
+            "reason": "requires qualified rule interpretation"
+          }
+        ],
+        "extraction": {
+          "source_text": "Articolul 9 (1) Este interzisă înstrăinarea tractoarelor, combinelor, maşinilor şi utilajelor agricole, precum şi a instalaţiilor pentru irigat, achiziţionate în condiţiile ordonanţei şi ale prezentelor norme metodologice, înainte de achitarea integrală a creditului. ... (2) În cazul înstrăinării sunt aplicabile sancţiunile civile prevăzute la art. 6 din ordonanţa. ... + Articolul 10 (1) Subvenţia se acordă la dobânzile calculate şi datorate de beneficiarul de credite numai la soldul creditului curent, calculat lunar. ... (2) Beneficiarul de credite primeşte de la bugetul de stat, prin banca comercială creditoare, subvenţia de 70% din dobânda calculată la creditul curent, după plata cotei de 30% din dobânda. ...",
+          "prompt_version": "document-claims-v6-legal-grounded",
+          "provider": "openai-compat",
+          "model": "grap-legal-gemma4",
+          "generation_config": {
+            "model": "grap-legal-gemma4",
+            "think": true,
+            "native_options": {
+              "temperature": 0,
+              "seed": 42,
+              "num_predict": 2048,
+              "top_p": 0.95,
+              "num_ctx": 16384
+            }
+          },
+          "response_format": "json_schema",
+          "response_format_sha256": "5d3379018ee790b0aa60dc961090858a9fa4261107f689ed98dbc151c811de2a"
+        },
+        "classification_repair": {
+          "units": {
+            "u21": {
+              "kind": "right",
+              "subject": "Beneficiarul de credite"
+            }
+          },
+          "raw_reply": "{\"units\": {\"u21\": {\"kind\": \"right\", \"subject\": \"Beneficiarul de credite\"}}}",
+          "unit_ids": [
+            "u21"
+          ]
+        }
+      },
+      "schema_wire_sha256": "201147a06c65ee751dad08b956f2787dcde7794f5c3dd2f042daa5ac58cb90eb"
+    }
+  ]
+}

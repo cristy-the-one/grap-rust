@@ -1,0 +1,31 @@
+{
+  "artifacts": {
+    "runtime-revisit-fresh.json": {
+      "sha256": "e6b0217c4e9d62130b8b9d076ed2acbe7f17ef71354f486b9bd9e90d7bd2f427"
+    },
+    "runtime-revisit-selective-fresh.json": {
+      "sha256": "00fcc16e1e2b6a1cd1459ba127a629858fa5fb31da0e6725c7bda5fa7ed849ee"
+    },
+    "runtime-revisit-escalation-fresh.json": {
+      "sha256": "42dc459c75a448baa57627460f5771a86705cc0e18404549d7b6797a07c39418"
+    },
+    "runtime-revisit-selective-historical.json": {
+      "sha256": "0be05a8798cc1cb53d5931531b766467b56d113c272ffeac80f0e5876a5aa297"
+    },
+    "runtime-revisit-escalation-historical.json": {
+      "sha256": "af296cf46e6f8bfac0d35f56ed91f1c17607c320dee7d9fe413864e5cf75680d"
+    },
+    "runtime-revisit-thinking.json": {
+      "sha256": "98fbc7c5bf77bfaab6aad4e47cb5a76c795cd2a4e4f9e4656cc2dfe09708d301"
+    },
+    "runtime-revisit-temperature.json": {
+      "sha256": "92b13aa13f44ec754d6c5c24a5b9709f95dc960881563477a11e36c835a3cb9f"
+    },
+    "runtime-revisit-rescore-grounded.json": {
+      "sha256": "033f2312b1024b998c95f6fab44ab409853f2285c16c54f1cec9fc9048a71bce"
+    },
+    "runtime-revisit-full-ingress.json": {
+      "sha256": "c628b6da42c15e6f2ca6dd8188020fd1d5450b1cf019dcfaa6a1797993dc21b3"
+    }
+  }
+}

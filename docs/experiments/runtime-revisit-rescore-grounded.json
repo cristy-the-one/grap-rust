@@ -1,0 +1,3178 @@
+{
+  "legal_rules_version": "legal-rules-v11",
+  "qualified_version": "qualified-rules-v2",
+  "input_sha256": "ae9460072b8273426c4b7402f041bc240a9950127fbd6fb55db42411b7000656",
+  "rows": [
+    {
+      "experiment": "screen",
+      "config": "greedy",
+      "condition": "resident",
+      "case": "semantic-02",
+      "before": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "executorul bancar",
+          "banca",
+          "executorilor bancari",
+          "cauzarea de prejudiciu prin încălcarea obligaţiilor sale profesionale",
+          "Asigurarea de răspundere profesională a executorului bancar",
+          "de către şi în contul băncii în care îşi desfăşoară activitatea, dacă aceasta este expres stipulată, după caz, în regulamentul intern al băncii sau în convenţia încheiată de banca cu executorul bancar.",
+          "achizitioneze, direct sau prin interpusi, pentru ei sau pentru alţii, bunurile ce au format obiectul activităţii de executare silită sau să facă acte de executare în propria lor cauza ori în cauzele privind rudele şi afinii până la gradul al patrulea inclusiv."
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "executorul bancar",
+          "banca",
+          "executorilor bancari",
+          "cauzarea de prejudiciu prin încălcarea obligaţiilor sale profesionale",
+          "Asigurarea de răspundere profesională a executorului bancar",
+          "de către şi în contul băncii în care îşi desfăşoară activitatea, dacă aceasta este expres stipulată, după caz, în regulamentul intern al băncii sau în convenţia încheiată de banca cu executorul bancar.",
+          "achizitioneze, direct sau prin interpusi, pentru ei sau pentru alţii, bunurile ce au format obiectul activităţii de executare silită sau să facă acte de executare în propria lor cauza ori în cauzele privind rudele şi afinii până la gradul al patrulea inclusiv."
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "failure": null,
+      "historical_wall_s": 6.781447399999706,
+      "note": "Revalidation only; historical latency and repair decisions are not current measurements."
+    },
+    {
+      "experiment": "screen",
+      "config": "greedy",
+      "condition": "resident",
+      "case": "semantic-06",
+      "before": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "HOTĂRÂRE nr. 55 din 29 ianuarie 1999 privind organizarea şi funcţionarea Direcţiei generale de prognoza în subordinea Ministerului Finanţelor",
+          "Guvernul României",
+          "Direcţia generală de prognoza",
+          "Ministerului Finanţelor",
+          "Comisiei Naţionale de Prognoza"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "HOTĂRÂRE nr. 55 din 29 ianuarie 1999 privind organizarea şi funcţionarea Direcţiei generale de prognoza în subordinea Ministerului Finanţelor",
+          "Guvernul României",
+          "Direcţia generală de prognoza",
+          "Ministerului Finanţelor",
+          "Comisiei Naţionale de Prognoza"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "failure": null,
+      "historical_wall_s": 6.487930600000254,
+      "note": "Revalidation only; historical latency and repair decisions are not current measurements."
+    },
+    {
+      "experiment": "screen",
+      "config": "greedy",
+      "condition": "resident",
+      "case": "semantic-09",
+      "before": {
+        "target_correct": true,
+        "unresolved": 1,
+        "entity_names": [
+          "Membrii Consiliului de administraţie al A.N.L.",
+          "Consiliul de administraţie al A.N.L.",
+          "cei membri",
+          "o indemnizaţie lunară în cuantum de 20% din salariul de baza brut lunar al directorului general al A.N.L."
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 1,
+        "entity_names": [
+          "Membrii Consiliului de administraţie al A.N.L.",
+          "Consiliul de administraţie al A.N.L.",
+          "cei membri",
+          "o indemnizaţie lunară în cuantum de 20% din salariul de baza brut lunar al directorului general al A.N.L."
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "failure": null,
+      "historical_wall_s": 6.207326499999908,
+      "note": "Revalidation only; historical latency and repair decisions are not current measurements."
+    },
+    {
+      "experiment": "screen",
+      "config": "greedy",
+      "condition": "resident",
+      "case": "semantic-13",
+      "before": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "tractoarelor, combinelor, maşinilor şi utilajelor agricole, precum şi a instalaţiilor pentru irigat",
+          "sancţiunile civile prevăzute la art. 6 din ordonanţa",
+          "Subvenţia",
+          "Beneficiarul de credite",
+          "tractoarelor, combinelor, maşinilor şi utilajelor agricole, precum şi a instalaţiilor pentru irigat, achiziţionate în condiţiile ordonanţei şi ale prezentelor norme metodologice",
+          "achitarea integrală a creditului",
+          "dobânzile calculate şi datorate de beneficiarul de credite numai la soldul creditului curent, calculat lunar",
+          "subvenţia de 70% din dobânda calculată la creditul curent, după plata cotei de 30% din dobânda"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "tractoarelor, combinelor, maşinilor şi utilajelor agricole, precum şi a instalaţiilor pentru irigat",
+          "sancţiunile civile prevăzute la art. 6 din ordonanţa",
+          "Subvenţia",
+          "Beneficiarul de credite",
+          "tractoarelor, combinelor, maşinilor şi utilajelor agricole, precum şi a instalaţiilor pentru irigat, achiziţionate în condiţiile ordonanţei şi ale prezentelor norme metodologice",
+          "achitarea integrală a creditului",
+          "dobânzile calculate şi datorate de beneficiarul de credite numai la soldul creditului curent, calculat lunar",
+          "subvenţia de 70% din dobânda calculată la creditul curent, după plata cotei de 30% din dobânda"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "failure": null,
+      "historical_wall_s": 8.416060100000323,
+      "note": "Revalidation only; historical latency and repair decisions are not current measurements."
+    },
+    {
+      "experiment": "screen",
+      "config": "mild",
+      "condition": "resident",
+      "case": "semantic-02",
+      "before": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "executorul bancar",
+          "banca",
+          "executorilor bancari",
+          "cauzarea de prejudiciu prin încălcarea obligaţiilor sale profesionale",
+          "Asigurarea de răspundere profesională a executorului bancar",
+          "băncii în care îşi desfăşoară activitatea",
+          "achizitioneze, direct sau prin interpusi, pentru ei sau pentru alţii, bunurile ce au format obiectul activităţii de executare silită sau să facă acte de executare în propria lor cauza ori în cauzele privind rudele şi afinii până la gradul al patrulea inclusiv"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "executorul bancar",
+          "banca",
+          "executorilor bancari",
+          "cauzarea de prejudiciu prin încălcarea obligaţiilor sale profesionale",
+          "Asigurarea de răspundere profesională a executorului bancar",
+          "băncii în care îşi desfăşoară activitatea",
+          "achizitioneze, direct sau prin interpusi, pentru ei sau pentru alţii, bunurile ce au format obiectul activităţii de executare silită sau să facă acte de executare în propria lor cauza ori în cauzele privind rudele şi afinii până la gradul al patrulea inclusiv"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "failure": null,
+      "historical_wall_s": 6.28066200000012,
+      "note": "Revalidation only; historical latency and repair decisions are not current measurements."
+    },
+    {
+      "experiment": "screen",
+      "config": "mild",
+      "condition": "resident",
+      "case": "semantic-06",
+      "before": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "HOTĂRÂRE nr. 55 din 29 ianuarie 1999 privind organizarea şi funcţionarea Direcţiei generale de prognoza în subordinea Ministerului Finanţelor",
+          "Guvernul României",
+          "Direcţia generală de prognoza",
+          "Ministerului Finanţelor",
+          "Comisiei Naţionale de Prognoza"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "HOTĂRÂRE nr. 55 din 29 ianuarie 1999 privind organizarea şi funcţionarea Direcţiei generale de prognoza în subordinea Ministerului Finanţelor",
+          "Guvernul României",
+          "Direcţia generală de prognoza",
+          "Ministerului Finanţelor",
+          "Comisiei Naţionale de Prognoza"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "failure": null,
+      "historical_wall_s": 6.4366086,
+      "note": "Revalidation only; historical latency and repair decisions are not current measurements."
+    },
+    {
+      "experiment": "screen",
+      "config": "mild",
+      "condition": "resident",
+      "case": "semantic-09",
+      "before": {
+        "target_correct": true,
+        "unresolved": 1,
+        "entity_names": [
+          "Membrii Consiliului de administraţie al A.N.L.",
+          "Consiliul de administraţie al A.N.L.",
+          "cei membri",
+          "o indemnizaţie lunară în cuantum de 20% din salariul de baza brut lunar al directorului general al A.N.L.",
+          "lege"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 1,
+        "entity_names": [
+          "Membrii Consiliului de administraţie al A.N.L.",
+          "Consiliul de administraţie al A.N.L.",
+          "cei membri",
+          "o indemnizaţie lunară în cuantum de 20% din salariul de baza brut lunar al directorului general al A.N.L.",
+          "lege"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "failure": null,
+      "historical_wall_s": 6.93328560000009,
+      "note": "Revalidation only; historical latency and repair decisions are not current measurements."
+    },
+    {
+      "experiment": "screen",
+      "config": "mild",
+      "condition": "resident",
+      "case": "semantic-13",
+      "before": {
+        "target_correct": true,
+        "unresolved": 1,
+        "entity_names": [
+          "tractoarelor, combinelor, maşinilor şi utilajelor agricole, precum şi a instalaţiilor pentru irigat",
+          "sancţiunile civile prevăzute la art. 6 din ordonanţa",
+          "Subvenţia",
+          "Beneficiarul de credite",
+          "tractoarelor, combinelor, maşinilor şi utilajelor agricole, precum şi a instalaţiilor pentru irigat, achiziţionate în condiţiile ordonanţei şi ale prezentelor norme metodologice",
+          "achitarea integrală a creditului",
+          "dobânzile calculate şi datorate de beneficiarul de credite numai la soldul creditului curent, calculat lunar",
+          "subvenţia de 70% din dobânda calculată la creditul curent, după plata cotei de 30% din dobânda"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 1,
+        "entity_names": [
+          "tractoarelor, combinelor, maşinilor şi utilajelor agricole, precum şi a instalaţiilor pentru irigat",
+          "sancţiunile civile prevăzute la art. 6 din ordonanţa",
+          "Subvenţia",
+          "Beneficiarul de credite",
+          "tractoarelor, combinelor, maşinilor şi utilajelor agricole, precum şi a instalaţiilor pentru irigat, achiziţionate în condiţiile ordonanţei şi ale prezentelor norme metodologice",
+          "achitarea integrală a creditului",
+          "dobânzile calculate şi datorate de beneficiarul de credite numai la soldul creditului curent, calculat lunar",
+          "subvenţia de 70% din dobânda calculată la creditul curent, după plata cotei de 30% din dobânda"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "failure": null,
+      "historical_wall_s": 8.41421360000004,
+      "note": "Revalidation only; historical latency and repair decisions are not current measurements."
+    },
+    {
+      "experiment": "screen",
+      "config": "recommended",
+      "condition": "resident",
+      "case": "semantic-02",
+      "before": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "executorul bancar",
+          "Asigurarea de răspundere profesională a executorului bancar",
+          "executorilor bancari"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "executorul bancar",
+          "Asigurarea de răspundere profesională a executorului bancar",
+          "executorilor bancari"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "failure": null,
+      "historical_wall_s": 3.3570984999996654,
+      "note": "Revalidation only; historical latency and repair decisions are not current measurements."
+    },
+    {
+      "experiment": "screen",
+      "config": "recommended",
+      "condition": "resident",
+      "case": "semantic-06",
+      "before": {
+        "target_correct": false,
+        "unresolved": 0,
+        "entity_names": [
+          "HOTĂRÂRE nr. 55 din 29 ianuarie 1999 privind organizarea şi funcţionarea Direcţiei generale de prognoza în subordinea Ministerului Finanţelor",
+          "Guvernul României",
+          "Direcţia generală de prognoza",
+          "Ministerului Finanţelor",
+          "Comisiei Naţionale de Prognoza"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": false,
+        "unresolved": 0,
+        "entity_names": [
+          "HOTĂRÂRE nr. 55 din 29 ianuarie 1999 privind organizarea şi funcţionarea Direcţiei generale de prognoza în subordinea Ministerului Finanţelor",
+          "Guvernul României",
+          "Direcţia generală de prognoza",
+          "Ministerului Finanţelor",
+          "Comisiei Naţionale de Prognoza"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "failure": null,
+      "historical_wall_s": 5.529911700000412,
+      "note": "Revalidation only; historical latency and repair decisions are not current measurements."
+    },
+    {
+      "experiment": "screen",
+      "config": "recommended",
+      "condition": "resident",
+      "case": "semantic-09",
+      "before": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "Membrii Consiliului de administraţie al A.N.L.",
+          "Consiliul de administraţie al A.N.L.",
+          "o indemnizaţie lunară în cuantum de 20% din salariul de baza brut lunar al directorului general al A.N.L.",
+          "lege",
+          "Consiliului naţional de coordonare al A.N.L."
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 1,
+        "entity_names": [
+          "Membrii Consiliului de administraţie al A.N.L.",
+          "Consiliul de administraţie al A.N.L.",
+          "o indemnizaţie lunară în cuantum de 20% din salariul de baza brut lunar al directorului general al A.N.L.",
+          "lege",
+          "Consiliului naţional de coordonare al A.N.L."
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "failure": null,
+      "historical_wall_s": 7.148906700000225,
+      "note": "Revalidation only; historical latency and repair decisions are not current measurements."
+    },
+    {
+      "experiment": "screen",
+      "config": "recommended",
+      "condition": "resident",
+      "case": "semantic-13",
+      "before": {
+        "target_correct": true,
+        "unresolved": 1,
+        "entity_names": [
+          "tractoarelor, combinelor, maşinilor şi utilajelor agricole, precum şi a instalaţiilor pentru irigat",
+          "sancţiunile civile prevăzute la art. 6 din ordonanţa",
+          "Subvenţia",
+          "Beneficiarul de credite",
+          "tractoarelor, combinelor, maşinilor şi utilajelor agricole, precum şi a instalaţiilor pentru irigat, achiziţionate în condiţiile ordonanţei şi ale prezentelor norme metodologice",
+          "achitarea integrală a creditului",
+          "subvenţia de 70% din dobânda calculată la creditul curent"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 1,
+        "entity_names": [
+          "tractoarelor, combinelor, maşinilor şi utilajelor agricole, precum şi a instalaţiilor pentru irigat",
+          "sancţiunile civile prevăzute la art. 6 din ordonanţa",
+          "Subvenţia",
+          "Beneficiarul de credite",
+          "tractoarelor, combinelor, maşinilor şi utilajelor agricole, precum şi a instalaţiilor pentru irigat, achiziţionate în condiţiile ordonanţei şi ale prezentelor norme metodologice",
+          "achitarea integrală a creditului",
+          "subvenţia de 70% din dobânda calculată la creditul curent"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "failure": null,
+      "historical_wall_s": 7.547952100000657,
+      "note": "Revalidation only; historical latency and repair decisions are not current measurements."
+    },
+    {
+      "experiment": "screen",
+      "config": "context8k",
+      "condition": "resident",
+      "case": "semantic-02",
+      "before": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "executorul bancar",
+          "banca",
+          "executorilor bancari",
+          "cauzarea de prejudiciu prin încălcarea obligaţiilor sale profesionale",
+          "Asigurarea de răspundere profesională a executorului bancar",
+          "de către şi în contul băncii în care îşi desfăşoară activitatea, dacă aceasta este expres stipulată, după caz, în regulamentul intern al băncii sau în convenţia încheiată de banca cu executorul bancar.",
+          "sa achizitioneze, direct sau prin interpusi, pentru ei sau pentru alţii, bunurile ce au format obiectul activităţii de executare silită sau să facă acte de executare în propria lor cauza ori în cauzele privind rudele şi afinii până la gradul al patrulea inclusiv."
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "executorul bancar",
+          "banca",
+          "executorilor bancari",
+          "cauzarea de prejudiciu prin încălcarea obligaţiilor sale profesionale",
+          "Asigurarea de răspundere profesională a executorului bancar",
+          "de către şi în contul băncii în care îşi desfăşoară activitatea, dacă aceasta este expres stipulată, după caz, în regulamentul intern al băncii sau în convenţia încheiată de banca cu executorul bancar.",
+          "sa achizitioneze, direct sau prin interpusi, pentru ei sau pentru alţii, bunurile ce au format obiectul activităţii de executare silită sau să facă acte de executare în propria lor cauza ori în cauzele privind rudele şi afinii până la gradul al patrulea inclusiv."
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "failure": null,
+      "historical_wall_s": 7.04508689999966,
+      "note": "Revalidation only; historical latency and repair decisions are not current measurements."
+    },
+    {
+      "experiment": "screen",
+      "config": "context8k",
+      "condition": "resident",
+      "case": "semantic-06",
+      "before": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "HOTĂRÂRE nr. 55 din 29 ianuarie 1999 privind organizarea şi funcţionarea Direcţiei generale de prognoza în subordinea Ministerului Finanţelor",
+          "Guvernul României",
+          "Direcţia generală de prognoza",
+          "Ministerului Finanţelor",
+          "Comisiei Naţionale de Prognoza"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "HOTĂRÂRE nr. 55 din 29 ianuarie 1999 privind organizarea şi funcţionarea Direcţiei generale de prognoza în subordinea Ministerului Finanţelor",
+          "Guvernul României",
+          "Direcţia generală de prognoza",
+          "Ministerului Finanţelor",
+          "Comisiei Naţionale de Prognoza"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "failure": null,
+      "historical_wall_s": 6.776227600000311,
+      "note": "Revalidation only; historical latency and repair decisions are not current measurements."
+    },
+    {
+      "experiment": "screen",
+      "config": "context8k",
+      "condition": "resident",
+      "case": "semantic-09",
+      "before": {
+        "target_correct": true,
+        "unresolved": 1,
+        "entity_names": [
+          "Membrii Consiliului de administraţie al A.N.L.",
+          "Consiliul de administraţie al A.N.L.",
+          "cei membri",
+          "o indemnizaţie lunară în cuantum de 20% din salariul de baza brut lunar al directorului general al A.N.L."
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 1,
+        "entity_names": [
+          "Membrii Consiliului de administraţie al A.N.L.",
+          "Consiliul de administraţie al A.N.L.",
+          "cei membri",
+          "o indemnizaţie lunară în cuantum de 20% din salariul de baza brut lunar al directorului general al A.N.L."
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "failure": null,
+      "historical_wall_s": 6.481090800000857,
+      "note": "Revalidation only; historical latency and repair decisions are not current measurements."
+    },
+    {
+      "experiment": "screen",
+      "config": "context8k",
+      "condition": "resident",
+      "case": "semantic-13",
+      "before": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "tractoarelor, combinelor, maşinilor şi utilajelor agricole, precum şi a instalaţiilor pentru irigat",
+          "sancţiunile civile prevăzute la art. 6 din ordonanţa",
+          "Subvenţia",
+          "Beneficiarul de credite",
+          "tractoarelor, combinelor, maşinilor şi utilajelor agricole, precum şi a instalaţiilor pentru irigat, achiziţionate în condiţiile ordonanţei şi ale prezentelor norme metodologice",
+          "achitarea integrală a creditului",
+          "dobânzile calculate şi datorate de beneficiarul de credite numai la soldul creditului curent, calculat lunar",
+          "subvenţia de 70% din dobânda calculată la creditul curent, după plata cotei de 30% din dobânda"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "tractoarelor, combinelor, maşinilor şi utilajelor agricole, precum şi a instalaţiilor pentru irigat",
+          "sancţiunile civile prevăzute la art. 6 din ordonanţa",
+          "Subvenţia",
+          "Beneficiarul de credite",
+          "tractoarelor, combinelor, maşinilor şi utilajelor agricole, precum şi a instalaţiilor pentru irigat, achiziţionate în condiţiile ordonanţei şi ale prezentelor norme metodologice",
+          "achitarea integrală a creditului",
+          "dobânzile calculate şi datorate de beneficiarul de credite numai la soldul creditului curent, calculat lunar",
+          "subvenţia de 70% din dobânda calculată la creditul curent, după plata cotei de 30% din dobânda"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "failure": null,
+      "historical_wall_s": 8.664690400000836,
+      "note": "Revalidation only; historical latency and repair decisions are not current measurements."
+    },
+    {
+      "experiment": "screen",
+      "config": "batch128",
+      "condition": "resident",
+      "case": "semantic-02",
+      "before": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "executorul bancar",
+          "banca",
+          "executorilor bancari",
+          "cauzarea de prejudiciu prin încălcarea obligaţiilor sale profesionale",
+          "Asigurarea de răspundere profesională a executorului bancar",
+          "de către şi în contul băncii în care îşi desfăşoară activitatea, dacă aceasta este expres stipulată, după caz, în regulamentul intern al băncii sau în convenţia încheiată de banca cu executorul bancar.",
+          "achizitioneze, direct sau prin interpusi, pentru ei sau pentru alţii, bunurile ce au format obiectul activităţii de executare silită sau să facă acte de executare în propria lor cauza ori în cauzele privind rudele şi afinii până la gradul al patrulea inclusiv."
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "executorul bancar",
+          "banca",
+          "executorilor bancari",
+          "cauzarea de prejudiciu prin încălcarea obligaţiilor sale profesionale",
+          "Asigurarea de răspundere profesională a executorului bancar",
+          "de către şi în contul băncii în care îşi desfăşoară activitatea, dacă aceasta este expres stipulată, după caz, în regulamentul intern al băncii sau în convenţia încheiată de banca cu executorul bancar.",
+          "achizitioneze, direct sau prin interpusi, pentru ei sau pentru alţii, bunurile ce au format obiectul activităţii de executare silită sau să facă acte de executare în propria lor cauza ori în cauzele privind rudele şi afinii până la gradul al patrulea inclusiv."
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "failure": null,
+      "historical_wall_s": 7.092072099999314,
+      "note": "Revalidation only; historical latency and repair decisions are not current measurements."
+    },
+    {
+      "experiment": "screen",
+      "config": "batch128",
+      "condition": "resident",
+      "case": "semantic-06",
+      "before": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "HOTĂRÂRE nr. 55 din 29 ianuarie 1999 privind organizarea şi funcţionarea Direcţiei generale de prognoza în subordinea Ministerului Finanţelor",
+          "Guvernul României",
+          "Direcţia generală de prognoza",
+          "Ministerului Finanţelor",
+          "Comisiei Naţionale de Prognoza"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "HOTĂRÂRE nr. 55 din 29 ianuarie 1999 privind organizarea şi funcţionarea Direcţiei generale de prognoza în subordinea Ministerului Finanţelor",
+          "Guvernul României",
+          "Direcţia generală de prognoza",
+          "Ministerului Finanţelor",
+          "Comisiei Naţionale de Prognoza"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "failure": null,
+      "historical_wall_s": 7.007351000000199,
+      "note": "Revalidation only; historical latency and repair decisions are not current measurements."
+    },
+    {
+      "experiment": "screen",
+      "config": "batch128",
+      "condition": "resident",
+      "case": "semantic-09",
+      "before": {
+        "target_correct": true,
+        "unresolved": 1,
+        "entity_names": [
+          "Membrii Consiliului de administraţie al A.N.L.",
+          "Consiliul de administraţie al A.N.L.",
+          "cei membri",
+          "o indemnizaţie lunară în cuantum de 20% din salariul de baza brut lunar al directorului general al A.N.L."
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 1,
+        "entity_names": [
+          "Membrii Consiliului de administraţie al A.N.L.",
+          "Consiliul de administraţie al A.N.L.",
+          "cei membri",
+          "o indemnizaţie lunară în cuantum de 20% din salariul de baza brut lunar al directorului general al A.N.L."
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "failure": null,
+      "historical_wall_s": 6.817686700000195,
+      "note": "Revalidation only; historical latency and repair decisions are not current measurements."
+    },
+    {
+      "experiment": "screen",
+      "config": "batch128",
+      "condition": "resident",
+      "case": "semantic-13",
+      "before": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "tractoarelor, combinelor, maşinilor şi utilajelor agricole, precum şi a instalaţiilor pentru irigat",
+          "sancţiunile civile prevăzute la art. 6 din ordonanţa",
+          "Subvenţia",
+          "Beneficiarul de credite",
+          "tractoarelor, combinelor, maşinilor şi utilajelor agricole, precum şi a instalaţiilor pentru irigat, achiziţionate în condiţiile ordonanţei şi ale prezentelor norme metodologice",
+          "achitarea integrală a creditului",
+          "dobânzile calculate şi datorate de beneficiarul de credite numai la soldul creditului curent, calculat lunar",
+          "subvenţia de 70% din dobânda calculată la creditul curent, după plata cotei de 30% din dobânda"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "tractoarelor, combinelor, maşinilor şi utilajelor agricole, precum şi a instalaţiilor pentru irigat",
+          "sancţiunile civile prevăzute la art. 6 din ordonanţa",
+          "Subvenţia",
+          "Beneficiarul de credite",
+          "tractoarelor, combinelor, maşinilor şi utilajelor agricole, precum şi a instalaţiilor pentru irigat, achiziţionate în condiţiile ordonanţei şi ale prezentelor norme metodologice",
+          "achitarea integrală a creditului",
+          "dobânzile calculate şi datorate de beneficiarul de credite numai la soldul creditului curent, calculat lunar",
+          "subvenţia de 70% din dobânda calculată la creditul curent, după plata cotei de 30% din dobânda"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "failure": null,
+      "historical_wall_s": 8.682496500000525,
+      "note": "Revalidation only; historical latency and repair decisions are not current measurements."
+    },
+    {
+      "experiment": "thinking",
+      "config": "greedy",
+      "condition": "resident",
+      "case": "semantic-02",
+      "before": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "executorul bancar",
+          "Răspunderea civilă a executorului bancar",
+          "obligaţiilor sale profesionale",
+          "Asigurarea de răspundere profesională a executorului bancar",
+          "băncii",
+          "regulamentul intern al băncii",
+          "convenţia încheiată de banca cu executorul bancar",
+          "bunurile ce au format obiectul activităţii de executare silită",
+          "rudele şi afinii până la gradul al patrulea inclusiv",
+          "cauzarea de prejudiciu prin încălcarea obligaţiilor sale profesionale",
+          "băncii în care îşi desfăşoară activitatea",
+          "regulamentul intern al băncii sau în convenţia încheiată de banca cu executorul bancar",
+          "executorilor bancari",
+          "bunurile ce au format obiectul activităţii de executare silită sau să facă acte de executare în propria lor cauza ori în cauzele privind rudele şi afinii până la gradul al patrulea inclusiv."
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "executorul bancar",
+          "Răspunderea civilă a executorului bancar",
+          "obligaţiilor sale profesionale",
+          "Asigurarea de răspundere profesională a executorului bancar",
+          "băncii",
+          "regulamentul intern al băncii",
+          "convenţia încheiată de banca cu executorul bancar",
+          "bunurile ce au format obiectul activităţii de executare silită",
+          "rudele şi afinii până la gradul al patrulea inclusiv",
+          "cauzarea de prejudiciu prin încălcarea obligaţiilor sale profesionale",
+          "băncii în care îşi desfăşoară activitatea",
+          "regulamentul intern al băncii sau în convenţia încheiată de banca cu executorul bancar",
+          "executorilor bancari",
+          "bunurile ce au format obiectul activităţii de executare silită sau să facă acte de executare în propria lor cauza ori în cauzele privind rudele şi afinii până la gradul al patrulea inclusiv."
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "failure": null,
+      "historical_wall_s": 19.99940240000069,
+      "note": "Revalidation only; historical latency and repair decisions are not current measurements."
+    },
+    {
+      "experiment": "thinking",
+      "config": "greedy",
+      "condition": "resident",
+      "case": "semantic-06",
+      "before": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "HOTĂRÂRE nr. 55 din 29 ianuarie 1999 privind organizarea şi funcţionarea Direcţiei generale de prognoza în subordinea Ministerului Finanţelor",
+          "MONITORUL OFICIAL nr. 48 din 30 ianuarie 1999",
+          "Constituţia României",
+          "Ministerul Finanţelor",
+          "Guvernul",
+          "Direcţia generală de prognoza",
+          "Comisia Naţională de Prognoză"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "HOTĂRÂRE nr. 55 din 29 ianuarie 1999 privind organizarea şi funcţionarea Direcţiei generale de prognoza în subordinea Ministerului Finanţelor",
+          "MONITORUL OFICIAL nr. 48 din 30 ianuarie 1999",
+          "Constituţia României",
+          "Ministerul Finanţelor",
+          "Guvernul",
+          "Direcţia generală de prognoza",
+          "Comisia Naţională de Prognoză"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "failure": null,
+      "historical_wall_s": 19.75889780000216,
+      "note": "Revalidation only; historical latency and repair decisions are not current measurements."
+    },
+    {
+      "experiment": "thinking",
+      "config": "greedy",
+      "condition": "resident",
+      "case": "semantic-09",
+      "before": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "Consiliul de administraţie al A.N.L.",
+          "directorul general al A.N.L.",
+          "Consiliul naţional de coordonare al A.N.L.",
+          "indemnizaţie lunară",
+          "antecedente penale",
+          "Membrii Consiliului de administraţie al A.N.L.",
+          "A.N.L.",
+          "o indemnizaţie lunară în cuantum de 20% din salariul de baza brut lunar al directorului general al A.N.L.",
+          "membri ai Consiliului de administraţie al A.N.L."
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 2
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "Consiliul de administraţie al A.N.L.",
+          "directorul general al A.N.L.",
+          "Consiliul naţional de coordonare al A.N.L.",
+          "indemnizaţie lunară",
+          "antecedente penale",
+          "Membrii Consiliului de administraţie al A.N.L.",
+          "A.N.L.",
+          "o indemnizaţie lunară în cuantum de 20% din salariul de baza brut lunar al directorului general al A.N.L.",
+          "membri ai Consiliului de administraţie al A.N.L."
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 2
+      },
+      "failure": null,
+      "historical_wall_s": 27.069415500001924,
+      "note": "Revalidation only; historical latency and repair decisions are not current measurements."
+    },
+    {
+      "experiment": "thinking",
+      "config": "greedy",
+      "condition": "resident",
+      "case": "semantic-13",
+      "before": {
+        "target_correct": true,
+        "unresolved": 1,
+        "entity_names": [
+          "ordonanţa",
+          "norme metodologice",
+          "sancţiunile civile",
+          "bugetul de stat",
+          "beneficiarul de credite",
+          "banca comercială creditoare",
+          "înstrăinării",
+          "sancţiunile civile prevăzute la art. 6 din ordonanţa",
+          "Beneficiarul de credite"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 1,
+        "entity_names": [
+          "ordonanţa",
+          "norme metodologice",
+          "sancţiunile civile",
+          "bugetul de stat",
+          "beneficiarul de credite",
+          "banca comercială creditoare",
+          "înstrăinării",
+          "sancţiunile civile prevăzute la art. 6 din ordonanţa",
+          "Beneficiarul de credite"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "failure": null,
+      "historical_wall_s": 20.96305619999839,
+      "note": "Revalidation only; historical latency and repair decisions are not current measurements."
+    },
+    {
+      "experiment": "warmup",
+      "config": "greedy",
+      "condition": "cold",
+      "case": "semantic-02",
+      "before": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "executorul bancar",
+          "banca",
+          "executorilor bancari",
+          "cauzarea de prejudiciu prin încălcarea obligaţiilor sale profesionale",
+          "Asigurarea de răspundere profesională a executorului bancar",
+          "de către şi în contul băncii în care îşi desfăşoară activitatea, dacă aceasta este expres stipulată, după caz, în regulamentul intern al băncii sau în convenţia încheiată de banca cu executorul bancar.",
+          "achizitioneze, direct sau prin interpusi, pentru ei sau pentru alţii, bunurile ce au format obiectul activităţii de executare silită sau să facă acte de executare în propria lor cauza ori în cauzele privind rudele şi afinii până la gradul al patrulea inclusiv."
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "executorul bancar",
+          "banca",
+          "executorilor bancari",
+          "cauzarea de prejudiciu prin încălcarea obligaţiilor sale profesionale",
+          "Asigurarea de răspundere profesională a executorului bancar",
+          "de către şi în contul băncii în care îşi desfăşoară activitatea, dacă aceasta este expres stipulată, după caz, în regulamentul intern al băncii sau în convenţia încheiată de banca cu executorul bancar.",
+          "achizitioneze, direct sau prin interpusi, pentru ei sau pentru alţii, bunurile ce au format obiectul activităţii de executare silită sau să facă acte de executare în propria lor cauza ori în cauzele privind rudele şi afinii până la gradul al patrulea inclusiv."
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "failure": null,
+      "historical_wall_s": 14.350751899997704,
+      "note": "Revalidation only; historical latency and repair decisions are not current measurements."
+    },
+    {
+      "experiment": "warmup",
+      "config": "greedy",
+      "condition": "cold",
+      "case": "semantic-06",
+      "before": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "HOTĂRÂRE nr. 55 din 29 ianuarie 1999 privind organizarea şi funcţionarea Direcţiei generale de prognoza în subordinea Ministerului Finanţelor",
+          "Guvernul României",
+          "Direcţia generală de prognoza",
+          "Ministerului Finanţelor",
+          "Comisiei Naţionale de Prognoza"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "HOTĂRÂRE nr. 55 din 29 ianuarie 1999 privind organizarea şi funcţionarea Direcţiei generale de prognoza în subordinea Ministerului Finanţelor",
+          "Guvernul României",
+          "Direcţia generală de prognoza",
+          "Ministerului Finanţelor",
+          "Comisiei Naţionale de Prognoza"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "failure": null,
+      "historical_wall_s": 6.418834899999638,
+      "note": "Revalidation only; historical latency and repair decisions are not current measurements."
+    },
+    {
+      "experiment": "warmup",
+      "config": "greedy",
+      "condition": "cold",
+      "case": "semantic-09",
+      "before": {
+        "target_correct": true,
+        "unresolved": 1,
+        "entity_names": [
+          "Membrii Consiliului de administraţie al A.N.L.",
+          "Consiliul de administraţie al A.N.L.",
+          "cei membri",
+          "o indemnizaţie lunară în cuantum de 20% din salariul de baza brut lunar al directorului general al A.N.L."
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 1,
+        "entity_names": [
+          "Membrii Consiliului de administraţie al A.N.L.",
+          "Consiliul de administraţie al A.N.L.",
+          "cei membri",
+          "o indemnizaţie lunară în cuantum de 20% din salariul de baza brut lunar al directorului general al A.N.L."
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "failure": null,
+      "historical_wall_s": 6.141574899997067,
+      "note": "Revalidation only; historical latency and repair decisions are not current measurements."
+    },
+    {
+      "experiment": "warmup",
+      "config": "greedy",
+      "condition": "cold",
+      "case": "semantic-13",
+      "before": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "tractoarelor, combinelor, maşinilor şi utilajelor agricole, precum şi a instalaţiilor pentru irigat",
+          "sancţiunile civile prevăzute la art. 6 din ordonanţa",
+          "Subvenţia",
+          "Beneficiarul de credite",
+          "tractoarelor, combinelor, maşinilor şi utilajelor agricole, precum şi a instalaţiilor pentru irigat, achiziţionate în condiţiile ordonanţei şi ale prezentelor norme metodologice",
+          "achitarea integrală a creditului",
+          "dobânzile calculate şi datorate de beneficiarul de credite numai la soldul creditului curent, calculat lunar",
+          "subvenţia de 70% din dobânda calculată la creditul curent, după plata cotei de 30% din dobânda"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "tractoarelor, combinelor, maşinilor şi utilajelor agricole, precum şi a instalaţiilor pentru irigat",
+          "sancţiunile civile prevăzute la art. 6 din ordonanţa",
+          "Subvenţia",
+          "Beneficiarul de credite",
+          "tractoarelor, combinelor, maşinilor şi utilajelor agricole, precum şi a instalaţiilor pentru irigat, achiziţionate în condiţiile ordonanţei şi ale prezentelor norme metodologice",
+          "achitarea integrală a creditului",
+          "dobânzile calculate şi datorate de beneficiarul de credite numai la soldul creditului curent, calculat lunar",
+          "subvenţia de 70% din dobânda calculată la creditul curent, după plata cotei de 30% din dobânda"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "failure": null,
+      "historical_wall_s": 8.305581099997653,
+      "note": "Revalidation only; historical latency and repair decisions are not current measurements."
+    },
+    {
+      "experiment": "warmup",
+      "config": "greedy",
+      "condition": "preload",
+      "case": "semantic-02",
+      "before": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "executorul bancar",
+          "banca",
+          "executorilor bancari",
+          "cauzarea de prejudiciu prin încălcarea obligaţiilor sale profesionale",
+          "Asigurarea de răspundere profesională a executorului bancar",
+          "de către şi în contul băncii în care îşi desfăşoară activitatea, dacă aceasta este expres stipulată, după caz, în regulamentul intern al băncii sau în convenţia încheiată de banca cu executorul bancar.",
+          "sa achizitioneze, direct sau prin interpusi, pentru ei sau pentru alţii, bunurile ce au format obiectul activităţii de executare silită sau să facă acte de executare în propria lor cauza ori în cauzele privind rudele şi afinii până la gradul al patrulea inclusiv."
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "executorul bancar",
+          "banca",
+          "executorilor bancari",
+          "cauzarea de prejudiciu prin încălcarea obligaţiilor sale profesionale",
+          "Asigurarea de răspundere profesională a executorului bancar",
+          "de către şi în contul băncii în care îşi desfăşoară activitatea, dacă aceasta este expres stipulată, după caz, în regulamentul intern al băncii sau în convenţia încheiată de banca cu executorul bancar.",
+          "sa achizitioneze, direct sau prin interpusi, pentru ei sau pentru alţii, bunurile ce au format obiectul activităţii de executare silită sau să facă acte de executare în propria lor cauza ori în cauzele privind rudele şi afinii până la gradul al patrulea inclusiv."
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "failure": null,
+      "historical_wall_s": 6.801994300003571,
+      "note": "Revalidation only; historical latency and repair decisions are not current measurements."
+    },
+    {
+      "experiment": "warmup",
+      "config": "greedy",
+      "condition": "preload",
+      "case": "semantic-06",
+      "before": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "HOTĂRÂRE nr. 55 din 29 ianuarie 1999 privind organizarea şi funcţionarea Direcţiei generale de prognoza în subordinea Ministerului Finanţelor",
+          "Guvernul României",
+          "Direcţia generală de prognoza",
+          "Ministerului Finanţelor",
+          "Comisiei Naţionale de Prognoza"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "HOTĂRÂRE nr. 55 din 29 ianuarie 1999 privind organizarea şi funcţionarea Direcţiei generale de prognoza în subordinea Ministerului Finanţelor",
+          "Guvernul României",
+          "Direcţia generală de prognoza",
+          "Ministerului Finanţelor",
+          "Comisiei Naţionale de Prognoza"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "failure": null,
+      "historical_wall_s": 6.563926400001947,
+      "note": "Revalidation only; historical latency and repair decisions are not current measurements."
+    },
+    {
+      "experiment": "warmup",
+      "config": "greedy",
+      "condition": "preload",
+      "case": "semantic-09",
+      "before": {
+        "target_correct": true,
+        "unresolved": 1,
+        "entity_names": [
+          "Membrii Consiliului de administraţie al A.N.L.",
+          "Consiliul de administraţie al A.N.L.",
+          "cei membri",
+          "o indemnizaţie lunară în cuantum de 20% din salariul de baza brut lunar al directorului general al A.N.L."
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 1,
+        "entity_names": [
+          "Membrii Consiliului de administraţie al A.N.L.",
+          "Consiliul de administraţie al A.N.L.",
+          "cei membri",
+          "o indemnizaţie lunară în cuantum de 20% din salariul de baza brut lunar al directorului general al A.N.L."
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "failure": null,
+      "historical_wall_s": 6.2664719999993395,
+      "note": "Revalidation only; historical latency and repair decisions are not current measurements."
+    },
+    {
+      "experiment": "warmup",
+      "config": "greedy",
+      "condition": "preload",
+      "case": "semantic-13",
+      "before": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "tractoarelor, combinelor, maşinilor şi utilajelor agricole, precum şi a instalaţiilor pentru irigat",
+          "sancţiunile civile prevăzute la art. 6 din ordonanţa",
+          "Subvenţia",
+          "Beneficiarul de credite",
+          "tractoarelor, combinelor, maşinilor şi utilajelor agricole, precum şi a instalaţiilor pentru irigat, achiziţionate în condiţiile ordonanţei şi ale prezentelor norme metodologice",
+          "achitarea integrală a creditului",
+          "dobânzile calculate şi datorate de beneficiarul de credite numai la soldul creditului curent, calculat lunar",
+          "subvenţia de 70% din dobânda calculată la creditul curent, după plata cotei de 30% din dobânda"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "tractoarelor, combinelor, maşinilor şi utilajelor agricole, precum şi a instalaţiilor pentru irigat",
+          "sancţiunile civile prevăzute la art. 6 din ordonanţa",
+          "Subvenţia",
+          "Beneficiarul de credite",
+          "tractoarelor, combinelor, maşinilor şi utilajelor agricole, precum şi a instalaţiilor pentru irigat, achiziţionate în condiţiile ordonanţei şi ale prezentelor norme metodologice",
+          "achitarea integrală a creditului",
+          "dobânzile calculate şi datorate de beneficiarul de credite numai la soldul creditului curent, calculat lunar",
+          "subvenţia de 70% din dobânda calculată la creditul curent, după plata cotei de 30% din dobânda"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "failure": null,
+      "historical_wall_s": 8.541926699999749,
+      "note": "Revalidation only; historical latency and repair decisions are not current measurements."
+    },
+    {
+      "experiment": "warmup",
+      "config": "greedy",
+      "condition": "prefix",
+      "case": "semantic-02",
+      "before": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "executorul bancar",
+          "banca",
+          "executorilor bancari",
+          "cauzarea de prejudiciu prin încălcarea obligaţiilor sale profesionale",
+          "Asigurarea de răspundere profesională a executorului bancar",
+          "de către şi în contul băncii în care îşi desfăşoară activitatea, dacă aceasta este expres stipulată, după caz, în regulamentul intern al băncii sau în convenţia încheiată de banca cu executorul bancar.",
+          "sa achizitioneze, direct sau prin interpusi, pentru ei sau pentru alţii, bunurile ce au format obiectul activităţii de executare silită sau să facă acte de executare în propria lor cauza ori în cauzele privind rudele şi afinii până la gradul al patrulea inclusiv."
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "executorul bancar",
+          "banca",
+          "executorilor bancari",
+          "cauzarea de prejudiciu prin încălcarea obligaţiilor sale profesionale",
+          "Asigurarea de răspundere profesională a executorului bancar",
+          "de către şi în contul băncii în care îşi desfăşoară activitatea, dacă aceasta este expres stipulată, după caz, în regulamentul intern al băncii sau în convenţia încheiată de banca cu executorul bancar.",
+          "sa achizitioneze, direct sau prin interpusi, pentru ei sau pentru alţii, bunurile ce au format obiectul activităţii de executare silită sau să facă acte de executare în propria lor cauza ori în cauzele privind rudele şi afinii până la gradul al patrulea inclusiv."
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "failure": null,
+      "historical_wall_s": 6.889799100001255,
+      "note": "Revalidation only; historical latency and repair decisions are not current measurements."
+    },
+    {
+      "experiment": "warmup",
+      "config": "greedy",
+      "condition": "prefix",
+      "case": "semantic-06",
+      "before": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "HOTĂRÂRE nr. 55 din 29 ianuarie 1999 privind organizarea şi funcţionarea Direcţiei generale de prognoza în subordinea Ministerului Finanţelor",
+          "Guvernul României",
+          "Direcţia generală de prognoza",
+          "Ministerului Finanţelor",
+          "Comisiei Naţionale de Prognoza"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "HOTĂRÂRE nr. 55 din 29 ianuarie 1999 privind organizarea şi funcţionarea Direcţiei generale de prognoza în subordinea Ministerului Finanţelor",
+          "Guvernul României",
+          "Direcţia generală de prognoza",
+          "Ministerului Finanţelor",
+          "Comisiei Naţionale de Prognoza"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "failure": null,
+      "historical_wall_s": 6.786781500002689,
+      "note": "Revalidation only; historical latency and repair decisions are not current measurements."
+    },
+    {
+      "experiment": "warmup",
+      "config": "greedy",
+      "condition": "prefix",
+      "case": "semantic-09",
+      "before": {
+        "target_correct": true,
+        "unresolved": 1,
+        "entity_names": [
+          "Membrii Consiliului de administraţie al A.N.L.",
+          "Consiliul de administraţie al A.N.L.",
+          "cei membri",
+          "o indemnizaţie lunară în cuantum de 20% din salariul de baza brut lunar al directorului general al A.N.L."
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 1,
+        "entity_names": [
+          "Membrii Consiliului de administraţie al A.N.L.",
+          "Consiliul de administraţie al A.N.L.",
+          "cei membri",
+          "o indemnizaţie lunară în cuantum de 20% din salariul de baza brut lunar al directorului general al A.N.L."
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "failure": null,
+      "historical_wall_s": 6.540423099999316,
+      "note": "Revalidation only; historical latency and repair decisions are not current measurements."
+    },
+    {
+      "experiment": "warmup",
+      "config": "greedy",
+      "condition": "prefix",
+      "case": "semantic-13",
+      "before": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "tractoarelor, combinelor, maşinilor şi utilajelor agricole, precum şi a instalaţiilor pentru irigat",
+          "sancţiunile civile prevăzute la art. 6 din ordonanţa",
+          "Subvenţia",
+          "Beneficiarul de credite",
+          "tractoarelor, combinelor, maşinilor şi utilajelor agricole, precum şi a instalaţiilor pentru irigat, achiziţionate în condiţiile ordonanţei şi ale prezentelor norme metodologice",
+          "achitarea integrală a creditului",
+          "dobânzile calculate şi datorate de beneficiarul de credite numai la soldul creditului curent, calculat lunar",
+          "subvenţia de 70% din dobânda calculată la creditul curent, după plata cotei de 30% din dobânda"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "tractoarelor, combinelor, maşinilor şi utilajelor agricole, precum şi a instalaţiilor pentru irigat",
+          "sancţiunile civile prevăzute la art. 6 din ordonanţa",
+          "Subvenţia",
+          "Beneficiarul de credite",
+          "tractoarelor, combinelor, maşinilor şi utilajelor agricole, precum şi a instalaţiilor pentru irigat, achiziţionate în condiţiile ordonanţei şi ale prezentelor norme metodologice",
+          "achitarea integrală a creditului",
+          "dobânzile calculate şi datorate de beneficiarul de credite numai la soldul creditului curent, calculat lunar",
+          "subvenţia de 70% din dobânda calculată la creditul curent, după plata cotei de 30% din dobânda"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "failure": null,
+      "historical_wall_s": 8.701047700000345,
+      "note": "Revalidation only; historical latency and repair decisions are not current measurements."
+    },
+    {
+      "experiment": "warmup-costed",
+      "config": "greedy",
+      "condition": "cold",
+      "case": "semantic-02",
+      "before": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "executorul bancar",
+          "banca",
+          "executorilor bancari",
+          "cauzarea de prejudiciu prin încălcarea obligaţiilor sale profesionale",
+          "Asigurarea de răspundere profesională a executorului bancar",
+          "de către şi în contul băncii în care îşi desfăşoară activitatea, dacă aceasta este expres stipulată, după caz, în regulamentul intern al băncii sau în convenţia încheiată de banca cu executorul bancar.",
+          "sa achizitioneze, direct sau prin interpusi, pentru ei sau pentru alţii, bunurile ce au format obiectul activităţii de executare silită sau să facă acte de executare în propria lor cauza ori în cauzele privind rudele şi afinii până la gradul al patrulea inclusiv."
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "executorul bancar",
+          "banca",
+          "executorilor bancari",
+          "cauzarea de prejudiciu prin încălcarea obligaţiilor sale profesionale",
+          "Asigurarea de răspundere profesională a executorului bancar",
+          "de către şi în contul băncii în care îşi desfăşoară activitatea, dacă aceasta este expres stipulată, după caz, în regulamentul intern al băncii sau în convenţia încheiată de banca cu executorul bancar.",
+          "sa achizitioneze, direct sau prin interpusi, pentru ei sau pentru alţii, bunurile ce au format obiectul activităţii de executare silită sau să facă acte de executare în propria lor cauza ori în cauzele privind rudele şi afinii până la gradul al patrulea inclusiv."
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "failure": null,
+      "historical_wall_s": 12.541533800002071,
+      "note": "Revalidation only; historical latency and repair decisions are not current measurements."
+    },
+    {
+      "experiment": "warmup-costed",
+      "config": "greedy",
+      "condition": "preload",
+      "case": "semantic-02",
+      "before": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "executorul bancar",
+          "banca",
+          "executorilor bancari",
+          "cauzarea de prejudiciu prin încălcarea obligaţiilor sale profesionale",
+          "Asigurarea de răspundere profesională a executorului bancar",
+          "de către şi în contul băncii în care îşi desfăşoară activitatea, dacă aceasta este expres stipulată, după caz, în regulamentul intern al băncii sau în convenţia încheiată de banca cu executorul bancar.",
+          "sa achizitioneze, direct sau prin interpusi, pentru ei sau pentru alţii, bunurile ce au format obiectul activităţii de executare silită sau să facă acte de executare în propria lor cauza ori în cauzele privind rudele şi afinii până la gradul al patrulea inclusiv."
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "executorul bancar",
+          "banca",
+          "executorilor bancari",
+          "cauzarea de prejudiciu prin încălcarea obligaţiilor sale profesionale",
+          "Asigurarea de răspundere profesională a executorului bancar",
+          "de către şi în contul băncii în care îşi desfăşoară activitatea, dacă aceasta este expres stipulată, după caz, în regulamentul intern al băncii sau în convenţia încheiată de banca cu executorul bancar.",
+          "sa achizitioneze, direct sau prin interpusi, pentru ei sau pentru alţii, bunurile ce au format obiectul activităţii de executare silită sau să facă acte de executare în propria lor cauza ori în cauzele privind rudele şi afinii până la gradul al patrulea inclusiv."
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "failure": null,
+      "historical_wall_s": 7.005999100001645,
+      "note": "Revalidation only; historical latency and repair decisions are not current measurements."
+    },
+    {
+      "experiment": "warmup-costed",
+      "config": "greedy",
+      "condition": "prefix",
+      "case": "semantic-02",
+      "before": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "executorul bancar",
+          "banca",
+          "executorilor bancari",
+          "cauzarea de prejudiciu prin încălcarea obligaţiilor sale profesionale",
+          "Asigurarea de răspundere profesională a executorului bancar",
+          "de către şi în contul băncii în care îşi desfăşoară activitatea, dacă aceasta este expres stipulată, după caz, în regulamentul intern al băncii sau în convenţia încheiată de banca cu executorul bancar.",
+          "sa achizitioneze, direct sau prin interpusi, pentru ei sau pentru alţii, bunurile ce au format obiectul activităţii de executare silită sau să facă acte de executare în propria lor cauza ori în cauzele privind rudele şi afinii până la gradul al patrulea inclusiv."
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "executorul bancar",
+          "banca",
+          "executorilor bancari",
+          "cauzarea de prejudiciu prin încălcarea obligaţiilor sale profesionale",
+          "Asigurarea de răspundere profesională a executorului bancar",
+          "de către şi în contul băncii în care îşi desfăşoară activitatea, dacă aceasta este expres stipulată, după caz, în regulamentul intern al băncii sau în convenţia încheiată de banca cu executorul bancar.",
+          "sa achizitioneze, direct sau prin interpusi, pentru ei sau pentru alţii, bunurile ce au format obiectul activităţii de executare silită sau să facă acte de executare în propria lor cauza ori în cauzele privind rudele şi afinii până la gradul al patrulea inclusiv."
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "failure": null,
+      "historical_wall_s": 6.904666999998881,
+      "note": "Revalidation only; historical latency and repair decisions are not current measurements."
+    },
+    {
+      "experiment": "order",
+      "config": "units_first",
+      "condition": "resident",
+      "case": "semantic-02",
+      "before": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "Răspunderea civilă a executorului bancar",
+          "Asigurarea de răspundere profesională a executorului bancar",
+          "executorilor bancari",
+          "cauzarea de prejudiciu prin încălcarea obligaţiilor sale profesionale",
+          "băncii în care îşi desfăşoară activitatea",
+          "achizitioneze, direct sau prin interpusi, pentru ei sau pentru alţii, bunurile ce au format obiectul activităţii de executare silită sau să facă acte de executare în propria lor cauza ori în cauzele privind rudele şi afinii până la gradul al patrulea inclusiv"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "Răspunderea civilă a executorului bancar",
+          "Asigurarea de răspundere profesională a executorului bancar",
+          "executorilor bancari",
+          "cauzarea de prejudiciu prin încălcarea obligaţiilor sale profesionale",
+          "băncii în care îşi desfăşoară activitatea",
+          "achizitioneze, direct sau prin interpusi, pentru ei sau pentru alţii, bunurile ce au format obiectul activităţii de executare silită sau să facă acte de executare în propria lor cauza ori în cauzele privind rudele şi afinii până la gradul al patrulea inclusiv"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "failure": null,
+      "historical_wall_s": 6.62484079999922,
+      "note": "Revalidation only; historical latency and repair decisions are not current measurements."
+    },
+    {
+      "experiment": "order",
+      "config": "units_first",
+      "condition": "resident",
+      "case": "semantic-06",
+      "before": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "Direcţia generală de prognoza",
+          "Ministerul Finanţelor",
+          "Comisia Naţională de Prognoza"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "Direcţia generală de prognoza",
+          "Ministerul Finanţelor",
+          "Comisia Naţională de Prognoza"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "failure": null,
+      "historical_wall_s": 3.5877682999998797,
+      "note": "Revalidation only; historical latency and repair decisions are not current measurements."
+    },
+    {
+      "experiment": "order",
+      "config": "units_first",
+      "condition": "resident",
+      "case": "semantic-09",
+      "before": {
+        "target_correct": true,
+        "unresolved": 1,
+        "entity_names": [
+          "Membrii Consiliului de administraţie al A.N.L., cu excepţia directorului general al A.N.L.",
+          "Consiliul de administraţie al A.N.L.",
+          "Membrii Consiliului de administraţie al A.N.L.",
+          "o indemnizaţie lunară în cuantum de 20% din salariul de baza brut lunar al directorului general al A.N.L."
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 1,
+        "entity_names": [
+          "Membrii Consiliului de administraţie al A.N.L., cu excepţia directorului general al A.N.L.",
+          "Consiliul de administraţie al A.N.L.",
+          "Membrii Consiliului de administraţie al A.N.L.",
+          "o indemnizaţie lunară în cuantum de 20% din salariul de baza brut lunar al directorului general al A.N.L."
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "failure": null,
+      "historical_wall_s": 6.1415659000012965,
+      "note": "Revalidation only; historical latency and repair decisions are not current measurements."
+    },
+    {
+      "experiment": "order",
+      "config": "units_first",
+      "condition": "resident",
+      "case": "semantic-13",
+      "before": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "tractoarelor, combinelor, maşinilor şi utilajelor agricole, precum şi a instalaţiilor pentru irigat, achiziţionate în condiţiile ordonanţei şi ale prezentelor norme metodologice",
+          "sancţiunile civile prevăzute la art. 6 din ordonanţa",
+          "Subvenţia",
+          "Beneficiarul de credite",
+          "achitarea integrală a creditului",
+          "În cazul înstrăinării",
+          "dobânzile calculate şi datorate de beneficiarul de credite numai la soldul creditului curent, calculat lunar",
+          "bugetul de stat, prin banca comercială creditoare, subvenţia de 70% din dobânda calculată la creditul curent, după plata cotei de 30% din dobânda"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "tractoarelor, combinelor, maşinilor şi utilajelor agricole, precum şi a instalaţiilor pentru irigat, achiziţionate în condiţiile ordonanţei şi ale prezentelor norme metodologice",
+          "sancţiunile civile prevăzute la art. 6 din ordonanţa",
+          "Subvenţia",
+          "Beneficiarul de credite",
+          "achitarea integrală a creditului",
+          "În cazul înstrăinării",
+          "dobânzile calculate şi datorate de beneficiarul de credite numai la soldul creditului curent, calculat lunar",
+          "bugetul de stat, prin banca comercială creditoare, subvenţia de 70% din dobânda calculată la creditul curent, după plata cotei de 30% din dobânda"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "failure": null,
+      "historical_wall_s": 8.511745799998607,
+      "note": "Revalidation only; historical latency and repair decisions are not current measurements."
+    },
+    {
+      "experiment": "order-full",
+      "config": "greedy",
+      "condition": "resident",
+      "case": "semantic-02",
+      "before": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "executorul bancar",
+          "banca",
+          "executorilor bancari",
+          "cauzarea de prejudiciu prin încălcarea obligaţiilor sale profesionale",
+          "Asigurarea de răspundere profesională a executorului bancar",
+          "de către şi în contul băncii în care îşi desfăşoară activitatea, dacă aceasta este expres stipulată, după caz, în regulamentul intern al băncii sau în convenţia încheiată de banca cu executorul bancar.",
+          "sa achizitioneze, direct sau prin interpusi, pentru ei sau pentru alţii, bunurile ce au format obiectul activităţii de executare silită sau să facă acte de executare în propria lor cauza ori în cauzele privind rudele şi afinii până la gradul al patrulea inclusiv."
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "executorul bancar",
+          "banca",
+          "executorilor bancari",
+          "cauzarea de prejudiciu prin încălcarea obligaţiilor sale profesionale",
+          "Asigurarea de răspundere profesională a executorului bancar",
+          "de către şi în contul băncii în care îşi desfăşoară activitatea, dacă aceasta este expres stipulată, după caz, în regulamentul intern al băncii sau în convenţia încheiată de banca cu executorul bancar.",
+          "sa achizitioneze, direct sau prin interpusi, pentru ei sau pentru alţii, bunurile ce au format obiectul activităţii de executare silită sau să facă acte de executare în propria lor cauza ori în cauzele privind rudele şi afinii până la gradul al patrulea inclusiv."
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "failure": null,
+      "historical_wall_s": 6.726860000002489,
+      "note": "Revalidation only; historical latency and repair decisions are not current measurements."
+    },
+    {
+      "experiment": "order-full",
+      "config": "greedy",
+      "condition": "resident",
+      "case": "semantic-03",
+      "before": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "executorii bancari",
+          "banca",
+          "Dosarele de executare aflate în curs de rezolvare la data intrării în vigoare a prezentului statut"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "executorii bancari",
+          "banca",
+          "Dosarele de executare aflate în curs de rezolvare la data intrării în vigoare a prezentului statut"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "failure": null,
+      "historical_wall_s": 2.492077499999141,
+      "note": "Revalidation only; historical latency and repair decisions are not current measurements."
+    },
+    {
+      "experiment": "order-full",
+      "config": "greedy",
+      "condition": "resident",
+      "case": "semantic-11",
+      "before": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "NORME din 28 iunie 1999 privind verificarea tehnica a vehiculelor feroviare aparţinând agentilor economici EMITENT MINISTERUL TRANSPORTURILOR Publicat în MONITORUL OFICIAL nr. 396 din 19 august 1999 + Capitolul 1 Dispozitii generale"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "NORME din 28 iunie 1999 privind verificarea tehnica a vehiculelor feroviare aparţinând agentilor economici EMITENT MINISTERUL TRANSPORTURILOR Publicat în MONITORUL OFICIAL nr. 396 din 19 august 1999 + Capitolul 1 Dispozitii generale"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "failure": null,
+      "historical_wall_s": 3.083527300001151,
+      "note": "Revalidation only; historical latency and repair decisions are not current measurements."
+    },
+    {
+      "experiment": "order-full",
+      "config": "greedy",
+      "condition": "resident",
+      "case": "semantic-16",
+      "before": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [],
+        "source_spans_valid": true,
+        "rejected_evidence": 1
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [],
+        "source_spans_valid": true,
+        "rejected_evidence": 1
+      },
+      "failure": null,
+      "historical_wall_s": 1.3544906999995874,
+      "note": "Revalidation only; historical latency and repair decisions are not current measurements."
+    },
+    {
+      "experiment": "order-full",
+      "config": "greedy",
+      "condition": "resident",
+      "case": "semantic-17",
+      "before": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "toate societățile comerciale, companiile și societățile naționale, regiile autonome din subordinea F.P.S. sau a ministerelor, precum și instituțiile publice și agențiile subordonate Guvernului"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "toate societățile comerciale, companiile și societățile naționale, regiile autonome din subordinea F.P.S. sau a ministerelor, precum și instituțiile publice și agențiile subordonate Guvernului"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "failure": null,
+      "historical_wall_s": 2.2487780999981624,
+      "note": "Revalidation only; historical latency and repair decisions are not current measurements."
+    },
+    {
+      "experiment": "order-full",
+      "config": "greedy",
+      "condition": "resident",
+      "case": "semantic-01",
+      "before": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "executorul bancar"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "executorul bancar"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "failure": null,
+      "historical_wall_s": 1.8474470999972255,
+      "note": "Revalidation only; historical latency and repair decisions are not current measurements."
+    },
+    {
+      "experiment": "order-full",
+      "config": "greedy",
+      "condition": "resident",
+      "case": "semantic-06",
+      "before": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "HOTĂRÂRE nr. 55 din 29 ianuarie 1999 privind organizarea şi funcţionarea Direcţiei generale de prognoza în subordinea Ministerului Finanţelor",
+          "Guvernul României",
+          "Direcţia generală de prognoza",
+          "Ministerului Finanţelor",
+          "Comisiei Naţionale de Prognoza"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "HOTĂRÂRE nr. 55 din 29 ianuarie 1999 privind organizarea şi funcţionarea Direcţiei generale de prognoza în subordinea Ministerului Finanţelor",
+          "Guvernul României",
+          "Direcţia generală de prognoza",
+          "Ministerului Finanţelor",
+          "Comisiei Naţionale de Prognoza"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "failure": null,
+      "historical_wall_s": 6.809756200000265,
+      "note": "Revalidation only; historical latency and repair decisions are not current measurements."
+    },
+    {
+      "experiment": "order-full",
+      "config": "greedy",
+      "condition": "resident",
+      "case": "semantic-09",
+      "before": {
+        "target_correct": true,
+        "unresolved": 1,
+        "entity_names": [
+          "Membrii Consiliului de administraţie al A.N.L.",
+          "Consiliul de administraţie al A.N.L.",
+          "cei membri",
+          "o indemnizaţie lunară în cuantum de 20% din salariul de baza brut lunar al directorului general al A.N.L."
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 1,
+        "entity_names": [
+          "Membrii Consiliului de administraţie al A.N.L.",
+          "Consiliul de administraţie al A.N.L.",
+          "cei membri",
+          "o indemnizaţie lunară în cuantum de 20% din salariul de baza brut lunar al directorului general al A.N.L."
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "failure": null,
+      "historical_wall_s": 6.489402799998061,
+      "note": "Revalidation only; historical latency and repair decisions are not current measurements."
+    },
+    {
+      "experiment": "order-full",
+      "config": "greedy",
+      "condition": "resident",
+      "case": "semantic-10",
+      "before": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "NORME din 28 iunie 1999 privind verificarea tehnica a vehiculelor feroviare aparţinând agentilor economici EMITENT MINISTERUL TRANSPORTURILOR Publicat în MONITORUL OFICIAL nr. 396 din 19 august 1999 + Capitolul 1 Dispozitii generale",
+          "vehiculele feroviare de orice tip aparţinând agentilor economici",
+          "operatorilor de transport feroviar şi gestionarului infrastructurii feroviare publice",
+          "normele tehnice specifice în vigoare"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "NORME din 28 iunie 1999 privind verificarea tehnica a vehiculelor feroviare aparţinând agentilor economici EMITENT MINISTERUL TRANSPORTURILOR Publicat în MONITORUL OFICIAL nr. 396 din 19 august 1999 + Capitolul 1 Dispozitii generale",
+          "vehiculele feroviare de orice tip aparţinând agentilor economici",
+          "operatorilor de transport feroviar şi gestionarului infrastructurii feroviare publice",
+          "normele tehnice specifice în vigoare"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "failure": null,
+      "historical_wall_s": 4.939775099999679,
+      "note": "Revalidation only; historical latency and repair decisions are not current measurements."
+    },
+    {
+      "experiment": "order-full",
+      "config": "greedy",
+      "condition": "resident",
+      "case": "semantic-13",
+      "before": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "tractoarelor, combinelor, maşinilor şi utilajelor agricole, precum şi a instalaţiilor pentru irigat",
+          "ordonanţei şi ale prezentelor norme metodologice",
+          "sancţiunile civile prevăzute la art. 6 din ordonanţa",
+          "Subvenţia",
+          "Beneficiarul de credite",
+          "tractoarelor, combinelor, maşinilor şi utilajelor agricole, precum şi a instalaţiilor pentru irigat, achiziţionate în condiţiile ordonanţei şi ale prezentelor norme metodologice",
+          "achitarea integrală a creditului",
+          "În cazul înstrăinării",
+          "dobânzile calculate şi datorate de beneficiarul de credite numai la soldul creditului curent, calculat lunar",
+          "bugetul de stat, prin banca comercială creditoare, subvenţia de 70% din dobânda calculată la creditul curent, după plata cotei de 30% din dobânda"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "tractoarelor, combinelor, maşinilor şi utilajelor agricole, precum şi a instalaţiilor pentru irigat",
+          "ordonanţei şi ale prezentelor norme metodologice",
+          "sancţiunile civile prevăzute la art. 6 din ordonanţa",
+          "Subvenţia",
+          "Beneficiarul de credite",
+          "tractoarelor, combinelor, maşinilor şi utilajelor agricole, precum şi a instalaţiilor pentru irigat, achiziţionate în condiţiile ordonanţei şi ale prezentelor norme metodologice",
+          "achitarea integrală a creditului",
+          "În cazul înstrăinării",
+          "dobânzile calculate şi datorate de beneficiarul de credite numai la soldul creditului curent, calculat lunar",
+          "bugetul de stat, prin banca comercială creditoare, subvenţia de 70% din dobânda calculată la creditul curent, după plata cotei de 30% din dobânda"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "failure": null,
+      "historical_wall_s": 8.727541899999778,
+      "note": "Revalidation only; historical latency and repair decisions are not current measurements."
+    },
+    {
+      "experiment": "order-full",
+      "config": "greedy",
+      "condition": "resident",
+      "case": "semantic-15",
+      "before": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "prevederile anexei nr. 4 bis la prezentul contract",
+          "instalaţiei de utilizare a unui consumator",
+          "Tarife pentru energia electrică",
+          "Modalităţi şi condiţii de plată",
+          "tipul de tarif",
+          "tariful",
+          "Recalcularea consumului de energie",
+          "conectarea la reţelele furnizorului",
+          "respectarea prevederilor legale"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "prevederile anexei nr. 4 bis la prezentul contract",
+          "instalaţiei de utilizare a unui consumator",
+          "Tarife pentru energia electrică",
+          "Modalităţi şi condiţii de plată",
+          "tipul de tarif",
+          "tariful",
+          "Recalcularea consumului de energie",
+          "conectarea la reţelele furnizorului",
+          "respectarea prevederilor legale"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "failure": null,
+      "historical_wall_s": 7.703513000000385,
+      "note": "Revalidation only; historical latency and repair decisions are not current measurements."
+    },
+    {
+      "experiment": "order-full",
+      "config": "greedy",
+      "condition": "resident",
+      "case": "article-59",
+      "before": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "Comisia centrala de arbitraj",
+          "Arbitrii",
+          "Sediul Comisiei centrale de arbitraj",
+          "legii",
+          "medici, economişti sau jurişti, acreditaţi şi înregistraţi de Ministerul Justiţiei"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "Comisia centrala de arbitraj",
+          "Arbitrii",
+          "Sediul Comisiei centrale de arbitraj",
+          "legii",
+          "medici, economişti sau jurişti, acreditaţi şi înregistraţi de Ministerul Justiţiei"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "failure": null,
+      "historical_wall_s": 4.060649499995634,
+      "note": "Revalidation only; historical latency and repair decisions are not current measurements."
+    },
+    {
+      "experiment": "order-full",
+      "config": "units_first",
+      "condition": "resident",
+      "case": "semantic-02",
+      "before": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "Răspunderea civilă a executorului bancar",
+          "Asigurarea de răspundere profesională a executorului bancar",
+          "executorilor bancari",
+          "cauzarea de prejudiciu prin încălcarea obligaţiilor sale profesionale",
+          "băncii în care îşi desfăşoară activitatea",
+          "achizitioneze, direct sau prin interpusi, pentru ei sau pentru alţii, bunurile ce au format obiectul activităţii de executare silită sau să facă acte de executare în propria lor cauza ori în cauzele privind rudele şi afinii până la gradul al patrulea inclusiv"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "Răspunderea civilă a executorului bancar",
+          "Asigurarea de răspundere profesională a executorului bancar",
+          "executorilor bancari",
+          "cauzarea de prejudiciu prin încălcarea obligaţiilor sale profesionale",
+          "băncii în care îşi desfăşoară activitatea",
+          "achizitioneze, direct sau prin interpusi, pentru ei sau pentru alţii, bunurile ce au format obiectul activităţii de executare silită sau să facă acte de executare în propria lor cauza ori în cauzele privind rudele şi afinii până la gradul al patrulea inclusiv"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "failure": null,
+      "historical_wall_s": 6.781719799997518,
+      "note": "Revalidation only; historical latency and repair decisions are not current measurements."
+    },
+    {
+      "experiment": "order-full",
+      "config": "units_first",
+      "condition": "resident",
+      "case": "semantic-03",
+      "before": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "executorii bancari",
+          "banca",
+          "Dosarele de executare aflate în curs de rezolvare la data intrării în vigoare a prezentului statut"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "executorii bancari",
+          "banca",
+          "Dosarele de executare aflate în curs de rezolvare la data intrării în vigoare a prezentului statut"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "failure": null,
+      "historical_wall_s": 2.509828000002017,
+      "note": "Revalidation only; historical latency and repair decisions are not current measurements."
+    },
+    {
+      "experiment": "order-full",
+      "config": "units_first",
+      "condition": "resident",
+      "case": "semantic-11",
+      "before": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "NORME din 28 iunie 1999 privind verificarea tehnica a vehiculelor feroviare aparţinând agentilor economici EMITENT MINISTERUL TRANSPORTURILOR Publicat în MONITORUL OFICIAL nr. 396 din 19 august 1999 + Capitolul 1 Dispozitii generale",
+          "vehiculele feroviare de orice tip aparţinând agentilor economici",
+          "operatorilor de transport feroviar şi gestionarului infrastructurii feroviare publice",
+          "condiţiile prevăzute în normele tehnice specifice în vigoare"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "NORME din 28 iunie 1999 privind verificarea tehnica a vehiculelor feroviare aparţinând agentilor economici EMITENT MINISTERUL TRANSPORTURILOR Publicat în MONITORUL OFICIAL nr. 396 din 19 august 1999 + Capitolul 1 Dispozitii generale",
+          "vehiculele feroviare de orice tip aparţinând agentilor economici",
+          "operatorilor de transport feroviar şi gestionarului infrastructurii feroviare publice",
+          "condiţiile prevăzute în normele tehnice specifice în vigoare"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "failure": null,
+      "historical_wall_s": 4.635697999998229,
+      "note": "Revalidation only; historical latency and repair decisions are not current measurements."
+    },
+    {
+      "experiment": "order-full",
+      "config": "units_first",
+      "condition": "resident",
+      "case": "semantic-16",
+      "before": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "Aceste sume se evidențiază prin contul de creditori.",
+          "Sumele ce urmează a fi restituite beneficiarilor în condițiile art. III alin. (1)"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "Aceste sume se evidențiază prin contul de creditori.",
+          "Sumele ce urmează a fi restituite beneficiarilor în condițiile art. III alin. (1)"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "failure": null,
+      "historical_wall_s": 2.519201200004318,
+      "note": "Revalidation only; historical latency and repair decisions are not current measurements."
+    },
+    {
+      "experiment": "order-full",
+      "config": "units_first",
+      "condition": "resident",
+      "case": "semantic-17",
+      "before": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "toate societățile comerciale, companiile și societățile naționale, regiile autonome din subordinea F.P.S. sau a ministerelor, precum și instituțiile publice și agențiile subordonate Guvernului"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "toate societățile comerciale, companiile și societățile naționale, regiile autonome din subordinea F.P.S. sau a ministerelor, precum și instituțiile publice și agențiile subordonate Guvernului"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "failure": null,
+      "historical_wall_s": 2.39828259999922,
+      "note": "Revalidation only; historical latency and repair decisions are not current measurements."
+    },
+    {
+      "experiment": "order-full",
+      "config": "units_first",
+      "condition": "resident",
+      "case": "semantic-01",
+      "before": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "Executorii bancari, precum şi oricare alt personal angajat în compartimentul acestora"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "Executorii bancari, precum şi oricare alt personal angajat în compartimentul acestora"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "failure": null,
+      "historical_wall_s": 1.8295770000040648,
+      "note": "Revalidation only; historical latency and repair decisions are not current measurements."
+    },
+    {
+      "experiment": "order-full",
+      "config": "units_first",
+      "condition": "resident",
+      "case": "semantic-06",
+      "before": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "Direcţia generală de prognoza",
+          "Ministerul Finanţelor",
+          "Comisia Naţională de Prognoza"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "Direcţia generală de prognoza",
+          "Ministerul Finanţelor",
+          "Comisia Naţională de Prognoza"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "failure": null,
+      "historical_wall_s": 3.7367454999985057,
+      "note": "Revalidation only; historical latency and repair decisions are not current measurements."
+    },
+    {
+      "experiment": "order-full",
+      "config": "units_first",
+      "condition": "resident",
+      "case": "semantic-09",
+      "before": {
+        "target_correct": true,
+        "unresolved": 1,
+        "entity_names": [
+          "Membrii Consiliului de administraţie al A.N.L., cu excepţia directorului general al A.N.L.",
+          "Consiliul de administraţie al A.N.L.",
+          "Membrii Consiliului de administraţie al A.N.L.",
+          "o indemnizaţie lunară în cuantum de 20% din salariul de baza brut lunar al directorului general al A.N.L."
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 1,
+        "entity_names": [
+          "Membrii Consiliului de administraţie al A.N.L., cu excepţia directorului general al A.N.L.",
+          "Consiliul de administraţie al A.N.L.",
+          "Membrii Consiliului de administraţie al A.N.L.",
+          "o indemnizaţie lunară în cuantum de 20% din salariul de baza brut lunar al directorului general al A.N.L."
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "failure": null,
+      "historical_wall_s": 6.320985799997288,
+      "note": "Revalidation only; historical latency and repair decisions are not current measurements."
+    },
+    {
+      "experiment": "order-full",
+      "config": "units_first",
+      "condition": "resident",
+      "case": "semantic-10",
+      "before": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "NORME din 28 iunie 1999 privind verificarea tehnica a vehiculelor feroviare aparţinând agentilor economici EMITENT MINISTERUL TRANSPORTURILOR Publicat în MONITORUL OFICIAL nr. 396 din 19 august 1999 + Capitolul 1 Dispozitii generale",
+          "vehiculele feroviare de orice tip aparţinând agentilor economici",
+          "operatorilor de transport feroviar şi gestionarului infrastructurii feroviare publice",
+          "condiţiile prevăzute în normele tehnice specifice în vigoare"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "NORME din 28 iunie 1999 privind verificarea tehnica a vehiculelor feroviare aparţinând agentilor economici EMITENT MINISTERUL TRANSPORTURILOR Publicat în MONITORUL OFICIAL nr. 396 din 19 august 1999 + Capitolul 1 Dispozitii generale",
+          "vehiculele feroviare de orice tip aparţinând agentilor economici",
+          "operatorilor de transport feroviar şi gestionarului infrastructurii feroviare publice",
+          "condiţiile prevăzute în normele tehnice specifice în vigoare"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "failure": null,
+      "historical_wall_s": 4.6355858000024455,
+      "note": "Revalidation only; historical latency and repair decisions are not current measurements."
+    },
+    {
+      "experiment": "order-full",
+      "config": "units_first",
+      "condition": "resident",
+      "case": "semantic-13",
+      "before": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "tractoarelor, combinelor, maşinilor şi utilajelor agricole, precum şi a instalaţiilor pentru irigat, achiziţionate în condiţiile ordonanţei şi ale prezentelor norme metodologice",
+          "sancţiunile civile prevăzute la art. 6 din ordonanţa",
+          "Subvenţia",
+          "Beneficiarul de credite",
+          "achitarea integrală a creditului",
+          "În cazul înstrăinării",
+          "dobânzile calculate şi datorate de beneficiarul de credite numai la soldul creditului curent, calculat lunar",
+          "bugetul de stat, prin banca comercială creditoare, subvenţia de 70% din dobânda calculată la creditul curent, după plata cotei de 30% din dobânda"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "tractoarelor, combinelor, maşinilor şi utilajelor agricole, precum şi a instalaţiilor pentru irigat, achiziţionate în condiţiile ordonanţei şi ale prezentelor norme metodologice",
+          "sancţiunile civile prevăzute la art. 6 din ordonanţa",
+          "Subvenţia",
+          "Beneficiarul de credite",
+          "achitarea integrală a creditului",
+          "În cazul înstrăinării",
+          "dobânzile calculate şi datorate de beneficiarul de credite numai la soldul creditului curent, calculat lunar",
+          "bugetul de stat, prin banca comercială creditoare, subvenţia de 70% din dobânda calculată la creditul curent, după plata cotei de 30% din dobânda"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "failure": null,
+      "historical_wall_s": 8.925193600000057,
+      "note": "Revalidation only; historical latency and repair decisions are not current measurements."
+    },
+    {
+      "experiment": "order-full",
+      "config": "units_first",
+      "condition": "resident",
+      "case": "semantic-15",
+      "before": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "Recalcularea consumului de energie",
+          "conectarea la reţelele furnizorului a instalaţiei de utilizare a unui consumator",
+          "Tarife pentru energia electrică",
+          "Modalităţi şi condiţii de plată"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "Recalcularea consumului de energie",
+          "conectarea la reţelele furnizorului a instalaţiei de utilizare a unui consumator",
+          "Tarife pentru energia electrică",
+          "Modalităţi şi condiţii de plată"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "failure": null,
+      "historical_wall_s": 3.7055842999980086,
+      "note": "Revalidation only; historical latency and repair decisions are not current measurements."
+    },
+    {
+      "experiment": "order-full",
+      "config": "units_first",
+      "condition": "resident",
+      "case": "article-59",
+      "before": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "Comisia centrala de arbitraj",
+          "Ministerul Justiţiei",
+          "C.A.S.A.O.P.S.N.A.J.",
+          "legii"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "Comisia centrala de arbitraj",
+          "Ministerul Justiţiei",
+          "C.A.S.A.O.P.S.N.A.J.",
+          "legii"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "failure": null,
+      "historical_wall_s": 3.3247449999980745,
+      "note": "Revalidation only; historical latency and repair decisions are not current measurements."
+    },
+    {
+      "experiment": "order-confirm",
+      "config": "units_first",
+      "condition": "resident",
+      "case": "semantic-02",
+      "before": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "Răspunderea civilă a executorului bancar",
+          "Asigurarea de răspundere profesională a executorului bancar",
+          "executorilor bancari",
+          "cauzarea de prejudiciu prin încălcarea obligaţiilor sale profesionale",
+          "băncii în care îşi desfăşoară activitatea",
+          "achizitioneze, direct sau prin interpusi, pentru ei sau pentru alţii, bunurile ce au format obiectul activităţii de executare silită sau să facă acte de executare în propria lor cauza ori în cauzele privind rudele şi afinii până la gradul al patrulea inclusiv"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "Răspunderea civilă a executorului bancar",
+          "Asigurarea de răspundere profesională a executorului bancar",
+          "executorilor bancari",
+          "cauzarea de prejudiciu prin încălcarea obligaţiilor sale profesionale",
+          "băncii în care îşi desfăşoară activitatea",
+          "achizitioneze, direct sau prin interpusi, pentru ei sau pentru alţii, bunurile ce au format obiectul activităţii de executare silită sau să facă acte de executare în propria lor cauza ori în cauzele privind rudele şi afinii până la gradul al patrulea inclusiv"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "failure": null,
+      "historical_wall_s": 6.799119999996037,
+      "note": "Revalidation only; historical latency and repair decisions are not current measurements."
+    },
+    {
+      "experiment": "order-confirm",
+      "config": "units_first",
+      "condition": "resident",
+      "case": "semantic-03",
+      "before": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "executorii bancari",
+          "banca",
+          "Dosarele de executare aflate în curs de rezolvare la data intrării în vigoare a prezentului statut"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "executorii bancari",
+          "banca",
+          "Dosarele de executare aflate în curs de rezolvare la data intrării în vigoare a prezentului statut"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "failure": null,
+      "historical_wall_s": 2.3853515000009793,
+      "note": "Revalidation only; historical latency and repair decisions are not current measurements."
+    },
+    {
+      "experiment": "order-confirm",
+      "config": "units_first",
+      "condition": "resident",
+      "case": "semantic-11",
+      "before": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "NORME din 28 iunie 1999 privind verificarea tehnica a vehiculelor feroviare aparţinând agentilor economici EMITENT MINISTERUL TRANSPORTURILOR Publicat în MONITORUL OFICIAL nr. 396 din 19 august 1999 + Capitolul 1 Dispozitii generale",
+          "vehiculele feroviare de orice tip aparţinând agentilor economici",
+          "operatorilor de transport feroviar şi gestionarului infrastructurii feroviare publice",
+          "condiţiile prevăzute în normele tehnice specifice în vigoare"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "NORME din 28 iunie 1999 privind verificarea tehnica a vehiculelor feroviare aparţinând agentilor economici EMITENT MINISTERUL TRANSPORTURILOR Publicat în MONITORUL OFICIAL nr. 396 din 19 august 1999 + Capitolul 1 Dispozitii generale",
+          "vehiculele feroviare de orice tip aparţinând agentilor economici",
+          "operatorilor de transport feroviar şi gestionarului infrastructurii feroviare publice",
+          "condiţiile prevăzute în normele tehnice specifice în vigoare"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "failure": null,
+      "historical_wall_s": 4.488348099999712,
+      "note": "Revalidation only; historical latency and repair decisions are not current measurements."
+    },
+    {
+      "experiment": "order-confirm",
+      "config": "units_first",
+      "condition": "resident",
+      "case": "semantic-16",
+      "before": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "Aceste sume se evidențiază prin contul de creditori.",
+          "Sumele ce urmează a fi restituite beneficiarilor în condițiile art. III alin. (1)"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "Aceste sume se evidențiază prin contul de creditori.",
+          "Sumele ce urmează a fi restituite beneficiarilor în condițiile art. III alin. (1)"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "failure": null,
+      "historical_wall_s": 2.4107379999986733,
+      "note": "Revalidation only; historical latency and repair decisions are not current measurements."
+    },
+    {
+      "experiment": "order-confirm",
+      "config": "units_first",
+      "condition": "resident",
+      "case": "semantic-17",
+      "before": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "toate societățile comerciale, companiile și societățile naționale, regiile autonome din subordinea F.P.S. sau a ministerelor, precum și instituțiile publice și agențiile subordonate Guvernului"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "toate societățile comerciale, companiile și societățile naționale, regiile autonome din subordinea F.P.S. sau a ministerelor, precum și instituțiile publice și agențiile subordonate Guvernului"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "failure": null,
+      "historical_wall_s": 2.068534300000465,
+      "note": "Revalidation only; historical latency and repair decisions are not current measurements."
+    },
+    {
+      "experiment": "order-confirm",
+      "config": "units_first",
+      "condition": "resident",
+      "case": "semantic-01",
+      "before": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "Executorii bancari, precum şi oricare alt personal angajat în compartimentul acestora"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "Executorii bancari, precum şi oricare alt personal angajat în compartimentul acestora"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "failure": null,
+      "historical_wall_s": 1.7603498000025866,
+      "note": "Revalidation only; historical latency and repair decisions are not current measurements."
+    },
+    {
+      "experiment": "order-confirm",
+      "config": "units_first",
+      "condition": "resident",
+      "case": "semantic-06",
+      "before": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "Direcţia generală de prognoza",
+          "Ministerul Finanţelor",
+          "Comisia Naţională de Prognoza"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "Direcţia generală de prognoza",
+          "Ministerul Finanţelor",
+          "Comisia Naţională de Prognoza"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "failure": null,
+      "historical_wall_s": 3.640456000000995,
+      "note": "Revalidation only; historical latency and repair decisions are not current measurements."
+    },
+    {
+      "experiment": "order-confirm",
+      "config": "units_first",
+      "condition": "resident",
+      "case": "semantic-09",
+      "before": {
+        "target_correct": true,
+        "unresolved": 1,
+        "entity_names": [
+          "Membrii Consiliului de administraţie al A.N.L., cu excepţia directorului general al A.N.L.",
+          "Consiliul de administraţie al A.N.L.",
+          "Membrii Consiliului de administraţie al A.N.L.",
+          "o indemnizaţie lunară în cuantum de 20% din salariul de baza brut lunar al directorului general al A.N.L."
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 1,
+        "entity_names": [
+          "Membrii Consiliului de administraţie al A.N.L., cu excepţia directorului general al A.N.L.",
+          "Consiliul de administraţie al A.N.L.",
+          "Membrii Consiliului de administraţie al A.N.L.",
+          "o indemnizaţie lunară în cuantum de 20% din salariul de baza brut lunar al directorului general al A.N.L."
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "failure": null,
+      "historical_wall_s": 6.217735400001402,
+      "note": "Revalidation only; historical latency and repair decisions are not current measurements."
+    },
+    {
+      "experiment": "order-confirm",
+      "config": "units_first",
+      "condition": "resident",
+      "case": "semantic-10",
+      "before": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "NORME din 28 iunie 1999 privind verificarea tehnica a vehiculelor feroviare aparţinând agentilor economici EMITENT MINISTERUL TRANSPORTURILOR Publicat în MONITORUL OFICIAL nr. 396 din 19 august 1999 + Capitolul 1 Dispozitii generale",
+          "vehiculele feroviare de orice tip aparţinând agentilor economici",
+          "operatorilor de transport feroviar şi gestionarului infrastructurii feroviare publice",
+          "condiţiile prevăzute în normele tehnice specifice în vigoare"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "NORME din 28 iunie 1999 privind verificarea tehnica a vehiculelor feroviare aparţinând agentilor economici EMITENT MINISTERUL TRANSPORTURILOR Publicat în MONITORUL OFICIAL nr. 396 din 19 august 1999 + Capitolul 1 Dispozitii generale",
+          "vehiculele feroviare de orice tip aparţinând agentilor economici",
+          "operatorilor de transport feroviar şi gestionarului infrastructurii feroviare publice",
+          "condiţiile prevăzute în normele tehnice specifice în vigoare"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "failure": null,
+      "historical_wall_s": 4.589827199997671,
+      "note": "Revalidation only; historical latency and repair decisions are not current measurements."
+    },
+    {
+      "experiment": "order-confirm",
+      "config": "units_first",
+      "condition": "resident",
+      "case": "semantic-13",
+      "before": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "tractoarelor, combinelor, maşinilor şi utilajelor agricole, precum şi a instalaţiilor pentru irigat, achiziţionate în condiţiile ordonanţei şi ale prezentelor norme metodologice",
+          "sancţiunile civile prevăzute la art. 6 din ordonanţa",
+          "Subvenţia",
+          "Beneficiarul de credite",
+          "achitarea integrală a creditului",
+          "În cazul înstrăinării",
+          "dobânzile calculate şi datorate de beneficiarul de credite numai la soldul creditului curent, calculat lunar",
+          "bugetul de stat, prin banca comercială creditoare, subvenţia de 70% din dobânda calculată la creditul curent, după plata cotei de 30% din dobânda"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "tractoarelor, combinelor, maşinilor şi utilajelor agricole, precum şi a instalaţiilor pentru irigat, achiziţionate în condiţiile ordonanţei şi ale prezentelor norme metodologice",
+          "sancţiunile civile prevăzute la art. 6 din ordonanţa",
+          "Subvenţia",
+          "Beneficiarul de credite",
+          "achitarea integrală a creditului",
+          "În cazul înstrăinării",
+          "dobânzile calculate şi datorate de beneficiarul de credite numai la soldul creditului curent, calculat lunar",
+          "bugetul de stat, prin banca comercială creditoare, subvenţia de 70% din dobânda calculată la creditul curent, după plata cotei de 30% din dobânda"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "failure": null,
+      "historical_wall_s": 8.797984599994379,
+      "note": "Revalidation only; historical latency and repair decisions are not current measurements."
+    },
+    {
+      "experiment": "order-confirm",
+      "config": "units_first",
+      "condition": "resident",
+      "case": "semantic-15",
+      "before": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "Recalcularea consumului de energie",
+          "conectarea la reţelele furnizorului a instalaţiei de utilizare a unui consumator",
+          "Tarife pentru energia electrică",
+          "Modalităţi şi condiţii de plată"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "Recalcularea consumului de energie",
+          "conectarea la reţelele furnizorului a instalaţiei de utilizare a unui consumator",
+          "Tarife pentru energia electrică",
+          "Modalităţi şi condiţii de plată"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "failure": null,
+      "historical_wall_s": 3.7088000000003376,
+      "note": "Revalidation only; historical latency and repair decisions are not current measurements."
+    },
+    {
+      "experiment": "order-confirm",
+      "config": "units_first",
+      "condition": "resident",
+      "case": "article-59",
+      "before": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "Comisia centrala de arbitraj",
+          "Ministerul Justiţiei",
+          "C.A.S.A.O.P.S.N.A.J.",
+          "legii"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "Comisia centrala de arbitraj",
+          "Ministerul Justiţiei",
+          "C.A.S.A.O.P.S.N.A.J.",
+          "legii"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "failure": null,
+      "historical_wall_s": 3.2749113000027137,
+      "note": "Revalidation only; historical latency and repair decisions are not current measurements."
+    },
+    {
+      "experiment": "order-confirm",
+      "config": "greedy",
+      "condition": "resident",
+      "case": "semantic-02",
+      "before": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "executorului bancar",
+          "băncii",
+          "executorilor bancari",
+          "cauzarea de prejudiciu prin încălcarea obligaţiilor sale profesionale",
+          "Asigurarea de răspundere profesională a executorului bancar",
+          "de către şi în contul băncii în care îşi desfăşoară activitatea, dacă aceasta este expres stipulată, după caz, în regulamentul intern al băncii sau în convenţia încheiată de banca cu executorul bancar.",
+          "achizitioneze, direct sau prin interpusi, pentru ei sau pentru alţii, bunurile ce au format obiectul activităţii de executare silită sau să facă acte de executare în propria lor cauza ori în cauzele privind rudele şi afinii până la gradul al patrulea inclusiv."
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "executorului bancar",
+          "băncii",
+          "executorilor bancari",
+          "cauzarea de prejudiciu prin încălcarea obligaţiilor sale profesionale",
+          "Asigurarea de răspundere profesională a executorului bancar",
+          "de către şi în contul băncii în care îşi desfăşoară activitatea, dacă aceasta este expres stipulată, după caz, în regulamentul intern al băncii sau în convenţia încheiată de banca cu executorul bancar.",
+          "achizitioneze, direct sau prin interpusi, pentru ei sau pentru alţii, bunurile ce au format obiectul activităţii de executare silită sau să facă acte de executare în propria lor cauza ori în cauzele privind rudele şi afinii până la gradul al patrulea inclusiv."
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "failure": null,
+      "historical_wall_s": 6.826525999997102,
+      "note": "Revalidation only; historical latency and repair decisions are not current measurements."
+    },
+    {
+      "experiment": "order-confirm",
+      "config": "greedy",
+      "condition": "resident",
+      "case": "semantic-03",
+      "before": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "executorii bancari",
+          "banca",
+          "Dosarele de executare aflate în curs de rezolvare la data intrării în vigoare a prezentului statut"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "executorii bancari",
+          "banca",
+          "Dosarele de executare aflate în curs de rezolvare la data intrării în vigoare a prezentului statut"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "failure": null,
+      "historical_wall_s": 2.410371699996176,
+      "note": "Revalidation only; historical latency and repair decisions are not current measurements."
+    },
+    {
+      "experiment": "order-confirm",
+      "config": "greedy",
+      "condition": "resident",
+      "case": "semantic-11",
+      "before": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "NORME din 28 iunie 1999 privind verificarea tehnica a vehiculelor feroviare aparţinând agentilor economici EMITENT MINISTERUL TRANSPORTURILOR Publicat în MONITORUL OFICIAL nr. 396 din 19 august 1999 + Capitolul 1 Dispozitii generale"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "NORME din 28 iunie 1999 privind verificarea tehnica a vehiculelor feroviare aparţinând agentilor economici EMITENT MINISTERUL TRANSPORTURILOR Publicat în MONITORUL OFICIAL nr. 396 din 19 august 1999 + Capitolul 1 Dispozitii generale"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "failure": null,
+      "historical_wall_s": 2.955928999996104,
+      "note": "Revalidation only; historical latency and repair decisions are not current measurements."
+    },
+    {
+      "experiment": "order-confirm",
+      "config": "greedy",
+      "condition": "resident",
+      "case": "semantic-16",
+      "before": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [],
+        "source_spans_valid": true,
+        "rejected_evidence": 1
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [],
+        "source_spans_valid": true,
+        "rejected_evidence": 1
+      },
+      "failure": null,
+      "historical_wall_s": 1.7570782999973744,
+      "note": "Revalidation only; historical latency and repair decisions are not current measurements."
+    },
+    {
+      "experiment": "order-confirm",
+      "config": "greedy",
+      "condition": "resident",
+      "case": "semantic-17",
+      "before": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "toate societățile comerciale, companiile și societățile naționale, regiile autonome din subordinea F.P.S. sau a ministerelor, precum și instituțiile publice și agențiile subordonate Guvernului"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "toate societățile comerciale, companiile și societățile naționale, regiile autonome din subordinea F.P.S. sau a ministerelor, precum și instituțiile publice și agențiile subordonate Guvernului"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "failure": null,
+      "historical_wall_s": 2.100580099999206,
+      "note": "Revalidation only; historical latency and repair decisions are not current measurements."
+    },
+    {
+      "experiment": "order-confirm",
+      "config": "greedy",
+      "condition": "resident",
+      "case": "semantic-01",
+      "before": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "executorul bancar"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "executorul bancar"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "failure": null,
+      "historical_wall_s": 1.6715283999947133,
+      "note": "Revalidation only; historical latency and repair decisions are not current measurements."
+    },
+    {
+      "experiment": "order-confirm",
+      "config": "greedy",
+      "condition": "resident",
+      "case": "semantic-06",
+      "before": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "HOTĂRÂRE nr. 55 din 29 ianuarie 1999 privind organizarea şi funcţionarea Direcţiei generale de prognoza în subordinea Ministerului Finanţelor",
+          "Guvernul României",
+          "Direcţia generală de prognoza",
+          "Ministerului Finanţelor",
+          "Comisiei Naţionale de Prognoza"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "HOTĂRÂRE nr. 55 din 29 ianuarie 1999 privind organizarea şi funcţionarea Direcţiei generale de prognoza în subordinea Ministerului Finanţelor",
+          "Guvernul României",
+          "Direcţia generală de prognoza",
+          "Ministerului Finanţelor",
+          "Comisiei Naţionale de Prognoza"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "failure": null,
+      "historical_wall_s": 6.599074099998688,
+      "note": "Revalidation only; historical latency and repair decisions are not current measurements."
+    },
+    {
+      "experiment": "order-confirm",
+      "config": "greedy",
+      "condition": "resident",
+      "case": "semantic-09",
+      "before": {
+        "target_correct": true,
+        "unresolved": 1,
+        "entity_names": [
+          "Membrii Consiliului de administraţie al A.N.L.",
+          "Consiliul de administraţie al A.N.L.",
+          "cei membri",
+          "o indemnizaţie lunară în cuantum de 20% din salariul de baza brut lunar al directorului general al A.N.L."
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 1,
+        "entity_names": [
+          "Membrii Consiliului de administraţie al A.N.L.",
+          "Consiliul de administraţie al A.N.L.",
+          "cei membri",
+          "o indemnizaţie lunară în cuantum de 20% din salariul de baza brut lunar al directorului general al A.N.L."
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "failure": null,
+      "historical_wall_s": 6.262467499997001,
+      "note": "Revalidation only; historical latency and repair decisions are not current measurements."
+    },
+    {
+      "experiment": "order-confirm",
+      "config": "greedy",
+      "condition": "resident",
+      "case": "semantic-10",
+      "before": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "NORME din 28 iunie 1999 privind verificarea tehnica a vehiculelor feroviare aparţinând agentilor economici EMITENT MINISTERUL TRANSPORTURILOR Publicat în MONITORUL OFICIAL nr. 396 din 19 august 1999 + Capitolul 1 Dispozitii generale",
+          "vehiculele feroviare de orice tip aparţinând agentilor economici",
+          "operatorilor de transport feroviar şi gestionarului infrastructurii feroviare publice",
+          "normele tehnice specifice în vigoare"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "NORME din 28 iunie 1999 privind verificarea tehnica a vehiculelor feroviare aparţinând agentilor economici EMITENT MINISTERUL TRANSPORTURILOR Publicat în MONITORUL OFICIAL nr. 396 din 19 august 1999 + Capitolul 1 Dispozitii generale",
+          "vehiculele feroviare de orice tip aparţinând agentilor economici",
+          "operatorilor de transport feroviar şi gestionarului infrastructurii feroviare publice",
+          "normele tehnice specifice în vigoare"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "failure": null,
+      "historical_wall_s": 4.8702353999979096,
+      "note": "Revalidation only; historical latency and repair decisions are not current measurements."
+    },
+    {
+      "experiment": "order-confirm",
+      "config": "greedy",
+      "condition": "resident",
+      "case": "semantic-13",
+      "before": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "tractoarelor, combinelor, maşinilor şi utilajelor agricole, precum şi a instalaţiilor pentru irigat",
+          "ordonanţei şi ale prezentelor norme metodologice",
+          "sancţiunile civile prevăzute la art. 6 din ordonanţa",
+          "Subvenţia",
+          "Beneficiarul de credite",
+          "tractoarelor, combinelor, maşinilor şi utilajelor agricole, precum şi a instalaţiilor pentru irigat, achiziţionate în condiţiile ordonanţei şi ale prezentelor norme metodologice",
+          "achitarea integrală a creditului",
+          "În cazul înstrăinării",
+          "dobânzile calculate şi datorate de beneficiarul de credite numai la soldul creditului curent, calculat lunar",
+          "bugetul de stat, prin banca comercială creditoare, subvenţia de 70% din dobânda calculată la creditul curent, după plata cotei de 30% din dobânda"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "tractoarelor, combinelor, maşinilor şi utilajelor agricole, precum şi a instalaţiilor pentru irigat",
+          "ordonanţei şi ale prezentelor norme metodologice",
+          "sancţiunile civile prevăzute la art. 6 din ordonanţa",
+          "Subvenţia",
+          "Beneficiarul de credite",
+          "tractoarelor, combinelor, maşinilor şi utilajelor agricole, precum şi a instalaţiilor pentru irigat, achiziţionate în condiţiile ordonanţei şi ale prezentelor norme metodologice",
+          "achitarea integrală a creditului",
+          "În cazul înstrăinării",
+          "dobânzile calculate şi datorate de beneficiarul de credite numai la soldul creditului curent, calculat lunar",
+          "bugetul de stat, prin banca comercială creditoare, subvenţia de 70% din dobânda calculată la creditul curent, după plata cotei de 30% din dobânda"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "failure": null,
+      "historical_wall_s": 8.706733200000599,
+      "note": "Revalidation only; historical latency and repair decisions are not current measurements."
+    },
+    {
+      "experiment": "order-confirm",
+      "config": "greedy",
+      "condition": "resident",
+      "case": "semantic-15",
+      "before": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "Tarife pentru energia electrică",
+          "Recalcularea consumului de energie"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "Tarife pentru energia electrică",
+          "Recalcularea consumului de energie"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "failure": null,
+      "historical_wall_s": 2.6945444000011776,
+      "note": "Revalidation only; historical latency and repair decisions are not current measurements."
+    },
+    {
+      "experiment": "order-confirm",
+      "config": "greedy",
+      "condition": "resident",
+      "case": "article-59",
+      "before": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "Comisia centrala de arbitraj",
+          "Arbitrii",
+          "Sediul Comisiei centrale de arbitraj",
+          "legii"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "Comisia centrala de arbitraj",
+          "Arbitrii",
+          "Sediul Comisiei centrale de arbitraj",
+          "legii"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "failure": null,
+      "historical_wall_s": 3.089922500003013,
+      "note": "Revalidation only; historical latency and repair decisions are not current measurements."
+    }
+  ]
+}

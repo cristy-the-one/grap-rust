@@ -1,5 +1,8 @@
 # Gemma configuration and warm-up evaluation
 
+Follow-up: [dependency-aware revisit](runtime-revisit-2026-09.md) reruns selected
+arms after subject-boundary validation. Treat the measurements below as history.
+
 Measured September 9–10, 2026, on the local RTX 5080 Laptop GPU with Ollama
 0.33.3, `grap-legal-gemma4` (Q4_K_M), and BGE-M3.
 

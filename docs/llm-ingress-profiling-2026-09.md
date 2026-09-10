@@ -109,6 +109,10 @@ GUI was not refreshed in this activity. Benchmark models were unloaded.
 
 ## Reproducibility and remaining limits
 
+The [September 10 revisit](runtime-revisit-2026-09.md) repeats the full-ingress
+comparison after the subject-boundary validator change. Use that report for the
+new measurements; the observations here remain historical.
+
 - `experiments/profile_llm_ingestion.py`: native phase measurements and prompt
   experiments on frozen, hash-checked source fixtures.
 - `experiments/profile_full_ingress.py`: full production-provider comparison on
