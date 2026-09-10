@@ -1,0 +1,68 @@
+[
+  {
+    "file": "real-data-law-ro\\17752.json",
+    "sha256": "e238b0b798936d1f05270cb8366d3578b1a14100e493da8046ef49801f587d8f",
+    "characters": 798,
+    "units": 4,
+    "definitions": 0,
+    "deterministic": 0,
+    "unit_characters": 778,
+    "deterministic_characters": 0,
+    "seconds": 0.0002877999941119924
+  },
+  {
+    "file": "real-data-law-ro\\19401.json",
+    "sha256": "177a318a44fedd54926518b2e8f722b47f8ed00296ee561ccd5465303626308a",
+    "characters": 1454,
+    "units": 4,
+    "definitions": 0,
+    "deterministic": 0,
+    "unit_characters": 1423,
+    "deterministic_characters": 0,
+    "seconds": 0.0004980000085197389
+  },
+  {
+    "file": "real-data-law-ro\\19217.json",
+    "sha256": "6989834544ccc8416b355e9e023bc007886a08b1c38af4c2964a50849fda92e1",
+    "characters": 2620,
+    "units": 14,
+    "definitions": 0,
+    "deterministic": 0,
+    "unit_characters": 2565,
+    "deterministic_characters": 0,
+    "seconds": 0.0011286000080872327
+  },
+  {
+    "file": "real-data-law-ro\\20284.json",
+    "sha256": "e2ffa026a210308e24b1b717660ac60cc263395d36d25ac448e36cd02ed4257d",
+    "characters": 7055,
+    "units": 27,
+    "definitions": 0,
+    "deterministic": 1,
+    "unit_characters": 7029,
+    "deterministic_characters": 361,
+    "seconds": 0.005580899989581667
+  },
+  {
+    "file": "real-data-law-ro\\18302.json",
+    "sha256": "1d163744bf9ac6ae17ea62fb521e99e713580623831ee866e1f7b3530cb68498",
+    "characters": 16314,
+    "units": 3,
+    "definitions": 0,
+    "deterministic": 0,
+    "unit_characters": 16295,
+    "deterministic_characters": 0,
+    "seconds": 0.004035999998450279
+  },
+  {
+    "file": "real-data-law-ro\\17927.json",
+    "sha256": "6c2bff860e113ce8705f3006052efe8d4b0a8d9d0bc152218b6d760859101eb9",
+    "characters": 42844,
+    "units": 154,
+    "definitions": 0,
+    "deterministic": 2,
+    "unit_characters": 42691,
+    "deterministic_characters": 327,
+    "seconds": 0.19934170000487939
+  }
+]

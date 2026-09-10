@@ -1,0 +1,39 @@
+{
+  "counts": {
+    "documents": 7,
+    "tables": 9,
+    "characters": 45194,
+    "tsv_characters": 19980,
+    "rows": 355
+  },
+  "files": [
+    {
+      "file": "real-data-law-ro\\17084.json",
+      "tables": 1
+    },
+    {
+      "file": "real-data-law-ro\\17126.json",
+      "tables": 1
+    },
+    {
+      "file": "real-data-law-ro\\18767.json",
+      "tables": 1
+    },
+    {
+      "file": "real-data-law-ro\\18838.json",
+      "tables": 1
+    },
+    {
+      "file": "real-data-law-ro\\18903.json",
+      "tables": 2
+    },
+    {
+      "file": "real-data-law-ro\\19981.json",
+      "tables": 1
+    },
+    {
+      "file": "real-data-law-ro\\36556.json",
+      "tables": 2
+    }
+  ]
+}

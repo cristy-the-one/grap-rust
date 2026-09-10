@@ -1,0 +1,1918 @@
+{
+  "scope": "12 development targets; label-only path, not full ontology discovery",
+  "rows": [
+    {
+      "case": "semantic-02",
+      "seconds": 1.1558787999965716,
+      "score": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "units": 3,
+      "calls": [
+        {
+          "purpose": "classification",
+          "wall_s": 1.1530821999913314,
+          "prompt_sha256": "98277ec6c014a793c2e4c59dc6b1a8b3b516400b2661c779f5da04fa127646eb",
+          "prompt_chars": 2969,
+          "raw": "{\"units\": {\"u21\": {\"kind\": \"fact\", \"subject\": \"Răspunderea civilă a executorului bancar\" }, \"u22\": {\"kind\": \"fact\", \"subject\": \"Asigurarea de răspundere profesională a executorului bancar\" }, \"u23\": {\"kind\": \"prohibition\", \"subject\": \"executorilor bancari\"}}\n}",
+          "finish_reason": "stop",
+          "options": {
+            "temperature": 0,
+            "seed": 42,
+            "num_predict": 2048,
+            "num_ctx": 16384
+          },
+          "think": false,
+          "thinking_characters": 0,
+          "total_duration": 1142727100,
+          "load_duration": 2129700,
+          "prompt_eval_duration": 295776000,
+          "eval_duration": 837031000,
+          "prompt_eval_count": 686,
+          "eval_count": 90
+        }
+      ],
+      "result": {
+        "claims": [
+          {
+            "statement": "Răspunderea civilă a executorului bancar poate fi angajata, în condiţiile legii, pentru cauzarea de prejudiciu prin încălcarea obligaţiilor sale profesionale.",
+            "subject": "Răspunderea civilă a executorului bancar",
+            "predicate": "",
+            "object": "",
+            "provision": "+ Articolul 14",
+            "scope": [],
+            "conditions": [
+              "în condiţiile legii, pentru cauzarea de prejudiciu prin încălcarea obligaţiilor sale profesionale."
+            ],
+            "exceptions": [],
+            "dates": [],
+            "evidence": [
+              {
+                "quote": "Răspunderea civilă a executorului bancar poate fi angajata, în condiţiile legii, pentru cauzarea de prejudiciu prin încălcarea obligaţiilor sale profesionale.",
+                "start": 7464,
+                "end": 7622
+              }
+            ],
+            "context_evidence": [
+              {
+                "quote": "+ Articolul 14 Răspunderea civilă a executorului bancar poate fi angajata, în condiţiile legii, pentru cauzarea de prejudiciu prin încălcarea obligaţiilor sale profesionale. Asigurarea de răspundere profesională a executorului bancar se poate realiza de către şi în contul băncii în care îşi desfăşoară activitatea, dacă aceasta este expres stipulată, după caz, în regulamentul intern al băncii sau în convenţia încheiată de banca cu executorul bancar. ",
+                "start": 7449,
+                "end": 7902
+              }
+            ],
+            "provision_evidence": {
+              "quote": "+ Articolul 14",
+              "start": 7449,
+              "end": 7463
+            },
+            "review_status": "proposed",
+            "scope_resolution": "unresolved",
+            "review_issues": [],
+            "subject_evidence": {
+              "quote": "Răspunderea civilă a executorului bancar",
+              "start": 7464,
+              "end": 7504
+            },
+            "subject_method": "model-source-quote",
+            "kind": "fact",
+            "extraction_method": "source-statement-classification"
+          },
+          {
+            "statement": "Asigurarea de răspundere profesională a executorului bancar se poate realiza de către şi în contul băncii în care îşi desfăşoară activitatea, dacă aceasta este expres stipulată, după caz, în regulamentul intern al băncii sau în convenţia încheiată de banca cu executorul bancar.",
+            "subject": "Asigurarea de răspundere profesională a executorului bancar",
+            "predicate": "",
+            "object": "",
+            "provision": "+ Articolul 14",
+            "scope": [],
+            "conditions": [
+              "dacă aceasta este expres stipulată, după caz, în regulamentul intern al băncii sau în convenţia încheiată de banca cu executorul bancar."
+            ],
+            "exceptions": [],
+            "dates": [],
+            "evidence": [
+              {
+                "quote": "Asigurarea de răspundere profesională a executorului bancar se poate realiza de către şi în contul băncii în care îşi desfăşoară activitatea, dacă aceasta este expres stipulată, după caz, în regulamentul intern al băncii sau în convenţia încheiată de banca cu executorul bancar.",
+                "start": 7623,
+                "end": 7901
+              }
+            ],
+            "context_evidence": [
+              {
+                "quote": "+ Articolul 14 Răspunderea civilă a executorului bancar poate fi angajata, în condiţiile legii, pentru cauzarea de prejudiciu prin încălcarea obligaţiilor sale profesionale. Asigurarea de răspundere profesională a executorului bancar se poate realiza de către şi în contul băncii în care îşi desfăşoară activitatea, dacă aceasta este expres stipulată, după caz, în regulamentul intern al băncii sau în convenţia încheiată de banca cu executorul bancar. ",
+                "start": 7449,
+                "end": 7902
+              }
+            ],
+            "provision_evidence": {
+              "quote": "+ Articolul 14",
+              "start": 7449,
+              "end": 7463
+            },
+            "review_status": "proposed",
+            "scope_resolution": "unresolved",
+            "review_issues": [],
+            "subject_evidence": {
+              "quote": "Asigurarea de răspundere profesională a executorului bancar",
+              "start": 7623,
+              "end": 7682
+            },
+            "subject_method": "model-source-quote",
+            "kind": "fact",
+            "extraction_method": "source-statement-classification"
+          },
+          {
+            "statement": "Este interzis executorilor bancari sa achizitioneze, direct sau prin interpusi, pentru ei sau pentru alţii, bunurile ce au format obiectul activităţii de executare silită sau să facă acte de executare în propria lor cauza ori în cauzele privind rudele şi afinii până la gradul al patrulea inclusiv.",
+            "subject": "executorilor bancari",
+            "predicate": "",
+            "object": "",
+            "provision": "+ Articolul 15",
+            "scope": [],
+            "conditions": [],
+            "exceptions": [],
+            "dates": [],
+            "evidence": [
+              {
+                "quote": "Este interzis executorilor bancari sa achizitioneze, direct sau prin interpusi, pentru ei sau pentru alţii, bunurile ce au format obiectul activităţii de executare silită sau să facă acte de executare în propria lor cauza ori în cauzele privind rudele şi afinii până la gradul al patrulea inclusiv.",
+                "start": 7917,
+                "end": 8215
+              }
+            ],
+            "context_evidence": [
+              {
+                "quote": "+ Articolul 15 Este interzis executorilor bancari sa achizitioneze, direct sau prin interpusi, pentru ei sau pentru alţii, bunurile ce au format obiectul activităţii de executare silită sau să facă acte de executare în propria lor cauza ori în cauzele privind rudele şi afinii până la gradul al patrulea inclusiv. ",
+                "start": 7902,
+                "end": 8216
+              }
+            ],
+            "provision_evidence": {
+              "quote": "+ Articolul 15",
+              "start": 7902,
+              "end": 7916
+            },
+            "review_status": "proposed",
+            "scope_resolution": "unresolved",
+            "review_issues": [],
+            "subject_evidence": {
+              "quote": "executorilor bancari",
+              "start": 7931,
+              "end": 7951
+            },
+            "subject_method": "model-source-quote",
+            "kind": "prohibition",
+            "extraction_method": "source-statement-classification"
+          }
+        ],
+        "prompt_version": "legal-rules-v11",
+        "raw_reply": "[{\"raw_reply\": \"{\\\"units\\\": {\\\"u21\\\": {\\\"kind\\\": \\\"fact\\\", \\\"subject\\\": \\\"Răspunderea civilă a executorului bancar\\\"}, \\\"u22\\\": {\\\"kind\\\": \\\"fact\\\", \\\"subject\\\": \\\"Asigurarea de răspundere profesională a executorului bancar\\\"}, \\\"u23\\\": {\\\"kind\\\": \\\"prohibition\\\", \\\"subject\\\": \\\"executorilor bancari\\\"}}}\", \"unit_ids\": [\"u21\", \"u22\", \"u23\"], \"model_raw_reply\": \"{\\\"units\\\": {\\\"u21\\\": {\\\"kind\\\": \\\"fact\\\", \\\"subject\\\": \\\"Răspunderea civilă a executorului bancar\\\" }, \\\"u22\\\": {\\\"kind\\\": \\\"fact\\\", \\\"subject\\\": \\\"Asigurarea de răspundere profesională a executorului bancar\\\" }, \\\"u23\\\": {\\\"kind\\\": \\\"prohibition\\\", \\\"subject\\\": \\\"executorilor bancari\\\"}}\\n}\", \"deterministic_unit_ids\": [], \"model_unit_ids\": [\"u21\", \"u22\", \"u23\"]}]",
+        "units": [
+          {
+            "id": "u21",
+            "kind": "fact",
+            "model_kind": "fact",
+            "evidence": {
+              "quote": "Răspunderea civilă a executorului bancar poate fi angajata, în condiţiile legii, pentru cauzarea de prejudiciu prin încălcarea obligaţiilor sale profesionale.",
+              "start": 7464,
+              "end": 7622
+            }
+          },
+          {
+            "id": "u22",
+            "kind": "fact",
+            "model_kind": "fact",
+            "evidence": {
+              "quote": "Asigurarea de răspundere profesională a executorului bancar se poate realiza de către şi în contul băncii în care îşi desfăşoară activitatea, dacă aceasta este expres stipulată, după caz, în regulamentul intern al băncii sau în convenţia încheiată de banca cu executorul bancar.",
+              "start": 7623,
+              "end": 7901
+            }
+          },
+          {
+            "id": "u23",
+            "kind": "prohibition",
+            "model_kind": "prohibition",
+            "evidence": {
+              "quote": "Este interzis executorilor bancari sa achizitioneze, direct sau prin interpusi, pentru ei sau pentru alţii, bunurile ce au format obiectul activităţii de executare silită sau să facă acte de executare în propria lor cauza ori în cauzele privind rudele şi afinii până la gradul al patrulea inclusiv.",
+              "start": 7917,
+              "end": 8215
+            }
+          }
+        ],
+        "model_calls": 1,
+        "provider": {
+          "name": "openai-compat",
+          "model": "grap-legal-gemma4"
+        }
+      }
+    },
+    {
+      "case": "semantic-03",
+      "seconds": 0.694357400003355,
+      "score": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "units": 2,
+      "calls": [
+        {
+          "purpose": "classification",
+          "wall_s": 0.6941080000106012,
+          "prompt_sha256": "ffa804079441ab081fae8e19eda1b8c64d972f02567121c3ecac65d978245624",
+          "prompt_chars": 2562,
+          "raw": "{\"units\": {\"u41\": {\"kind\": \"other\", \"subject\": \"Prezentul statut\"}, \"u42\": {\"kind\": \"permission\", \"subject\": \"Dosarele de executare aflate în curs de rezolvare la data intrării în vigoare a prezentului statut\"}}}",
+          "finish_reason": "stop",
+          "options": {
+            "temperature": 0,
+            "seed": 42,
+            "num_predict": 2048,
+            "num_ctx": 16384
+          },
+          "think": false,
+          "thinking_characters": 0,
+          "total_duration": 693247900,
+          "load_duration": 2489700,
+          "prompt_eval_duration": 116554000,
+          "eval_duration": 566589000,
+          "prompt_eval_count": 578,
+          "eval_count": 68
+        }
+      ],
+      "result": {
+        "claims": [
+          {
+            "statement": "Dosarele de executare aflate în curs de rezolvare la data intrării în vigoare a prezentului statut pot fi preluate de către executorii bancari, pe baza solicitării scrise adresate de banca preşedintelui instanţei de executare. -----------",
+            "subject": "Dosarele de executare aflate în curs de rezolvare la data intrării în vigoare a prezentului statut",
+            "predicate": "",
+            "object": "",
+            "provision": "+ Articolul 25",
+            "scope": [],
+            "conditions": [],
+            "exceptions": [],
+            "dates": [],
+            "evidence": [
+              {
+                "quote": "Dosarele de executare aflate în curs de rezolvare la data intrării în vigoare a prezentului statut pot fi preluate de către executorii bancari, pe baza solicitării scrise adresate de banca preşedintelui instanţei de executare. -----------",
+                "start": 11475,
+                "end": 11713
+              }
+            ],
+            "context_evidence": [
+              {
+                "quote": "+ Articolul 25 Dosarele de executare aflate în curs de rezolvare la data intrării în vigoare a prezentului statut pot fi preluate de către executorii bancari, pe baza solicitării scrise adresate de banca preşedintelui instanţei de executare. -----------",
+                "start": 11460,
+                "end": 11713
+              }
+            ],
+            "provision_evidence": {
+              "quote": "+ Articolul 25",
+              "start": 11460,
+              "end": 11474
+            },
+            "review_status": "proposed",
+            "scope_resolution": "unresolved",
+            "review_issues": [],
+            "subject_evidence": {
+              "quote": "Dosarele de executare aflate în curs de rezolvare la data intrării în vigoare a prezentului statut",
+              "start": 11475,
+              "end": 11573
+            },
+            "subject_method": "model-source-quote",
+            "kind": "permission",
+            "extraction_method": "source-statement-classification"
+          }
+        ],
+        "prompt_version": "legal-rules-v11",
+        "raw_reply": "[{\"raw_reply\": \"{\\\"units\\\": {\\\"u41\\\": {\\\"kind\\\": \\\"other\\\", \\\"subject\\\": \\\"Prezentul statut\\\"}, \\\"u42\\\": {\\\"kind\\\": \\\"permission\\\", \\\"subject\\\": \\\"Dosarele de executare aflate în curs de rezolvare la data intrării în vigoare a prezentului statut\\\"}}}\", \"unit_ids\": [\"u41\", \"u42\"], \"model_raw_reply\": \"{\\\"units\\\": {\\\"u41\\\": {\\\"kind\\\": \\\"other\\\", \\\"subject\\\": \\\"Prezentul statut\\\"}, \\\"u42\\\": {\\\"kind\\\": \\\"permission\\\", \\\"subject\\\": \\\"Dosarele de executare aflate în curs de rezolvare la data intrării în vigoare a prezentului statut\\\"}}}\", \"deterministic_unit_ids\": [], \"model_unit_ids\": [\"u41\", \"u42\"]}]",
+        "units": [
+          {
+            "id": "u41",
+            "kind": "other",
+            "model_kind": "other",
+            "evidence": {
+              "quote": "Prezentul statut intră în vigoare la data publicării lui în Monitorul Oficial al României, Partea I.",
+              "start": 11359,
+              "end": 11459
+            }
+          },
+          {
+            "id": "u42",
+            "kind": "permission",
+            "model_kind": "permission",
+            "evidence": {
+              "quote": "Dosarele de executare aflate în curs de rezolvare la data intrării în vigoare a prezentului statut pot fi preluate de către executorii bancari, pe baza solicitării scrise adresate de banca preşedintelui instanţei de executare. -----------",
+              "start": 11475,
+              "end": 11713
+            }
+          }
+        ],
+        "model_calls": 1,
+        "provider": {
+          "name": "openai-compat",
+          "model": "grap-legal-gemma4"
+        }
+      }
+    },
+    {
+      "case": "semantic-11",
+      "seconds": 1.1700699999928474,
+      "score": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "units": 3,
+      "calls": [
+        {
+          "purpose": "classification",
+          "wall_s": 1.169537699999637,
+          "prompt_sha256": "c78117d732104a85de42af94c254ebdb4221243bcf5eb440e59d287663d72b57",
+          "prompt_chars": 2705,
+          "raw": "{\"units\": {\"u0\": {\"kind\": \"other\", \"subject\": \"NORME din 28 iunie 1999 privind verificarea tehnica a vehiculelor feroviare aparţinând agentilor economici EMITENT MINISTERUL TRANSPORTURILOR Publicat în MONITORUL OFICIAL nr. 396 din 19 august 1999 + Capitolul 1 Dispozitii generale\"}, \"u1\": {\"kind\": \"obligation\", \"subject\": \"vehiculele feroviare de orice tip aparţinând agentilor economici\"}}}",
+          "finish_reason": "stop",
+          "options": {
+            "temperature": 0,
+            "seed": 42,
+            "num_predict": 2048,
+            "num_ctx": 16384
+          },
+          "think": false,
+          "thinking_characters": 0,
+          "total_duration": 1158934500,
+          "load_duration": 2288000,
+          "prompt_eval_duration": 125885000,
+          "eval_duration": 1024494999,
+          "prompt_eval_count": 622,
+          "eval_count": 125
+        }
+      ],
+      "result": {
+        "claims": [
+          {
+            "statement": "(1) Pentru asigurarea efectuării transportului feroviar în condiţii de siguranţă a circulaţiei, vehiculele feroviare de orice tip aparţinând agentilor economici trebuie să indeplineasca condiţiile prevăzute în normele tehnice specifice în vigoare. ...",
+            "subject": "vehiculele feroviare de orice tip aparţinând agentilor economici",
+            "predicate": "",
+            "object": "",
+            "provision": "+ Articolul 1",
+            "scope": [],
+            "conditions": [],
+            "exceptions": [],
+            "dates": [],
+            "evidence": [
+              {
+                "quote": "(1) Pentru asigurarea efectuării transportului feroviar în condiţii de siguranţă a circulaţiei, vehiculele feroviare de orice tip aparţinând agentilor economici trebuie să indeplineasca condiţiile prevăzute în normele tehnice specifice în vigoare. ...",
+                "start": 247,
+                "end": 498
+              }
+            ],
+            "context_evidence": [
+              {
+                "quote": "+ Articolul 1 (1) Pentru asigurarea efectuării transportului feroviar în condiţii de siguranţă a circulaţiei, vehiculele feroviare de orice tip aparţinând agentilor economici trebuie să indeplineasca condiţiile prevăzute în normele tehnice specifice în vigoare. ... (2) Prezentele norme nu se aplică operatorilor de transport feroviar şi gestionarului infrastructurii feroviare publice. ... ",
+                "start": 233,
+                "end": 624
+              }
+            ],
+            "provision_evidence": {
+              "quote": "+ Articolul 1",
+              "start": 233,
+              "end": 246
+            },
+            "review_status": "proposed",
+            "scope_resolution": "unresolved",
+            "review_issues": [],
+            "subject_evidence": {
+              "quote": "vehiculele feroviare de orice tip aparţinând agentilor economici",
+              "start": 343,
+              "end": 407
+            },
+            "subject_method": "model-source-quote",
+            "kind": "obligation",
+            "extraction_method": "source-statement-classification"
+          },
+          {
+            "statement": "(2) Prezentele norme nu se aplică operatorilor de transport feroviar şi gestionarului infrastructurii feroviare publice. ...",
+            "subject": "Prezentele norme",
+            "predicate": "",
+            "object": "",
+            "provision": "+ Articolul 1",
+            "scope": [],
+            "conditions": [],
+            "exceptions": [],
+            "dates": [],
+            "evidence": [
+              {
+                "quote": "(2) Prezentele norme nu se aplică operatorilor de transport feroviar şi gestionarului infrastructurii feroviare publice. ...",
+                "start": 499,
+                "end": 623
+              }
+            ],
+            "context_evidence": [
+              {
+                "quote": "+ Articolul 1 (1) Pentru asigurarea efectuării transportului feroviar în condiţii de siguranţă a circulaţiei, vehiculele feroviare de orice tip aparţinând agentilor economici trebuie să indeplineasca condiţiile prevăzute în normele tehnice specifice în vigoare. ... (2) Prezentele norme nu se aplică operatorilor de transport feroviar şi gestionarului infrastructurii feroviare publice. ... ",
+                "start": 233,
+                "end": 624
+              }
+            ],
+            "provision_evidence": {
+              "quote": "+ Articolul 1",
+              "start": 233,
+              "end": 246
+            },
+            "review_status": "proposed",
+            "scope_resolution": "unresolved",
+            "review_issues": [],
+            "subject_evidence": {
+              "quote": "Prezentele norme",
+              "start": 503,
+              "end": 519
+            },
+            "subject_method": "explicit-syntax",
+            "kind": "fact",
+            "extraction_method": "source-statement-classification"
+          }
+        ],
+        "prompt_version": "legal-rules-v11",
+        "raw_reply": "[{\"raw_reply\": \"{\\\"units\\\": {\\\"u0\\\": {\\\"kind\\\": \\\"other\\\", \\\"subject\\\": \\\"NORME din 28 iunie 1999 privind verificarea tehnica a vehiculelor feroviare aparţinând agentilor economici EMITENT MINISTERUL TRANSPORTURILOR Publicat în MONITORUL OFICIAL nr. 396 din 19 august 1999 + Capitolul 1 Dispozitii generale\\\"}, \\\"u1\\\": {\\\"kind\\\": \\\"obligation\\\", \\\"subject\\\": \\\"vehiculele feroviare de orice tip aparţinând agentilor economici\\\"}, \\\"u2\\\": {\\\"kind\\\": \\\"fact\\\", \\\"subject\\\": \\\"Prezentele norme\\\"}}}\", \"unit_ids\": [\"u0\", \"u1\", \"u2\"], \"model_raw_reply\": \"{\\\"units\\\": {\\\"u0\\\": {\\\"kind\\\": \\\"other\\\", \\\"subject\\\": \\\"NORME din 28 iunie 1999 privind verificarea tehnica a vehiculelor feroviare aparţinând agentilor economici EMITENT MINISTERUL TRANSPORTURILOR Publicat în MONITORUL OFICIAL nr. 396 din 19 august 1999 + Capitolul 1 Dispozitii generale\\\"}, \\\"u1\\\": {\\\"kind\\\": \\\"obligation\\\", \\\"subject\\\": \\\"vehiculele feroviare de orice tip aparţinând agentilor economici\\\"}}}\", \"deterministic_unit_ids\": [\"u2\"], \"model_unit_ids\": [\"u0\", \"u1\"]}]",
+        "units": [
+          {
+            "id": "u0",
+            "kind": "other",
+            "model_kind": "other",
+            "evidence": {
+              "quote": "NORME din 28 iunie 1999 privind verificarea tehnica a vehiculelor feroviare aparţinând agentilor economici EMITENT MINISTERUL TRANSPORTURILOR Publicat în MONITORUL OFICIAL nr. 396 din 19 august 1999 + Capitolul 1 Dispozitii generale",
+              "start": 0,
+              "end": 232
+            }
+          },
+          {
+            "id": "u1",
+            "kind": "obligation",
+            "model_kind": "obligation",
+            "evidence": {
+              "quote": "(1) Pentru asigurarea efectuării transportului feroviar în condiţii de siguranţă a circulaţiei, vehiculele feroviare de orice tip aparţinând agentilor economici trebuie să indeplineasca condiţiile prevăzute în normele tehnice specifice în vigoare. ...",
+              "start": 247,
+              "end": 498
+            }
+          },
+          {
+            "id": "u2",
+            "kind": "fact",
+            "model_kind": "fact",
+            "evidence": {
+              "quote": "(2) Prezentele norme nu se aplică operatorilor de transport feroviar şi gestionarului infrastructurii feroviare publice. ...",
+              "start": 499,
+              "end": 623
+            }
+          }
+        ],
+        "model_calls": 1,
+        "provider": {
+          "name": "openai-compat",
+          "model": "grap-legal-gemma4"
+        }
+      }
+    },
+    {
+      "case": "semantic-16",
+      "seconds": 0.7238424999959534,
+      "score": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "units": 2,
+      "calls": [
+        {
+          "purpose": "classification",
+          "wall_s": 0.7235625999892363,
+          "prompt_sha256": "5d2708e74932c4cde0861c409af4a35dd50cf4d60bc9db76a30e48f4ed260097",
+          "prompt_chars": 2503,
+          "raw": "{\"units\": {\"u71\": {\"kind\": \"fact\", \"subject\": \"Aceste sume\" }, \"u72\": {\"kind\": \"fact\", \"subject\": \"Sumele ce urmează a fi restituite beneficiarilor în condițiile art. III alin. (1)\" }}}",
+          "finish_reason": "stop",
+          "options": {
+            "temperature": 0,
+            "seed": 42,
+            "num_predict": 2048,
+            "num_ctx": 16384
+          },
+          "think": false,
+          "thinking_characters": 0,
+          "total_duration": 712392100,
+          "load_duration": 2235500,
+          "prompt_eval_duration": 121524000,
+          "eval_duration": 582044000,
+          "prompt_eval_count": 573,
+          "eval_count": 67
+        }
+      ],
+      "result": {
+        "claims": [
+          {
+            "statement": "Aceste sume se evidențiază prin contul de creditori.",
+            "subject": "Aceste sume",
+            "predicate": "",
+            "object": "",
+            "provision": "+ Articolul V",
+            "scope": [],
+            "conditions": [],
+            "exceptions": [],
+            "dates": [],
+            "evidence": [
+              {
+                "quote": "Aceste sume se evidențiază prin contul de creditori.",
+                "start": 36972,
+                "end": 37024
+              }
+            ],
+            "context_evidence": [
+              {
+                "quote": "+ Articolul V Sumele care fac obiectul restituirii sunt cele provenite din debite constituite anterior sau ulterior datei de 1 ianuarie 2015 și recuperate, total sau parțial, după caz, începând cu data de 1 ianuarie 2015 și până la data de 1 martie 2019. Aceste sume se evidențiază prin contul de creditori. ",
+                "start": 36717,
+                "end": 37025
+              }
+            ],
+            "provision_evidence": {
+              "quote": "+ Articolul V",
+              "start": 36717,
+              "end": 36730
+            },
+            "review_status": "proposed",
+            "scope_resolution": "unresolved",
+            "review_issues": [],
+            "subject_evidence": {
+              "quote": "Aceste sume",
+              "start": 36972,
+              "end": 36983
+            },
+            "subject_method": "model-source-quote",
+            "kind": "fact",
+            "extraction_method": "source-statement-classification"
+          },
+          {
+            "statement": "Sumele ce urmează a fi restituite beneficiarilor în condițiile art. III alin. (1) nu se actualizează cu indicele de inflație și nu sunt purtătoare de dobânzi, penalități de întârziere sau majorări de întârziere, după caz. -----",
+            "subject": "Sumele ce urmează a fi restituite beneficiarilor în condițiile art. III alin. (1)",
+            "predicate": "",
+            "object": "",
+            "provision": "+ Articolul VI",
+            "scope": [],
+            "conditions": [
+              "în condițiile art. III alin. (1) nu se actualizează cu indicele de inflație și nu sunt purtătoare de dobânzi, penalități de întârziere sau majorări de întârziere, după caz. -----"
+            ],
+            "exceptions": [],
+            "dates": [],
+            "evidence": [
+              {
+                "quote": "Sumele ce urmează a fi restituite beneficiarilor în condițiile art. III alin. (1) nu se actualizează cu indicele de inflație și nu sunt purtătoare de dobânzi, penalități de întârziere sau majorări de întârziere, după caz. -----",
+                "start": 37040,
+                "end": 37267
+              }
+            ],
+            "context_evidence": [
+              {
+                "quote": "+ Articolul VI Sumele ce urmează a fi restituite beneficiarilor în condițiile art. III alin. (1) nu se actualizează cu indicele de inflație și nu sunt purtătoare de dobânzi, penalități de întârziere sau majorări de întârziere, după caz. -----",
+                "start": 37025,
+                "end": 37267
+              }
+            ],
+            "provision_evidence": {
+              "quote": "+ Articolul VI",
+              "start": 37025,
+              "end": 37039
+            },
+            "review_status": "proposed",
+            "scope_resolution": "unresolved",
+            "review_issues": [],
+            "subject_evidence": {
+              "quote": "Sumele ce urmează a fi restituite beneficiarilor în condițiile art. III alin. (1)",
+              "start": 37040,
+              "end": 37121
+            },
+            "subject_method": "model-source-quote",
+            "kind": "fact",
+            "extraction_method": "source-statement-classification"
+          }
+        ],
+        "prompt_version": "legal-rules-v11",
+        "raw_reply": "[{\"raw_reply\": \"{\\\"units\\\": {\\\"u71\\\": {\\\"kind\\\": \\\"fact\\\", \\\"subject\\\": \\\"Aceste sume\\\"}, \\\"u72\\\": {\\\"kind\\\": \\\"fact\\\", \\\"subject\\\": \\\"Sumele ce urmează a fi restituite beneficiarilor în condițiile art. III alin. (1)\\\"}}}\", \"unit_ids\": [\"u71\", \"u72\"], \"model_raw_reply\": \"{\\\"units\\\": {\\\"u71\\\": {\\\"kind\\\": \\\"fact\\\", \\\"subject\\\": \\\"Aceste sume\\\" }, \\\"u72\\\": {\\\"kind\\\": \\\"fact\\\", \\\"subject\\\": \\\"Sumele ce urmează a fi restituite beneficiarilor în condițiile art. III alin. (1)\\\" }}}\", \"deterministic_unit_ids\": [], \"model_unit_ids\": [\"u71\", \"u72\"]}]",
+        "units": [
+          {
+            "id": "u71",
+            "kind": "fact",
+            "model_kind": "fact",
+            "evidence": {
+              "quote": "Aceste sume se evidențiază prin contul de creditori.",
+              "start": 36972,
+              "end": 37024
+            }
+          },
+          {
+            "id": "u72",
+            "kind": "fact",
+            "model_kind": "fact",
+            "evidence": {
+              "quote": "Sumele ce urmează a fi restituite beneficiarilor în condițiile art. III alin. (1) nu se actualizează cu indicele de inflație și nu sunt purtătoare de dobânzi, penalități de întârziere sau majorări de întârziere, după caz. -----",
+              "start": 37040,
+              "end": 37267
+            }
+          }
+        ],
+        "model_calls": 1,
+        "provider": {
+          "name": "openai-compat",
+          "model": "grap-legal-gemma4"
+        }
+      }
+    },
+    {
+      "case": "semantic-17",
+      "seconds": 0.793237699996098,
+      "score": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "units": 1,
+      "calls": [
+        {
+          "purpose": "classification",
+          "wall_s": 0.792838399996981,
+          "prompt_sha256": "f5454478fbae865693ba30cf043102ee65f92de662733be56aad94720ea554e7",
+          "prompt_chars": 2731,
+          "raw": "{\"units\": {\"u28\": {\"kind\": \"obligation\", \"subject\": \"toate societățile comerciale, companiile și societățile naționale, regiile autonome din subordinea F.P.S. sau a ministerelor, precum și instituțiile publice și agențiile subordonate Guvernului\"}}}",
+          "finish_reason": "stop",
+          "options": {
+            "temperature": 0,
+            "seed": 42,
+            "num_predict": 2048,
+            "num_ctx": 16384
+          },
+          "think": false,
+          "thinking_characters": 0,
+          "total_duration": 781356900,
+          "load_duration": 2614400,
+          "prompt_eval_duration": 121582000,
+          "eval_duration": 651072000,
+          "prompt_eval_count": 612,
+          "eval_count": 75
+        }
+      ],
+      "result": {
+        "claims": [
+          {
+            "statement": "Pentru a sprijini actul decizional la nivel local și central, în scopul implementarii eficiente și corecte a RICOP, precum și al corelării măsurilor luate în cadrul acestuia cu obiectivele PSAL, toate societățile comerciale, companiile și societățile naționale, regiile autonome din subordinea F.P.S. sau a ministerelor, precum și instituțiile publice și agențiile subordonate Guvernului au obligația sa pună imediat la dispoziție structurilor locale și centrale ale RICOP toate documentele și informațiile solicitate.",
+            "subject": "toate societățile comerciale, companiile și societățile naționale, regiile autonome din subordinea F.P.S. sau a ministerelor, precum și instituțiile publice și agențiile subordonate Guvernului",
+            "predicate": "",
+            "object": "",
+            "provision": "+ Articolul 7",
+            "scope": [],
+            "conditions": [],
+            "exceptions": [],
+            "dates": [],
+            "evidence": [
+              {
+                "quote": "Pentru a sprijini actul decizional la nivel local și central, în scopul implementarii eficiente și corecte a RICOP, precum și al corelării măsurilor luate în cadrul acestuia cu obiectivele PSAL, toate societățile comerciale, companiile și societățile naționale, regiile autonome din subordinea F.P.S. sau a ministerelor, precum și instituțiile publice și agențiile subordonate Guvernului au obligația sa pună imediat la dispoziție structurilor locale și centrale ale RICOP toate documentele și informațiile solicitate.",
+                "start": 7182,
+                "end": 7700
+              }
+            ],
+            "context_evidence": [
+              {
+                "quote": "+ Articolul 7 Pentru a sprijini actul decizional la nivel local și central, în scopul implementarii eficiente și corecte a RICOP, precum și al corelării măsurilor luate în cadrul acestuia cu obiectivele PSAL, toate societățile comerciale, companiile și societățile naționale, regiile autonome din subordinea F.P.S. sau a ministerelor, precum și instituțiile publice și agențiile subordonate Guvernului au obligația sa pună imediat la dispoziție structurilor locale și centrale ale RICOP toate documentele și informațiile solicitate. ",
+                "start": 7168,
+                "end": 7701
+              }
+            ],
+            "provision_evidence": {
+              "quote": "+ Articolul 7",
+              "start": 7168,
+              "end": 7181
+            },
+            "review_status": "proposed",
+            "scope_resolution": "unresolved",
+            "review_issues": [],
+            "subject_evidence": {
+              "quote": "toate societățile comerciale, companiile și societățile naționale, regiile autonome din subordinea F.P.S. sau a ministerelor, precum și instituțiile publice și agențiile subordonate Guvernului",
+              "start": 7377,
+              "end": 7569
+            },
+            "subject_method": "model-source-quote",
+            "kind": "obligation",
+            "extraction_method": "source-statement-classification"
+          }
+        ],
+        "prompt_version": "legal-rules-v11",
+        "raw_reply": "[{\"raw_reply\": \"{\\\"units\\\": {\\\"u28\\\": {\\\"kind\\\": \\\"obligation\\\", \\\"subject\\\": \\\"toate societățile comerciale, companiile și societățile naționale, regiile autonome din subordinea F.P.S. sau a ministerelor, precum și instituțiile publice și agențiile subordonate Guvernului\\\"}}}\", \"unit_ids\": [\"u28\"], \"model_raw_reply\": \"{\\\"units\\\": {\\\"u28\\\": {\\\"kind\\\": \\\"obligation\\\", \\\"subject\\\": \\\"toate societățile comerciale, companiile și societățile naționale, regiile autonome din subordinea F.P.S. sau a ministerelor, precum și instituțiile publice și agențiile subordonate Guvernului\\\"}}}\", \"deterministic_unit_ids\": [], \"model_unit_ids\": [\"u28\"]}]",
+        "units": [
+          {
+            "id": "u28",
+            "kind": "obligation",
+            "model_kind": "obligation",
+            "evidence": {
+              "quote": "Pentru a sprijini actul decizional la nivel local și central, în scopul implementarii eficiente și corecte a RICOP, precum și al corelării măsurilor luate în cadrul acestuia cu obiectivele PSAL, toate societățile comerciale, companiile și societățile naționale, regiile autonome din subordinea F.P.S. sau a ministerelor, precum și instituțiile publice și agențiile subordonate Guvernului au obligația sa pună imediat la dispoziție structurilor locale și centrale ale RICOP toate documentele și informațiile solicitate.",
+              "start": 7182,
+              "end": 7700
+            }
+          }
+        ],
+        "model_calls": 1,
+        "provider": {
+          "name": "openai-compat",
+          "model": "grap-legal-gemma4"
+        }
+      }
+    },
+    {
+      "case": "semantic-01",
+      "seconds": 0.0002750999992713332,
+      "score": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "units": 1,
+      "calls": [],
+      "result": {
+        "claims": [
+          {
+            "statement": "Executorii bancari, precum şi oricare alt personal angajat în compartimentul acestora au obligaţia sa păstreze secretul profesional, inclusiv secretul bancar, cu privire la actele, datele şi faptele despre care au luat cunoştinţa în cadrul activităţii lor, chiar şi după încetarea funcţiei, cu excepţia cazurilor în care legea sau părţile interesate îi eliberează de aceasta obligaţie.",
+            "subject": "Executorii bancari, precum şi oricare alt personal angajat în compartimentul acestora",
+            "predicate": "",
+            "object": "",
+            "provision": "+ Articolul 3",
+            "scope": [],
+            "conditions": [],
+            "exceptions": [
+              "cu excepţia cazurilor în care legea sau părţile interesate îi eliberează de aceasta obligaţie."
+            ],
+            "dates": [],
+            "evidence": [
+              {
+                "quote": "Executorii bancari, precum şi oricare alt personal angajat în compartimentul acestora au obligaţia sa păstreze secretul profesional, inclusiv secretul bancar, cu privire la actele, datele şi faptele despre care au luat cunoştinţa în cadrul activităţii lor, chiar şi după încetarea funcţiei, cu excepţia cazurilor în care legea sau părţile interesate îi eliberează de aceasta obligaţie.",
+                "start": 1296,
+                "end": 1681
+              }
+            ],
+            "context_evidence": [
+              {
+                "quote": "+ Articolul 3 Executorii bancari, precum şi oricare alt personal angajat în compartimentul acestora au obligaţia sa păstreze secretul profesional, inclusiv secretul bancar, cu privire la actele, datele şi faptele despre care au luat cunoştinţa în cadrul activităţii lor, chiar şi după încetarea funcţiei, cu excepţia cazurilor în care legea sau părţile interesate îi eliberează de aceasta obligaţie. ",
+                "start": 1282,
+                "end": 1682
+              }
+            ],
+            "provision_evidence": {
+              "quote": "+ Articolul 3",
+              "start": 1282,
+              "end": 1295
+            },
+            "review_status": "proposed",
+            "scope_resolution": "unresolved",
+            "review_issues": [],
+            "subject_evidence": {
+              "quote": "Executorii bancari, precum şi oricare alt personal angajat în compartimentul acestora",
+              "start": 1296,
+              "end": 1381
+            },
+            "subject_method": "explicit-syntax",
+            "kind": "obligation",
+            "extraction_method": "source-statement-classification"
+          }
+        ],
+        "prompt_version": "legal-rules-v11",
+        "raw_reply": "[{\"raw_reply\": \"{\\\"units\\\": {\\\"u6\\\": {\\\"kind\\\": \\\"obligation\\\", \\\"subject\\\": \\\"Executorii bancari, precum şi oricare alt personal angajat în compartimentul acestora\\\"}}}\", \"unit_ids\": [\"u6\"], \"model_raw_reply\": null, \"deterministic_unit_ids\": [\"u6\"], \"model_unit_ids\": []}]",
+        "units": [
+          {
+            "id": "u6",
+            "kind": "obligation",
+            "model_kind": "obligation",
+            "evidence": {
+              "quote": "Executorii bancari, precum şi oricare alt personal angajat în compartimentul acestora au obligaţia sa păstreze secretul profesional, inclusiv secretul bancar, cu privire la actele, datele şi faptele despre care au luat cunoştinţa în cadrul activităţii lor, chiar şi după încetarea funcţiei, cu excepţia cazurilor în care legea sau părţile interesate îi eliberează de aceasta obligaţie.",
+              "start": 1296,
+              "end": 1681
+            }
+          }
+        ],
+        "model_calls": 0,
+        "provider": {
+          "name": "openai-compat",
+          "model": "grap-legal-gemma4"
+        }
+      }
+    },
+    {
+      "case": "semantic-06",
+      "seconds": 1.1137364000023808,
+      "score": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "units": 3,
+      "calls": [
+        {
+          "purpose": "classification",
+          "wall_s": 1.1134129999991274,
+          "prompt_sha256": "4e8e78515381af3462f19569c2b504f872acdb2aabdb3db7cca2d71d086c0913",
+          "prompt_chars": 3003,
+          "raw": "{\"units\": {\"u0\": {\"kind\": \"other\", \"subject\": \"HOTĂRÂRE nr. 55 din 29 ianuarie 1999 privind organizarea şi funcţionarea Direcţiei generale de prognoza în subordinea Ministerului Finanţelor EMITENT GUVERNUL\"}, \"u1\": {\"kind\": \"fact\", \"subject\": \"Direcţia generală de prognoza\"}, \"u2\": {\"kind\": \"fact\", \"subject\": \"Direcţia generală de prognoza\"}}}",
+          "finish_reason": "stop",
+          "options": {
+            "temperature": 0,
+            "seed": 42,
+            "num_predict": 2048,
+            "num_ctx": 16384
+          },
+          "think": false,
+          "thinking_characters": 0,
+          "total_duration": 1112567500,
+          "load_duration": 2174000,
+          "prompt_eval_duration": 137616000,
+          "eval_duration": 965650000,
+          "prompt_eval_count": 728,
+          "eval_count": 124
+        }
+      ],
+      "result": {
+        "claims": [
+          {
+            "statement": "Direcţia generală de prognoza se organizează şi funcţionează ca organ de specialitate cu personalitate juridică în subordinea Ministerului Finanţelor, prin reorganizarea Comisiei Naţionale de Prognoza, care se desfiinţează.",
+            "subject": "Direcţia generală de prognoza",
+            "predicate": "",
+            "object": "",
+            "provision": "+ Articolul 1",
+            "scope": [],
+            "conditions": [],
+            "exceptions": [],
+            "dates": [],
+            "evidence": [
+              {
+                "quote": "Direcţia generală de prognoza se organizează şi funcţionează ca organ de specialitate cu personalitate juridică în subordinea Ministerului Finanţelor, prin reorganizarea Comisiei Naţionale de Prognoza, care se desfiinţează.",
+                "start": 319,
+                "end": 542
+              }
+            ],
+            "context_evidence": [
+              {
+                "quote": "+ Articolul 1 Direcţia generală de prognoza se organizează şi funcţionează ca organ de specialitate cu personalitate juridică în subordinea Ministerului Finanţelor, prin reorganizarea Comisiei Naţionale de Prognoza, care se desfiinţează. Direcţia generală de prognoza fundamentează şi elaborează studii şi prognoze pe termen scurt, mediu şi lung, privind evoluţia economiei româneşti în ansamblu şi a sectoarelor acesteia, necesare fundamentarii strategiei programului de guvernare. ",
+                "start": 305,
+                "end": 788
+              }
+            ],
+            "provision_evidence": {
+              "quote": "+ Articolul 1",
+              "start": 305,
+              "end": 318
+            },
+            "review_status": "proposed",
+            "scope_resolution": "unresolved",
+            "review_issues": [],
+            "subject_evidence": {
+              "quote": "Direcţia generală de prognoza",
+              "start": 319,
+              "end": 348
+            },
+            "subject_method": "model-source-quote",
+            "kind": "fact",
+            "extraction_method": "source-statement-classification"
+          },
+          {
+            "statement": "Direcţia generală de prognoza fundamentează şi elaborează studii şi prognoze pe termen scurt, mediu şi lung, privind evoluţia economiei româneşti în ansamblu şi a sectoarelor acesteia, necesare fundamentarii strategiei programului de guvernare.",
+            "subject": "Direcţia generală de prognoza",
+            "predicate": "",
+            "object": "",
+            "provision": "+ Articolul 1",
+            "scope": [],
+            "conditions": [],
+            "exceptions": [],
+            "dates": [],
+            "evidence": [
+              {
+                "quote": "Direcţia generală de prognoza fundamentează şi elaborează studii şi prognoze pe termen scurt, mediu şi lung, privind evoluţia economiei româneşti în ansamblu şi a sectoarelor acesteia, necesare fundamentarii strategiei programului de guvernare.",
+                "start": 543,
+                "end": 787
+              }
+            ],
+            "context_evidence": [
+              {
+                "quote": "+ Articolul 1 Direcţia generală de prognoza se organizează şi funcţionează ca organ de specialitate cu personalitate juridică în subordinea Ministerului Finanţelor, prin reorganizarea Comisiei Naţionale de Prognoza, care se desfiinţează. Direcţia generală de prognoza fundamentează şi elaborează studii şi prognoze pe termen scurt, mediu şi lung, privind evoluţia economiei româneşti în ansamblu şi a sectoarelor acesteia, necesare fundamentarii strategiei programului de guvernare. ",
+                "start": 305,
+                "end": 788
+              }
+            ],
+            "provision_evidence": {
+              "quote": "+ Articolul 1",
+              "start": 305,
+              "end": 318
+            },
+            "review_status": "proposed",
+            "scope_resolution": "unresolved",
+            "review_issues": [],
+            "subject_evidence": {
+              "quote": "Direcţia generală de prognoza",
+              "start": 543,
+              "end": 572
+            },
+            "subject_method": "model-source-quote",
+            "kind": "fact",
+            "extraction_method": "source-statement-classification"
+          }
+        ],
+        "prompt_version": "legal-rules-v11",
+        "raw_reply": "[{\"raw_reply\": \"{\\\"units\\\": {\\\"u0\\\": {\\\"kind\\\": \\\"other\\\", \\\"subject\\\": \\\"HOTĂRÂRE nr. 55 din 29 ianuarie 1999 privind organizarea şi funcţionarea Direcţiei generale de prognoza în subordinea Ministerului Finanţelor EMITENT GUVERNUL\\\"}, \\\"u1\\\": {\\\"kind\\\": \\\"fact\\\", \\\"subject\\\": \\\"Direcţia generală de prognoza\\\"}, \\\"u2\\\": {\\\"kind\\\": \\\"fact\\\", \\\"subject\\\": \\\"Direcţia generală de prognoza\\\"}}}\", \"unit_ids\": [\"u0\", \"u1\", \"u2\"], \"model_raw_reply\": \"{\\\"units\\\": {\\\"u0\\\": {\\\"kind\\\": \\\"other\\\", \\\"subject\\\": \\\"HOTĂRÂRE nr. 55 din 29 ianuarie 1999 privind organizarea şi funcţionarea Direcţiei generale de prognoza în subordinea Ministerului Finanţelor EMITENT GUVERNUL\\\"}, \\\"u1\\\": {\\\"kind\\\": \\\"fact\\\", \\\"subject\\\": \\\"Direcţia generală de prognoza\\\"}, \\\"u2\\\": {\\\"kind\\\": \\\"fact\\\", \\\"subject\\\": \\\"Direcţia generală de prognoza\\\"}}}\", \"deterministic_unit_ids\": [], \"model_unit_ids\": [\"u0\", \"u1\", \"u2\"]}]",
+        "units": [
+          {
+            "id": "u0",
+            "kind": "other",
+            "model_kind": "other",
+            "evidence": {
+              "quote": "HOTĂRÂRE nr. 55 din 29 ianuarie 1999 privind organizarea şi funcţionarea Direcţiei generale de prognoza în subordinea Ministerului Finanţelor EMITENT GUVERNUL Publicat în MONITORUL OFICIAL nr. 48 din 30 ianuarie 1999 În temeiul prevederilor art. 115 din Constituţia României, Guvernul României hotărăşte:",
+              "start": 0,
+              "end": 304
+            }
+          },
+          {
+            "id": "u1",
+            "kind": "fact",
+            "model_kind": "fact",
+            "evidence": {
+              "quote": "Direcţia generală de prognoza se organizează şi funcţionează ca organ de specialitate cu personalitate juridică în subordinea Ministerului Finanţelor, prin reorganizarea Comisiei Naţionale de Prognoza, care se desfiinţează.",
+              "start": 319,
+              "end": 542
+            }
+          },
+          {
+            "id": "u2",
+            "kind": "fact",
+            "model_kind": "fact",
+            "evidence": {
+              "quote": "Direcţia generală de prognoza fundamentează şi elaborează studii şi prognoze pe termen scurt, mediu şi lung, privind evoluţia economiei româneşti în ansamblu şi a sectoarelor acesteia, necesare fundamentarii strategiei programului de guvernare.",
+              "start": 543,
+              "end": 787
+            }
+          }
+        ],
+        "model_calls": 1,
+        "provider": {
+          "name": "openai-compat",
+          "model": "grap-legal-gemma4"
+        }
+      }
+    },
+    {
+      "case": "semantic-09",
+      "seconds": 1.0701530999940587,
+      "score": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "units": 3,
+      "calls": [
+        {
+          "purpose": "classification",
+          "wall_s": 1.069757599994773,
+          "prompt_sha256": "8cf9bb6493e3096c74af76be23a475b89c71edd454e46856173059ba50a742fb",
+          "prompt_chars": 2937,
+          "raw": "{\"units\": {\"u27\": {\"kind\": \"fact\", \"subject\": \"Membrii Consiliului de administraţie al A.N.L., cu excepţia directorului general al A.N.L.\"},\"u28\": {\"kind\": \"fact\", \"subject\": \"Consiliul de administraţie al A.N.L.\"},\"u29\": {\"kind\": \"prohibition\", \"subject\": \"membri ai Consiliului de administraţie al A.N.L.\"}}}",
+          "finish_reason": "stop",
+          "options": {
+            "temperature": 0,
+            "seed": 42,
+            "num_predict": 2048,
+            "num_ctx": 16384
+          },
+          "think": false,
+          "thinking_characters": 0,
+          "total_duration": 1054647900,
+          "load_duration": 2662900,
+          "prompt_eval_duration": 138358000,
+          "eval_duration": 908372000,
+          "prompt_eval_count": 705,
+          "eval_count": 112
+        }
+      ],
+      "result": {
+        "claims": [
+          {
+            "statement": "Membrii Consiliului de administraţie al A.N.L., cu excepţia directorului general al A.N.L., nu sunt salariaţi ai A.N.L. şi beneficiază de o indemnizaţie lunară în cuantum de 20% din salariul de baza brut lunar al directorului general al A.N.L.",
+            "subject": "Membrii Consiliului de administraţie al A.N.L., cu excepţia directorului general al A.N.L.",
+            "predicate": "",
+            "object": "",
+            "provision": "+ Articolul 18",
+            "scope": [],
+            "conditions": [],
+            "exceptions": [
+              "cu excepţia directorului general al A.N.L., nu sunt salariaţi ai A.N.L. şi beneficiază de o indemnizaţie lunară în cuantum de 20% din salariul de baza brut lunar al directorului general al A.N.L."
+            ],
+            "dates": [
+              "lunar"
+            ],
+            "evidence": [
+              {
+                "quote": "Membrii Consiliului de administraţie al A.N.L., cu excepţia directorului general al A.N.L., nu sunt salariaţi ai A.N.L. şi beneficiază de o indemnizaţie lunară în cuantum de 20% din salariul de baza brut lunar al directorului general al A.N.L.",
+                "start": 9854,
+                "end": 10097
+              }
+            ],
+            "context_evidence": [
+              {
+                "quote": "+ Articolul 18 Membrii Consiliului de administraţie al A.N.L., cu excepţia directorului general al A.N.L., nu sunt salariaţi ai A.N.L. şi beneficiază de o indemnizaţie lunară în cuantum de 20% din salariul de baza brut lunar al directorului general al A.N.L. ",
+                "start": 9839,
+                "end": 10098
+              }
+            ],
+            "provision_evidence": {
+              "quote": "+ Articolul 18",
+              "start": 9839,
+              "end": 9853
+            },
+            "review_status": "proposed",
+            "scope_resolution": "unresolved",
+            "review_issues": [
+              "model labeled fact; explicit wording indicates right"
+            ],
+            "subject_evidence": {
+              "quote": "Membrii Consiliului de administraţie al A.N.L., cu excepţia directorului general al A.N.L.",
+              "start": 9854,
+              "end": 9944
+            },
+            "subject_method": "model-source-quote",
+            "kind": "right",
+            "extraction_method": "source-statement-classification"
+          },
+          {
+            "statement": "Consiliul de administraţie al A.N.L. are atribuţiile prevăzute de lege şi aplica hotărârile Consiliului naţional de coordonare al A.N.L.",
+            "subject": "Consiliul de administraţie al A.N.L.",
+            "predicate": "",
+            "object": "",
+            "provision": "+ Articolul 19",
+            "scope": [],
+            "conditions": [],
+            "exceptions": [],
+            "dates": [],
+            "evidence": [
+              {
+                "quote": "Consiliul de administraţie al A.N.L. are atribuţiile prevăzute de lege şi aplica hotărârile Consiliului naţional de coordonare al A.N.L.",
+                "start": 10113,
+                "end": 10249
+              }
+            ],
+            "context_evidence": [
+              {
+                "quote": "+ Articolul 19 Consiliul de administraţie al A.N.L. are atribuţiile prevăzute de lege şi aplica hotărârile Consiliului naţional de coordonare al A.N.L. ",
+                "start": 10098,
+                "end": 10250
+              }
+            ],
+            "provision_evidence": {
+              "quote": "+ Articolul 19",
+              "start": 10098,
+              "end": 10112
+            },
+            "review_status": "proposed",
+            "scope_resolution": "unresolved",
+            "review_issues": [],
+            "subject_evidence": {
+              "quote": "Consiliul de administraţie al A.N.L.",
+              "start": 10113,
+              "end": 10149
+            },
+            "subject_method": "model-source-quote",
+            "kind": "fact",
+            "extraction_method": "source-statement-classification"
+          },
+          {
+            "statement": "Nu pot fi desemnaţi membri ai Consiliului de administraţie al A.N.L. sau vor fi revocaţi de drept acei membri care se găsesc în una dintre următoarele situaţii: a) au antecedente penale; ... b) au interdicţii, stabilite potrivit legii, de a conduce, controla, gestiona sau administra o societate sau instituţie publică. ...",
+            "subject": "membri ai Consiliului de administraţie al A.N.L.",
+            "predicate": "",
+            "object": "",
+            "provision": "+ Articolul 20",
+            "scope": [],
+            "conditions": [],
+            "exceptions": [],
+            "dates": [],
+            "evidence": [
+              {
+                "quote": "Nu pot fi desemnaţi membri ai Consiliului de administraţie al A.N.L. sau vor fi revocaţi de drept acei membri care se găsesc în una dintre următoarele situaţii: a) au antecedente penale; ... b) au interdicţii, stabilite potrivit legii, de a conduce, controla, gestiona sau administra o societate sau instituţie publică. ...",
+                "start": 10265,
+                "end": 10588
+              }
+            ],
+            "context_evidence": [
+              {
+                "quote": "+ Articolul 20 Nu pot fi desemnaţi membri ai Consiliului de administraţie al A.N.L. sau vor fi revocaţi de drept acei membri care se găsesc în una dintre următoarele situaţii: a) au antecedente penale; ... b) au interdicţii, stabilite potrivit legii, de a conduce, controla, gestiona sau administra o societate sau instituţie publică. ... ",
+                "start": 10250,
+                "end": 10589
+              }
+            ],
+            "provision_evidence": {
+              "quote": "+ Articolul 20",
+              "start": 10250,
+              "end": 10264
+            },
+            "review_status": "proposed",
+            "scope_resolution": "unresolved",
+            "review_issues": [],
+            "subject_evidence": {
+              "quote": "membri ai Consiliului de administraţie al A.N.L.",
+              "start": 10285,
+              "end": 10333
+            },
+            "subject_method": "model-source-quote",
+            "kind": "prohibition",
+            "extraction_method": "source-statement-classification"
+          }
+        ],
+        "prompt_version": "legal-rules-v11",
+        "raw_reply": "[{\"raw_reply\": \"{\\\"units\\\": {\\\"u27\\\": {\\\"kind\\\": \\\"fact\\\", \\\"subject\\\": \\\"Membrii Consiliului de administraţie al A.N.L., cu excepţia directorului general al A.N.L.\\\"}, \\\"u28\\\": {\\\"kind\\\": \\\"fact\\\", \\\"subject\\\": \\\"Consiliul de administraţie al A.N.L.\\\"}, \\\"u29\\\": {\\\"kind\\\": \\\"prohibition\\\", \\\"subject\\\": \\\"membri ai Consiliului de administraţie al A.N.L.\\\"}}}\", \"unit_ids\": [\"u27\", \"u28\", \"u29\"], \"model_raw_reply\": \"{\\\"units\\\": {\\\"u27\\\": {\\\"kind\\\": \\\"fact\\\", \\\"subject\\\": \\\"Membrii Consiliului de administraţie al A.N.L., cu excepţia directorului general al A.N.L.\\\"},\\\"u28\\\": {\\\"kind\\\": \\\"fact\\\", \\\"subject\\\": \\\"Consiliul de administraţie al A.N.L.\\\"},\\\"u29\\\": {\\\"kind\\\": \\\"prohibition\\\", \\\"subject\\\": \\\"membri ai Consiliului de administraţie al A.N.L.\\\"}}}\", \"deterministic_unit_ids\": [], \"model_unit_ids\": [\"u27\", \"u28\", \"u29\"]}]",
+        "units": [
+          {
+            "id": "u27",
+            "kind": "right",
+            "model_kind": "fact",
+            "evidence": {
+              "quote": "Membrii Consiliului de administraţie al A.N.L., cu excepţia directorului general al A.N.L., nu sunt salariaţi ai A.N.L. şi beneficiază de o indemnizaţie lunară în cuantum de 20% din salariul de baza brut lunar al directorului general al A.N.L.",
+              "start": 9854,
+              "end": 10097
+            }
+          },
+          {
+            "id": "u28",
+            "kind": "fact",
+            "model_kind": "fact",
+            "evidence": {
+              "quote": "Consiliul de administraţie al A.N.L. are atribuţiile prevăzute de lege şi aplica hotărârile Consiliului naţional de coordonare al A.N.L.",
+              "start": 10113,
+              "end": 10249
+            }
+          },
+          {
+            "id": "u29",
+            "kind": "prohibition",
+            "model_kind": "prohibition",
+            "evidence": {
+              "quote": "Nu pot fi desemnaţi membri ai Consiliului de administraţie al A.N.L. sau vor fi revocaţi de drept acei membri care se găsesc în una dintre următoarele situaţii: a) au antecedente penale; ... b) au interdicţii, stabilite potrivit legii, de a conduce, controla, gestiona sau administra o societate sau instituţie publică. ...",
+              "start": 10265,
+              "end": 10588
+            }
+          }
+        ],
+        "model_calls": 1,
+        "provider": {
+          "name": "openai-compat",
+          "model": "grap-legal-gemma4"
+        }
+      }
+    },
+    {
+      "case": "semantic-10",
+      "seconds": 1.1459641999972519,
+      "score": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "units": 3,
+      "calls": [
+        {
+          "purpose": "classification",
+          "wall_s": 1.145522799997707,
+          "prompt_sha256": "c78117d732104a85de42af94c254ebdb4221243bcf5eb440e59d287663d72b57",
+          "prompt_chars": 2705,
+          "raw": "{\"units\": {\"u0\": {\"kind\": \"other\", \"subject\": \"NORME din 28 iunie 1999 privind verificarea tehnica a vehiculelor feroviare aparţinând agentilor economici EMITENT MINISTERUL TRANSPORTURILOR Publicat în MONITORUL OFICIAL nr. 396 din 19 august 1999 + Capitolul 1 Dispozitii generale\"}, \"u1\": {\"kind\": \"obligation\", \"subject\": \"vehiculele feroviare de orice tip aparţinând agentilor economici\"}}}",
+          "finish_reason": "stop",
+          "options": {
+            "temperature": 0,
+            "seed": 42,
+            "num_predict": 2048,
+            "num_ctx": 16384
+          },
+          "think": false,
+          "thinking_characters": 0,
+          "total_duration": 1132541500,
+          "load_duration": 2377500,
+          "prompt_eval_duration": 113833000,
+          "eval_duration": 1010485000,
+          "prompt_eval_count": 622,
+          "eval_count": 125
+        }
+      ],
+      "result": {
+        "claims": [
+          {
+            "statement": "(1) Pentru asigurarea efectuării transportului feroviar în condiţii de siguranţă a circulaţiei, vehiculele feroviare de orice tip aparţinând agentilor economici trebuie să indeplineasca condiţiile prevăzute în normele tehnice specifice în vigoare. ...",
+            "subject": "vehiculele feroviare de orice tip aparţinând agentilor economici",
+            "predicate": "",
+            "object": "",
+            "provision": "+ Articolul 1",
+            "scope": [],
+            "conditions": [],
+            "exceptions": [],
+            "dates": [],
+            "evidence": [
+              {
+                "quote": "(1) Pentru asigurarea efectuării transportului feroviar în condiţii de siguranţă a circulaţiei, vehiculele feroviare de orice tip aparţinând agentilor economici trebuie să indeplineasca condiţiile prevăzute în normele tehnice specifice în vigoare. ...",
+                "start": 247,
+                "end": 498
+              }
+            ],
+            "context_evidence": [
+              {
+                "quote": "+ Articolul 1 (1) Pentru asigurarea efectuării transportului feroviar în condiţii de siguranţă a circulaţiei, vehiculele feroviare de orice tip aparţinând agentilor economici trebuie să indeplineasca condiţiile prevăzute în normele tehnice specifice în vigoare. ... (2) Prezentele norme nu se aplică operatorilor de transport feroviar şi gestionarului infrastructurii feroviare publice. ... ",
+                "start": 233,
+                "end": 624
+              }
+            ],
+            "provision_evidence": {
+              "quote": "+ Articolul 1",
+              "start": 233,
+              "end": 246
+            },
+            "review_status": "proposed",
+            "scope_resolution": "unresolved",
+            "review_issues": [],
+            "subject_evidence": {
+              "quote": "vehiculele feroviare de orice tip aparţinând agentilor economici",
+              "start": 343,
+              "end": 407
+            },
+            "subject_method": "model-source-quote",
+            "kind": "obligation",
+            "extraction_method": "source-statement-classification"
+          },
+          {
+            "statement": "(2) Prezentele norme nu se aplică operatorilor de transport feroviar şi gestionarului infrastructurii feroviare publice. ...",
+            "subject": "Prezentele norme",
+            "predicate": "",
+            "object": "",
+            "provision": "+ Articolul 1",
+            "scope": [],
+            "conditions": [],
+            "exceptions": [],
+            "dates": [],
+            "evidence": [
+              {
+                "quote": "(2) Prezentele norme nu se aplică operatorilor de transport feroviar şi gestionarului infrastructurii feroviare publice. ...",
+                "start": 499,
+                "end": 623
+              }
+            ],
+            "context_evidence": [
+              {
+                "quote": "+ Articolul 1 (1) Pentru asigurarea efectuării transportului feroviar în condiţii de siguranţă a circulaţiei, vehiculele feroviare de orice tip aparţinând agentilor economici trebuie să indeplineasca condiţiile prevăzute în normele tehnice specifice în vigoare. ... (2) Prezentele norme nu se aplică operatorilor de transport feroviar şi gestionarului infrastructurii feroviare publice. ... ",
+                "start": 233,
+                "end": 624
+              }
+            ],
+            "provision_evidence": {
+              "quote": "+ Articolul 1",
+              "start": 233,
+              "end": 246
+            },
+            "review_status": "proposed",
+            "scope_resolution": "unresolved",
+            "review_issues": [],
+            "subject_evidence": {
+              "quote": "Prezentele norme",
+              "start": 503,
+              "end": 519
+            },
+            "subject_method": "explicit-syntax",
+            "kind": "fact",
+            "extraction_method": "source-statement-classification"
+          }
+        ],
+        "prompt_version": "legal-rules-v11",
+        "raw_reply": "[{\"raw_reply\": \"{\\\"units\\\": {\\\"u0\\\": {\\\"kind\\\": \\\"other\\\", \\\"subject\\\": \\\"NORME din 28 iunie 1999 privind verificarea tehnica a vehiculelor feroviare aparţinând agentilor economici EMITENT MINISTERUL TRANSPORTURILOR Publicat în MONITORUL OFICIAL nr. 396 din 19 august 1999 + Capitolul 1 Dispozitii generale\\\"}, \\\"u1\\\": {\\\"kind\\\": \\\"obligation\\\", \\\"subject\\\": \\\"vehiculele feroviare de orice tip aparţinând agentilor economici\\\"}, \\\"u2\\\": {\\\"kind\\\": \\\"fact\\\", \\\"subject\\\": \\\"Prezentele norme\\\"}}}\", \"unit_ids\": [\"u0\", \"u1\", \"u2\"], \"model_raw_reply\": \"{\\\"units\\\": {\\\"u0\\\": {\\\"kind\\\": \\\"other\\\", \\\"subject\\\": \\\"NORME din 28 iunie 1999 privind verificarea tehnica a vehiculelor feroviare aparţinând agentilor economici EMITENT MINISTERUL TRANSPORTURILOR Publicat în MONITORUL OFICIAL nr. 396 din 19 august 1999 + Capitolul 1 Dispozitii generale\\\"}, \\\"u1\\\": {\\\"kind\\\": \\\"obligation\\\", \\\"subject\\\": \\\"vehiculele feroviare de orice tip aparţinând agentilor economici\\\"}}}\", \"deterministic_unit_ids\": [\"u2\"], \"model_unit_ids\": [\"u0\", \"u1\"]}]",
+        "units": [
+          {
+            "id": "u0",
+            "kind": "other",
+            "model_kind": "other",
+            "evidence": {
+              "quote": "NORME din 28 iunie 1999 privind verificarea tehnica a vehiculelor feroviare aparţinând agentilor economici EMITENT MINISTERUL TRANSPORTURILOR Publicat în MONITORUL OFICIAL nr. 396 din 19 august 1999 + Capitolul 1 Dispozitii generale",
+              "start": 0,
+              "end": 232
+            }
+          },
+          {
+            "id": "u1",
+            "kind": "obligation",
+            "model_kind": "obligation",
+            "evidence": {
+              "quote": "(1) Pentru asigurarea efectuării transportului feroviar în condiţii de siguranţă a circulaţiei, vehiculele feroviare de orice tip aparţinând agentilor economici trebuie să indeplineasca condiţiile prevăzute în normele tehnice specifice în vigoare. ...",
+              "start": 247,
+              "end": 498
+            }
+          },
+          {
+            "id": "u2",
+            "kind": "fact",
+            "model_kind": "fact",
+            "evidence": {
+              "quote": "(2) Prezentele norme nu se aplică operatorilor de transport feroviar şi gestionarului infrastructurii feroviare publice. ...",
+              "start": 499,
+              "end": 623
+            }
+          }
+        ],
+        "model_calls": 1,
+        "provider": {
+          "name": "openai-compat",
+          "model": "grap-legal-gemma4"
+        }
+      }
+    },
+    {
+      "case": "semantic-13",
+      "seconds": 0.6329887000028975,
+      "score": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "units": 4,
+      "calls": [
+        {
+          "purpose": "classification",
+          "wall_s": 0.6322523999988334,
+          "prompt_sha256": "0467dd8aca5374d9cc74e97d7e3441a7b365b72f5fc456b9048e48db0c5f202d",
+          "prompt_chars": 2557,
+          "raw": "{\"units\": {\"u20\": {\"kind\": \"obligation\", \"subject\": \"Subvenţia\" }, \"u21\": {\"kind\": \"fact\", \"subject\": \"Beneficiarul de credite\"}}}",
+          "finish_reason": "stop",
+          "options": {
+            "temperature": 0,
+            "seed": 42,
+            "num_predict": 2048,
+            "num_ctx": 16384
+          },
+          "think": false,
+          "thinking_characters": 0,
+          "total_duration": 621033700,
+          "load_duration": 2928800,
+          "prompt_eval_duration": 118866000,
+          "eval_duration": 492781000,
+          "prompt_eval_count": 587,
+          "eval_count": 50
+        }
+      ],
+      "result": {
+        "claims": [
+          {
+            "statement": "(1) Este interzisă înstrăinarea tractoarelor, combinelor, maşinilor şi utilajelor agricole, precum şi a instalaţiilor pentru irigat, achiziţionate în condiţiile ordonanţei şi ale prezentelor norme metodologice, înainte de achitarea integrală a creditului. ...",
+            "subject": "înstrăinarea tractoarelor, combinelor, maşinilor şi utilajelor agricole, precum şi a instalaţiilor pentru irigat, achiziţionate în condiţiile ordonanţei şi ale prezentelor norme metodologice",
+            "predicate": "",
+            "object": "",
+            "provision": "+ Articolul 9",
+            "scope": [],
+            "conditions": [
+              "în condiţiile ordonanţei şi ale prezentelor norme metodologice, înainte de achitarea integrală a creditului. ..."
+            ],
+            "exceptions": [],
+            "dates": [],
+            "evidence": [
+              {
+                "quote": "(1) Este interzisă înstrăinarea tractoarelor, combinelor, maşinilor şi utilajelor agricole, precum şi a instalaţiilor pentru irigat, achiziţionate în condiţiile ordonanţei şi ale prezentelor norme metodologice, înainte de achitarea integrală a creditului. ...",
+                "start": 6319,
+                "end": 6578
+              }
+            ],
+            "context_evidence": [
+              {
+                "quote": "+ Articolul 9 (1) Este interzisă înstrăinarea tractoarelor, combinelor, maşinilor şi utilajelor agricole, precum şi a instalaţiilor pentru irigat, achiziţionate în condiţiile ordonanţei şi ale prezentelor norme metodologice, înainte de achitarea integrală a creditului. ... (2) În cazul înstrăinării sunt aplicabile sancţiunile civile prevăzute la art. 6 din ordonanţa. ... ",
+                "start": 6305,
+                "end": 6679
+              }
+            ],
+            "provision_evidence": {
+              "quote": "+ Articolul 9",
+              "start": 6305,
+              "end": 6318
+            },
+            "review_status": "proposed",
+            "scope_resolution": "unresolved",
+            "review_issues": [],
+            "subject_evidence": {
+              "quote": "înstrăinarea tractoarelor, combinelor, maşinilor şi utilajelor agricole, precum şi a instalaţiilor pentru irigat, achiziţionate în condiţiile ordonanţei şi ale prezentelor norme metodologice",
+              "start": 6338,
+              "end": 6528
+            },
+            "subject_method": "explicit-syntax",
+            "kind": "prohibition",
+            "extraction_method": "source-statement-classification"
+          },
+          {
+            "statement": "(2) În cazul înstrăinării sunt aplicabile sancţiunile civile prevăzute la art. 6 din ordonanţa. ...",
+            "subject": "sancţiunile civile prevăzute la art. 6 din ordonanţa",
+            "predicate": "",
+            "object": "",
+            "provision": "+ Articolul 9",
+            "scope": [],
+            "conditions": [
+              "În cazul înstrăinării sunt aplicabile sancţiunile civile prevăzute la art. 6 din ordonanţa. ..."
+            ],
+            "exceptions": [],
+            "dates": [],
+            "evidence": [
+              {
+                "quote": "(2) În cazul înstrăinării sunt aplicabile sancţiunile civile prevăzute la art. 6 din ordonanţa. ...",
+                "start": 6579,
+                "end": 6678
+              }
+            ],
+            "context_evidence": [
+              {
+                "quote": "+ Articolul 9 (1) Este interzisă înstrăinarea tractoarelor, combinelor, maşinilor şi utilajelor agricole, precum şi a instalaţiilor pentru irigat, achiziţionate în condiţiile ordonanţei şi ale prezentelor norme metodologice, înainte de achitarea integrală a creditului. ... (2) În cazul înstrăinării sunt aplicabile sancţiunile civile prevăzute la art. 6 din ordonanţa. ... ",
+                "start": 6305,
+                "end": 6679
+              }
+            ],
+            "provision_evidence": {
+              "quote": "+ Articolul 9",
+              "start": 6305,
+              "end": 6318
+            },
+            "review_status": "proposed",
+            "scope_resolution": "unresolved",
+            "review_issues": [],
+            "subject_evidence": {
+              "quote": "sancţiunile civile prevăzute la art. 6 din ordonanţa",
+              "start": 6621,
+              "end": 6673
+            },
+            "subject_method": "explicit-syntax",
+            "kind": "fact",
+            "extraction_method": "source-statement-classification"
+          },
+          {
+            "statement": "(1) Subvenţia se acordă la dobânzile calculate şi datorate de beneficiarul de credite numai la soldul creditului curent, calculat lunar. ...",
+            "subject": "Subvenţia",
+            "predicate": "",
+            "object": "",
+            "provision": "+ Articolul 10",
+            "scope": [],
+            "conditions": [
+              "numai la soldul creditului curent, calculat lunar. ..."
+            ],
+            "exceptions": [],
+            "dates": [
+              "lunar"
+            ],
+            "evidence": [
+              {
+                "quote": "(1) Subvenţia se acordă la dobânzile calculate şi datorate de beneficiarul de credite numai la soldul creditului curent, calculat lunar. ...",
+                "start": 6694,
+                "end": 6834
+              }
+            ],
+            "context_evidence": [
+              {
+                "quote": "+ Articolul 10 (1) Subvenţia se acordă la dobânzile calculate şi datorate de beneficiarul de credite numai la soldul creditului curent, calculat lunar. ... (2) Beneficiarul de credite primeşte de la bugetul de stat, prin banca comercială creditoare, subvenţia de 70% din dobânda calculată la creditul curent, după plata cotei de 30% din dobânda. ... (3) În cazul în care beneficiarul de credite nu îşi plăteşte cota de 30% care îi revine conform graficului de rambursare, el nu beneficiază de subvenţie decât după data achitării acesteia şi numai la perioadele următoare. ... ",
+                "start": 6679,
+                "end": 7255
+              }
+            ],
+            "provision_evidence": {
+              "quote": "+ Articolul 10",
+              "start": 6679,
+              "end": 6693
+            },
+            "review_status": "proposed",
+            "scope_resolution": "unresolved",
+            "review_issues": [],
+            "subject_evidence": {
+              "quote": "Subvenţia",
+              "start": 6698,
+              "end": 6707
+            },
+            "subject_method": "model-source-quote",
+            "kind": "obligation",
+            "extraction_method": "source-statement-classification"
+          },
+          {
+            "statement": "(2) Beneficiarul de credite primeşte de la bugetul de stat, prin banca comercială creditoare, subvenţia de 70% din dobânda calculată la creditul curent, după plata cotei de 30% din dobânda. ...",
+            "subject": "Beneficiarul de credite",
+            "predicate": "",
+            "object": "",
+            "provision": "+ Articolul 10",
+            "scope": [],
+            "conditions": [],
+            "exceptions": [],
+            "dates": [],
+            "evidence": [
+              {
+                "quote": "(2) Beneficiarul de credite primeşte de la bugetul de stat, prin banca comercială creditoare, subvenţia de 70% din dobânda calculată la creditul curent, după plata cotei de 30% din dobânda. ...",
+                "start": 6835,
+                "end": 7028
+              }
+            ],
+            "context_evidence": [
+              {
+                "quote": "+ Articolul 10 (1) Subvenţia se acordă la dobânzile calculate şi datorate de beneficiarul de credite numai la soldul creditului curent, calculat lunar. ... (2) Beneficiarul de credite primeşte de la bugetul de stat, prin banca comercială creditoare, subvenţia de 70% din dobânda calculată la creditul curent, după plata cotei de 30% din dobânda. ... (3) În cazul în care beneficiarul de credite nu îşi plăteşte cota de 30% care îi revine conform graficului de rambursare, el nu beneficiază de subvenţie decât după data achitării acesteia şi numai la perioadele următoare. ... ",
+                "start": 6679,
+                "end": 7255
+              }
+            ],
+            "provision_evidence": {
+              "quote": "+ Articolul 10",
+              "start": 6679,
+              "end": 6693
+            },
+            "review_status": "proposed",
+            "scope_resolution": "unresolved",
+            "review_issues": [],
+            "subject_evidence": {
+              "quote": "Beneficiarul de credite",
+              "start": 6839,
+              "end": 6862
+            },
+            "subject_method": "model-source-quote",
+            "kind": "fact",
+            "extraction_method": "source-statement-classification"
+          }
+        ],
+        "prompt_version": "legal-rules-v11",
+        "raw_reply": "[{\"raw_reply\": \"{\\\"units\\\": {\\\"u20\\\": {\\\"kind\\\": \\\"obligation\\\", \\\"subject\\\": \\\"Subvenţia\\\"}, \\\"u21\\\": {\\\"kind\\\": \\\"fact\\\", \\\"subject\\\": \\\"Beneficiarul de credite\\\"}, \\\"u18\\\": {\\\"kind\\\": \\\"prohibition\\\", \\\"subject\\\": \\\"înstrăinarea tractoarelor, combinelor, maşinilor şi utilajelor agricole, precum şi a instalaţiilor pentru irigat, achiziţionate în condiţiile ordonanţei şi ale prezentelor norme metodologice\\\"}, \\\"u19\\\": {\\\"kind\\\": \\\"fact\\\", \\\"subject\\\": \\\"sancţiunile civile prevăzute la art. 6 din ordonanţa\\\"}}}\", \"unit_ids\": [\"u18\", \"u19\", \"u20\", \"u21\"], \"model_raw_reply\": \"{\\\"units\\\": {\\\"u20\\\": {\\\"kind\\\": \\\"obligation\\\", \\\"subject\\\": \\\"Subvenţia\\\" }, \\\"u21\\\": {\\\"kind\\\": \\\"fact\\\", \\\"subject\\\": \\\"Beneficiarul de credite\\\"}}}\", \"deterministic_unit_ids\": [\"u18\", \"u19\"], \"model_unit_ids\": [\"u20\", \"u21\"]}]",
+        "units": [
+          {
+            "id": "u18",
+            "kind": "prohibition",
+            "model_kind": "prohibition",
+            "evidence": {
+              "quote": "(1) Este interzisă înstrăinarea tractoarelor, combinelor, maşinilor şi utilajelor agricole, precum şi a instalaţiilor pentru irigat, achiziţionate în condiţiile ordonanţei şi ale prezentelor norme metodologice, înainte de achitarea integrală a creditului. ...",
+              "start": 6319,
+              "end": 6578
+            }
+          },
+          {
+            "id": "u19",
+            "kind": "fact",
+            "model_kind": "fact",
+            "evidence": {
+              "quote": "(2) În cazul înstrăinării sunt aplicabile sancţiunile civile prevăzute la art. 6 din ordonanţa. ...",
+              "start": 6579,
+              "end": 6678
+            }
+          },
+          {
+            "id": "u20",
+            "kind": "obligation",
+            "model_kind": "obligation",
+            "evidence": {
+              "quote": "(1) Subvenţia se acordă la dobânzile calculate şi datorate de beneficiarul de credite numai la soldul creditului curent, calculat lunar. ...",
+              "start": 6694,
+              "end": 6834
+            }
+          },
+          {
+            "id": "u21",
+            "kind": "fact",
+            "model_kind": "fact",
+            "evidence": {
+              "quote": "(2) Beneficiarul de credite primeşte de la bugetul de stat, prin banca comercială creditoare, subvenţia de 70% din dobânda calculată la creditul curent, după plata cotei de 30% din dobânda. ...",
+              "start": 6835,
+              "end": 7028
+            }
+          }
+        ],
+        "model_calls": 1,
+        "provider": {
+          "name": "openai-compat",
+          "model": "grap-legal-gemma4"
+        }
+      }
+    },
+    {
+      "case": "semantic-15",
+      "seconds": 1.0784618000034243,
+      "score": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "units": 6,
+      "calls": [
+        {
+          "purpose": "classification",
+          "wall_s": 1.078097899997374,
+          "prompt_sha256": "571af91b37883fc9ab9a9f9cfe948ab88dcab8b4f315680b58380f533edf09ec",
+          "prompt_chars": 2728,
+          "raw": "{\"units\": {\"u72\": {\"kind\": \"other\", \"subject\": \"Recalcularea consumului de energie\"}, \"u74\": {\"kind\": \"other\", \"subject\": \"Tarife pentru energia electrică.\"}, \"u75\": {\"kind\": \"other\", \"subject\": \"Modalităţi şi condiţii de plată\"}, \"u76\": {\"kind\": \"other\", \"subject\": \"tipul de tarif\"}, \"u77\": {\"kind\": \"other\", \"subject\": \"tariful\"}}\n}",
+          "finish_reason": "stop",
+          "options": {
+            "temperature": 0,
+            "seed": 42,
+            "num_predict": 2048,
+            "num_ctx": 16384
+          },
+          "think": false,
+          "thinking_characters": 0,
+          "total_duration": 1077330600,
+          "load_duration": 2316700,
+          "prompt_eval_duration": 120463000,
+          "eval_duration": 947303000,
+          "prompt_eval_count": 632,
+          "eval_count": 117
+        }
+      ],
+      "result": {
+        "claims": [
+          {
+            "statement": "Se interzice conectarea la reţelele furnizorului a instalaţiei de utilizare a unui consumator, dacă nu este prevăzută cu echipamente de măsurare.",
+            "subject": "conectarea la reţelele furnizorului a instalaţiei de utilizare a unui consumator",
+            "predicate": "",
+            "object": "",
+            "provision": "+ Articolul 14",
+            "scope": [],
+            "conditions": [
+              "dacă nu este prevăzută cu echipamente de măsurare."
+            ],
+            "exceptions": [],
+            "dates": [],
+            "evidence": [
+              {
+                "quote": "Se interzice conectarea la reţelele furnizorului a instalaţiei de utilizare a unui consumator, dacă nu este prevăzută cu echipamente de măsurare.",
+                "start": 21456,
+                "end": 21601
+              }
+            ],
+            "context_evidence": [
+              {
+                "quote": "+ Articolul 14 Se interzice conectarea la reţelele furnizorului a instalaţiei de utilizare a unui consumator, dacă nu este prevăzută cu echipamente de măsurare. Tarife pentru energia electrică. Modalităţi şi condiţii de plată ",
+                "start": 21441,
+                "end": 21667
+              }
+            ],
+            "provision_evidence": {
+              "quote": "+ Articolul 14",
+              "start": 21441,
+              "end": 21455
+            },
+            "review_status": "proposed",
+            "scope_resolution": "unresolved",
+            "review_issues": [],
+            "subject_evidence": {
+              "quote": "conectarea la reţelele furnizorului a instalaţiei de utilizare a unui consumator",
+              "start": 21469,
+              "end": 21549
+            },
+            "subject_method": "explicit-syntax",
+            "kind": "prohibition",
+            "extraction_method": "source-statement-classification"
+          }
+        ],
+        "prompt_version": "legal-rules-v11",
+        "raw_reply": "[{\"raw_reply\": \"{\\\"units\\\": {\\\"u72\\\": {\\\"kind\\\": \\\"other\\\", \\\"subject\\\": \\\"Recalcularea consumului de energie\\\"}, \\\"u74\\\": {\\\"kind\\\": \\\"other\\\", \\\"subject\\\": \\\"Tarife pentru energia electrică.\\\"}, \\\"u75\\\": {\\\"kind\\\": \\\"other\\\", \\\"subject\\\": \\\"Modalităţi şi condiţii de plată\\\"}, \\\"u76\\\": {\\\"kind\\\": \\\"other\\\", \\\"subject\\\": \\\"tipul de tarif\\\"}, \\\"u77\\\": {\\\"kind\\\": \\\"other\\\", \\\"subject\\\": \\\"tariful\\\"}, \\\"u73\\\": {\\\"kind\\\": \\\"prohibition\\\", \\\"subject\\\": \\\"conectarea la reţelele furnizorului a instalaţiei de utilizare a unui consumator\\\"}}}\", \"unit_ids\": [\"u72\", \"u73\", \"u74\", \"u75\", \"u76\", \"u77\"], \"model_raw_reply\": \"{\\\"units\\\": {\\\"u72\\\": {\\\"kind\\\": \\\"other\\\", \\\"subject\\\": \\\"Recalcularea consumului de energie\\\"}, \\\"u74\\\": {\\\"kind\\\": \\\"other\\\", \\\"subject\\\": \\\"Tarife pentru energia electrică.\\\"}, \\\"u75\\\": {\\\"kind\\\": \\\"other\\\", \\\"subject\\\": \\\"Modalităţi şi condiţii de plată\\\"}, \\\"u76\\\": {\\\"kind\\\": \\\"other\\\", \\\"subject\\\": \\\"tipul de tarif\\\"}, \\\"u77\\\": {\\\"kind\\\": \\\"other\\\", \\\"subject\\\": \\\"tariful\\\"}}\\n}\", \"deterministic_unit_ids\": [\"u73\"], \"model_unit_ids\": [\"u72\", \"u74\", \"u75\", \"u76\", \"u77\"]}]",
+        "units": [
+          {
+            "id": "u72",
+            "kind": "other",
+            "model_kind": "other",
+            "evidence": {
+              "quote": "Recalcularea consumului de energie se va face în conformitate cu prevederile anexei nr. 4 bis la prezentul contract. ...",
+              "start": 21320,
+              "end": 21440
+            }
+          },
+          {
+            "id": "u73",
+            "kind": "prohibition",
+            "model_kind": "prohibition",
+            "evidence": {
+              "quote": "Se interzice conectarea la reţelele furnizorului a instalaţiei de utilizare a unui consumator, dacă nu este prevăzută cu echipamente de măsurare.",
+              "start": 21456,
+              "end": 21601
+            }
+          },
+          {
+            "id": "u74",
+            "kind": "other",
+            "model_kind": "other",
+            "evidence": {
+              "quote": "Tarife pentru energia electrică.",
+              "start": 21602,
+              "end": 21634
+            }
+          },
+          {
+            "id": "u75",
+            "kind": "other",
+            "model_kind": "other",
+            "evidence": {
+              "quote": "Modalităţi şi condiţii de plată",
+              "start": 21635,
+              "end": 21666
+            }
+          },
+          {
+            "id": "u76",
+            "kind": "other",
+            "model_kind": "other",
+            "evidence": {
+              "quote": "(1) În condiţiile actualelor tarife, tipul de tarif se negociază, cu respectarea prevederilor legale. ...",
+              "start": 21682,
+              "end": 21787
+            }
+          },
+          {
+            "id": "u77",
+            "kind": "other",
+            "model_kind": "other",
+            "evidence": {
+              "quote": "(2) La intrarea în vigoare a unui nou sistem de tarifare, aprobat de către autoritatea competentă, tariful este ales liber de către consumator, cu respectarea prevederilor legale. ...",
+              "start": 21788,
+              "end": 21971
+            }
+          }
+        ],
+        "model_calls": 1,
+        "provider": {
+          "name": "openai-compat",
+          "model": "grap-legal-gemma4"
+        }
+      }
+    },
+    {
+      "case": "article-59",
+      "seconds": 0.7857736000005389,
+      "score": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "units": 3,
+      "calls": [
+        {
+          "purpose": "classification",
+          "wall_s": 0.7854919999954291,
+          "prompt_sha256": "08d4ed7d750a28537b51163995a40ce4e9ff9fbd0c494a6636f100797a6f5a5c",
+          "prompt_chars": 2532,
+          "raw": "{\"units\": {\"u82\": {\"kind\": \"fact\", \"subject\": \"Comisia centrala de arbitraj\"}, \"u83\": {\"kind\": \"fact\", \"subject\": \"Arbitrii\"}, \"u84\": {\"kind\": \"other\", \"subject\": \"Sediul Comisiei centrale de arbitraj\"}}\n}",
+          "finish_reason": "stop",
+          "options": {
+            "temperature": 0,
+            "seed": 42,
+            "num_predict": 2048,
+            "num_ctx": 16384
+          },
+          "think": false,
+          "thinking_characters": 0,
+          "total_duration": 770619900,
+          "load_duration": 2462600,
+          "prompt_eval_duration": 117401000,
+          "eval_duration": 645033000,
+          "prompt_eval_count": 594,
+          "eval_count": 75
+        }
+      ],
+      "result": {
+        "claims": [
+          {
+            "statement": "Comisia centrala de arbitraj se numeşte şi îşi desfăşoară activitatea potrivit legii.",
+            "subject": "Comisia centrala de arbitraj",
+            "predicate": "",
+            "object": "",
+            "provision": "+ Articolul 59",
+            "scope": [],
+            "conditions": [],
+            "exceptions": [],
+            "dates": [],
+            "evidence": [
+              {
+                "quote": "Comisia centrala de arbitraj se numeşte şi îşi desfăşoară activitatea potrivit legii.",
+                "start": 26986,
+                "end": 27071
+              }
+            ],
+            "context_evidence": [
+              {
+                "quote": "+ Articolul 59 Comisia centrala de arbitraj se numeşte şi îşi desfăşoară activitatea potrivit legii. ",
+                "start": 26971,
+                "end": 27072
+              }
+            ],
+            "provision_evidence": {
+              "quote": "+ Articolul 59",
+              "start": 26971,
+              "end": 26985
+            },
+            "review_status": "proposed",
+            "scope_resolution": "unresolved",
+            "review_issues": [],
+            "subject_evidence": {
+              "quote": "Comisia centrala de arbitraj",
+              "start": 26986,
+              "end": 27014
+            },
+            "subject_method": "model-source-quote",
+            "kind": "fact",
+            "extraction_method": "source-statement-classification"
+          },
+          {
+            "statement": "Arbitrii pot fi medici, economişti sau jurişti, acreditaţi şi înregistraţi de Ministerul Justiţiei.",
+            "subject": "Arbitrii",
+            "predicate": "",
+            "object": "",
+            "provision": "+ Articolul 60",
+            "scope": [],
+            "conditions": [],
+            "exceptions": [],
+            "dates": [],
+            "evidence": [
+              {
+                "quote": "Arbitrii pot fi medici, economişti sau jurişti, acreditaţi şi înregistraţi de Ministerul Justiţiei.",
+                "start": 27087,
+                "end": 27186
+              }
+            ],
+            "context_evidence": [
+              {
+                "quote": "+ Articolul 60 Arbitrii pot fi medici, economişti sau jurişti, acreditaţi şi înregistraţi de Ministerul Justiţiei. ",
+                "start": 27072,
+                "end": 27187
+              }
+            ],
+            "provision_evidence": {
+              "quote": "+ Articolul 60",
+              "start": 27072,
+              "end": 27086
+            },
+            "review_status": "proposed",
+            "scope_resolution": "unresolved",
+            "review_issues": [],
+            "subject_evidence": {
+              "quote": "Arbitrii",
+              "start": 27087,
+              "end": 27095
+            },
+            "subject_method": "model-source-quote",
+            "kind": "fact",
+            "extraction_method": "source-statement-classification"
+          }
+        ],
+        "prompt_version": "legal-rules-v11",
+        "raw_reply": "[{\"raw_reply\": \"{\\\"units\\\": {\\\"u82\\\": {\\\"kind\\\": \\\"fact\\\", \\\"subject\\\": \\\"Comisia centrala de arbitraj\\\"}, \\\"u83\\\": {\\\"kind\\\": \\\"fact\\\", \\\"subject\\\": \\\"Arbitrii\\\"}, \\\"u84\\\": {\\\"kind\\\": \\\"other\\\", \\\"subject\\\": \\\"Sediul Comisiei centrale de arbitraj\\\"}}}\", \"unit_ids\": [\"u82\", \"u83\", \"u84\"], \"model_raw_reply\": \"{\\\"units\\\": {\\\"u82\\\": {\\\"kind\\\": \\\"fact\\\", \\\"subject\\\": \\\"Comisia centrala de arbitraj\\\"}, \\\"u83\\\": {\\\"kind\\\": \\\"fact\\\", \\\"subject\\\": \\\"Arbitrii\\\"}, \\\"u84\\\": {\\\"kind\\\": \\\"other\\\", \\\"subject\\\": \\\"Sediul Comisiei centrale de arbitraj\\\"}}\\n}\", \"deterministic_unit_ids\": [], \"model_unit_ids\": [\"u82\", \"u83\", \"u84\"]}]",
+        "units": [
+          {
+            "id": "u82",
+            "kind": "fact",
+            "model_kind": "fact",
+            "evidence": {
+              "quote": "Comisia centrala de arbitraj se numeşte şi îşi desfăşoară activitatea potrivit legii.",
+              "start": 26986,
+              "end": 27071
+            }
+          },
+          {
+            "id": "u83",
+            "kind": "fact",
+            "model_kind": "fact",
+            "evidence": {
+              "quote": "Arbitrii pot fi medici, economişti sau jurişti, acreditaţi şi înregistraţi de Ministerul Justiţiei.",
+              "start": 27087,
+              "end": 27186
+            }
+          },
+          {
+            "id": "u84",
+            "kind": "other",
+            "model_kind": "other",
+            "evidence": {
+              "quote": "Sediul Comisiei centrale de arbitraj este la sediul C.A.S.A.O.P.S.N.A.J. + Capitolul 14 Modalităţi de publicitate",
+              "start": 27202,
+              "end": 27315
+            }
+          }
+        ],
+        "model_calls": 1,
+        "provider": {
+          "name": "openai-compat",
+          "model": "grap-legal-gemma4"
+        }
+      }
+    }
+  ]
+}

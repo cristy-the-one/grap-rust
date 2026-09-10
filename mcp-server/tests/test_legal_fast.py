@@ -83,3 +83,38 @@ def test_large_article_planning_has_bounded_runtime():
     # Regression for growing-prefix scans: real source shape, no model or GPU.
     code = "from grap_mcp.kee.legal_rules import source_units; t='Afirmație simplă. '*30000; assert len(source_units(t)[0])==30000"
     subprocess.run([sys.executable, '-c', code], timeout=5, check=True)
+
+
+def test_oversized_statement_is_explicit_unfinished_work_not_lost_document(tmp_path):
+    text = 'Lung ' * 1300 + '. Banca trebuie să plătească.'
+    file = tmp_path / 'law.json'
+    file.write_text(json.dumps({'id':'1','titlu':'Act','text_complet':text}),encoding='utf-8')
+    provider = StubProvider(default='must not call')
+    with LegalClaimStore(tmp_path/'db.sqlite', extractor=extract_rules_fast) as store:
+        result = store.ingest_folder(file, provider, max_batches=1)
+        assert result['counts']['ready'] == 1 and not provider.calls
+        row = store.db.execute('SELECT record FROM revisions').fetchone()
+        receipt = json.loads(row['record'])
+        assert receipt['source_text'] == text
+        assert receipt['review_queue'][0]['reason'] == 'input_budget_exceeded'
+        assert receipt['review_queue'][0]['statement'] == text.split('. ')[0]+'.'
+        assert receipt['claim_count'] == 1
+
+
+def test_repeated_context_is_stored_once_and_api_quotes_are_unchanged(tmp_path):
+    text = ' '.join(f'Banca {i} trebuie să plătească.' for i in range(24))
+    file = tmp_path / 'law.json'
+    file.write_text(json.dumps({'id':'1','titlu':'Act','text_complet':text}), encoding='utf-8')
+    with LegalClaimStore(tmp_path/'db.sqlite', extractor=extract_rules_fast) as store:
+        provider = StubProvider(default='must not call')
+        assert store.ingest_folder(file, provider, max_batches=1)['counts']['partial'] == 1
+        saved = store.db.execute('SELECT record FROM legal_batches').fetchone()[0]
+        assert '"quote_source":"source_text"' in saved
+        assert store.ingest_folder(file, provider, max_batches=10)['counts']['ready'] == 1
+        stored = json.loads(store.db.execute('SELECT record FROM claims LIMIT 1').fetchone()[0])
+        assert 'quote' not in stored['context_evidence'][0]
+        public = store.read(limit=100)['claims']
+        assert len(public) == 24
+        assert all(c['context_evidence'][0]['quote'] == text for c in public)
+        assert store.receipt(public[0]['revision_id'])['claims'][0]['context_evidence'][0]['quote'] == text
+        assert not provider.calls

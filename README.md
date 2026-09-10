@@ -14,6 +14,9 @@ The [Romanian legal statement path](docs/legal-rules-2026-09.md) preserves sourc
 wording and context, uses LLMs for classification, resolves explicit definitions
 within each source, and exports receipt-backed Rust graph snapshots. The report
 includes complete-document trials and remaining semantic limitations.
+The [corpus-scale legal-first workflow](docs/corpus-scale-workflow-2026-09.md)
+adds bounded resumable labeling, explicit review queues, source-preserving TSV
+tables and compact context storage, with measured throughput and quality limits.
 [Large-act extraction now resumes from durable batch checkpoints](docs/legal-resume-2026-09.md),
 with a complete-document publication gate and a tested local model context profile.
 The [semantic evaluation](docs/legal-semantics-2026-09.md) measures complete subjects

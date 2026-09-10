@@ -97,6 +97,39 @@ def _hash(value):
     return hashlib.sha256(value.encode("utf-8")).hexdigest()
 
 
+def _context_refs(value, text, *, hydrate=False, _quotes=None):
+    """Share repeated context through exact source spans; read legacy quotes too."""
+    if _quotes is None:
+        _quotes = {}
+    if isinstance(value, list):
+        return [_context_refs(item, text, hydrate=hydrate, _quotes=_quotes) for item in value]
+    if not isinstance(value, dict):
+        return value
+    result = {}
+    for key, item in value.items():
+        if key != 'context_evidence' or not isinstance(item, list):
+            result[key] = _context_refs(item, text, hydrate=hydrate, _quotes=_quotes)
+            continue
+        spans = []
+        for span in item:
+            copy = dict(span)
+            start, end = copy.get('start'), copy.get('end')
+            valid = type(start) is int and type(end) is int and 0 <= start <= end <= len(text)
+            if hydrate and copy.get('quote_source') == 'source_text':
+                if not valid:
+                    raise ValueError('Invalid stored context span')
+                if (start, end) not in _quotes:
+                    _quotes[start, end] = text[start:end]
+                copy['quote'] = _quotes[start, end]
+                copy.pop('quote_source')
+            elif not hydrate and valid and isinstance(copy.get('quote'), str) and len(copy['quote']) == end-start and text.startswith(copy['quote'], start, end):
+                copy.pop('quote')
+                copy['quote_source'] = 'source_text'
+            spans.append(copy)
+        result[key] = spans
+    return result
+
+
 def validate_reply(raw: str, text: str) -> list[dict]:
     """Reject the entire reply on malformed or ungrounded items; never silently prune."""
     data = json.loads(raw)
@@ -232,7 +265,8 @@ class LegalClaimStore:
 
         from .legal_tables import extract_tables
         tables = extract_tables(text) if self.extractor is extract_rules_fast else []
-        batches, definitions = plan_rules(text, tables=tables)
+        deferred = [] if self.extractor is extract_rules_fast else None
+        batches, definitions = plan_rules(text, tables=tables, deferred=deferred)
         # Persist only a hash of generation configuration, never credentials.
         provider_key = _hash(_json({"provider": {key: getattr(provider, key, None) for key in
             ("name", "model", "base_url", "temperature", "max_tokens", "extra_body")},
@@ -254,7 +288,8 @@ class LegalClaimStore:
                     (work_id, source_id, digest, self.prompt_version, provider_key, len(batches)))
         else:
             work_id = work["work_id"]
-        saved = {row["batch_index"]: json.loads(row["record"]) for row in self.db.execute(
+        quotes = {}
+        saved = {row["batch_index"]: _context_refs(json.loads(row["record"]), text, hydrate=True, _quotes=quotes) for row in self.db.execute(
             "SELECT batch_index, record FROM legal_batches WHERE work_id=?", (work_id,))}
         parts = []
         for index, batch in enumerate(batches):
@@ -279,7 +314,7 @@ class LegalClaimStore:
                     (source_id, attempt_id, work_id)).rowcount == 1
                 if not owned:
                     raise RuntimeError("extraction superseded before checkpoint")
-                self.db.execute("INSERT INTO legal_batches VALUES (?, ?, ?)", (work_id, index, _json(part)))
+                self.db.execute("INSERT INTO legal_batches VALUES (?, ?, ?)", (work_id, index, _json(_context_refs(part, text))))
             budget["completed"] += 1
             parts.append(part)
         if hashlib.sha256(file.read_bytes()).hexdigest() != digest:
@@ -296,7 +331,7 @@ class LegalClaimStore:
         receipt['prompt_version'] = self.prompt_version
         if self.extractor is extract_rules_fast:
             receipt['tables'] = tables
-            receipt['review_queue'] = [unit for part in parts for unit in part.get('review_queue', [])]
+            receipt['review_queue'] = [unit for part in parts for unit in part.get('review_queue', [])] + deferred
         receipt["claims"].extend(claim for part in parts for claim in part["claims"])
         receipt["units"] = [unit for part in parts for unit in part["units"]]
         receipt["raw_reply"] = _json([request for part in parts for request in json.loads(part["raw_reply"])])
@@ -437,6 +472,8 @@ class LegalClaimStore:
                 continue
             receipt.update(source_id=source_id, source_file=source_file, source_sha256=digest,
                            source_text=text, metadata=act)
+            receipt = _context_refs(receipt, text)
+            receipt['context_encoding'] = 'source_text-spans-v1'
             revision_id = _hash(_json(receipt))
             claim_rows = []
             for claim in receipt.pop("claims"):
@@ -472,6 +509,12 @@ class LegalClaimStore:
                     (SELECT 1 FROM claims WHERE revision_id=sources.accepted_revision)""").fetchone()[0],
                 "meaning": "Extraction status for observed files; not legal validity or folder completeness."}
 
+    def _read_claim(self, raw, revision_id, texts):
+        if revision_id not in texts:
+            record = self.db.execute('SELECT record FROM revisions WHERE revision_id=?', (revision_id,)).fetchone()
+            texts[revision_id] = json.loads(record[0])['source_text']
+        return _context_refs(json.loads(raw), texts[revision_id], hydrate=True)
+
     def read(self, *, kind=None, source_id=None, include_stale=False, limit=20, offset=0) -> dict:
         """Page latest accepted proposals; stale receipts require explicit inclusion."""
         if kind is not None and kind not in KINDS:
@@ -493,7 +536,8 @@ class LegalClaimStore:
         total = self.db.execute("SELECT count(*)" + base, params).fetchone()[0]
         rows = self.db.execute("SELECT c.*, s.source_id, s.source_file, s.status, s.error" + base +
                                " ORDER BY c.claim_id LIMIT ? OFFSET ?", [*params, limit, offset])
-        claims = [{**json.loads(r["record"]), "claim_id": r["claim_id"], "revision_id": r["revision_id"],
+        texts = {}
+        claims = [{**self._read_claim(r["record"], r["revision_id"], texts), "claim_id": r["claim_id"], "revision_id": r["revision_id"],
                    "source_id": r["source_id"], "source_file": r["source_file"],
                    "source_status": r["status"], "stale": r["status"] != "ready", "source_error": r["error"]}
                   for r in rows]
@@ -531,10 +575,11 @@ class LegalClaimStore:
         if source is None:
             raise ValueError("unknown source_id")
         matches = []
+        texts = {}
         if source["status"] == "ready":
             for row in self.db.execute("SELECT claim_id, record FROM claims WHERE revision_id=? AND kind='definition'",
                                        (source["accepted_revision"],)):
-                claim = json.loads(row["record"])
+                claim = self._read_claim(row["record"], source['accepted_revision'], texts)
                 if claim.get("extraction_method") != "explicit-definition":
                     continue
                 defined = claim["subject"]
@@ -556,7 +601,8 @@ class LegalClaimStore:
             raise ValueError("unknown revision_id")
         claims = [json.loads(r[0]) | {"claim_id": r[1]} for r in self.db.execute(
             "SELECT record, claim_id FROM claims WHERE revision_id=? ORDER BY claim_id", (revision_id,))]
-        return json.loads(row[0]) | {"revision_id": revision_id, "claims": claims}
+        receipt = json.loads(row[0])
+        return _context_refs(receipt | {"revision_id": revision_id, "claims": claims}, receipt['source_text'], hydrate=True)
 
     def export_graph(self, path) -> dict:
         """Create an explicit, immutable-by-convention Rust search/traversal snapshot.
@@ -584,6 +630,7 @@ class LegalClaimStore:
             revision_id = row["revision_id"]
             if revision_id not in sources:
                 receipt = json.loads(row["receipt_record"])
+                receipt = _context_refs(receipt, receipt['source_text'])
                 title = receipt["metadata"]["title"] or row["source_file"]
                 sources[revision_id] = kg.add_node(text=title + "\n\n" + receipt["source_text"],
                                                    label="legal-source:" + revision_id)
@@ -604,7 +651,7 @@ class LegalClaimStore:
                         table_rows += 1
             if row["claim_id"] is None:
                 continue
-            claim = json.loads(row["claim_record"])
+            claim = _context_refs(json.loads(row["claim_record"]), receipts[revision_id]['source_text'])
             nid = kg.add_node(text=_json(claim), label="legal-claim:" + row["claim_id"])
             kg.add_edge(nid, sources[revision_id], 1.0, {"relation_type": "claimed_in",
                                                         "review_status": "proposed"})
@@ -613,6 +660,7 @@ class LegalClaimStore:
         kg.save_to_dir(str(path / "graph"))
         result = {"graph_path": str(path / "graph"), "claims": len(manifest), "sources": len(sources),
                   "table_rows": table_rows,
+                  "context_encoding": "source_text-spans-v1; context quotes resolve against the linked revision source_text",
                   "created_at": datetime.now(timezone.utc).isoformat(), "coverage": self.coverage(),
                   "meaning": "Snapshot of proposed claims; does not establish current law. Re-export after ingestion."}
         (path / "legal-claims.json").write_text(_json({"snapshot": result, "claims": manifest,

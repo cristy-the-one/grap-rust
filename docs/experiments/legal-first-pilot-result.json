@@ -1,0 +1,49 @@
+{
+  "status": "ok",
+  "counts": {
+    "scanned": 6,
+    "attempted": 6,
+    "ready": 6,
+    "unchanged": 0,
+    "deferred": 0,
+    "failed": 0,
+    "missing": 0,
+    "superseded": 0,
+    "partial": 0
+  },
+  "coverage": {
+    "sources": 6,
+    "statuses": {
+      "ready": 6
+    },
+    "sources_with_retained_claims": 0,
+    "meaning": "Extraction status for observed files; not legal validity or folder completeness."
+  },
+  "store": ".logs\\legal-first-pilot-final.sqlite",
+  "batches": {
+    "limit": 100,
+    "attempted": 21,
+    "completed": 21,
+    "reused": 0
+  },
+  "review_queue_units": 97,
+  "quality_scope": "Ready means an extraction receipt exists, not that every assertion is classified correctly. Review queue is unresolved work.",
+  "snapshot": {
+    "graph_path": ".logs\\legal-first-pilot-final-graph\\graph",
+    "claims": 112,
+    "sources": 6,
+    "table_rows": 0,
+    "created_at": "2026-09-10T15:56:20.695764+00:00",
+    "coverage": {
+      "sources": 6,
+      "statuses": {
+        "ready": 6
+      },
+      "sources_with_retained_claims": 0,
+      "meaning": "Extraction status for observed files; not legal validity or folder completeness."
+    },
+    "meaning": "Snapshot of proposed claims; does not establish current law. Re-export after ingestion."
+  },
+  "elapsed_s": 69.6177813999966,
+  "scope": "Proposed legal claims and explicit table cells; does not perform full entity/ontology discovery."
+}

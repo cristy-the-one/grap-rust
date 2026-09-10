@@ -1,0 +1,42 @@
+{
+  "model_calls": 0,
+  "method": "Offline replay of saved model replies through current fast-path validation",
+  "review_queue_units": 13,
+  "differences": [
+    {
+      "case": "semantic-02",
+      "statement": "Asigurarea de răspundere profesională a executorului bancar se poate realiza de către şi în contul băncii în care îşi desfăşoară activitatea, dacă aceasta este expres stipulată, după caz, în regulamentul intern al băncii sau în convenţia încheiată de banca cu executorul bancar.",
+      "richer_kind": "permission",
+      "label_first_kind": "fact",
+      "queued": true
+    },
+    {
+      "case": "semantic-15",
+      "statement": "(1) În condiţiile actualelor tarife, tipul de tarif se negociază, cu respectarea prevederilor legale. ...",
+      "richer_kind": "obligation",
+      "label_first_kind": "other",
+      "queued": true
+    },
+    {
+      "case": "semantic-15",
+      "statement": "(2) La intrarea în vigoare a unui nou sistem de tarifare, aprobat de către autoritatea competentă, tariful este ales liber de către consumator, cu respectarea prevederilor legale. ...",
+      "richer_kind": "permission",
+      "label_first_kind": "other",
+      "queued": true
+    },
+    {
+      "case": "article-59",
+      "statement": "Arbitrii pot fi medici, economişti sau jurişti, acreditaţi şi înregistraţi de Ministerul Justiţiei.",
+      "richer_kind": "permission",
+      "label_first_kind": "fact",
+      "queued": true
+    },
+    {
+      "case": "article-59",
+      "statement": "Sediul Comisiei centrale de arbitraj este la sediul C.A.S.A.O.P.S.N.A.J. + Capitolul 14 Modalităţi de publicitate",
+      "richer_kind": "fact",
+      "label_first_kind": "other",
+      "queued": true
+    }
+  ]
+}

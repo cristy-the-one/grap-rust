@@ -296,14 +296,16 @@ def deterministic_label(statement):
 def extract_rules_fast(provider, text):
     from .legal_tables import extract_tables
     tables = extract_tables(text)
-    batches, definitions = plan_rules(text, tables=tables)
+    deferred = []
+    batches, definitions = plan_rules(text, tables=tables, deferred=deferred)
     result = extract_batches(provider, text, batches, definitions, deterministic=True)
+    result['review_queue'].extend(deferred)
     result['tables'] = tables
     result['prompt_version'] = extract_rules_fast.prompt_version
     return result
 
 
-def plan_rules(text, *, tables=()):
+def plan_rules(text, *, tables=(), deferred=None):
     """Stable statement-aligned batches with full-source offsets and provision context."""
     if not text.strip() or text.strip().casefold().rstrip(".") == "act în curs de procesare":
         return [], []
@@ -315,6 +317,9 @@ def plan_rules(text, *, tables=()):
         wire_size = len(json.dumps({unit["id"]: unit["statement"]}, ensure_ascii=False).encode("utf-8"))
         if size > 1200 or wire_size > 12000:
             span = unit["evidence"][0]
+            if deferred is not None:
+                deferred.append({**unit, 'reason': 'input_budget_exceeded', 'model_kind': 'unclassified'})
+                continue
             raise ValueError(f"source statement exceeds 1200 tokens or 12000 rendered bytes "
                              f"({size} tokens, {wire_size} bytes) at characters "
                              f"{span['start']}:{span['end']} in {unit['provision']!r}; "
@@ -424,4 +429,4 @@ def extract_batches(provider, text, batches, definitions=(), *, deterministic=Fa
 
 
 extract_rules.prompt_version = VERSION
-extract_rules_fast.prompt_version = VERSION + "-deterministic-first-v2"
+extract_rules_fast.prompt_version = VERSION + "-deterministic-first-v3"

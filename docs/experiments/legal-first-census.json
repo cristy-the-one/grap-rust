@@ -1,0 +1,198 @@
+{
+  "counts": {
+    "documents": 2092,
+    "planned_batches": 7724,
+    "deferred_units": 60,
+    "model_batches": 7723,
+    "model_units": 75397,
+    "units": 78287,
+    "context_characters_before_serialization": 4066516458
+  },
+  "deferred_files": [
+    {
+      "file": "real-data-law-ro\\15543.json",
+      "units": 1,
+      "characters": 8870
+    },
+    {
+      "file": "real-data-law-ro\\16737.json",
+      "units": 1,
+      "characters": 8198
+    },
+    {
+      "file": "real-data-law-ro\\16858.json",
+      "units": 1,
+      "characters": 10802
+    },
+    {
+      "file": "real-data-law-ro\\16889.json",
+      "units": 1,
+      "characters": 7273
+    },
+    {
+      "file": "real-data-law-ro\\16947.json",
+      "units": 1,
+      "characters": 65620
+    },
+    {
+      "file": "real-data-law-ro\\17025.json",
+      "units": 2,
+      "characters": 334250
+    },
+    {
+      "file": "real-data-law-ro\\17031.json",
+      "units": 1,
+      "characters": 30040
+    },
+    {
+      "file": "real-data-law-ro\\17136.json",
+      "units": 1,
+      "characters": 12306
+    },
+    {
+      "file": "real-data-law-ro\\17178.json",
+      "units": 10,
+      "characters": 310580
+    },
+    {
+      "file": "real-data-law-ro\\17179.json",
+      "units": 10,
+      "characters": 310580
+    },
+    {
+      "file": "real-data-law-ro\\17216.json",
+      "units": 1,
+      "characters": 57577
+    },
+    {
+      "file": "real-data-law-ro\\17554.json",
+      "units": 1,
+      "characters": 13805
+    },
+    {
+      "file": "real-data-law-ro\\17764.json",
+      "units": 1,
+      "characters": 10069
+    },
+    {
+      "file": "real-data-law-ro\\18302.json",
+      "units": 1,
+      "characters": 15258
+    },
+    {
+      "file": "real-data-law-ro\\18338.json",
+      "units": 1,
+      "characters": 35666
+    },
+    {
+      "file": "real-data-law-ro\\18388.json",
+      "units": 1,
+      "characters": 18713
+    },
+    {
+      "file": "real-data-law-ro\\18429.json",
+      "units": 1,
+      "characters": 21730
+    },
+    {
+      "file": "real-data-law-ro\\18618.json",
+      "units": 1,
+      "characters": 30046
+    },
+    {
+      "file": "real-data-law-ro\\18663.json",
+      "units": 1,
+      "characters": 16212
+    },
+    {
+      "file": "real-data-law-ro\\18761.json",
+      "units": 2,
+      "characters": 38165
+    },
+    {
+      "file": "real-data-law-ro\\18762.json",
+      "units": 2,
+      "characters": 36391
+    },
+    {
+      "file": "real-data-law-ro\\18838.json",
+      "units": 1,
+      "characters": 8134
+    },
+    {
+      "file": "real-data-law-ro\\18912.json",
+      "units": 1,
+      "characters": 78286
+    },
+    {
+      "file": "real-data-law-ro\\19058.json",
+      "units": 1,
+      "characters": 12523
+    },
+    {
+      "file": "real-data-law-ro\\19161.json",
+      "units": 1,
+      "characters": 7766
+    },
+    {
+      "file": "real-data-law-ro\\19162.json",
+      "units": 1,
+      "characters": 16808
+    },
+    {
+      "file": "real-data-law-ro\\19392.json",
+      "units": 2,
+      "characters": 18331
+    },
+    {
+      "file": "real-data-law-ro\\20275.json",
+      "units": 1,
+      "characters": 20944
+    },
+    {
+      "file": "real-data-law-ro\\20469.json",
+      "units": 2,
+      "characters": 119835
+    },
+    {
+      "file": "real-data-law-ro\\20470.json",
+      "units": 1,
+      "characters": 89606
+    },
+    {
+      "file": "real-data-law-ro\\20505.json",
+      "units": 1,
+      "characters": 10487
+    },
+    {
+      "file": "real-data-law-ro\\23812.json",
+      "units": 1,
+      "characters": 11062
+    },
+    {
+      "file": "real-data-law-ro\\36533.json",
+      "units": 1,
+      "characters": 12336
+    },
+    {
+      "file": "real-data-law-ro\\36556.json",
+      "units": 1,
+      "characters": 9638
+    },
+    {
+      "file": "real-data-law-ro\\50956.json",
+      "units": 1,
+      "characters": 16064
+    },
+    {
+      "file": "real-data-law-ro\\53610.json",
+      "units": 1,
+      "characters": 6383
+    },
+    {
+      "file": "real-data-law-ro\\92227.json",
+      "units": 1,
+      "characters": 12306
+    }
+  ]
+}
