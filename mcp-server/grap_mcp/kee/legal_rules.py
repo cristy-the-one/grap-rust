@@ -3,8 +3,9 @@ from __future__ import annotations
 
 import json
 import re
+import unicodedata
 
-VERSION = "legal-rules-v10"
+VERSION = "legal-rules-v11"
 KINDS = ("fact", "definition", "right", "obligation", "prohibition", "permission", "amendment")
 PROMPT = """Classify Romanian legal statements. Every supplied unit must get a result.
 Return the required units object. For each unit choose kind and copy its complete
@@ -249,6 +250,20 @@ def _invalid_subject(subject):
             or plain.casefold() in {"dreptul", "obligația", "obligaţia"})
 
 
+def _subject_boundaries(text, start, end):
+    """Reject cuts through Unicode words, including decomposed diacritics.
+
+    Punctuation remains a delimiter; this is span integrity, not a Romanian
+    noun-phrase parser. Do not normalize text: evidence offsets must stay exact.
+    """
+    def word(char):
+        category = unicodedata.category(char)
+        return category[0] in "LNM" or category == "Pc"
+    return (0 <= start < end <= len(text)
+            and not (start and word(text[start - 1]) and word(text[start]))
+            and not (end < len(text) and word(text[end - 1]) and word(text[end])))
+
+
 def extract_rules(provider, text):
     """Bounded labeling calls, source-backed subjects and lossless rule statements."""
     batches, definitions = plan_rules(text)
@@ -336,7 +351,10 @@ def extract_batches(provider, text, batches, definitions=()):
                         if syntax else (unit["evidence"][0]["start"] + at,
                                         unit["evidence"][0]["start"] + at + len(selected)))
                 subject = text[a:b].rstrip(",;:")
-                if _invalid_subject(subject):
+                if not _subject_boundaries(text, a, a + len(subject)):
+                    issues.append("selected subject cuts through a source word")
+                    subject = ""
+                elif _invalid_subject(subject):
                     issues.append("selected subject is a circumstance, verb or incomplete phrase")
                     subject = ""
                 else:

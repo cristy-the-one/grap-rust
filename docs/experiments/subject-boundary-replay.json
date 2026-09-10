@@ -1,0 +1,1487 @@
+{
+  "rows": [
+    {
+      "dataset": "order-full",
+      "case": "semantic-02",
+      "thinking_repair": false,
+      "before": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "executorul bancar",
+          "banca",
+          "executorilor bancari",
+          "cauzarea de prejudiciu prin încălcarea obligaţiilor sale profesionale",
+          "Asigurarea de răspundere profesională a executorului bancar",
+          "de către şi în contul băncii în care îşi desfăşoară activitatea, dacă aceasta este expres stipulată, după caz, în regulamentul intern al băncii sau în convenţia încheiată de banca cu executorul bancar.",
+          "sa achizitioneze, direct sau prin interpusi, pentru ei sau pentru alţii, bunurile ce au format obiectul activităţii de executare silită sau să facă acte de executare în propria lor cauza ori în cauzele privind rudele şi afinii până la gradul al patrulea inclusiv."
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "executorul bancar",
+          "banca",
+          "executorilor bancari",
+          "cauzarea de prejudiciu prin încălcarea obligaţiilor sale profesionale",
+          "Asigurarea de răspundere profesională a executorului bancar",
+          "de către şi în contul băncii în care îşi desfăşoară activitatea, dacă aceasta este expres stipulată, după caz, în regulamentul intern al băncii sau în convenţia încheiată de banca cu executorul bancar.",
+          "sa achizitioneze, direct sau prin interpusi, pentru ei sau pentru alţii, bunurile ce au format obiectul activităţii de executare silită sau să facă acte de executare în propria lor cauza ori în cauzele privind rudele şi afinii până la gradul al patrulea inclusiv."
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "boundary_rejections": [],
+      "failure": null
+    },
+    {
+      "dataset": "order-full",
+      "case": "semantic-02",
+      "thinking_repair": true,
+      "before": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "executorul bancar",
+          "banca",
+          "executorilor bancari",
+          "cauzarea de prejudiciu prin încălcarea obligaţiilor sale profesionale",
+          "Asigurarea de răspundere profesională a executorului bancar",
+          "de către şi în contul băncii în care îşi desfăşoară activitatea, dacă aceasta este expres stipulată, după caz, în regulamentul intern al băncii sau în convenţia încheiată de banca cu executorul bancar.",
+          "sa achizitioneze, direct sau prin interpusi, pentru ei sau pentru alţii, bunurile ce au format obiectul activităţii de executare silită sau să facă acte de executare în propria lor cauza ori în cauzele privind rudele şi afinii până la gradul al patrulea inclusiv."
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "executorul bancar",
+          "banca",
+          "executorilor bancari",
+          "cauzarea de prejudiciu prin încălcarea obligaţiilor sale profesionale",
+          "Asigurarea de răspundere profesională a executorului bancar",
+          "de către şi în contul băncii în care îşi desfăşoară activitatea, dacă aceasta este expres stipulată, după caz, în regulamentul intern al băncii sau în convenţia încheiată de banca cu executorul bancar.",
+          "sa achizitioneze, direct sau prin interpusi, pentru ei sau pentru alţii, bunurile ce au format obiectul activităţii de executare silită sau să facă acte de executare în propria lor cauza ori în cauzele privind rudele şi afinii până la gradul al patrulea inclusiv."
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "boundary_rejections": [],
+      "failure": null
+    },
+    {
+      "dataset": "order-full",
+      "case": "semantic-03",
+      "thinking_repair": true,
+      "before": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "executorii bancari",
+          "banca",
+          "Dosarele de executare aflate în curs de rezolvare la data intrării în vigoare a prezentului statut"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "executorii bancari",
+          "banca",
+          "Dosarele de executare aflate în curs de rezolvare la data intrării în vigoare a prezentului statut"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "boundary_rejections": [],
+      "failure": null
+    },
+    {
+      "dataset": "order-full",
+      "case": "semantic-03",
+      "thinking_repair": false,
+      "before": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "executorii bancari",
+          "banca",
+          "Dosarele de executare aflate în curs de rezolvare la data intrării în vigoare a prezentului statut"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "executorii bancari",
+          "banca",
+          "Dosarele de executare aflate în curs de rezolvare la data intrării în vigoare a prezentului statut"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "boundary_rejections": [],
+      "failure": null
+    },
+    {
+      "dataset": "order-full",
+      "case": "semantic-11",
+      "thinking_repair": false,
+      "before": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "NORME din 28 iunie 1999 privind verificarea tehnica a vehiculelor feroviare aparţinând agentilor economici EMITENT MINISTERUL TRANSPORTURILOR Publicat în MONITORUL OFICIAL nr. 396 din 19 august 1999 + Capitolul 1 Dispozitii generale"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "NORME din 28 iunie 1999 privind verificarea tehnica a vehiculelor feroviare aparţinând agentilor economici EMITENT MINISTERUL TRANSPORTURILOR Publicat în MONITORUL OFICIAL nr. 396 din 19 august 1999 + Capitolul 1 Dispozitii generale"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "boundary_rejections": [],
+      "failure": null
+    },
+    {
+      "dataset": "order-full",
+      "case": "semantic-11",
+      "thinking_repair": true,
+      "before": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "NORME din 28 iunie 1999 privind verificarea tehnica a vehiculelor feroviare aparţinând agentilor economici EMITENT MINISTERUL TRANSPORTURILOR Publicat în MONITORUL OFICIAL nr. 396 din 19 august 1999 + Capitolul 1 Dispozitii generale"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "NORME din 28 iunie 1999 privind verificarea tehnica a vehiculelor feroviare aparţinând agentilor economici EMITENT MINISTERUL TRANSPORTURILOR Publicat în MONITORUL OFICIAL nr. 396 din 19 august 1999 + Capitolul 1 Dispozitii generale"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "boundary_rejections": [],
+      "failure": null
+    },
+    {
+      "dataset": "order-full",
+      "case": "semantic-16",
+      "thinking_repair": true,
+      "before": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [],
+        "source_spans_valid": true,
+        "rejected_evidence": 1
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [],
+        "source_spans_valid": true,
+        "rejected_evidence": 1
+      },
+      "boundary_rejections": [],
+      "failure": null
+    },
+    {
+      "dataset": "order-full",
+      "case": "semantic-16",
+      "thinking_repair": false,
+      "before": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [],
+        "source_spans_valid": true,
+        "rejected_evidence": 1
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [],
+        "source_spans_valid": true,
+        "rejected_evidence": 1
+      },
+      "boundary_rejections": [],
+      "failure": null
+    },
+    {
+      "dataset": "order-full",
+      "case": "semantic-17",
+      "thinking_repair": false,
+      "before": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "toate societățile comerciale, companiile și societățile naționale, regiile autonome din subordinea F.P.S. sau a ministerelor, precum și instituțiile publice și agențiile subordonate Guvernului"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "toate societățile comerciale, companiile și societățile naționale, regiile autonome din subordinea F.P.S. sau a ministerelor, precum și instituțiile publice și agențiile subordonate Guvernului"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "boundary_rejections": [],
+      "failure": null
+    },
+    {
+      "dataset": "order-full",
+      "case": "semantic-17",
+      "thinking_repair": true,
+      "before": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "toate societățile comerciale, companiile și societățile naționale, regiile autonome din subordinea F.P.S. sau a ministerelor, precum și instituțiile publice și agențiile subordonate Guvernului"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "toate societățile comerciale, companiile și societățile naționale, regiile autonome din subordinea F.P.S. sau a ministerelor, precum și instituțiile publice și agențiile subordonate Guvernului"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "boundary_rejections": [],
+      "failure": null
+    },
+    {
+      "dataset": "order-full",
+      "case": "semantic-01",
+      "thinking_repair": true,
+      "before": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "executorul bancar"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "executorul bancar"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "boundary_rejections": [],
+      "failure": null
+    },
+    {
+      "dataset": "order-full",
+      "case": "semantic-01",
+      "thinking_repair": false,
+      "before": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "executorul bancar"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "executorul bancar"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "boundary_rejections": [],
+      "failure": null
+    },
+    {
+      "dataset": "order-full",
+      "case": "semantic-06",
+      "thinking_repair": false,
+      "before": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "HOTĂRÂRE nr. 55 din 29 ianuarie 1999 privind organizarea şi funcţionarea Direcţiei generale de prognoza în subordinea Ministerului Finanţelor",
+          "Guvernul României",
+          "Direcţia generală de prognoza",
+          "Ministerului Finanţelor",
+          "Comisiei Naţionale de Prognoza"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "HOTĂRÂRE nr. 55 din 29 ianuarie 1999 privind organizarea şi funcţionarea Direcţiei generale de prognoza în subordinea Ministerului Finanţelor",
+          "Guvernul României",
+          "Direcţia generală de prognoza",
+          "Ministerului Finanţelor",
+          "Comisiei Naţionale de Prognoza"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "boundary_rejections": [],
+      "failure": null
+    },
+    {
+      "dataset": "order-full",
+      "case": "semantic-06",
+      "thinking_repair": true,
+      "before": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "HOTĂRÂRE nr. 55 din 29 ianuarie 1999 privind organizarea şi funcţionarea Direcţiei generale de prognoza în subordinea Ministerului Finanţelor",
+          "Guvernul României",
+          "Direcţia generală de prognoza",
+          "Ministerului Finanţelor",
+          "Comisiei Naţionale de Prognoza"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "HOTĂRÂRE nr. 55 din 29 ianuarie 1999 privind organizarea şi funcţionarea Direcţiei generale de prognoza în subordinea Ministerului Finanţelor",
+          "Guvernul României",
+          "Direcţia generală de prognoza",
+          "Ministerului Finanţelor",
+          "Comisiei Naţionale de Prognoza"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "boundary_rejections": [],
+      "failure": null
+    },
+    {
+      "dataset": "order-full",
+      "case": "semantic-09",
+      "thinking_repair": true,
+      "before": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "Membrii Consiliului de administraţie al A.N.L.",
+          "Consiliul de administraţie al A.N.L.",
+          "cei membri",
+          "o indemnizaţie lunară în cuantum de 20% din salariul de baza brut lunar al directorului general al A.N.L."
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 1,
+        "entity_names": [
+          "Membrii Consiliului de administraţie al A.N.L.",
+          "Consiliul de administraţie al A.N.L.",
+          "cei membri",
+          "o indemnizaţie lunară în cuantum de 20% din salariul de baza brut lunar al directorului general al A.N.L."
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "boundary_rejections": [
+        {
+          "statement": "Nu pot fi desemnaţi membri ai Consiliului de administraţie al A.N.L. sau vor fi revocaţi de drept acei membri care se găsesc în una dintre următoarele situaţii: a) au antecedente penale; ... b) au interdicţii, stabilite potrivit legii, de a conduce, controla, gestiona sau administra o societate sau instituţie publică. ...",
+          "issues": [
+            "selected subject cuts through a source word",
+            "subject unresolved"
+          ]
+        }
+      ],
+      "failure": null
+    },
+    {
+      "dataset": "order-full",
+      "case": "semantic-09",
+      "thinking_repair": false,
+      "before": {
+        "target_correct": true,
+        "unresolved": 1,
+        "entity_names": [
+          "Membrii Consiliului de administraţie al A.N.L.",
+          "Consiliul de administraţie al A.N.L.",
+          "cei membri",
+          "o indemnizaţie lunară în cuantum de 20% din salariul de baza brut lunar al directorului general al A.N.L."
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 1,
+        "entity_names": [
+          "Membrii Consiliului de administraţie al A.N.L.",
+          "Consiliul de administraţie al A.N.L.",
+          "cei membri",
+          "o indemnizaţie lunară în cuantum de 20% din salariul de baza brut lunar al directorului general al A.N.L."
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "boundary_rejections": [],
+      "failure": null
+    },
+    {
+      "dataset": "order-full",
+      "case": "semantic-10",
+      "thinking_repair": false,
+      "before": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "NORME din 28 iunie 1999 privind verificarea tehnica a vehiculelor feroviare aparţinând agentilor economici EMITENT MINISTERUL TRANSPORTURILOR Publicat în MONITORUL OFICIAL nr. 396 din 19 august 1999 + Capitolul 1 Dispozitii generale",
+          "vehiculele feroviare de orice tip aparţinând agentilor economici",
+          "operatorilor de transport feroviar şi gestionarului infrastructurii feroviare publice",
+          "normele tehnice specifice în vigoare"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "NORME din 28 iunie 1999 privind verificarea tehnica a vehiculelor feroviare aparţinând agentilor economici EMITENT MINISTERUL TRANSPORTURILOR Publicat în MONITORUL OFICIAL nr. 396 din 19 august 1999 + Capitolul 1 Dispozitii generale",
+          "vehiculele feroviare de orice tip aparţinând agentilor economici",
+          "operatorilor de transport feroviar şi gestionarului infrastructurii feroviare publice",
+          "normele tehnice specifice în vigoare"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "boundary_rejections": [],
+      "failure": null
+    },
+    {
+      "dataset": "order-full",
+      "case": "semantic-10",
+      "thinking_repair": true,
+      "before": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "NORME din 28 iunie 1999 privind verificarea tehnica a vehiculelor feroviare aparţinând agentilor economici EMITENT MINISTERUL TRANSPORTURILOR Publicat în MONITORUL OFICIAL nr. 396 din 19 august 1999 + Capitolul 1 Dispozitii generale",
+          "vehiculele feroviare de orice tip aparţinând agentilor economici",
+          "operatorilor de transport feroviar şi gestionarului infrastructurii feroviare publice",
+          "normele tehnice specifice în vigoare"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "NORME din 28 iunie 1999 privind verificarea tehnica a vehiculelor feroviare aparţinând agentilor economici EMITENT MINISTERUL TRANSPORTURILOR Publicat în MONITORUL OFICIAL nr. 396 din 19 august 1999 + Capitolul 1 Dispozitii generale",
+          "vehiculele feroviare de orice tip aparţinând agentilor economici",
+          "operatorilor de transport feroviar şi gestionarului infrastructurii feroviare publice",
+          "normele tehnice specifice în vigoare"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "boundary_rejections": [],
+      "failure": null
+    },
+    {
+      "dataset": "order-full",
+      "case": "semantic-13",
+      "thinking_repair": true,
+      "before": {
+        "target_correct": true,
+        "unresolved": 1,
+        "entity_names": [
+          "tractoarelor, combinelor, maşinilor şi utilajelor agricole, precum şi a instalaţiilor pentru irigat",
+          "ordonanţei şi ale prezentelor norme metodologice",
+          "sancţiunile civile prevăzute la art. 6 din ordonanţa",
+          "Subvenţia",
+          "Beneficiarul de credite",
+          "tractoarelor, combinelor, maşinilor şi utilajelor agricole, precum şi a instalaţiilor pentru irigat, achiziţionate în condiţiile ordonanţei şi ale prezentelor norme metodologice",
+          "achitarea integrală a creditului",
+          "În cazul înstrăinării",
+          "dobânzile calculate şi datorate de beneficiarul de credite numai la soldul creditului curent, calculat lunar",
+          "bugetul de stat, prin banca comercială creditoare, subvenţia de 70% din dobânda calculată la creditul curent, după plata cotei de 30% din dobânda"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 1,
+        "entity_names": [
+          "tractoarelor, combinelor, maşinilor şi utilajelor agricole, precum şi a instalaţiilor pentru irigat",
+          "ordonanţei şi ale prezentelor norme metodologice",
+          "sancţiunile civile prevăzute la art. 6 din ordonanţa",
+          "Subvenţia",
+          "Beneficiarul de credite",
+          "tractoarelor, combinelor, maşinilor şi utilajelor agricole, precum şi a instalaţiilor pentru irigat, achiziţionate în condiţiile ordonanţei şi ale prezentelor norme metodologice",
+          "achitarea integrală a creditului",
+          "În cazul înstrăinării",
+          "dobânzile calculate şi datorate de beneficiarul de credite numai la soldul creditului curent, calculat lunar",
+          "bugetul de stat, prin banca comercială creditoare, subvenţia de 70% din dobânda calculată la creditul curent, după plata cotei de 30% din dobânda"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "boundary_rejections": [],
+      "failure": null
+    },
+    {
+      "dataset": "order-full",
+      "case": "semantic-13",
+      "thinking_repair": false,
+      "before": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "tractoarelor, combinelor, maşinilor şi utilajelor agricole, precum şi a instalaţiilor pentru irigat",
+          "ordonanţei şi ale prezentelor norme metodologice",
+          "sancţiunile civile prevăzute la art. 6 din ordonanţa",
+          "Subvenţia",
+          "Beneficiarul de credite",
+          "tractoarelor, combinelor, maşinilor şi utilajelor agricole, precum şi a instalaţiilor pentru irigat, achiziţionate în condiţiile ordonanţei şi ale prezentelor norme metodologice",
+          "achitarea integrală a creditului",
+          "În cazul înstrăinării",
+          "dobânzile calculate şi datorate de beneficiarul de credite numai la soldul creditului curent, calculat lunar",
+          "bugetul de stat, prin banca comercială creditoare, subvenţia de 70% din dobânda calculată la creditul curent, după plata cotei de 30% din dobânda"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "tractoarelor, combinelor, maşinilor şi utilajelor agricole, precum şi a instalaţiilor pentru irigat",
+          "ordonanţei şi ale prezentelor norme metodologice",
+          "sancţiunile civile prevăzute la art. 6 din ordonanţa",
+          "Subvenţia",
+          "Beneficiarul de credite",
+          "tractoarelor, combinelor, maşinilor şi utilajelor agricole, precum şi a instalaţiilor pentru irigat, achiziţionate în condiţiile ordonanţei şi ale prezentelor norme metodologice",
+          "achitarea integrală a creditului",
+          "În cazul înstrăinării",
+          "dobânzile calculate şi datorate de beneficiarul de credite numai la soldul creditului curent, calculat lunar",
+          "bugetul de stat, prin banca comercială creditoare, subvenţia de 70% din dobânda calculată la creditul curent, după plata cotei de 30% din dobânda"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "boundary_rejections": [],
+      "failure": null
+    },
+    {
+      "dataset": "order-full",
+      "case": "semantic-15",
+      "thinking_repair": false,
+      "before": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "prevederile anexei nr. 4 bis la prezentul contract",
+          "instalaţiei de utilizare a unui consumator",
+          "Tarife pentru energia electrică",
+          "Modalităţi şi condiţii de plată",
+          "tipul de tarif",
+          "tariful",
+          "Recalcularea consumului de energie",
+          "conectarea la reţelele furnizorului",
+          "respectarea prevederilor legale"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "prevederile anexei nr. 4 bis la prezentul contract",
+          "instalaţiei de utilizare a unui consumator",
+          "Tarife pentru energia electrică",
+          "Modalităţi şi condiţii de plată",
+          "tipul de tarif",
+          "tariful",
+          "Recalcularea consumului de energie",
+          "conectarea la reţelele furnizorului",
+          "respectarea prevederilor legale"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "boundary_rejections": [],
+      "failure": null
+    },
+    {
+      "dataset": "order-full",
+      "case": "semantic-15",
+      "thinking_repair": true,
+      "before": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "prevederile anexei nr. 4 bis la prezentul contract",
+          "instalaţiei de utilizare a unui consumator",
+          "Tarife pentru energia electrică",
+          "Modalităţi şi condiţii de plată",
+          "tipul de tarif",
+          "tariful",
+          "Recalcularea consumului de energie",
+          "conectarea la reţelele furnizorului",
+          "respectarea prevederilor legale"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "prevederile anexei nr. 4 bis la prezentul contract",
+          "instalaţiei de utilizare a unui consumator",
+          "Tarife pentru energia electrică",
+          "Modalităţi şi condiţii de plată",
+          "tipul de tarif",
+          "tariful",
+          "Recalcularea consumului de energie",
+          "conectarea la reţelele furnizorului",
+          "respectarea prevederilor legale"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "boundary_rejections": [],
+      "failure": null
+    },
+    {
+      "dataset": "order-full",
+      "case": "article-59",
+      "thinking_repair": true,
+      "before": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "Comisia centrala de arbitraj",
+          "Arbitrii",
+          "Sediul Comisiei centrale de arbitraj",
+          "legii",
+          "medici, economişti sau jurişti, acreditaţi şi înregistraţi de Ministerul Justiţiei"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "Comisia centrala de arbitraj",
+          "Arbitrii",
+          "Sediul Comisiei centrale de arbitraj",
+          "legii",
+          "medici, economişti sau jurişti, acreditaţi şi înregistraţi de Ministerul Justiţiei"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "boundary_rejections": [],
+      "failure": null
+    },
+    {
+      "dataset": "order-full",
+      "case": "article-59",
+      "thinking_repair": false,
+      "before": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "Comisia centrala de arbitraj",
+          "Arbitrii",
+          "Sediul Comisiei centrale de arbitraj",
+          "legii",
+          "medici, economişti sau jurişti, acreditaţi şi înregistraţi de Ministerul Justiţiei"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "Comisia centrala de arbitraj",
+          "Arbitrii",
+          "Sediul Comisiei centrale de arbitraj",
+          "legii",
+          "medici, economişti sau jurişti, acreditaţi şi înregistraţi de Ministerul Justiţiei"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "boundary_rejections": [],
+      "failure": null
+    },
+    {
+      "dataset": "order-confirm",
+      "case": "semantic-02",
+      "thinking_repair": false,
+      "before": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "executorului bancar",
+          "băncii",
+          "executorilor bancari",
+          "cauzarea de prejudiciu prin încălcarea obligaţiilor sale profesionale",
+          "Asigurarea de răspundere profesională a executorului bancar",
+          "de către şi în contul băncii în care îşi desfăşoară activitatea, dacă aceasta este expres stipulată, după caz, în regulamentul intern al băncii sau în convenţia încheiată de banca cu executorul bancar.",
+          "achizitioneze, direct sau prin interpusi, pentru ei sau pentru alţii, bunurile ce au format obiectul activităţii de executare silită sau să facă acte de executare în propria lor cauza ori în cauzele privind rudele şi afinii până la gradul al patrulea inclusiv."
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "executorului bancar",
+          "băncii",
+          "executorilor bancari",
+          "cauzarea de prejudiciu prin încălcarea obligaţiilor sale profesionale",
+          "Asigurarea de răspundere profesională a executorului bancar",
+          "de către şi în contul băncii în care îşi desfăşoară activitatea, dacă aceasta este expres stipulată, după caz, în regulamentul intern al băncii sau în convenţia încheiată de banca cu executorul bancar.",
+          "achizitioneze, direct sau prin interpusi, pentru ei sau pentru alţii, bunurile ce au format obiectul activităţii de executare silită sau să facă acte de executare în propria lor cauza ori în cauzele privind rudele şi afinii până la gradul al patrulea inclusiv."
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "boundary_rejections": [],
+      "failure": null
+    },
+    {
+      "dataset": "order-confirm",
+      "case": "semantic-02",
+      "thinking_repair": true,
+      "before": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "executorului bancar",
+          "băncii",
+          "executorilor bancari",
+          "cauzarea de prejudiciu prin încălcarea obligaţiilor sale profesionale",
+          "Asigurarea de răspundere profesională a executorului bancar",
+          "de către şi în contul băncii în care îşi desfăşoară activitatea, dacă aceasta este expres stipulată, după caz, în regulamentul intern al băncii sau în convenţia încheiată de banca cu executorul bancar.",
+          "achizitioneze, direct sau prin interpusi, pentru ei sau pentru alţii, bunurile ce au format obiectul activităţii de executare silită sau să facă acte de executare în propria lor cauza ori în cauzele privind rudele şi afinii până la gradul al patrulea inclusiv."
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "executorului bancar",
+          "băncii",
+          "executorilor bancari",
+          "cauzarea de prejudiciu prin încălcarea obligaţiilor sale profesionale",
+          "Asigurarea de răspundere profesională a executorului bancar",
+          "de către şi în contul băncii în care îşi desfăşoară activitatea, dacă aceasta este expres stipulată, după caz, în regulamentul intern al băncii sau în convenţia încheiată de banca cu executorul bancar.",
+          "achizitioneze, direct sau prin interpusi, pentru ei sau pentru alţii, bunurile ce au format obiectul activităţii de executare silită sau să facă acte de executare în propria lor cauza ori în cauzele privind rudele şi afinii până la gradul al patrulea inclusiv."
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "boundary_rejections": [],
+      "failure": null
+    },
+    {
+      "dataset": "order-confirm",
+      "case": "semantic-03",
+      "thinking_repair": true,
+      "before": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "executorii bancari",
+          "banca",
+          "Dosarele de executare aflate în curs de rezolvare la data intrării în vigoare a prezentului statut"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "executorii bancari",
+          "banca",
+          "Dosarele de executare aflate în curs de rezolvare la data intrării în vigoare a prezentului statut"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "boundary_rejections": [],
+      "failure": null
+    },
+    {
+      "dataset": "order-confirm",
+      "case": "semantic-03",
+      "thinking_repair": false,
+      "before": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "executorii bancari",
+          "banca",
+          "Dosarele de executare aflate în curs de rezolvare la data intrării în vigoare a prezentului statut"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "executorii bancari",
+          "banca",
+          "Dosarele de executare aflate în curs de rezolvare la data intrării în vigoare a prezentului statut"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "boundary_rejections": [],
+      "failure": null
+    },
+    {
+      "dataset": "order-confirm",
+      "case": "semantic-11",
+      "thinking_repair": false,
+      "before": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "NORME din 28 iunie 1999 privind verificarea tehnica a vehiculelor feroviare aparţinând agentilor economici EMITENT MINISTERUL TRANSPORTURILOR Publicat în MONITORUL OFICIAL nr. 396 din 19 august 1999 + Capitolul 1 Dispozitii generale"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "NORME din 28 iunie 1999 privind verificarea tehnica a vehiculelor feroviare aparţinând agentilor economici EMITENT MINISTERUL TRANSPORTURILOR Publicat în MONITORUL OFICIAL nr. 396 din 19 august 1999 + Capitolul 1 Dispozitii generale"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "boundary_rejections": [],
+      "failure": null
+    },
+    {
+      "dataset": "order-confirm",
+      "case": "semantic-11",
+      "thinking_repair": true,
+      "before": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "NORME din 28 iunie 1999 privind verificarea tehnica a vehiculelor feroviare aparţinând agentilor economici EMITENT MINISTERUL TRANSPORTURILOR Publicat în MONITORUL OFICIAL nr. 396 din 19 august 1999 + Capitolul 1 Dispozitii generale"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "NORME din 28 iunie 1999 privind verificarea tehnica a vehiculelor feroviare aparţinând agentilor economici EMITENT MINISTERUL TRANSPORTURILOR Publicat în MONITORUL OFICIAL nr. 396 din 19 august 1999 + Capitolul 1 Dispozitii generale"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "boundary_rejections": [],
+      "failure": null
+    },
+    {
+      "dataset": "order-confirm",
+      "case": "semantic-16",
+      "thinking_repair": true,
+      "before": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [],
+        "source_spans_valid": true,
+        "rejected_evidence": 1
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [],
+        "source_spans_valid": true,
+        "rejected_evidence": 1
+      },
+      "boundary_rejections": [],
+      "failure": null
+    },
+    {
+      "dataset": "order-confirm",
+      "case": "semantic-16",
+      "thinking_repair": false,
+      "before": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [],
+        "source_spans_valid": true,
+        "rejected_evidence": 1
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [],
+        "source_spans_valid": true,
+        "rejected_evidence": 1
+      },
+      "boundary_rejections": [],
+      "failure": null
+    },
+    {
+      "dataset": "order-confirm",
+      "case": "semantic-17",
+      "thinking_repair": false,
+      "before": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "toate societățile comerciale, companiile și societățile naționale, regiile autonome din subordinea F.P.S. sau a ministerelor, precum și instituțiile publice și agențiile subordonate Guvernului"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "toate societățile comerciale, companiile și societățile naționale, regiile autonome din subordinea F.P.S. sau a ministerelor, precum și instituțiile publice și agențiile subordonate Guvernului"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "boundary_rejections": [],
+      "failure": null
+    },
+    {
+      "dataset": "order-confirm",
+      "case": "semantic-17",
+      "thinking_repair": true,
+      "before": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "toate societățile comerciale, companiile și societățile naționale, regiile autonome din subordinea F.P.S. sau a ministerelor, precum și instituțiile publice și agențiile subordonate Guvernului"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "toate societățile comerciale, companiile și societățile naționale, regiile autonome din subordinea F.P.S. sau a ministerelor, precum și instituțiile publice și agențiile subordonate Guvernului"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "boundary_rejections": [],
+      "failure": null
+    },
+    {
+      "dataset": "order-confirm",
+      "case": "semantic-01",
+      "thinking_repair": true,
+      "before": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "executorul bancar"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "executorul bancar"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "boundary_rejections": [],
+      "failure": null
+    },
+    {
+      "dataset": "order-confirm",
+      "case": "semantic-01",
+      "thinking_repair": false,
+      "before": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "executorul bancar"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "executorul bancar"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "boundary_rejections": [],
+      "failure": null
+    },
+    {
+      "dataset": "order-confirm",
+      "case": "semantic-06",
+      "thinking_repair": false,
+      "before": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "HOTĂRÂRE nr. 55 din 29 ianuarie 1999 privind organizarea şi funcţionarea Direcţiei generale de prognoza în subordinea Ministerului Finanţelor",
+          "Guvernul României",
+          "Direcţia generală de prognoza",
+          "Ministerului Finanţelor",
+          "Comisiei Naţionale de Prognoza"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "HOTĂRÂRE nr. 55 din 29 ianuarie 1999 privind organizarea şi funcţionarea Direcţiei generale de prognoza în subordinea Ministerului Finanţelor",
+          "Guvernul României",
+          "Direcţia generală de prognoza",
+          "Ministerului Finanţelor",
+          "Comisiei Naţionale de Prognoza"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "boundary_rejections": [],
+      "failure": null
+    },
+    {
+      "dataset": "order-confirm",
+      "case": "semantic-06",
+      "thinking_repair": true,
+      "before": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "HOTĂRÂRE nr. 55 din 29 ianuarie 1999 privind organizarea şi funcţionarea Direcţiei generale de prognoza în subordinea Ministerului Finanţelor",
+          "Guvernul României",
+          "Direcţia generală de prognoza",
+          "Ministerului Finanţelor",
+          "Comisiei Naţionale de Prognoza"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "HOTĂRÂRE nr. 55 din 29 ianuarie 1999 privind organizarea şi funcţionarea Direcţiei generale de prognoza în subordinea Ministerului Finanţelor",
+          "Guvernul României",
+          "Direcţia generală de prognoza",
+          "Ministerului Finanţelor",
+          "Comisiei Naţionale de Prognoza"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "boundary_rejections": [],
+      "failure": null
+    },
+    {
+      "dataset": "order-confirm",
+      "case": "semantic-09",
+      "thinking_repair": true,
+      "before": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "Membrii Consiliului de administraţie al A.N.L.",
+          "Consiliul de administraţie al A.N.L.",
+          "cei membri",
+          "o indemnizaţie lunară în cuantum de 20% din salariul de baza brut lunar al directorului general al A.N.L."
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 1,
+        "entity_names": [
+          "Membrii Consiliului de administraţie al A.N.L.",
+          "Consiliul de administraţie al A.N.L.",
+          "cei membri",
+          "o indemnizaţie lunară în cuantum de 20% din salariul de baza brut lunar al directorului general al A.N.L."
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "boundary_rejections": [
+        {
+          "statement": "Nu pot fi desemnaţi membri ai Consiliului de administraţie al A.N.L. sau vor fi revocaţi de drept acei membri care se găsesc în una dintre următoarele situaţii: a) au antecedente penale; ... b) au interdicţii, stabilite potrivit legii, de a conduce, controla, gestiona sau administra o societate sau instituţie publică. ...",
+          "issues": [
+            "selected subject cuts through a source word",
+            "subject unresolved"
+          ]
+        }
+      ],
+      "failure": null
+    },
+    {
+      "dataset": "order-confirm",
+      "case": "semantic-09",
+      "thinking_repair": false,
+      "before": {
+        "target_correct": true,
+        "unresolved": 1,
+        "entity_names": [
+          "Membrii Consiliului de administraţie al A.N.L.",
+          "Consiliul de administraţie al A.N.L.",
+          "cei membri",
+          "o indemnizaţie lunară în cuantum de 20% din salariul de baza brut lunar al directorului general al A.N.L."
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 1,
+        "entity_names": [
+          "Membrii Consiliului de administraţie al A.N.L.",
+          "Consiliul de administraţie al A.N.L.",
+          "cei membri",
+          "o indemnizaţie lunară în cuantum de 20% din salariul de baza brut lunar al directorului general al A.N.L."
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "boundary_rejections": [],
+      "failure": null
+    },
+    {
+      "dataset": "order-confirm",
+      "case": "semantic-10",
+      "thinking_repair": false,
+      "before": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "NORME din 28 iunie 1999 privind verificarea tehnica a vehiculelor feroviare aparţinând agentilor economici EMITENT MINISTERUL TRANSPORTURILOR Publicat în MONITORUL OFICIAL nr. 396 din 19 august 1999 + Capitolul 1 Dispozitii generale",
+          "vehiculele feroviare de orice tip aparţinând agentilor economici",
+          "operatorilor de transport feroviar şi gestionarului infrastructurii feroviare publice",
+          "normele tehnice specifice în vigoare"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "NORME din 28 iunie 1999 privind verificarea tehnica a vehiculelor feroviare aparţinând agentilor economici EMITENT MINISTERUL TRANSPORTURILOR Publicat în MONITORUL OFICIAL nr. 396 din 19 august 1999 + Capitolul 1 Dispozitii generale",
+          "vehiculele feroviare de orice tip aparţinând agentilor economici",
+          "operatorilor de transport feroviar şi gestionarului infrastructurii feroviare publice",
+          "normele tehnice specifice în vigoare"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "boundary_rejections": [],
+      "failure": null
+    },
+    {
+      "dataset": "order-confirm",
+      "case": "semantic-10",
+      "thinking_repair": true,
+      "before": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "NORME din 28 iunie 1999 privind verificarea tehnica a vehiculelor feroviare aparţinând agentilor economici EMITENT MINISTERUL TRANSPORTURILOR Publicat în MONITORUL OFICIAL nr. 396 din 19 august 1999 + Capitolul 1 Dispozitii generale",
+          "vehiculele feroviare de orice tip aparţinând agentilor economici",
+          "operatorilor de transport feroviar şi gestionarului infrastructurii feroviare publice",
+          "normele tehnice specifice în vigoare"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "NORME din 28 iunie 1999 privind verificarea tehnica a vehiculelor feroviare aparţinând agentilor economici EMITENT MINISTERUL TRANSPORTURILOR Publicat în MONITORUL OFICIAL nr. 396 din 19 august 1999 + Capitolul 1 Dispozitii generale",
+          "vehiculele feroviare de orice tip aparţinând agentilor economici",
+          "operatorilor de transport feroviar şi gestionarului infrastructurii feroviare publice",
+          "normele tehnice specifice în vigoare"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "boundary_rejections": [],
+      "failure": null
+    },
+    {
+      "dataset": "order-confirm",
+      "case": "semantic-13",
+      "thinking_repair": true,
+      "before": {
+        "target_correct": true,
+        "unresolved": 1,
+        "entity_names": [
+          "tractoarelor, combinelor, maşinilor şi utilajelor agricole, precum şi a instalaţiilor pentru irigat",
+          "ordonanţei şi ale prezentelor norme metodologice",
+          "sancţiunile civile prevăzute la art. 6 din ordonanţa",
+          "Subvenţia",
+          "Beneficiarul de credite",
+          "tractoarelor, combinelor, maşinilor şi utilajelor agricole, precum şi a instalaţiilor pentru irigat, achiziţionate în condiţiile ordonanţei şi ale prezentelor norme metodologice",
+          "achitarea integrală a creditului",
+          "În cazul înstrăinării",
+          "dobânzile calculate şi datorate de beneficiarul de credite numai la soldul creditului curent, calculat lunar",
+          "bugetul de stat, prin banca comercială creditoare, subvenţia de 70% din dobânda calculată la creditul curent, după plata cotei de 30% din dobânda"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 1,
+        "entity_names": [
+          "tractoarelor, combinelor, maşinilor şi utilajelor agricole, precum şi a instalaţiilor pentru irigat",
+          "ordonanţei şi ale prezentelor norme metodologice",
+          "sancţiunile civile prevăzute la art. 6 din ordonanţa",
+          "Subvenţia",
+          "Beneficiarul de credite",
+          "tractoarelor, combinelor, maşinilor şi utilajelor agricole, precum şi a instalaţiilor pentru irigat, achiziţionate în condiţiile ordonanţei şi ale prezentelor norme metodologice",
+          "achitarea integrală a creditului",
+          "În cazul înstrăinării",
+          "dobânzile calculate şi datorate de beneficiarul de credite numai la soldul creditului curent, calculat lunar",
+          "bugetul de stat, prin banca comercială creditoare, subvenţia de 70% din dobânda calculată la creditul curent, după plata cotei de 30% din dobânda"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "boundary_rejections": [],
+      "failure": null
+    },
+    {
+      "dataset": "order-confirm",
+      "case": "semantic-13",
+      "thinking_repair": false,
+      "before": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "tractoarelor, combinelor, maşinilor şi utilajelor agricole, precum şi a instalaţiilor pentru irigat",
+          "ordonanţei şi ale prezentelor norme metodologice",
+          "sancţiunile civile prevăzute la art. 6 din ordonanţa",
+          "Subvenţia",
+          "Beneficiarul de credite",
+          "tractoarelor, combinelor, maşinilor şi utilajelor agricole, precum şi a instalaţiilor pentru irigat, achiziţionate în condiţiile ordonanţei şi ale prezentelor norme metodologice",
+          "achitarea integrală a creditului",
+          "În cazul înstrăinării",
+          "dobânzile calculate şi datorate de beneficiarul de credite numai la soldul creditului curent, calculat lunar",
+          "bugetul de stat, prin banca comercială creditoare, subvenţia de 70% din dobânda calculată la creditul curent, după plata cotei de 30% din dobânda"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "tractoarelor, combinelor, maşinilor şi utilajelor agricole, precum şi a instalaţiilor pentru irigat",
+          "ordonanţei şi ale prezentelor norme metodologice",
+          "sancţiunile civile prevăzute la art. 6 din ordonanţa",
+          "Subvenţia",
+          "Beneficiarul de credite",
+          "tractoarelor, combinelor, maşinilor şi utilajelor agricole, precum şi a instalaţiilor pentru irigat, achiziţionate în condiţiile ordonanţei şi ale prezentelor norme metodologice",
+          "achitarea integrală a creditului",
+          "În cazul înstrăinării",
+          "dobânzile calculate şi datorate de beneficiarul de credite numai la soldul creditului curent, calculat lunar",
+          "bugetul de stat, prin banca comercială creditoare, subvenţia de 70% din dobânda calculată la creditul curent, după plata cotei de 30% din dobânda"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "boundary_rejections": [],
+      "failure": null
+    },
+    {
+      "dataset": "order-confirm",
+      "case": "semantic-15",
+      "thinking_repair": false,
+      "before": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "Tarife pentru energia electrică",
+          "Recalcularea consumului de energie"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "Tarife pentru energia electrică",
+          "Recalcularea consumului de energie"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "boundary_rejections": [],
+      "failure": null
+    },
+    {
+      "dataset": "order-confirm",
+      "case": "semantic-15",
+      "thinking_repair": true,
+      "before": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "Tarife pentru energia electrică",
+          "Recalcularea consumului de energie"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "Tarife pentru energia electrică",
+          "Recalcularea consumului de energie"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "boundary_rejections": [],
+      "failure": null
+    },
+    {
+      "dataset": "order-confirm",
+      "case": "article-59",
+      "thinking_repair": true,
+      "before": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "Comisia centrala de arbitraj",
+          "Arbitrii",
+          "Sediul Comisiei centrale de arbitraj",
+          "legii"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "Comisia centrala de arbitraj",
+          "Arbitrii",
+          "Sediul Comisiei centrale de arbitraj",
+          "legii"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "boundary_rejections": [],
+      "failure": null
+    },
+    {
+      "dataset": "order-confirm",
+      "case": "article-59",
+      "thinking_repair": false,
+      "before": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "Comisia centrala de arbitraj",
+          "Arbitrii",
+          "Sediul Comisiei centrale de arbitraj",
+          "legii"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "after": {
+        "target_correct": true,
+        "unresolved": 0,
+        "entity_names": [
+          "Comisia centrala de arbitraj",
+          "Arbitrii",
+          "Sediul Comisiei centrale de arbitraj",
+          "legii"
+        ],
+        "source_spans_valid": true,
+        "rejected_evidence": 0
+      },
+      "boundary_rejections": [],
+      "failure": null
+    }
+  ],
+  "targets_before": 48,
+  "targets_after": 48,
+  "boundary_rejections": 2
+}

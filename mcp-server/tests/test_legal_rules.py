@@ -25,6 +25,35 @@ def labels(**rows):
     return StubProvider(handler=reply)
 
 
+@pytest.mark.parametrize("phrase,selected,accepted", [
+    ("acei membri", "cei membri", False),
+    ("acei membri", "acei membr", False),
+    ("acei membri", "acei membri", True),
+    ("țara", "ara", False),
+    ("s\u0326ara", "s", False),
+    ("t\u0326ara", "\u0326ara", False),
+    ("t\u0326ara", "t\u0326ara", True),
+    ("grup_12", "grup", False),
+    ("grup12", "grup", False),
+    ("«membrii»", "membrii", True),
+    ("Consiliul A.N.L.", "Consiliul A.N.L.", True),
+    ("membrii,", "membrii,", True),
+])
+def test_model_subject_requires_unicode_word_boundaries(phrase, selected, accepted):
+    text = "Raportul privește " + phrase + "."
+    provider = StubProvider(default=json.dumps({"units": {"u0": {"kind": "fact", "subject": selected}}}))
+    claim = extract_rules(provider, text)["claims"][0]
+    assert claim["statement"] == text
+    if accepted:
+        assert claim["subject"] == selected.rstrip(",;:")
+        span = claim["subject_evidence"]
+        assert text[span["start"]:span["end"]] == span["quote"] == claim["subject"]
+    else:
+        assert claim["subject"] == ""
+        assert "subject_evidence" not in claim
+        assert "selected subject cuts through a source word" in claim["review_issues"]
+
+
 def assert_anchored(text, claims):
     for claim in claims:
         assert claim["statement"] in text

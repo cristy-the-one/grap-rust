@@ -11,6 +11,24 @@ from grap_mcp.kee.working_graph import WorkingGraph
 RULE = "Executorii bancari au obligaţia sa păstreze secretul profesional, chiar şi după încetarea funcţiei, cu excepţia cazurilor în care legea îi eliberează de aceasta obligaţie."
 
 
+def test_interior_word_subject_stays_unresolved_through_focused_repair():
+    text = "Articolul 1 Raportul privește acei membri."
+    context = qualified.plan(text)
+    unit = context["units"][0]
+    label = {"kind": "fact", "subject": "cei membri"}
+    raw = json.dumps({"units": {unit["id"]: label}, "outcomes": [], "relations": []})
+    provider = StubProvider(default=json.dumps({"units": {unit["id"]: label}}))
+    fragment, failure = extract.finalize_reply(raw, "source", text, provider, context)
+    assert failure is None
+    assert len(provider.calls) == 1
+    assert fragment["rule_coverage"]["unresolved"] == 1
+    rule = fragment["qualified_rules"][0]
+    assert rule["subject"] == ""
+    assert rule["statement"] == unit["statement"]
+    assert rule["evidence"] == unit["evidence"]
+    assert "selected subject cuts through a source word" in rule["review_issues"]
+
+
 def test_abbreviated_article_heading_enables_rule_protection():
     assert qualified.plan("ART. 12 Instituţia funcţionează autonom.")["units"]
 
