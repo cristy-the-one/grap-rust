@@ -1,0 +1,2 @@
+# Trailing tabs and empty physical rows encode real empty cells.
+*.tsv whitespace=-blank-at-eol,-blank-at-eof
