@@ -10,6 +10,7 @@ import time
 from grap_mcp.kee import extract, qualified, graph_extract
 from grap_mcp.kee.llm import OpenAICompatProvider
 from embedding_schedule_benchmark import MeasuredEmbedder
+from runtime_provenance import provenance
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -55,7 +56,8 @@ def run(args):
     MeasuredEmbedder("bge-m3").embed(["Încălzire"])
     report = {"scope": "12 development targets, full graph-augmented loop, real generation/embeddings, no production writes",
               "transport": "production OpenAI-compatible provider; zero retries, temperature 0, seed 42, max tokens 2048",
-              "source_hashes": {c["source_file"]: c["source_sha256"] for c in cases}, "runs": []}
+              "source_hashes": {c["source_file"]: c["source_sha256"] for c in cases},
+              "provenance": provenance(), "runs": []}
     report["code_sha256"] = {str(Path(module.__file__).relative_to(ROOT)):
         hashlib.sha256(Path(module.__file__).read_bytes()).hexdigest()
         for module in (extract, qualified, graph_extract)}

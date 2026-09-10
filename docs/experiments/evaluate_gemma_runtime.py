@@ -16,6 +16,7 @@ from grap_mcp.kee import extract, qualified
 from grap_mcp.kee.embeddings import OpenAICompatEmbedder
 from grap_mcp.kee.working_graph import WorkingGraph
 from profile_llm_ingestion import ProfileProvider
+from runtime_provenance import provenance
 
 ROOT = Path(__file__).resolve().parents[2]
 MODEL = "grap-legal-gemma4"
@@ -86,7 +87,7 @@ def run(args):
     if args.case_limit:
         selected = selected[:args.case_limit]
     report = {"model": MODEL, "prompt_file_sha256": hashlib.sha256(args.prompts.read_bytes()).hexdigest(),
-              "mode": args.mode, "rows": []}
+              "mode": args.mode, "provenance": provenance(), "rows": []}
     names = args.configs.split(",")
     for name in names:
         options = {**CONFIGS[name], "seed": args.seed}
