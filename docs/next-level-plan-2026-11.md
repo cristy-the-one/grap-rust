@@ -184,6 +184,13 @@ PDF and spreadsheets; signals and software structure as DBC and ARXML. The reade
 only Markdown, text and one JSON shape. Deterministic readers for the structured formats move into
 Phase 1 — VSS-engine already has DBC and ARXML ingest to reuse — and the model is kept for prose.
 
+## 5a. How this gets implemented
+
+[work-packages-2026-11.md](work-packages-2026-11.md) cuts the plan into cards, each tagged by the
+capability it needs. Cards tagged **[L]** need a capable model; the rest are written so a small one
+can carry them. Labelling follows [gold-set-guide-law.md](gold-set-guide-law.md) and
+[gold-set-guide-automotive.md](gold-set-guide-automotive.md).
+
 ## 6. Relation to VSS-engine
 
 VSS-engine solved the part grap lacks — sealed benchmarks, calibrated confidence, explicit
