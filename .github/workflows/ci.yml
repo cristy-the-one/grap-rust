@@ -78,7 +78,7 @@ jobs:
       - name: Install MCP server test dependencies
         run: pip install "mcp==1.30.0" "PyYAML>=6.0" "pytest>=8.0" "cantools>=45.1.2"
       - name: Run pytest
-        run: python -m pytest mcp-server/tests -q
+        run: PYTHONPATH=mcp-server python -m pytest mcp-server/tests -q
 
   doc:
     name: Documentation
