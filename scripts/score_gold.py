@@ -18,17 +18,22 @@ System JSON::
 
 Every figure includes a 95% bootstrap interval, resampling source documents
 with replacement (2,000 resamples, seed 20261112). No row is printed.
+``--sealed`` appends one line to the gold-root access log: timestamp, git
+commit, user, and that same aggregate summary. The line never contains a row.
 """
 
 from __future__ import annotations
 
 import argparse
 import csv
+import getpass
 import json
 import math
 import random
+import subprocess
 import sys
 from collections import defaultdict
+from datetime import datetime, timezone
 from pathlib import Path
 
 BOOTSTRAP_SEED = 20261112
@@ -342,15 +347,70 @@ def format_report(result: dict) -> str:
     return "\n".join(lines) + "\n"
 
 
+_SHEET_FILES = ("statements.csv", "pairs.csv", "questions.csv")
+
+
+def _gold_root(gold_dir: Path) -> Path:
+    """Directory that holds the access log.
+
+    ``--gold`` is a corpus directory: ``open/`` and ``sealed/`` inside it, or
+    the CSV sheets themselves. The log is one level above that directory.
+    A directory with neither is already the root.
+    """
+    folder = Path(gold_dir)
+    nested = (folder / "open").is_dir() or (folder / "sealed").is_dir()
+    flat = any((folder / name).is_file() for name in _SHEET_FILES)
+    if nested or flat:
+        return folder.parent
+    return folder
+
+
+def _git_commit() -> str:
+    repo = Path(__file__).resolve().parents[1]
+    try:
+        completed = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=repo,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+    except (OSError, subprocess.CalledProcessError):
+        return "unknown"
+    return completed.stdout.strip() or "unknown"
+
+
+def _append_access_log(gold_dir: Path, report: str) -> None:
+    """Append timestamp, git commit, user, and the metric summary.
+
+    The summary is the aggregate report on one line. Sheet rows are not written.
+    """
+    path = _gold_root(gold_dir) / "ACCESS.log"
+    summary = " ".join(report.splitlines())
+    stamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    row = [stamp, _git_commit(), getpass.getuser(), summary]
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a", encoding="utf-8", newline="") as handle:
+        csv.writer(handle, lineterminator="\n").writerow(row)
+
+
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(
         description="Score a gold folder against system output. Prints aggregates only."
     )
     parser.add_argument("--gold", required=True, type=Path)
     parser.add_argument("--system", required=True, type=Path)
+    parser.add_argument(
+        "--sealed",
+        action="store_true",
+        help="Append timestamp, git commit, user, and metric summary to gold/ACCESS.log.",
+    )
     args = parser.parse_args(argv)
     system = json.loads(args.system.read_text(encoding="utf-8"))
-    sys.stdout.write(format_report(score(args.gold, system)))
+    report = format_report(score(args.gold, system))
+    sys.stdout.write(report)
+    if args.sealed:
+        _append_access_log(args.gold, report)
 
 
 if __name__ == "__main__":
