@@ -14,7 +14,7 @@ crate-type = ["cdylib"]
 
 [dependencies]
 grap = { path = "../..", features = ["fulltext", "sharding", "mmap"] }
-pyo3 = { version = "0.23", features = ["extension-module"] }
+pyo3 = { version = "0.30", features = ["extension-module"] }
 
 [features]
 default = []

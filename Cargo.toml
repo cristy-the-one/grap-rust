@@ -33,11 +33,11 @@ path = "src/lib.rs"
 serde = { version = "1", features = ["derive"] }
 unicode-normalization = "0.1"
 serde_json = "1"
-bincode = "1.3"
-thiserror = "1"
+bincode = "3.0"
+thiserror = "2"
 log = "0.4"
 tempfile = "3"
-sha2 = "0.10"
+sha2 = "0.11"
 clap = { version = "4.5", features = ["derive"] }
 
 [dependencies.memmap2]
@@ -61,7 +61,7 @@ telemetry = []  # Enables the Telemetry trait and observability hooks
 ann-hnsw = ["hnsw_rs"]  # Experimental: HNSW ANN backend for vector search (Phase 1)
 
 [dev-dependencies]
-criterion = { version = "0.5", features = ["html_reports"] }
+criterion = { version = "0.8", features = ["html_reports"] }
 
 
 [profile.dev]
