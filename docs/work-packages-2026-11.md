@@ -58,11 +58,11 @@ A reader turns a file into a list of these. Readers do nothing else: no model ca
 | `source_id` | str | Stable ID of the file (its stem, or the ID inside it). |
 | `release` | str or null | Document version or release, as written in the file. |
 | `item_id` | str | ID of the item inside the source. If the source has none, `"{source_id}#{n}"` with `n` counting from 0 in file order. |
-| `kind_hint` | str | One of `requirement`, `signal`, `message`, `parameter`, `definition`, `heading`, `text`, `table`. What the *format* says, not an interpretation. |
+| `kind_hint` | str | One of `requirement`, `signal`, `message`, `parameter`, `definition`, `heading`, `text`, `table`, plus the ARXML values listed in §5 of the ARXML spec. What the *format* says, not an interpretation. |
 | `text` | str | The item's own text, unmodified. |
 | `heading_path` | list[str] | Titles of the enclosing sections, outermost first. Empty if unknown. |
 | `attributes` | dict[str, str] | Format-level fields (status, ASIL, unit, cycle time…), keys as in the source. |
-| `links` | list[{`type`, `target_id`}] | Links stated by the format itself. `type` is one of `traces_to`, `part_of`, `refers_to`. |
+| `links` | list[{`type`, `target_id`, `role`, `context`}] | Links stated by the format itself. `type` is one of `traces_to`, `part_of`, `refers_to`. `role` is the format's own name for the link (`""` if none). `context` is a list of item IDs, `[]` except for ARXML instance references. |
 | `file` | str | Path relative to the corpus root. |
 | `sha256` | str | Hash of the file's bytes. |
 
@@ -182,9 +182,11 @@ those in the two labelling guides, lower-case with underscores, preceded by `pac
   contains "refine" or "satisf", which are also `traces_to`; anything else `refers_to`).
 - **Stop if:** the sample file uses XHTML attribute values with embedded objects — report it.
 
-### R-05 [L] ARXML reader — **needs a capable model.**
-Schema is large and version-dependent; a naive reader silently drops references. First deliverable
-is a spec listing which element kinds are in scope and how references are resolved, then [S] cards.
+### R-05 ARXML reader — **spec done:** [spec-arxml-reader.md](spec-arxml-reader.md)
+The [L] part is complete. It yields cards AR-01 … AR-09 ([S] and [M]), listed in §10 of the spec
+with their tests and measured expected values. Two items remain for the owner and a capable model
+(§11 of the spec): confirming the software-component shapes on real files, and merging elements
+split across files.
 
 ### R-06 [S] Wire readers into ingestion
 - **File:** `mcp-server/grap_mcp/ingest.py` — extend `_ALL_EXTS` and dispatch by extension to the
