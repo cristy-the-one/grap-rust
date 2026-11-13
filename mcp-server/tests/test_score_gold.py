@@ -7,6 +7,8 @@ import math
 import random
 import subprocess
 import sys
+
+import pytest
 from collections import Counter, defaultdict
 from datetime import datetime
 from pathlib import Path
@@ -101,7 +103,8 @@ def _match_statements(gold, predicted):
         for index, pred in enumerate(predicted):
             if index in used:
                 continue
-            if (row["item_id"] == pred["item_id"]
+            if (row["source_id"] == pred["source_id"]
+                    and row["item_id"] == pred["item_id"]
                     and _norm(row["kind"]) == _norm(pred["kind"])
                     and _subjects_agree(row["subject"], pred["subject"])):
                 used.add(index)
@@ -417,9 +420,9 @@ def test_sealed_rows_are_scored_and_not_emitted(tmp_path, capsys, caplog):
     assert "pairs_f1=" in captured.out
     assert "pairs_unclear=" in captured.out
     assert "questions_hit_rate=" in captured.out
-    # The held row is a miss, so recall is 1/2. Ignoring it would leave recall at 1.
+    # Default scoring leaves the held row out, so the open match stays exact.
     recall = score_gold.score(folder, json.loads(system_path.read_text(encoding="utf-8")))
-    assert recall["statements_recall"] == 1 / 2
+    assert recall["statements_recall"] == 1.0
     assert recall["statements_precision"] == 1.0
 
 
@@ -504,16 +507,10 @@ def test_sealed_flag_appends_one_access_log_line(tmp_path, capsys):
     assert commit == expected_commit
     assert user == getpass.getuser()
     assert summary == " ".join(captured.out.splitlines())
-    scored = score_gold.score(corpus, payload)
-    assert scored["statements_recall"] == 1 / 2
-    for key in (
-        "statements_precision",
-        "statements_recall",
-        "statements_f1",
-        "pairs_f1",
-        "questions_hit_rate",
-    ):
-        assert f"{key}={scored[key]:.10f}" in summary
+    scored = score_gold.score(corpus, payload, sealed=True)
+    assert scored["statements_recall"] == 0.0
+    assert scored["statements_precision"] == 0.0
+    assert "statements_recall=0.0000000000" in summary
     assert f"pairs_unclear={scored['pairs_unclear']}" in summary
 
     score_gold.main(["--gold", str(corpus), "--system", str(system_path), "--sealed"])
@@ -526,3 +523,167 @@ def test_sealed_flag_appends_one_access_log_line(tmp_path, capsys):
     assert len(second) == 4
     assert canary not in second[3]
     assert "statements_precision=" in second[3]
+def test_statement_match_requires_source_and_item(tmp_path):
+    """The same article label in two acts is not one statement."""
+    folder = tmp_path / "packet"
+    _write_csv(folder / "open" / "statements.csv", _STATEMENT_COLUMNS, [
+        _statement("act-b", "Articolul 1", "obligation", "the bank"),
+    ])
+    crossed = score_gold.score(folder, {"statements": [{
+        "source_id": "act-a", "item_id": "Articolul 1", "kind": "obligation", "subject": "the bank",
+    }]})
+    assert crossed["statements_precision"] == 0.0
+    assert crossed["statements_recall"] == 0.0
+
+    same = score_gold.score(folder, {"statements": [{
+        "source_id": "act-b", "item_id": "Articolul 1", "kind": "obligation", "subject": "the bank",
+    }]})
+    assert same["statements_precision"] == 1.0
+    assert same["statements_recall"] == 1.0
+
+
+def test_refuses_blank_kind_bad_label_and_empty_where(tmp_path, capsys):
+    canary = "ROWTEXTMUSTNOTLEAK"
+    folder = tmp_path / "packet"
+    blank = _statement("doc", "a", "", "subject", passage=canary)
+    blank["note"] = canary
+    whitespace = _statement("doc", "b", "   ", "subject")
+    filled = _statement("doc", "c", "obligation", "the bank")
+    _write_csv(folder / "open" / "statements.csv", _STATEMENT_COLUMNS, [blank, whitespace, filled])
+    _write_csv(folder / "open" / "pairs.csv", _PAIR_COLUMNS, [
+        {"packet_id": "p1", "source_id": "d1", "item_id": "a", "passage": canary,
+         "other_source_id": "d9", "other_item_id": "b", "other_passage": "right", "label": "sme"},
+        {"packet_id": "p2", "source_id": "d1", "item_id": "c", "passage": "left",
+         "other_source_id": "d9", "other_item_id": "d", "other_passage": "right", "label": ""},
+        {"packet_id": "p3", "source_id": "d1", "item_id": "e", "passage": "left",
+         "other_source_id": "d9", "other_item_id": "f", "other_passage": "right", "label": "unclear"},
+        {"packet_id": "p4", "source_id": "d1", "item_id": "g", "passage": "left",
+         "other_source_id": "d9", "other_item_id": "h", "other_passage": "right", "label": "same"},
+    ])
+    _write_csv(folder / "open" / "questions.csv", _QUESTION_COLUMNS, [
+        {"packet_id": "q1", "source_id": "s1", "item_id": "", "passage": canary,
+         "question": "What is due?", "type": "Direct", "answer": "yes", "where": "", "note": ""},
+        {"packet_id": "q2", "source_id": "s1", "item_id": "", "passage": "",
+         "question": "Which article?", "type": "Direct", "answer": "yes", "where": "a#1", "note": ""},
+        {"packet_id": "q3", "source_id": "s2", "item_id": "", "passage": "",
+         "question": "Who signed it?", "type": "Not answerable", "answer": "x",
+         "where": "", "note": ""},
+    ])
+    with pytest.raises(Exception) as caught:
+        score_gold.score(folder, {})
+    message = str(caught.value)
+    assert "statements: 2 blank kind" in message
+    assert "pairs: 2 label outside the guide list" in message
+    assert "questions: 1 answerable with empty where" in message
+    assert canary not in message
+    system_path = tmp_path / "system.json"
+    system_path.write_text("{}", encoding="utf-8")
+    with pytest.raises(SystemExit) as exit_info:
+        score_gold.main(["--gold", str(folder), "--system", str(system_path)])
+    assert exit_info.value.code == 1
+    captured = capsys.readouterr()
+    assert canary not in captured.out
+    assert canary not in captured.err
+    assert "statements: 2 blank kind" in captured.err
+
+
+def test_metrics_carry_counts_and_empty_is_na(tmp_path, capsys):
+    """No gold rows and zero predictions print n/a, never 1.0, and every metric shows n."""
+    folder = tmp_path / "packet"
+    _write_csv(folder / "open" / "statements.csv", _STATEMENT_COLUMNS, [
+        _statement("doc", "art-1", "obligation", "the bank"),
+    ])
+    missed = score_gold.score(folder, {})
+    assert missed["statements_precision"] == "n/a"
+    assert missed["statements_precision_low"] == "n/a"
+    assert missed["statements_precision_high"] == "n/a"
+    assert missed["statements_recall"] == 0.0
+    assert missed["statements_f1"] == 0.0
+    assert missed["statements_n_gold"] == 1
+    assert missed["statements_n_pred"] == 0
+    assert missed["statements_n_docs"] == 1
+    assert missed["pairs_f1"] == "n/a"
+    assert missed["pairs_f1_low"] == "n/a"
+    assert missed["questions_hit_rate"] == "n/a"
+    assert missed["questions_hit_rate_low"] == "n/a"
+    assert missed["pairs_n_gold"] == 0
+    assert missed["pairs_n_pred"] == 0
+    assert missed["pairs_n_docs"] == 0
+    assert missed["questions_n_gold"] == 0
+    assert missed["questions_n_pred"] == 0
+    assert missed["questions_n_docs"] == 0
+    assert missed["pairs_unclear"] == 0
+
+    empty = tmp_path / "empty"
+    empty.mkdir()
+    nothing = score_gold.score(empty, {"statements": [{
+        "source_id": "doc", "item_id": "art-1", "kind": "obligation", "subject": "the bank",
+    }]})
+    assert nothing["statements_precision"] == "n/a"
+    assert nothing["statements_recall"] == "n/a"
+    assert nothing["statements_f1"] == "n/a"
+    assert nothing["statements_n_gold"] == 0
+    assert nothing["statements_n_pred"] == 1
+    assert nothing["statements_n_docs"] == 1
+
+    system_path = tmp_path / "system.json"
+    system_path.write_text("{}", encoding="utf-8")
+    score_gold.main(["--gold", str(folder), "--system", str(system_path)])
+    out = capsys.readouterr().out
+    assert "statements_precision=n/a [n/a, n/a] n_gold=1 n_pred=0 n_docs=1" in out
+    assert "pairs_f1=n/a [n/a, n/a] n_gold=0 n_pred=0 n_docs=0" in out
+    assert "questions_hit_rate=n/a [n/a, n/a] n_gold=0 n_pred=0 n_docs=0" in out
+    assert "pairs_f1=1" not in out
+    assert "questions_hit_rate=1" not in out
+
+
+def test_default_reads_open_only(tmp_path):
+    """A sealed row must not move a default score. A flat sheet counts as open."""
+    folder = tmp_path / "packet"
+    _write_csv(folder / "open" / "statements.csv", _STATEMENT_COLUMNS, [
+        _statement("open-doc", "art-1", "obligation", "the bank"),
+    ])
+    _write_csv(folder / "sealed" / "statements.csv", _STATEMENT_COLUMNS, [
+        _statement("held-doc", "art-9", "prohibition", "held subject"),
+    ])
+    system = {"statements": [{
+        "source_id": "open-doc", "item_id": "art-1", "kind": "obligation", "subject": "the bank",
+    }]}
+    opened = score_gold.score(folder, system)
+    assert opened["statements_recall"] == 1.0
+    assert opened["statements_precision"] == 1.0
+
+    flat = tmp_path / "flat"
+    _write_csv(flat / "statements.csv", _STATEMENT_COLUMNS, [
+        _statement("open-doc", "art-1", "obligation", "the bank"),
+    ])
+    _write_csv(flat / "sealed" / "statements.csv", _STATEMENT_COLUMNS, [
+        _statement("held-doc", "art-9", "prohibition", "held subject"),
+    ])
+    flat_score = score_gold.score(flat, system)
+    assert flat_score["statements_recall"] == 1.0
+    assert flat_score["statements_precision"] == 1.0
+
+
+def test_sealed_flag_reads_sealed_only(tmp_path, capsys):
+    canary = "SEALEDROWCANARY9f3a7c"
+    folder = tmp_path / "packet"
+    _write_csv(folder / "open" / "statements.csv", _STATEMENT_COLUMNS, [
+        _statement("open-doc", "art-1", "obligation", "the bank"),
+    ])
+    sealed = _statement("held-doc", "art-9", "prohibition", canary, passage=canary)
+    sealed["note"] = canary
+    _write_csv(folder / "sealed" / "statements.csv", _STATEMENT_COLUMNS, [sealed])
+    system = {"statements": [{
+        "source_id": "open-doc", "item_id": "art-1", "kind": "obligation", "subject": "the bank",
+    }]}
+    held = score_gold.score(folder, system, sealed=True)
+    # Only the unmatched sealed row is gold. The open prediction does not match it.
+    assert held["statements_recall"] == 0.0
+    assert held["statements_precision"] == 0.0
+    system_path = tmp_path / "system.json"
+    system_path.write_text(json.dumps(system), encoding="utf-8")
+    score_gold.main(["--gold", str(folder), "--system", str(system_path), "--sealed"])
+    captured = capsys.readouterr()
+    assert canary not in captured.out
+    assert canary not in captured.err

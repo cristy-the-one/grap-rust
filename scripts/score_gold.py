@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
 """Score a gold folder against a system-output JSON. Prints aggregates only.
 
-The folder is either a corpus directory with ``open/`` and ``sealed/`` sheets,
-or a directory that holds the CSVs itself. Sheets are UTF-8 with a header.
-Statement rows match on item_id, kind, and subject (B3). Pair labels collapse
-to same / not-same, and ``unclear`` rows are excluded from the pair metric.
-Question hits require every ``where`` entry, except unanswerable questions,
-which hit only when the system declines.
+Default reads ``open/`` plus a flat folder of CSVs. ``--sealed`` reads ``sealed/``
+only. The two are never combined. Sheets are UTF-8 with a header.
+Statement rows match on source_id, item_id, kind, and subject (B3). Pair labels
+collapse to same / not-same, and ``unclear`` rows are excluded from the pair
+metric. Question hits require every ``where`` entry, except unanswerable
+questions, which hit only when the system declines.
+
+A metric with no gold rows prints ``n/a``. Precision with no predictions prints
+``n/a``. Each figure is printed with gold rows, predicted rows, and documents.
 
 System JSON::
 
@@ -40,7 +43,18 @@ BOOTSTRAP_SEED = 20261112
 BOOTSTRAP_RESAMPLES = 2000
 
 _SAME_LABELS = {"same", "same only here"}
-_SHEETS = ("open", "sealed")
+_PAIR_LABELS = _SAME_LABELS | {
+    "same, other release",
+    "part of",
+    "realises",
+    "different",
+    "unclear",
+}
+_NA = "n/a"
+
+
+class ScoreRefusal(Exception):
+    """Gold rows that cannot be scored. The message names the sheet and the count."""
 
 
 def _norm(value) -> str:
@@ -123,15 +137,18 @@ def _bounds(point: float, interval: tuple[float, float] | None) -> tuple[float, 
     return interval
 
 
-def _sheet_paths(gold_dir: Path, name: str) -> list[Path]:
+def _sheet_paths(gold_dir: Path, name: str, sealed: bool) -> list[Path]:
+    """Default is open sheets plus a flat folder. ``sealed`` reads sealed sheets only."""
+    if sealed:
+        candidate = gold_dir / "sealed" / name
+        return [candidate] if candidate.is_file() else []
     paths = []
     direct = gold_dir / name
     if direct.is_file():
         paths.append(direct)
-    for part in _SHEETS:
-        candidate = gold_dir / part / name
-        if candidate.is_file():
-            paths.append(candidate)
+    opened = gold_dir / "open" / name
+    if opened.is_file():
+        paths.append(opened)
     return paths
 
 
@@ -151,7 +168,8 @@ def _match_statements(gold: list[dict], predicted: list[dict]) -> tuple[int, int
         for index, pred in enumerate(predicted):
             if index in used:
                 continue
-            if (row["item_id"] == pred["item_id"]
+            if (row["source_id"] == pred["source_id"]
+                    and row["item_id"] == pred["item_id"]
                     and _norm(row["kind"]) == _norm(pred["kind"])
                     and _subjects_agree(row["subject"], pred["subject"])):
                 used.add(index)
@@ -180,6 +198,9 @@ def _score_statements(rows: list[dict], predicted: list[dict]) -> dict:
         gold_by[row["source_id"]].append(row)
     for row in preds:
         pred_by[row["source_id"]].append(row)
+    n_gold = len(gold)
+    n_pred = len(preds)
+    n_docs = len(set(gold_by) | set(pred_by))
 
     def evaluate(drawn):
         return _prf(*_match_statements(_expand(drawn, gold_by), _expand(drawn, pred_by)))
@@ -188,6 +209,11 @@ def _score_statements(rows: list[dict], predicted: list[dict]) -> dict:
     precision_low, precision_high = _bounds(precision, None if intervals is None else intervals[0])
     recall_low, recall_high = _bounds(recall, None if intervals is None else intervals[1])
     f1_low, f1_high = _bounds(f1, None if intervals is None else intervals[2])
+    if n_gold == 0:
+        precision = recall = f1 = _NA
+        precision_low = precision_high = recall_low = recall_high = f1_low = f1_high = _NA
+    elif n_pred == 0:
+        precision = precision_low = precision_high = _NA
     return {
         "statements_precision": precision,
         "statements_precision_low": precision_low,
@@ -198,6 +224,9 @@ def _score_statements(rows: list[dict], predicted: list[dict]) -> dict:
         "statements_f1": f1,
         "statements_f1_low": f1_low,
         "statements_f1_high": f1_high,
+        "statements_n_gold": n_gold,
+        "statements_n_pred": n_pred,
+        "statements_n_docs": n_docs,
     }
 
 
@@ -240,18 +269,28 @@ def _score_pairs(rows: list[dict], system_pairs: list[dict]) -> dict:
         }
         scored.append(item)
         scored_by[item["source_id"]].append(item)
-    f1 = _prf(*_pair_counts(scored, labels))[2]
+    tp, fp, fn = _pair_counts(scored, labels)
+    n_gold = len(rows)
+    n_pred = len(system_pairs)
+    n_docs = len(scored_by)
+    if not scored or (tp == 0 and fp == 0 and fn == 0):
+        f1 = low = high = _NA
+    else:
+        f1 = _prf(tp, fp, fn)[2]
 
-    def evaluate(drawn):
-        return (_prf(*_pair_counts(_expand(drawn, scored_by), labels))[2],)
+        def evaluate(drawn):
+            return (_prf(*_pair_counts(_expand(drawn, scored_by), labels))[2],)
 
-    intervals = _bootstrap(scored_by, evaluate)
-    low, high = _bounds(f1, None if intervals is None else intervals[0])
+        intervals = _bootstrap(scored_by, evaluate)
+        low, high = _bounds(f1, None if intervals is None else intervals[0])
     return {
         "pairs_f1": f1,
         "pairs_f1_low": low,
         "pairs_f1_high": high,
         "pairs_unclear": unclear,
+        "pairs_n_gold": n_gold,
+        "pairs_n_pred": n_pred,
+        "pairs_n_docs": n_docs,
     }
 
 
@@ -297,51 +336,85 @@ def _score_questions(rows: list[dict], system_questions: list[dict]) -> dict:
         }
         gold.append(item)
         grouped[item["source_id"]].append(item)
-    rate = _question_rate(gold, by_id)
+    n_gold = len(gold)
+    n_pred = len(system_questions)
+    n_docs = len(grouped)
+    if n_gold == 0:
+        rate = low = high = _NA
+    else:
+        rate = _question_rate(gold, by_id)
 
-    def evaluate(drawn):
-        return (_question_rate(_expand(drawn, grouped), by_id),)
+        def evaluate(drawn):
+            return (_question_rate(_expand(drawn, grouped), by_id),)
 
-    intervals = _bootstrap(grouped, evaluate)
-    low, high = _bounds(rate, None if intervals is None else intervals[0])
+        intervals = _bootstrap(grouped, evaluate)
+        low, high = _bounds(rate, None if intervals is None else intervals[0])
     return {
         "questions_hit_rate": rate,
         "questions_hit_rate_low": low,
         "questions_hit_rate_high": high,
+        "questions_n_gold": n_gold,
+        "questions_n_pred": n_pred,
+        "questions_n_docs": n_docs,
     }
 
 
-def score(gold_dir, system: dict) -> dict:
-    """Return statement, pair, and question aggregates for one gold folder."""
+def _refuse_unscorable(statements: list[dict], pairs: list[dict], questions: list[dict]) -> None:
+    blank_kind = sum(1 for row in statements if not str(row.get("kind") or "").strip())
+    bad_labels = sum(1 for row in pairs if _norm(row.get("label") or "") not in _PAIR_LABELS)
+    empty_where = sum(
+        1 for row in questions
+        if not _unanswerable(row) and not _where_entries(row.get("where") or "")
+    )
+    problems = []
+    if blank_kind:
+        problems.append(f"statements: {blank_kind} blank kind")
+    if bad_labels:
+        problems.append(f"pairs: {bad_labels} label outside the guide list")
+    if empty_where:
+        problems.append(f"questions: {empty_where} answerable with empty where")
+    if problems:
+        raise ScoreRefusal("; ".join(problems))
+
+
+def score(gold_dir, system: dict, sealed: bool = False) -> dict:
+    """Return statement, pair, and question aggregates for one gold folder.
+
+    ``sealed=False`` reads open sheets and a flat folder. ``sealed=True`` reads
+    sealed sheets only. The two are never combined.
+    """
     folder = Path(gold_dir)
     system = system or {}
+    statements = _read_rows(_sheet_paths(folder, "statements.csv", sealed))
+    pairs = _read_rows(_sheet_paths(folder, "pairs.csv", sealed))
+    questions = _read_rows(_sheet_paths(folder, "questions.csv", sealed))
+    _refuse_unscorable(statements, pairs, questions)
     result = {}
-    result.update(_score_statements(
-        _read_rows(_sheet_paths(folder, "statements.csv")),
-        list(system.get("statements") or []),
-    ))
-    result.update(_score_pairs(
-        _read_rows(_sheet_paths(folder, "pairs.csv")),
-        list(system.get("pairs") or []),
-    ))
-    result.update(_score_questions(
-        _read_rows(_sheet_paths(folder, "questions.csv")),
-        list(system.get("questions") or []),
-    ))
+    result.update(_score_statements(statements, list(system.get("statements") or [])))
+    result.update(_score_pairs(pairs, list(system.get("pairs") or [])))
+    result.update(_score_questions(questions, list(system.get("questions") or [])))
     return result
+
+
+def _fmt(value) -> str:
+    if value == _NA:
+        return _NA
+    return f"{float(value):.10f}"
 
 
 def format_report(result: dict) -> str:
     lines = []
-    for key in (
-        "statements_precision",
-        "statements_recall",
-        "statements_f1",
-        "pairs_f1",
-        "questions_hit_rate",
+    for key, group in (
+        ("statements_precision", "statements"),
+        ("statements_recall", "statements"),
+        ("statements_f1", "statements"),
+        ("pairs_f1", "pairs"),
+        ("questions_hit_rate", "questions"),
     ):
         lines.append(
-            f"{key}={result[key]:.10f} [{result[key + '_low']:.10f}, {result[key + '_high']:.10f}]"
+            f"{key}={_fmt(result[key])} [{_fmt(result[key + '_low'])}, {_fmt(result[key + '_high'])}] "
+            f"n_gold={result[group + '_n_gold']} n_pred={result[group + '_n_pred']} "
+            f"n_docs={result[group + '_n_docs']}"
         )
     lines.append(f"pairs_unclear={result['pairs_unclear']}")
     return "\n".join(lines) + "\n"
@@ -403,11 +476,15 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument(
         "--sealed",
         action="store_true",
-        help="Append timestamp, git commit, user, and metric summary to gold/ACCESS.log.",
+        help="Score sealed sheets only and append timestamp, git commit, user, and metric summary to gold/ACCESS.log.",
     )
     args = parser.parse_args(argv)
     system = json.loads(args.system.read_text(encoding="utf-8"))
-    report = format_report(score(args.gold, system))
+    try:
+        report = format_report(score(args.gold, system, sealed=args.sealed))
+    except ScoreRefusal as exc:
+        sys.stderr.write(str(exc) + "\n")
+        raise SystemExit(1) from exc
     sys.stdout.write(report)
     if args.sealed:
         _append_access_log(args.gold, report)
