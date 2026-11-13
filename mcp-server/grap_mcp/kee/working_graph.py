@@ -33,31 +33,38 @@ EMBED_BATCH = 128     # texts per /embeddings request; bounds payload + peak mem
 REL_VOCAB_CAP = 40    # most-frequent relation types injected into extraction context
 # A bracketed id such as [SWS_Com_00123], found anywhere in the name.
 _BRACKETED_ID = re.compile(r"\[[^\]\s]+\]")
-# "Legea nr. 101/1998" and the same shape. These tokens are not identifiers.
-_LEGAL_ACT_REFERENCE = re.compile(
-    r"\b(?:Legea|Lege|OUG|HG|Ordonanța|Decizia)\s+nr\.\s+\d+/\d+\b"
-)
+# A lower-case letter followed by a capital: the inside of a CamelCase name.
+_CAMEL_HUMP = re.compile(r"[a-z][A-Z]")
 
 
-def _token_is_identifier(token: str) -> bool:
-    """No whitespace, and an underscore, slash, dot, digit, or a later capital."""
-    if not token or any(ch.isspace() for ch in token):
+def _name_is_identifier(name: str) -> bool:
+    """A name written as one token: no whitespace, and an underscore, slash,
+    dot, digit, or a capital after the first character."""
+    if not name or any(ch.isspace() for ch in name):
         return False
-    if any(ch in "_/." or ch.isdigit() for ch in token):
+    if any(ch in "_/." or ch.isdigit() for ch in name):
         return True
-    return any(ch.isupper() for ch in token[1:])
+    return any(ch.isupper() for ch in name[1:])
+
+
+def _token_is_strong_identifier(token: str) -> bool:
+    """Inside a phrase, only an unmistakable identifier counts.
+
+    Ordinary prose carries dots and digits ("nr. 58/1998", "art. 5", "S.A."),
+    so those do not mark a phrase. An underscore, a CamelCase hump, or an
+    absolute path does. This keeps the rule free of any one domain's wording.
+    """
+    return "_" in token or token.startswith("/") or _CAMEL_HUMP.search(token) is not None
 
 
 def _contains_identifier(name: str) -> bool:
-    """Search: the name is an identifier, or a phrase that contains one.
-
-    A legal act reference is removed first, so `nr.` and `101/1998` inside
-    `Legea nr. 101/1998` do not count.
-    """
+    """The name is an identifier, or a phrase that contains an unmistakable one."""
     if _BRACKETED_ID.search(name):
         return True
-    residual = _LEGAL_ACT_REFERENCE.sub(" ", name)
-    return any(_token_is_identifier(token) for token in re.findall(r"\S+", residual))
+    tokens = re.findall(r"\S+", name)
+    if len(tokens) == 1:
+        return _name_is_identifier(tokens[0])
+    return any(_token_is_strong_identifier(token) for token in tokens)
 
 
 @dataclass

@@ -610,3 +610,25 @@ def test_structural_labels_excluded_from_export_but_kept_in_the_graph(tmp_path):
         assert wg.chars[[n for n, v in wg.canonical.items() if v == "Anexa 1"][0]]
     finally:
         wg.close()
+
+
+@pytest.mark.parametrize("left,right", [
+    ("Normele nr. 2/1999", "Normelor nr. 2/1999"),
+    ("art. 5 alin. 2", "art. 5 alin. (2)"),
+    ("Banca Comerciala S.A.", "Băncii Comerciale S.A."),
+])
+def test_prose_with_dots_and_digits_is_not_an_identifier(left, right):
+    """No domain wording is special-cased: ordinary phrases still merge by similarity."""
+    from grap_mcp.kee.working_graph import _contains_identifier
+    assert not _contains_identifier(left)
+    assert not _contains_identifier(right)
+
+
+@pytest.mark.parametrize("name", [
+    "VehSpdFL", "BrakePedalPosition", "vehicle_speed", "/ISignal/SigA", "Com_SendSignal",
+    "the Com_SendSignal function", "signal VehSpdFL of the brake ECU", "see [SWS_Com_00123]",
+    "path /ISignal/SigA here",
+])
+def test_identifiers_alone_and_inside_phrases(name):
+    from grap_mcp.kee.working_graph import _contains_identifier
+    assert _contains_identifier(name)
