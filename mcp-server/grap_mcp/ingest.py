@@ -1,8 +1,9 @@
-"""Ingest plain-text / markdown / JSON documents into a grap KG as real evidence nodes."""
+"""Ingest prose documents and reader-backed files into a grap KG as real evidence nodes."""
 
 import json
 from itertools import islice
 from .native_graph import add_node_batch
+from .readers.dbc import read_dbc
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -11,7 +12,11 @@ _EXTS = {".md", ".txt", ".markdown"}
 # was law-JSON-aware while evidence ingestion silently skipped .json files,
 # so the pilot scored gaps against an empty evidence index (law-ro pilot
 # finding 13). Every ingest path now accepts this full set.
-_ALL_EXTS = _EXTS | {".json"}
+# Structured suffixes dispatch to a reader. Prose stays on read_document.
+_READERS = {
+    ".dbc": read_dbc,
+}
+_ALL_EXTS = _EXTS | {".json"} | set(_READERS)
 
 
 def _text_and_label_from_json(obj: Any, stem: str) -> Tuple[str, str]:
@@ -73,7 +78,10 @@ EMBED_BATCH = 128     # texts per /embeddings request; bounds payload size
 
 
 def ingest_paths(kg, root: str, embedder=None, batch_size: int = EMBED_BATCH) -> Dict[str, Any]:
-    """Chunk + add_node every .md/.txt/.json under `root` (file or dir). Returns counts.
+    """Add every .md/.txt/.json under `root`, and one node per reader item. Returns counts.
+
+    A reader node's text is item_id, kind_hint, text, then key=value attributes,
+    one field per line. Its label is kind_hint.
 
     If `embedder` is supplied (a kee.embeddings.Embedder), each chunk is embedded
     and stored on its node, enabling vector / hybrid search and semantic dedup.
@@ -88,13 +96,26 @@ def ingest_paths(kg, root: str, embedder=None, batch_size: int = EMBED_BATCH) ->
     p = Path(root)
     if p.is_file():
         files = [p]
+        corpus_root = p.parent
     elif p.is_dir():
         files = sorted(f for f in p.rglob("*") if f.suffix.lower() in _ALL_EXTS)
+        corpus_root = p
     else:
         raise FileNotFoundError(f"ingest path not found: {root}")
 
     def records():
         for f in files:
+            reader = _READERS.get(f.suffix.lower())
+            if reader is not None:
+                for item in reader(f, corpus_root=corpus_root):
+                    # item_id, kind, own text, then attributes. Own text is
+                    # often empty, so the name has to be in the node.
+                    lines = [item.item_id, item.kind_hint, item.text]
+                    lines.extend(
+                        f"{key}={value}" for key, value in item.attributes.items()
+                    )
+                    yield (item.kind_hint, "\n".join(lines))
+                continue
             text = read_document(f)
             if text is None:
                 continue

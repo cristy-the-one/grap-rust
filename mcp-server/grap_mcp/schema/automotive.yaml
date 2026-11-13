@@ -1,0 +1,515 @@
+# Automotive graph schema, transcribed from docs/spec-automotive-schema.md §3, §4 and §8.
+# Approved by the owner on 2026-11-13. A type or relation not listed here does not exist.
+#
+# Relation ends use the spec's words: "any" is every node type, "any entity" is every
+# type whose tier is Entity. The loader resolves those words to type names.
+# same_type is the spec's "X → X (same type)".
+
+kind_attribute: >
+  Several types cover more than one thing. Which one is recorded as the attribute
+  kind, taken from the source's own word (the ARXML tag, the DBC keyword).
+
+node_types:
+  - name: Source
+    tier: Evidence
+    description: A document or file set, with its release
+    typical_origin: every reader
+  - name: Item
+    tier: Evidence
+    description: One item read from a source, text unmodified
+    typical_origin: every reader
+  - name: Statement
+    tier: Claim
+    description: "One assertion: kind, subject, condition, required behaviour, values, exception"
+    typical_origin: text extraction
+  - name: Requirement
+    tier: Entity
+    description: An identified requirement or specification item, at any level
+    typical_origin: ReqIF, specification PDF
+  - name: TestConcept
+    tier: Entity
+    description: "What must be verified for a requirement: stimulus, expected result, pass criterion"
+    typical_origin: owner / generation
+  - name: Template
+    tier: Entity
+    description: A reusable test-specification or checklist structure
+    typical_origin: owner
+  - name: TestCase
+    tier: Entity
+    description: An existing concrete test, kept for reuse
+    typical_origin: owner / import
+  - name: Ecu
+    tier: Entity
+    description: An ECU instance
+    typical_origin: ARXML, DBC node
+  - name: Component
+    tier: Entity
+    description: A software component type, composition, or basic-software module
+    typical_origin: ARXML
+  - name: Interface
+    tier: Entity
+    description: A port interface or an API
+    typical_origin: ARXML, specification
+  - name: InterfaceElement
+    tier: Entity
+    description: A data element, operation or argument of an interface
+    typical_origin: ARXML, specification
+  - name: Network
+    tier: Entity
+    description: A cluster or physical channel
+    typical_origin: ARXML, DBC file
+  - name: Frame
+    tier: Entity
+    description: A frame on a network (a DBC "message")
+    typical_origin: ARXML, DBC
+  - name: Pdu
+    tier: Entity
+    description: A protocol data unit
+    typical_origin: ARXML
+  - name: Signal
+    tier: Entity
+    description: A system signal, bus signal, or signal group
+    typical_origin: ARXML, DBC
+    kind_examples: [system_signal, i_signal, dbc_signal, signal_group]
+  - name: DataType
+    tier: Entity
+    description: A data type, scaling, unit or value constraint
+    typical_origin: ARXML
+  - name: Parameter
+    tier: Entity
+    description: A configuration container, a configuration parameter, or a calibration value
+    typical_origin: ARXML, specification
+  - name: State
+    tier: Entity
+    description: A mode or a state
+    typical_origin: ARXML, specification
+  - name: Fault
+    tier: Entity
+    description: A diagnostic trouble code, diagnostic event, or development error code
+    typical_origin: specification, ARXML
+  - name: DiagnosticService
+    tier: Entity
+    description: A diagnostic service, data identifier, routine or input-output control
+    typical_origin: ARXML, specification
+  - name: Term
+    tier: Entity
+    description: A glossary term or abbreviation, valid in a stated scope
+    typical_origin: any
+  - name: Element
+    tier: Entity
+    description: "Fallback: an item no other type fits"
+    typical_origin: ARXML mostly
+
+goal_document:
+  - words: Requirement
+    schema: Requirement plus its Statements
+  - words: Signal
+    schema: Signal
+  - words: Interface
+    schema: Interface, InterfaceElement
+  - words: Constraint
+    schema: a Statement whose kind is a constraint — not a node type of its own
+  - words: Test Concept
+    schema: TestConcept
+  - words: Template
+    schema: Template
+  - words: Glossary term
+    schema: Term
+
+relations:
+  - name: in_source
+    group: Evidence
+    meaning: the item was read from this source
+    from: [Item]
+    to: [Source]
+  - name: stated_in
+    group: Evidence
+    meaning: this is where it is defined or asserted
+    from: ["any entity", Statement]
+    to: [Item]
+  - name: mentions
+    group: Evidence
+    meaning: the item's text names this entity
+    from: [Item]
+    to: ["any entity"]
+
+  - name: part_of
+    group: Structure and claims
+    meaning: containment
+    pairs:
+      - from: Signal
+        to: [Pdu, Frame, Signal]
+        note: Signal to Signal is a group
+      - from: Pdu
+        to: [Frame, Pdu]
+      - from: InterfaceElement
+        to: [Interface]
+      - from: Parameter
+        to: [Parameter, Component]
+      - from: Component
+        to: [Component]
+      - from: State
+        to: [State]
+      - from: Requirement
+        to: [Requirement]
+      - from: DiagnosticService
+        to: [DiagnosticService]
+      - from: Element
+        to: [Element]
+  - name: has_statement
+    group: Structure and claims
+    meaning: the requirement makes this assertion
+    from: [Requirement]
+    to: [Statement]
+  - name: about
+    group: Structure and claims
+    meaning: the subject the statement constrains — exactly one
+    from: [Statement]
+    to: ["any entity"]
+  - name: refers_to
+    group: Structure and claims
+    meaning: "Fallback. A stated reference with no better relation. role is mandatory."
+    from: ["any"]
+    to: ["any"]
+
+  - name: traces_to
+    group: Requirements and test
+    meaning: the first satisfies or refines the second (lower → upper)
+    from: [Requirement]
+    to: [Requirement]
+  - name: allocated_to
+    group: Requirements and test
+    meaning: who must fulfil it
+    from: [Requirement]
+    to: [Component, Ecu]
+  - name: depends_on
+    group: Requirements and test
+    meaning: a dependency the source states explicitly
+    pairs:
+      - from: Requirement
+        to: [Requirement]
+      - from: Component
+        to: [Component]
+  - name: verifies
+    group: Requirements and test
+    meaning: what the test covers
+    from: [TestConcept, TestCase]
+    to: [Requirement, Statement]
+  - name: instantiates
+    group: Requirements and test
+    meaning: the case realises the concept
+    from: [TestCase]
+    to: [TestConcept]
+  - name: uses_template
+    group: Requirements and test
+    meaning: the structure it is written in
+    from: [TestConcept, TestCase]
+    to: [Template]
+
+  - name: provides
+    group: Architecture
+    meaning: offers it (a provide port, an implemented API, a supported service)
+    from: [Component]
+    to: [Interface, DiagnosticService]
+  - name: requires
+    group: Architecture
+    meaning: needs it (a require port, or a called API)
+    from: [Component]
+    to: [Interface]
+  - name: connects_to
+    group: Architecture
+    meaning: a connector links them
+    from: [Component]
+    to: [Component]
+  - name: runs_on
+    group: Architecture
+    meaning: mapped to this ECU
+    from: [Component]
+    to: [Ecu]
+  - name: configured_by
+    group: Architecture
+    meaning: behaviour depends on this parameter
+    from: [Component, Statement]
+    to: [Parameter]
+
+  - name: attached_to
+    group: Communication and data
+    meaning: the ECU is on this network
+    from: [Ecu]
+    to: [Network]
+  - name: sends
+    group: Communication and data
+    meaning: transmits it
+    from: [Ecu, Component]
+    to: [Frame, Pdu, Signal]
+  - name: receives
+    group: Communication and data
+    meaning: receives it
+    from: [Ecu, Component]
+    to: [Frame, Pdu, Signal]
+  - name: transmitted_on
+    group: Communication and data
+    meaning: travels on this network
+    from: [Frame, Pdu]
+    to: [Network]
+  - name: realised_by
+    group: Communication and data
+    meaning: the same information one layer down
+    from: [InterfaceElement, Signal]
+    to: [Signal]
+  - name: has_type
+    group: Communication and data
+    meaning: its type, scaling or unit
+    from: [Signal, InterfaceElement, Parameter, DataType]
+    to: [DataType]
+
+  - name: applies_in
+    group: Behaviour
+    meaning: holds, or is available, only in this mode, state or session
+    from: [Statement, DiagnosticService]
+    to: [State]
+  - name: transitions_to
+    group: Behaviour
+    meaning: a transition
+    from: [State]
+    to: [State]
+  - name: raises
+    group: Behaviour
+    meaning: reports, sets or reads out this fault
+    from: [Component, Statement, DiagnosticService]
+    to: [Fault]
+
+  - name: defines
+    group: Terminology and versions
+    meaning: the statement gives the term its meaning
+    from: [Statement]
+    to: [Term]
+  - name: alias_of
+    group: Terminology and versions
+    meaning: the term names this entity, in the term's scope only
+    from: [Term]
+    to: ["any entity"]
+  - name: corresponds_to
+    group: Terminology and versions
+    meaning: the same element in another release
+    same_type: true
+
+# §8. ✔ is confirmed on the ARXML fixtures or by a merged reader.
+# ○ is from the standard, to be confirmed with the inventory tool on real files.
+item_mappings:
+  - reader: any
+    item: the file or file set
+    node_type: Source
+  - reader: any
+    item: every item
+    node_type: Item
+    note: plus the typed node below when there is one
+  - reader: DBC
+    mark: "✔"
+    item: message
+    node_type: Frame
+    kind: dbc_message
+  - reader: DBC
+    mark: "✔"
+    item: signal
+    node_type: Signal
+    kind: dbc_signal
+  - reader: DBC
+    item: the file itself
+    also:
+      - node_type: Network
+      - node_type: Ecu
+        note: senders and receivers
+  - reader: ARXML
+    mark: "✔"
+    tags: [ECU-INSTANCE]
+    node_type: Ecu
+  - reader: ARXML
+    mark: "✔"
+    tags: [CAN-CLUSTER, CAN-PHYSICAL-CHANNEL]
+    node_type: Network
+  - reader: ARXML
+    mark: "✔"
+    tags: [CAN-FRAME]
+    node_type: Frame
+  - reader: ARXML
+    mark: "✔"
+    tags: [I-SIGNAL-I-PDU, MULTIPLEXED-I-PDU, CONTAINER-I-PDU, SECURED-I-PDU, NM-PDU]
+    node_type: Pdu
+  - reader: ARXML
+    mark: "✔"
+    tags: [SYSTEM-SIGNAL, I-SIGNAL, I-SIGNAL-GROUP]
+    node_type: Signal
+  - reader: ARXML
+    mark: "✔"
+    tags: [COMPU-METHOD, UNIT, SW-BASE-TYPE]
+    node_type: DataType
+  - reader: ARXML
+    mark: "✔"
+    tags: [ECUC-MODULE-CONFIGURATION-VALUES, ECUC-CONTAINER-VALUE]
+    node_type: Parameter
+  - reader: ARXML
+    mark: "○"
+    item: tags ending -SW-COMPONENT-TYPE
+    node_type: Component
+  - reader: ARXML
+    mark: "○"
+    item: tags ending -INTERFACE
+    node_type: Interface
+  - reader: ARXML
+    mark: "○"
+    tags: [VARIABLE-DATA-PROTOTYPE, CLIENT-SERVER-OPERATION, ARGUMENT-DATA-PROTOTYPE]
+    node_type: InterfaceElement
+  - reader: ARXML
+    mark: "○"
+    tags: [MODE-DECLARATION-GROUP, MODE-DECLARATION]
+    node_type: State
+  - reader: ARXML
+    mark: "○"
+    item: application and implementation data types, DATA-CONSTR
+    node_type: DataType
+  - reader: ARXML
+    mark: "○"
+    item: diagnostic trouble codes and diagnostic events
+    node_type: Fault
+  - reader: ARXML
+    mark: "○"
+    item: diagnostic services, data identifiers, routines
+    node_type: DiagnosticService
+  - reader: ARXML
+    item: everything else, including runnables and events
+    node_type: Element
+  - reader: ReqIF
+    item: specification object
+    node_type: Requirement
+  - reader: Specification PDF
+    item: bracketed, numbered item
+    node_type: Requirement
+  - reader: Text extraction
+    item: one assertion
+    node_type: Statement
+
+folded_edge_note: >
+  An object is folded into one edge when it joins exactly two things. Its own
+  path is kept as the edge's evidence and its values as edge attributes in the
+  store, so nothing is lost.
+
+folded_edges:
+  - mark: "✔"
+    objects: [I-SIGNAL-TO-I-PDU-MAPPING]
+    from: Signal
+    relation: part_of
+    to: Pdu
+    kept: [start position, byte order]
+  - mark: "✔"
+    objects: [PDU-TO-FRAME-MAPPING]
+    from: Pdu
+    relation: part_of
+    to: Frame
+  - mark: "✔"
+    objects: [CAN-FRAME-TRIGGERING]
+    from: Frame
+    relation: transmitted_on
+    to: Network
+    kept: [identifier]
+  - mark: "✔"
+    objects: [PDU-TRIGGERING]
+    from: Pdu
+    relation: transmitted_on
+    to: Network
+  - mark: "✔"
+    objects: ["SYSTEM-SIGNAL-REF on an I-SIGNAL"]
+    from: Signal
+    from_kind: system
+    relation: realised_by
+    to: Signal
+    to_kind: bus
+  - mark: "✔"
+    objects: [COMPU-METHOD-REF, UNIT-REF, BASE-TYPE-REF]
+    relation: has_type
+    to: DataType
+  - mark: "○"
+    objects: [ports]
+    from: Component
+    relations: [provides, requires]
+    to: Interface
+    role: port name
+  - mark: "○"
+    objects: [assembly and delegation connectors]
+    from: Component
+    relation: connects_to
+    to: Component
+  - mark: "○"
+    objects: [sender-receiver-to-signal mapping]
+    from: InterfaceElement
+    relation: realised_by
+    to: Signal
+  - mark: "○"
+    objects: [component-to-ECU mapping]
+    from: Component
+    relation: runs_on
+    to: Ecu
+
+folded_edge_rule: >
+  An object that joins three or more things, or that other items refer to,
+  stays an Element.
+
+reader_links:
+  - link: part_of
+    note: containment
+    relation: part_of
+    when: where section 4 allows the pair
+    otherwise: refers_to
+  - link: traces_to
+    note: ReqIF relation, specification trace list
+    relation: traces_to
+  - link: refers_to
+    note: any other refers_to
+    relation: refers_to
+    keep_role: true
+  - link: DBC senders, receivers
+    from: Ecu
+    relations: [sends, receives]
+    to: [Frame, Signal]
+
+statements:
+  attributes: [kind, condition, required_behaviour, values_and_timing, exception]
+  kinds:
+    - requirement
+    - configuration_constraint
+    - definition
+    - state_or_mode_rule
+    - error_handling
+    - informative
+    - other
+  edges:
+    - relation: stated_in
+      direction: to
+      node_type: Item
+    - relation: has_statement
+      direction: from
+      node_type: Requirement
+      when: if it has one
+    - relation: about
+      direction: to
+      target: its subject
+    - relation: applies_in
+      direction: to
+      node_type: State
+      when: where the text names them
+    - relation: configured_by
+      direction: to
+      node_type: Parameter
+      when: where the text names them
+    - relation: raises
+      direction: to
+      node_type: Fault
+      when: where the text names them
+    - relation: defines
+      direction: to
+      node_type: Term
+      when: where the text names them
+    - relation: refers_to
+      direction: to
+      target: anything else
+      when: where the text names them
