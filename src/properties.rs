@@ -123,7 +123,7 @@ impl PropertyRegistry {
     /// Builds a `u64` bitmask from a list of property names.
     ///
     /// Any names not present in the registry are silently ignored.
-    /// The resulting mask can be passed to [`QueryBuilder::require_properties`].
+    /// The resulting mask can be passed to `QueryBuilder::require_properties`.
     pub fn build_mask(&self, names: &[&str]) -> u64 {
         let mut mask = 0u64;
         for name in names {
@@ -141,7 +141,7 @@ impl PropertyRegistry {
         &self.tag_to_name
     }
 
-    /// Like [`register`] but returns `Err(GraphError::TooManyProperties)` instead of panicking
+    /// Like `register` but returns `Err(GraphError::TooManyProperties)` instead of panicking
     /// when the 64-property limit is reached.
     pub fn try_register(&mut self, name: &str) -> Result<PropertyTag, crate::GraphError> {
         if let Some(&tag) = self.name_to_tag.get(name) {
