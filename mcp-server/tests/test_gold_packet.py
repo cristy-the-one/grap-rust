@@ -225,16 +225,188 @@ def test_keeps_text_from_80_to_1500_characters(tmp_path):
         assert all(row[column] == "" for column in LABEL_COLUMNS)
 
 
-def test_automotive_names_the_missing_readers(tmp_path):
+AUTOMOTIVE_COLUMNS = [
+    "packet_id",
+    "source_id",
+    "item_id",
+    "passage",
+    "kind",
+    "subject",
+    "trigger_condition",
+    "required_behaviour",
+    "values_and_timing",
+    "exception",
+    "refers_to",
+    "traces_up_to",
+    "configuration_dependency",
+    "sure",
+    "note",
+]
+AUTOMOTIVE_LABELS = AUTOMOTIVE_COLUMNS[4:]
+# Long enough for Sheet 1 (80 to 1,500). The stock fixtures are not.
+_PASSAGE = (
+    "The system shall remain controllable under braking when the pedal is pressed "
+    "and the wheel speed drops."
+)
+
+
+def _load_reader_fixture(module_name, attribute):
+    import importlib.util
+
+    path = Path(__file__).with_name(module_name + ".py")
+    spec = importlib.util.spec_from_file_location(module_name, path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return getattr(module, attribute)
+
+
+def _reqif(objects):
+    """objects is (identifier, type long-name, text). One XHTML ReqIF.Text each."""
+    types = []
+    specs = []
+    seen = {}
+    for ident, type_name, text in objects:
+        type_id = seen.get(type_name)
+        if type_id is None:
+            type_id = f"_t{len(seen)}"
+            seen[type_name] = type_id
+            types.append(
+                f'<SPEC-OBJECT-TYPE IDENTIFIER="{type_id}" LONG-NAME="{type_name}">'
+                "<SPEC-ATTRIBUTES>"
+                f'<ATTRIBUTE-DEFINITION-XHTML IDENTIFIER="{type_id}_ad" LONG-NAME="ReqIF.Text">'
+                "<TYPE><DATATYPE-DEFINITION-XHTML-REF>_dt</DATATYPE-DEFINITION-XHTML-REF></TYPE>"
+                "</ATTRIBUTE-DEFINITION-XHTML>"
+                "</SPEC-ATTRIBUTES>"
+                "</SPEC-OBJECT-TYPE>"
+            )
+        specs.append(
+            f'<SPEC-OBJECT IDENTIFIER="{ident}" LONG-NAME="{ident}">'
+            f"<TYPE><SPEC-OBJECT-TYPE-REF>{type_id}</SPEC-OBJECT-TYPE-REF></TYPE>"
+            "<VALUES><ATTRIBUTE-VALUE-XHTML>"
+            f"<DEFINITION><ATTRIBUTE-DEFINITION-XHTML-REF>{type_id}_ad</ATTRIBUTE-DEFINITION-XHTML-REF></DEFINITION>"
+            f"<THE-VALUE><xhtml:div>{text}</xhtml:div></THE-VALUE>"
+            "</ATTRIBUTE-VALUE-XHTML></VALUES>"
+            "</SPEC-OBJECT>"
+        )
+    return (
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        '<REQ-IF xmlns="http://www.omg.org/spec/ReqIF/20110401/reqif.xsd" '
+        'xmlns:xhtml="http://www.w3.org/1999/xhtml">\n'
+        "<CORE-CONTENT><REQ-IF-CONTENT>\n"
+        '<DATATYPES><DATATYPE-DEFINITION-XHTML IDENTIFIER="_dt" LONG-NAME="XHTML"/>'
+        "</DATATYPES>\n"
+        f"<SPEC-TYPES>{''.join(types)}</SPEC-TYPES>\n"
+        f"<SPEC-OBJECTS>{''.join(specs)}</SPEC-OBJECTS>\n"
+        "</REQ-IF-CONTENT></CORE-CONTENT>\n"
+        "</REQ-IF>\n"
+    )
+
+
+def _read_automotive(path):
+    with path.open(encoding="utf-8", newline="") as handle:
+        reader = csv.DictReader(handle)
+        assert reader.fieldnames == AUTOMOTIVE_COLUMNS
+        return list(reader)
+
+
+def test_automotive_dbc_and_reqif_fixtures_yield_rows_and_do_not_split_a_source(tmp_path, capsys, monkeypatch):
+    """TP-01: the DBC fixture and a ReqIF fixture yield rows.
+
+    One source_id is never in both sheets. The old readers-missing refusal is gone.
+    The stock fixture texts sit outside the 80 to 1,500 window, and the 40-file
+    stop is unchanged, so the folder also holds in-window ReqIF requirements.
+    """
+    assert 80 <= len(_PASSAGE) <= 1500
+    dbc = _load_reader_fixture("test_reader_dbc", "DBC")
+    reqif = _load_reader_fixture("test_reader_reqif", "REQIF")
     root = tmp_path / "corpus"
-    root.mkdir()
-    with pytest.raises(RuntimeError) as exc:
-        run(root, tmp_path / "out", seed="1", items=4, corpus="automotive")
-    message = str(exc.value).lower()
-    assert "dbc" in message
-    assert "pdf" in message
-    assert "reqif" in message
-    assert "arxml" in message
+    (root / "fixtures").mkdir(parents=True)
+    (root / "fixtures" / "vehicle.dbc").write_text(dbc, encoding="utf-8")
+    (root / "fixtures" / "requirements.reqif").write_text(reqif, encoding="utf-8")
+    (root / "kinds").mkdir()
+    (root / "kinds" / "extra.reqif").write_text(
+        _reqif([
+            ("long-heading", "Heading", _PASSAGE),
+            ("long-definition", "Definition", _PASSAGE),
+        ]),
+        encoding="utf-8",
+    )
+    eligible = [f"pool/s{index:02d}.reqif" for index in range(39)]
+    eligible += ["left/shared.reqif", "right/shared.reqif"]
+    (root / "pool").mkdir()
+    for index in range(39):
+        (root / "pool" / f"s{index:02d}.reqif").write_text(
+            _reqif([(f"s{index:02d}", "Requirement", _PASSAGE)]),
+            encoding="utf-8",
+        )
+    (root / "left").mkdir()
+    (root / "right").mkdir()
+    (root / "left" / "shared.reqif").write_text(
+        _reqif([("shared-left", "Requirement", _PASSAGE)]),
+        encoding="utf-8",
+    )
+    (root / "right" / "shared.reqif").write_text(
+        _reqif([("shared-right", "Requirement", _PASSAGE)]),
+        encoding="utf-8",
+    )
+    seed = None
+    for candidate in range(1, 200):
+        ordered = sorted(eligible, key=lambda relative: file_rank(str(candidate), relative))
+        left = ordered.index("left/shared.reqif")
+        right = ordered.index("right/shared.reqif")
+        if (left + 1) % 4 != (right + 1) % 4:
+            seed = str(candidate)
+            break
+    assert seed is not None
+
+    from grap_mcp.ingest import _READERS
+
+    seen = []
+
+    def _watch(suffix, reader):
+        def wrapped(path, corpus_root=None):
+            seen.append((suffix, Path(path).name))
+            return reader(path, corpus_root=corpus_root)
+        return wrapped
+
+    monkeypatch.setitem(_READERS, ".dbc", _watch(".dbc", _READERS[".dbc"]))
+    monkeypatch.setitem(_READERS, ".reqif", _watch(".reqif", _READERS[".reqif"]))
+
+    out = tmp_path / "out"
+    run(root, out, seed=seed, items=41, corpus="automotive")
+    assert (".dbc", "vehicle.dbc") in seen
+    assert (".reqif", "requirements.reqif") in seen
+    open_rows = _read_automotive(out / "open" / "statements.csv")
+    sealed_rows = _read_automotive(out / "sealed" / "statements.csv")
+    rows = open_rows + sealed_rows
+    assert open_rows and sealed_rows
+    open_ids = {row["source_id"] for row in open_rows}
+    sealed_ids = {row["source_id"] for row in sealed_rows}
+    assert open_ids.isdisjoint(sealed_ids)
+    shared_open = [row["item_id"] for row in open_rows if row["source_id"] == "shared"]
+    shared_sealed = [row["item_id"] for row in sealed_rows if row["source_id"] == "shared"]
+    assert (shared_open and not shared_sealed) or (shared_sealed and not shared_open)
+    assert set(shared_open + shared_sealed) == {"shared-left", "shared-right"}
+    got_ids = {row["item_id"] for row in rows}
+    assert "EngineData" not in got_ids
+    assert "long-heading" not in got_ids and "long-definition" not in got_ids
+    assert "_parent" not in got_ids and "_brake" not in got_ids
+    assert "vehicle" not in open_ids | sealed_ids
+    assert "requirements" not in open_ids | sealed_ids
+    for row in rows:
+        assert row["packet_id"] == f"{row['source_id']}#{row['item_id']}"
+        assert row["passage"] == _PASSAGE
+        assert all(row[column] == "" for column in AUTOMOTIVE_LABELS)
+    printed = capsys.readouterr().out
+    assert f"source_files={41}" in printed
+    assert f"rows={len(rows)}" in printed
+    assert f"sealed_rows={len(sealed_rows)}" in printed
+    manifest = json.loads((out / "manifest.json").read_text(encoding="utf-8"))
+    assert manifest["corpus"] == "automotive"
+    assert manifest["seed"] == seed
+    assert set(manifest["sealed_ids"]) == sealed_ids
+    script = Path(__file__).resolve().parents[2] / "scripts" / "make_gold_packet.py"
+    assert "readers that are not implemented" not in script.read_text(encoding="utf-8")
 
 
 def test_generator_does_not_call_source_units():

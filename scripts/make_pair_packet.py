@@ -431,8 +431,14 @@ def _write_csv(path: Path, rows: list[dict[str, str]]) -> None:
 def build_packet(corpus_root: Path, corpus: str, seed: str, items: int, out: Path,
                  embedder=None) -> None:
     if corpus == "automotive":
-        statements.build_packet(corpus_root, corpus, str(seed), items, out)
-        return
+        # Sheet 2 stays on the old refusal until TP-02. Sheet 1 no longer raises.
+        raise RuntimeError(
+            "automotive corpus requires Part D SourceItem readers that are not implemented: "
+            "R-02 DBC reader (mcp-server/grap_mcp/readers/dbc.py); "
+            "R-03 specification PDF reader (readers/spec_pdf.py); "
+            "R-04 ReqIF reader (readers/reqif.py); "
+            "R-05 ARXML reader"
+        )
     if corpus != "law-ro":
         raise RuntimeError(f"unknown corpus: {corpus}")
     root = Path(corpus_root)
