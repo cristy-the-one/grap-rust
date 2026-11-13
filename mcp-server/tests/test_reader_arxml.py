@@ -12,6 +12,9 @@ resolve, and the six categories sum to references_seen.
 AR-04: every identifiable element is a SourceItem. Scalar leaves become
 attributes, each owned reference that emits a link becomes refers_to, and
 dangling or undefined targets become one unresolved placeholder each.
+
+AR-05: an -IREF with exactly one TARGET- child is one refers_to link.
+Its other children are that link's context. Any other -IREF is malformed.
 """
 
 import hashlib
@@ -1322,3 +1325,146 @@ def test_short_name_is_not_also_an_attribute():
     assert item.attributes["short_name"] == "Signal1"
     assert item.attributes["START-POSITION"] == "36"
     assert item.attributes["PACKING-BYTE-ORDER"] == "MOST-SIGNIFICANT-BYTE-FIRST"
+
+
+def test_iref_with_two_context_children_is_one_link(tmp_path: Path):
+    """One -IREF with two context children and one target is one link.
+
+    The target sits between the context children, so context order is the
+    document order of the other children. Each child is still classified.
+    A sibling reference on the same item stays its own link.
+    """
+    path = _write_arxml(
+        tmp_path,
+        "iref.arxml",
+        """\
+        <COMPOSITION-SW-COMPONENT-TYPE>
+          <SHORT-NAME>Comp</SHORT-NAME>
+          <CONNECTORS>
+            <ASSEMBLY-SW-CONNECTOR>
+              <SHORT-NAME>GoodConn</SHORT-NAME>
+              <PROVIDER-IREF>
+                <CONTEXT-COMPONENT-REF DEST="SW-COMPONENT-PROTOTYPE">/P/ProtoA</CONTEXT-COMPONENT-REF>
+                <TARGET-P-PORT-REF DEST="P-PORT-PROTOTYPE">/P/PortTarget</TARGET-P-PORT-REF>
+                <CONTEXT-PORT-REF DEST="P-PORT-PROTOTYPE">/P/PortA</CONTEXT-PORT-REF>
+              </PROVIDER-IREF>
+              <MAPPING-REF DEST="SWC-TO-ECU-MAPPING">/P/Map</MAPPING-REF>
+            </ASSEMBLY-SW-CONNECTOR>
+          </CONNECTORS>
+        </COMPOSITION-SW-COMPONENT-TYPE>
+""",
+        None,
+    )
+    items, report = read_arxml([path], source_id="iref")
+    good = next(item for item in items if item.item_id == "/P/Comp/GoodConn")
+
+    assert good.links == [
+        _part_of("/P/Comp"),
+        SourceLink(
+            type="refers_to",
+            target_id="/P/PortTarget",
+            role="PROVIDER-IREF",
+            context=["/P/ProtoA", "/P/PortA"],
+        ),
+        _refers("/P/Map", "MAPPING-REF"),
+    ]
+    assert report["references_seen"] == 4
+    assert report["dangling"] == 4
+    assert _category_sum(report) == report["references_seen"]
+    iref_children = [ref for ref in report["references"] if ref.iref == "PROVIDER-IREF"]
+    assert [ref.role for ref in iref_children] == [
+        "CONTEXT-COMPONENT-REF",
+        "TARGET-P-PORT-REF",
+        "CONTEXT-PORT-REF",
+    ]
+    assert [ref.target for ref in iref_children] == [
+        "/P/ProtoA",
+        "/P/PortTarget",
+        "/P/PortA",
+    ]
+    assert all(ref.category == "dangling" for ref in iref_children)
+    unresolved = [
+        item.item_id for item in items if item.kind_hint == "unresolved"
+    ]
+    assert unresolved == ["/P/ProtoA", "/P/PortTarget", "/P/PortA", "/P/Map"]
+    assert report["malformed_irefs"] == 0
+    assert report["entries"]["malformed_irefs"] == ()
+
+
+def test_iref_without_exactly_one_target_is_malformed(tmp_path: Path):
+    """An -IREF with no TARGET- child, two, or none is malformed.
+
+    Its DEST children are ordinary links. The list keeps at most 50 entries;
+    the count is the total.
+    """
+    extras = "\n".join(
+        f"""\
+            <ASSEMBLY-SW-CONNECTOR>
+              <SHORT-NAME>E{i}</SHORT-NAME>
+              <EMPTY-IREF></EMPTY-IREF>
+            </ASSEMBLY-SW-CONNECTOR>"""
+        for i in range(51)
+    )
+    path = _write_arxml(
+        tmp_path,
+        "malformed.arxml",
+        f"""\
+        <COMPOSITION-SW-COMPONENT-TYPE>
+          <SHORT-NAME>Comp</SHORT-NAME>
+          <CONNECTORS>
+            <ASSEMBLY-SW-CONNECTOR>
+              <SHORT-NAME>BadConn</SHORT-NAME>
+              <REQUESTER-IREF>
+                <CONTEXT-COMPONENT-REF DEST="SW-COMPONENT-PROTOTYPE">/P/ProtoB</CONTEXT-COMPONENT-REF>
+                <CONTEXT-PORT-REF DEST="R-PORT-PROTOTYPE">/P/PortB</CONTEXT-PORT-REF>
+              </REQUESTER-IREF>
+            </ASSEMBLY-SW-CONNECTOR>
+            <ASSEMBLY-SW-CONNECTOR>
+              <SHORT-NAME>TwoConn</SHORT-NAME>
+              <INNER-PORT-IREF>
+                <TARGET-PORT-REF DEST="P-PORT-PROTOTYPE">/P/T1</TARGET-PORT-REF>
+                <CONTEXT-COMPONENT-REF DEST="SW-COMPONENT-PROTOTYPE">/P/C</CONTEXT-COMPONENT-REF>
+                <TARGET-PORT-REF DEST="R-PORT-PROTOTYPE">/P/T2</TARGET-PORT-REF>
+              </INNER-PORT-IREF>
+            </ASSEMBLY-SW-CONNECTOR>
+            <ASSEMBLY-SW-CONNECTOR>
+              <SHORT-NAME>EmptyConn</SHORT-NAME>
+              <EMPTY-PORT-IREF></EMPTY-PORT-IREF>
+            </ASSEMBLY-SW-CONNECTOR>
+{extras}
+          </CONNECTORS>
+        </COMPOSITION-SW-COMPONENT-TYPE>
+""",
+        None,
+    )
+    items, report = read_arxml([path], source_id="malformed")
+    by_id = {item.item_id: item for item in items}
+
+    assert by_id["/P/Comp/BadConn"].links == [
+        _part_of("/P/Comp"),
+        _refers("/P/ProtoB", "CONTEXT-COMPONENT-REF"),
+        _refers("/P/PortB", "CONTEXT-PORT-REF"),
+    ]
+    assert by_id["/P/Comp/TwoConn"].links == [
+        _part_of("/P/Comp"),
+        _refers("/P/T1", "TARGET-PORT-REF"),
+        _refers("/P/C", "CONTEXT-COMPONENT-REF"),
+        _refers("/P/T2", "TARGET-PORT-REF"),
+    ]
+    assert by_id["/P/Comp/EmptyConn"].links == [_part_of("/P/Comp")]
+
+    assert report["references_seen"] == 5
+    assert report["dangling"] == 5
+    assert _category_sum(report) == report["references_seen"]
+    # 3 named malformed instance references, plus 51 empty ones.
+    assert report["malformed_irefs"] == 54
+    entries = report["entries"]["malformed_irefs"]
+    assert len(entries) == 50
+    assert [(entry.owner, entry.role, entry.file) for entry in entries[:3]] == [
+        ("/P/Comp/BadConn", "REQUESTER-IREF", path.as_posix()),
+        ("/P/Comp/TwoConn", "INNER-PORT-IREF", path.as_posix()),
+        ("/P/Comp/EmptyConn", "EMPTY-PORT-IREF", path.as_posix()),
+    ]
+    assert entries[3].owner == "/P/Comp/E0"
+    assert entries[-1].owner == "/P/Comp/E46"
+    assert all(entry.owner != "/P/Comp/E50" for entry in entries)
