@@ -1,11 +1,13 @@
 """ARXML reader: refusals, the identity index, references, and items.
 
-Implements §3, §4.1 steps 1, 2, 3, and 5, §4.2, §4.3, §4.5, §5, and §6 of
-docs/spec-arxml-reader.md. `read_arxml` returns `(items, report)`.
+Implements §3, §4.1 steps 1, 2, 3, and 5, §4.2, §4.3, §4.4, §4.5, §5, and §6
+of docs/spec-arxml-reader.md. `read_arxml` returns `(items, report)`.
 Release text on an item comes from §7. An -IREF with exactly one TARGET-
 child is one refers_to link (§4.5). An ECUC-CONTAINER-VALUE also carries
 param.* attributes. A VALUE-REF under its REFERENCE-VALUES takes its link
-role from the DEFINITION-REF (§6).
+role from the DEFINITION-REF (§6). A repeated path is recorded under
+split_elements or path_conflicts (§4.4). Two packages at the same path are
+merged and not recorded.
 """
 
 from __future__ import annotations
@@ -74,6 +76,27 @@ class MalformedIref:
     file: str
     owner: str
     role: str
+
+
+@dataclass(frozen=True)
+class SplitElement:
+    """Same path and tag, not a package. The first occurrence keeps its text."""
+
+    path: str
+    tag: str
+    first_file: str
+    other_file: str
+
+
+@dataclass(frozen=True)
+class PathConflict:
+    """Same path, different tags. The first occurrence keeps the index tag."""
+
+    path: str
+    first_file: str
+    first_tag: str
+    other_file: str
+    other_tag: str
 
 
 @dataclass(frozen=True)
@@ -248,23 +271,30 @@ def read_arxml(
     Returns `(items, report)`. Items are one SourceItem per identifiable, in
     first-occurrence order, then one placeholder per distinct dangling or
     undefined target. The report counts every reference. Each list in it holds
-    at most 50 entries. `malformed_irefs` counts -IREF elements that do not
-    have exactly one TARGET- child. An ECUC-CONTAINER-VALUE also gains §6
-    parameter attributes, and a qualifying VALUE-REF link uses the
-    definition's last path segment as its role. A refusal raises `ArxmlError`
-    and returns nothing.
+    at most 50 entries; the counts are the totals. `malformed_irefs` counts
+    -IREF elements that do not have exactly one TARGET- child. An
+    ECUC-CONTAINER-VALUE also gains §6 parameter attributes, and a qualifying
+    VALUE-REF link uses the definition's last path segment as its role. A
+    later element at a path already in the index is a split when the tag
+    matches and is not a package, and a path conflict when the tag differs
+    (§4.4). Two packages at one path are merged and not recorded. A refusal
+    raises `ArxmlError` and returns nothing.
     """
     files = sorted((Path(path) for path in paths), key=lambda path: path.as_posix())
     index: dict[str, str] = {}
+    first_files: dict[str, str] = {}
     bases: list[ReferenceBase] = []
     seen: list[_SeenReference] = []
     raw_items: list[_RawItem] = []
     iref_groups: list[_IrefGroup] = []
+    splits: list[SplitElement] = []
+    conflicts: list[PathConflict] = []
     for path in files:
         root, digest = _root(path)
         _walk(
             root, "", "", [], None, index, bases, seen, path.as_posix(),
             raw_items, _release(root), digest, None, "", iref_groups,
+            first_files, splits, conflicts,
         )
 
     packages = sum(tag == "AR-PACKAGE" for tag in index.values())
@@ -297,6 +327,8 @@ def read_arxml(
     )
     listed = {name: tuple(entries[name]) for name in _ENTRY_CATEGORIES}
     listed["malformed_irefs"] = tuple(malformed[:_ENTRY_LIMIT])
+    listed["split_elements"] = tuple(splits[:_ENTRY_LIMIT])
+    listed["path_conflicts"] = tuple(conflicts[:_ENTRY_LIMIT])
 
     report = {
         "source_id": source_id,
@@ -306,6 +338,8 @@ def read_arxml(
         "references_seen": len(references),
         **counts,
         "base_declarations": len(bases),
+        "split_elements": len(splits),
+        "path_conflicts": len(conflicts),
         "bases": tuple(bases[:_ENTRY_LIMIT]),
         "references": references[:_ENTRY_LIMIT],
         "entries": listed,
@@ -404,6 +438,9 @@ def _walk(
     iref_group: int | None,
     iref_owner: str,
     iref_groups: list[_IrefGroup],
+    first_files: dict[str, str],
+    splits: list[SplitElement],
+    conflicts: list[PathConflict],
     config_role: str | None = None,
     config_owner: str = "",
 ) -> None:
@@ -418,10 +455,11 @@ def _walk(
         parent = owner
         heading = tuple(package.rsplit("/", 1)[-1] for package in packages)
         path = f"{path}/{short}"
-        # First occurrence wins. A later element at this path is still walked
-        # so its children are indexed (§4.4, applied when a path repeats).
+        # First occurrence wins (§4.4). A later element is still walked, so
+        # its children are indexed and its references are kept.
         if path not in index:
             index[path] = local
+            first_files[path] = file_name
             raw_items.append(_RawItem(
                 path=path,
                 tag=local,
@@ -433,6 +471,11 @@ def _walk(
                 release=release,
                 sha256=digest,
             ))
+        else:
+            _note_repeat(
+                path, local, index[path], first_files[path], file_name,
+                splits, conflicts,
+            )
         owner = path
         if local == "AR-PACKAGE":
             packages = [*packages, path]
@@ -487,8 +530,38 @@ def _walk(
             child, path, owner, packages, child_iref,
             index, bases, seen, file_name, raw_items, release, digest,
             child_group, child_owner, iref_groups,
+            first_files, splits, conflicts,
             child_config_role, child_config_owner,
         )
+
+
+def _note_repeat(
+    path: str,
+    tag: str,
+    first_tag: str,
+    first_file: str,
+    other_file: str,
+    splits: list[SplitElement],
+    conflicts: list[PathConflict],
+) -> None:
+    """§4.4. Two packages at one path merge. Any other repeat is recorded."""
+    if tag == "AR-PACKAGE" and first_tag == "AR-PACKAGE":
+        return
+    if tag == first_tag:
+        splits.append(SplitElement(
+            path=path,
+            tag=tag,
+            first_file=first_file,
+            other_file=other_file,
+        ))
+        return
+    conflicts.append(PathConflict(
+        path=path,
+        first_file=first_file,
+        first_tag=first_tag,
+        other_file=other_file,
+        other_tag=tag,
+    ))
 
 
 def _classify(
