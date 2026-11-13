@@ -444,13 +444,24 @@ def _held_sheet_mentions(text):
         start = found + 1
 
 
+# The scorer is the only reader of held sheets. The packet generator is the
+# only writer: it creates them and never opens one for reading.
+_HELD_SHEET_FILES = {"score_gold.py", "make_gold_packet.py"}
+
+
+def test_packet_generator_never_reads_a_sheet():
+    repo = Path(__file__).resolve().parents[2]
+    text = (repo / "scripts" / "make_gold_packet.py").read_text(encoding="utf-8")
+    assert "DictReader" not in text and "csv.reader" not in text
+
+
 def test_only_score_gold_py_mentions_held_sheet_paths():
-    """Every .py under mcp-server/ and scripts/ except the scorer."""
+    """Every .py under mcp-server/ and scripts/ except the reader and the writer."""
     repo = Path(__file__).resolve().parents[2]
     hits = []
     for base in ("mcp-server", "scripts"):
         for path in (repo / base).rglob("*.py"):
-            if path.name == "score_gold.py":
+            if path.name in _HELD_SHEET_FILES:
                 continue
             text = path.read_text(encoding="utf-8", errors="replace")
             if _held_sheet_mentions(text):
@@ -509,7 +520,9 @@ def test_sealed_flag_appends_one_access_log_line(tmp_path, capsys):
     assert summary == " ".join(captured.out.splitlines())
     scored = score_gold.score(corpus, payload, sealed=True)
     assert scored["statements_recall"] == 0.0
-    assert scored["statements_precision"] == 0.0
+    # The system's only claim is about a document outside the sealed sheet,
+    # so there is nothing to compute precision from.
+    assert scored["statements_precision"] == "n/a"
     assert "statements_recall=0.0000000000" in summary
     assert f"pairs_unclear={scored['pairs_unclear']}" in summary
 
@@ -527,8 +540,10 @@ def test_statement_match_requires_source_and_item(tmp_path):
     """The same article label in two acts is not one statement."""
     folder = tmp_path / "packet"
     _write_csv(folder / "open" / "statements.csv", _STATEMENT_COLUMNS, [
+        _statement("act-a", "Articolul 1", "obligation", "the ministry"),
         _statement("act-b", "Articolul 1", "obligation", "the bank"),
     ])
+    # Matching on the label alone would pair this claim with act-b's row.
     crossed = score_gold.score(folder, {"statements": [{
         "source_id": "act-a", "item_id": "Articolul 1", "kind": "obligation", "subject": "the bank",
     }]})
@@ -539,7 +554,8 @@ def test_statement_match_requires_source_and_item(tmp_path):
         "source_id": "act-b", "item_id": "Articolul 1", "kind": "obligation", "subject": "the bank",
     }]})
     assert same["statements_precision"] == 1.0
-    assert same["statements_recall"] == 1.0
+    # One of the two gold rows is found; act-a's row has no matching claim.
+    assert same["statements_recall"] == 0.5
 
 
 def test_refuses_blank_kind_bad_label_and_empty_where(tmp_path, capsys):
@@ -623,8 +639,9 @@ def test_metrics_carry_counts_and_empty_is_na(tmp_path, capsys):
     assert nothing["statements_recall"] == "n/a"
     assert nothing["statements_f1"] == "n/a"
     assert nothing["statements_n_gold"] == 0
-    assert nothing["statements_n_pred"] == 1
-    assert nothing["statements_n_docs"] == 1
+    # The claim is about a document that is in no sheet, so it is left out.
+    assert nothing["statements_n_pred"] == 0
+    assert nothing["statements_n_docs"] == 0
 
     system_path = tmp_path / "system.json"
     system_path.write_text("{}", encoding="utf-8")
@@ -678,9 +695,10 @@ def test_sealed_flag_reads_sealed_only(tmp_path, capsys):
         "source_id": "open-doc", "item_id": "art-1", "kind": "obligation", "subject": "the bank",
     }]}
     held = score_gold.score(folder, system, sealed=True)
-    # Only the unmatched sealed row is gold. The open prediction does not match it.
+    # Only the unmatched sealed row is gold. The open-document prediction is
+    # outside the sealed sheet, so it is left out rather than counted wrong.
     assert held["statements_recall"] == 0.0
-    assert held["statements_precision"] == 0.0
+    assert held["statements_precision"] == "n/a"
     system_path = tmp_path / "system.json"
     system_path.write_text(json.dumps(system), encoding="utf-8")
     score_gold.main(["--gold", str(folder), "--system", str(system_path), "--sealed"])
@@ -750,13 +768,31 @@ def test_unwritable_access_log_scores_nothing(tmp_path, capsys):
     ])
     system_path = corpus / "system.json"
     system_path.write_text("{}", encoding="utf-8")
-    tmp_path.chmod(0o555)
-    try:
-        with pytest.raises(SystemExit) as caught:
-            score_gold.main(["--gold", str(corpus), "--system", str(system_path), "--sealed"])
-        assert caught.value.code == 1
-    finally:
-        tmp_path.chmod(0o755)
+    # A directory where the log file should be makes the log unwritable on
+    # every platform. Directory permission bits do not do that on Windows.
+    (tmp_path / "ACCESS.log").mkdir()
+    with pytest.raises(SystemExit) as caught:
+        score_gold.main(["--gold", str(corpus), "--system", str(system_path), "--sealed"])
+    assert caught.value.code == 1
     captured = capsys.readouterr()
     assert captured.out == ""
-    assert not (tmp_path / "ACCESS.log").exists()
+    assert (tmp_path / "ACCESS.log").is_dir()
+
+
+def test_predictions_for_documents_outside_the_scored_sheet_are_ignored(tmp_path):
+    """A system normally outputs claims for every document. Claims about a
+    document that is not in the sheet being scored (for example a sealed
+    document during an open run) cannot be judged and must not count as
+    false positives."""
+    corpus = tmp_path / "x"
+    _write_csv(corpus / "open" / "statements.csv", _STATEMENT_COLUMNS, [
+        _statement("open-doc", "art-1", "obligation", "the bank"),
+    ])
+    system = {"statements": [
+        {"source_id": "open-doc", "item_id": "art-1", "kind": "obligation", "subject": "the bank"},
+        {"source_id": "held-doc", "item_id": "art-9", "kind": "prohibition", "subject": "the ministry"},
+    ]}
+    result = score_gold.score(corpus, system)
+    assert result["statements_precision"] == 1.0
+    assert result["statements_n_pred"] == 1
+    assert result["statements_n_docs"] == 1

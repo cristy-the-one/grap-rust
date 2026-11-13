@@ -193,11 +193,16 @@ def _score_statements(rows: list[dict], predicted: list[dict]) -> dict:
         "kind": row.get("kind") or "",
         "subject": row.get("subject") or "",
     } for row in predicted]
-    precision, recall, f1 = _prf(*_match_statements(gold, preds))
     gold_by = defaultdict(list)
     pred_by = defaultdict(list)
     for row in gold:
         gold_by[row["source_id"]].append(row)
+    # A system normally emits claims for every document. Claims about a
+    # document that is not in the sheet being scored (a sealed document during
+    # an open run, or the reverse) cannot be judged, so they are left out
+    # rather than counted as false positives.
+    preds = [row for row in preds if row["source_id"] in gold_by]
+    precision, recall, f1 = _prf(*_match_statements(gold, preds))
     for row in preds:
         pred_by[row["source_id"]].append(row)
     n_gold = len(gold)
