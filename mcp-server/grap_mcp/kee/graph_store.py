@@ -14,13 +14,48 @@ import sqlite3
 from dataclasses import dataclass, field
 from typing import Dict, List, Tuple
 
+
+def _migrate_edges_include_relation(c) -> None:
+    """Rebuild `edges` so the relation type is part of the primary key.
+
+    The previous key was (from_id, to_id), so a second relation between the
+    same nodes replaced the first. One pair has to be able to carry several
+    (`about` and `refers_to`; `sends` and `receives`). A store already on the
+    new key is left untouched, so a run that committed the rebuild but not
+    user_version can be repeated, and so can a fresh database whose first
+    migration already created the new key.
+    """
+    info = list(c.execute("PRAGMA table_info(edges)"))
+    pk = [row["name"] for row in sorted(info, key=lambda row: row["pk"]) if row["pk"]]
+    if pk == ["from_id", "to_id", "type"]:
+        return
+    # One transaction: a failure rolls the old table back into place.
+    c.executescript(
+        """
+        BEGIN;
+        DROP TABLE IF EXISTS edges_with_relation;
+        CREATE TABLE edges_with_relation (
+            from_id INTEGER,
+            to_id INTEGER,
+            type TEXT,
+            PRIMARY KEY(from_id, to_id, type)
+        );
+        INSERT INTO edges_with_relation (from_id, to_id, type)
+            SELECT from_id, to_id, type FROM edges;
+        DROP TABLE edges;
+        ALTER TABLE edges_with_relation RENAME TO edges;
+        COMMIT;
+        """
+    )
+
+
 _MIGRATIONS = [
     lambda c: c.executescript(
         """
         CREATE TABLE IF NOT EXISTS concepts (concept_id INTEGER PRIMARY KEY, canonical TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS aliases (concept_id INTEGER, alias TEXT, PRIMARY KEY(concept_id, alias));
         CREATE TABLE IF NOT EXISTS characteristics (concept_id INTEGER, text TEXT, PRIMARY KEY(concept_id, text));
-        CREATE TABLE IF NOT EXISTS edges (from_id INTEGER, to_id INTEGER, type TEXT, PRIMARY KEY(from_id, to_id));  -- one edge type per (from,to) pair; matches WorkingGraph._edge_types
+        CREATE TABLE IF NOT EXISTS edges (from_id INTEGER, to_id INTEGER, type TEXT, PRIMARY KEY(from_id, to_id, type));
         CREATE TABLE IF NOT EXISTS chunks (chunk_id TEXT PRIMARY KEY, content_hash TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS concept_hashes (concept_id INTEGER PRIMARY KEY, content_hash TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS concept_sources (concept_id INTEGER, chunk_id TEXT, PRIMARY KEY(concept_id, chunk_id));
@@ -54,6 +89,7 @@ _MIGRATIONS = [
     lambda c: c.execute(
         "CREATE TABLE IF NOT EXISTS extractions (chunk_id TEXT PRIMARY KEY, record TEXT NOT NULL)"
     ),
+    _migrate_edges_include_relation,
 ]
 
 SCHEMA_VERSION = len(_MIGRATIONS)
@@ -110,7 +146,7 @@ class GraphStore:
             "concepts": (1, list(state.concepts.items())),
             "aliases": (2, [(cid, a) for cid, al in state.aliases.items() for a in al]),
             "characteristics": (2, [(cid, t) for cid, ts in state.chars.items() for t in ts]),
-            "edges": (2, [tuple(e) for e in state.edges]),
+            "edges": (3, [tuple(e) for e in state.edges]),
             "chunks": (1, list(state.manifest.items())),
             "concept_hashes": (1, list(state.concept_hashes.items())),
             "concept_sources": (2, [(cid, ch) for cid, chs in state.concept_sources.items() for ch in chs]),
