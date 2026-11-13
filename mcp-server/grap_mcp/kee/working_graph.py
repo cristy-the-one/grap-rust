@@ -67,13 +67,29 @@ def _contains_identifier(name: str) -> bool:
     return any(_token_is_strong_identifier(token) for token in tokens)
 
 
-def _relation_properties(rel_type: str) -> dict:
-    """Engine encoding: the relation is the property name, value true.
+_SCHEMA_RELATION_NAMES: Optional[frozenset] = None
 
-    Legacy projections stored ``{"rel": "<verb>"}``. The property name is what
-    the engine prunes on, so each relation has to be its own name.
+
+def _schema_relation_names() -> frozenset:
+    """The closed relation vocabulary. Loaded once from the automotive schema."""
+    global _SCHEMA_RELATION_NAMES
+    if _SCHEMA_RELATION_NAMES is None:
+        from grap_mcp.schema.loader import load_automotive_schema
+        _SCHEMA_RELATION_NAMES = frozenset(
+            relation.name for relation in load_automotive_schema().relations)
+    return _SCHEMA_RELATION_NAMES
+
+
+def _relation_properties(rel_type: str) -> dict:
+    """Engine encoding of one stored relation.
+
+    A schema relation is the property name, value true. Any other verb is
+    ``{"refers_to": True, "role": <verb>}``. The engine allows 64 property
+    names in total, and free-text verbs are not a closed set.
     """
-    return {rel_type: True}
+    if rel_type in _schema_relation_names():
+        return {rel_type: True}
+    return {"refers_to": True, "role": rel_type}
 
 
 @dataclass
@@ -1069,7 +1085,7 @@ class WorkingGraph:
                              _relation_properties(e["type"]))
 
     def migrate_edge_encoding(self) -> dict:
-        """Rewrite projected edges from ``{"rel": verb}`` to ``{verb: true}``.
+        """Rewrite projected edges from ``{"rel": verb}`` to the schema encoding.
 
         The relation list is the authority — the sqlite store keeps the verb
         in the edge row, and ``open`` rebuilds a fresh projection from it.

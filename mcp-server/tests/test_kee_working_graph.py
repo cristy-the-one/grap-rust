@@ -139,6 +139,30 @@ def test_migrate_empty_graph_prints_zero_denominator(tmp_path, capsys):
     assert wg.kg.edge_count() == 0
 
 
+def test_seventy_free_verbs_are_accepted_and_retrievable_by_role(tmp_path):
+    """A verb outside the schema is refers_to with that verb as role.
+
+    Seventy distinct free verbs stay under the engine's 64 property-name
+    limit, and each edge is found again by its role.
+    """
+    from grap_mcp.schema.loader import load_automotive_schema
+    schema = {relation.name for relation in load_automotive_schema().relations}
+    verbs = [f"free_verb_{i:02d}" for i in range(70)]
+    assert schema.isdisjoint(verbs)
+    outcomes = [{"name": "Hub", "characteristics": []}]
+    outcomes += [{"name": f"Target {i:02d}", "characteristics": []} for i in range(70)]
+    relations = [{"from": "Hub", "type": verb, "to": f"Target {i:02d}"}
+                 for i, verb in enumerate(verbs)]
+    wg = _wg(tmp_path, merge_threshold=0.95)
+    wg.upsert_fragment({"source": "s#0", "outcomes": outcomes, "relations": relations}, "s#0")
+    assert len(wg.relations) == 70
+    src = wg._concept_to_node[wg.relations[0]["from_id"]]
+    by_type = {edge["type"]: edge for edge in wg.relations}
+    for verb in verbs:
+        dst = wg._concept_to_node[by_type[verb]["to_id"]]
+        assert wg.kg.neighbors_by_relation(src, "role", verb) == [(dst, 1.0)]
+
+
 def test_relation_with_ungrounded_endpoint_is_parked(tmp_path):
     wg = _wg(tmp_path, merge_threshold=0.95)
     frag = {
