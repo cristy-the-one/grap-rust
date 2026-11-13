@@ -1,0 +1,9 @@
+415aca333d9f724f5f8ef98fc8b21d7cf69891429b266830e915b0a2b6ab4356 *ecu-extract-4.2.arxml
+ca9f5d128d17420cec526d3d5a8b1d7463d31f145607823a2fa0cf25f3ac4fbc *system-3.2.3.arxml
+c6bf5671279bc7ec4f81ebbe48f430d5a7049abd04fbf279c8080a193c973fb2 *system-4.2.arxml
+c16f45ca2dfc33dc6d1be315632f749d57e44a24792a4b0f5aa10381b717cbe3 *system-DAI-3.1.2.arxml
+acd4f84e555a90e5bf76fb63656a6f82885861dc98d868d5c26cc092b9821576 *system-bad-root-tag-4.2.arxml
+f7466d09a93f880e3ddac8b6ca81ce258414084a66d0df7f8d49b8b5137c2a66 *system-dangling-reference-4.2.arxml
+7224ae12d82c9f8000ffe3a035daba576dc98e985d68f7c16901d463ce1dcd34 *system-illegal-namespace-4.2.arxml
+2d0c5942c3cc852f0e4afa529bedfbbbeb66c061d3f23e6aefc900003dc0202d *system-illegal-version-4.2.2.1.0.arxml
+9a3b04529eb213a90aa6ab920748d1b4b10e498b11e8e229dda1726ae01dd7b6 *system-missing-factor-4.2.arxml

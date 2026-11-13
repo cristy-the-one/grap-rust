@@ -210,6 +210,11 @@ read-only query change the graph. *Validity over time* is expressed by `scope` a
 **Encoding.** The relation is the property **name**, with value `true` — not the current
 `{"rel": "<verb>"}`. That is what lets the engine prune by relation in constant time.
 
+**Only the 30 relations of §4 may be property names.** Text extraction still produces free verbs,
+and the engine refuses the 65th distinct name. Any verb that is not one of the 30 is written as
+`{"refers_to": true, "role": "<verb>"}` — rule 2 of §1 applied to edges. Nothing is lost and the
+name budget cannot be exhausted.
+
 ---
 
 ## 7. What happens to things that do not fit
@@ -360,10 +365,10 @@ confirmed with the inventory tool on real files before the projection relies on 
 | Card | Tag | Does |
 |---|---|---|
 | **S-01** Schema as data | [S] | Transcribe §3, §4 and §8 into `mcp-server/grap_mcp/schema/automotive.yaml`, with a loader. Test: 22 node types, 30 relations, every relation's ends are known types. |
-| **S-02** Validator | [S] | Given a node type pair and a relation, say allowed or not, per §4. Test: one allowed and one refused example per relation. |
+| **S-02** Validator | [S] | Given a node type pair and a relation, say allowed or not, per §4. Loads the schema once; raises on a type or relation the schema does not contain. Test: one allowed and one refused example per relation; an unknown name raises. |
 | **S-03** Projection | [M] | Turn `SourceItem`s into typed nodes and edges per §5 and §8, with the four counts of §7. Test first on the ARXML fixtures: `/ISignalIPdu/message1/Signal1` yields one `part_of` edge from a `Signal` to a `Pdu`, and no node for the mapping object. |
 | **S-04** The eight questions | [M] | One executable check per row of §9, on fixture data. Needs S-03. |
-| **S-05** Edge encoding | [M] | Relation as property name (§6), with a migration for existing graphs. Touches `working_graph.py`; **not** the Rust engine. |
+| **S-05** Edge encoding | [M] | Relation as property name (§6) **only for the 30 schema relations**; every other verb as `refers_to` with `role`. Migration for existing graphs. Test: 70 distinct free verbs are accepted and each is retrievable by its role. Needs S-01 for the names and E-10 for the edge key. Touches `working_graph.py`; **not** the Rust engine. |
 | **S-06** Statements from text into the schema | **[L]** | Needs the entity-resolution design (E-01) for subjects that have no identifier. |
 
 Order: S-01 → S-02 → S-03 → S-04; S-05 independently. S-03 depends on ARXML cards AR-02 to AR-04.
