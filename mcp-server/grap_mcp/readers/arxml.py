@@ -1,9 +1,9 @@
 """ARXML reader: refusals, the identity index, references, and items.
 
 Implements §3, §4.1 steps 1, 2, 3, and 5, §4.2, §4.3, and §5 of
-docs/spec-arxml-reader.md. `read_arxml` still returns `(index, report)`.
-SourceItems are `report["items"]`. Release text on an item comes from §7.
-Collapsing an instance reference into one link is a later card.
+docs/spec-arxml-reader.md. `read_arxml` returns `(items, report)`.
+Release text on an item comes from §7. Collapsing an instance reference
+into one link is a later card.
 """
 
 from __future__ import annotations
@@ -214,18 +214,16 @@ _KIND_BY_TAG = {
 def read_arxml(
     paths: Sequence[str | Path],
     source_id: str,
-) -> tuple[dict[str, str], dict]:
-    """Index every identifiable element in an AUTOSAR 4.x file set.
+) -> tuple[tuple[SourceItem, ...], dict]:
+    """Read an AUTOSAR 4.x file set into source items.
 
-    Files are read in sorted path order. The index maps each absolute path
-    to the tag of its first occurrence. `source_id` is the caller-supplied
+    Files are read in sorted path order. `source_id` is the caller-supplied
     name of the set; it is recorded on the report and is not read from the files.
 
-    Returns `(index, report)`. The report counts every reference and classifies
-    it into exactly one §4.3 category. `report["items"]` is one SourceItem per
-    identifiable, in first-occurrence order, then one placeholder per distinct
-    dangling or undefined target. A refusal raises `ArxmlError` and returns
-    nothing.
+    Returns `(items, report)`. Items are one SourceItem per identifiable, in
+    first-occurrence order, then one placeholder per distinct dangling or
+    undefined target. The report counts every reference. Each list in it holds
+    at most 50 entries. A refusal raises `ArxmlError` and returns nothing.
     """
     files = sorted((Path(path) for path in paths), key=lambda path: path.as_posix())
     index: dict[str, str] = {}
@@ -257,7 +255,8 @@ def read_arxml(
         bucket = entries.get(ref.category)
         if bucket is not None and len(bucket) < _ENTRY_LIMIT:
             bucket.append(ref)
-    _conserve(source_id, len(references), counts)
+    dest_elements = sum(_dest_elements(path) for path in files)
+    _conserve(source_id, len(references), counts, dest_elements)
     assert len(raw_items) == len(index), (
         "index and items diverged: "
         f"identifiables={len(index)} items={len(raw_items)}"
@@ -274,21 +273,27 @@ def read_arxml(
         "references_seen": len(references),
         **counts,
         "base_declarations": len(bases),
-        "bases": bases,
-        "references": references,
+        "bases": tuple(bases[:_ENTRY_LIMIT]),
+        "references": references[:_ENTRY_LIMIT],
         "entries": {name: tuple(entries[name]) for name in _ENTRY_CATEGORIES},
-        "items": tuple(items),
         "tag_counts": tag_counts,
         "attributes_truncated": truncated,
         "variation_points": variations,
     }
-    return index, report
+    return tuple(items), report
 
 
-def _conserve(source_id: str, seen: int, counts: dict[str, int]) -> None:
-    """Every recorded reference is in exactly one category.
+def _conserve(
+    source_id: str,
+    seen: int,
+    counts: dict[str, int],
+    dest_elements: int,
+) -> None:
+    """Every recorded reference is in exactly one category, and none were missed.
 
-    The six terms are written out so that dropping one fails here.
+    The six terms are written out so that dropping one fails here. `dest_elements`
+    is counted by a separate pass, so a reference the collector never recorded
+    fails here too. This raises `ArxmlError`; it is not an assert.
     """
     total = (
         counts["resolved"]
@@ -298,17 +303,38 @@ def _conserve(source_id: str, seen: int, counts: dict[str, int]) -> None:
         + counts["unresolvable_relative"]
         + counts["empty"]
     )
-    assert total == seen, (
-        "conservation failed: "
-        f"source_id={source_id} references_seen={seen} n={seen} "
-        f"resolved={counts['resolved']} "
-        f"dest_mismatch={counts['dest_mismatch']} "
-        f"unresolved_definition={counts['unresolved_definition']} "
-        f"dangling={counts['dangling']} "
-        f"unresolvable_relative={counts['unresolvable_relative']} "
-        f"empty={counts['empty']} "
-        f"sum={total}"
-    )
+    if total != seen or dest_elements != seen:
+        raise ArxmlError(
+            "conservation failed: "
+            f"source_id={source_id} references_seen={seen} n={seen} "
+            f"resolved={counts['resolved']} "
+            f"dest_mismatch={counts['dest_mismatch']} "
+            f"unresolved_definition={counts['unresolved_definition']} "
+            f"dangling={counts['dangling']} "
+            f"unresolvable_relative={counts['unresolvable_relative']} "
+            f"empty={counts['empty']} "
+            f"sum={total} "
+            f"dest_elements={dest_elements} n_dest={dest_elements}"
+        )
+
+
+def _dest_elements(path: Path) -> int:
+    """DEST attributes in one file, not walking into REFERENCE-BASES.
+
+    A separate parse from the collector, so a missed reference changes this
+    count and not `references_seen`.
+    """
+    root = ET.fromstring(path.read_bytes())
+    return _count_dest(root)
+
+
+def _count_dest(element: ET.Element) -> int:
+    if _local(element.tag) == "REFERENCE-BASES":
+        return 0
+    found = 1 if _attribute(element, "DEST") is not None else 0
+    for child in element:
+        found += _count_dest(child)
+    return found
 
 
 def _root(path: Path) -> tuple[ET.Element, str]:
@@ -640,7 +666,7 @@ def _attributes(
             local = _local(child.tag)
             if local == "REFERENCE-BASES" or _attribute(child, "DEST") is not None:
                 continue
-            if _short_name(child) is not None:
+            if local == "SHORT-NAME" or _short_name(child) is not None:
                 continue
             if local == "VARIATION-POINT":
                 has_variation = True

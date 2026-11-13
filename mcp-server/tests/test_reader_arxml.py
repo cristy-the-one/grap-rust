@@ -15,6 +15,7 @@ dangling or undefined targets become one unresolved placeholder each.
 """
 
 import hashlib
+import os
 import re
 import subprocess
 import sys
@@ -24,8 +25,9 @@ from pathlib import Path
 
 import pytest
 
+import grap_mcp.readers.arxml as arxml_reader
 from grap_mcp.readers import SourceLink
-from grap_mcp.readers.arxml import ArxmlError, read_arxml
+from grap_mcp.readers.arxml import ArxmlError, _conserve, read_arxml
 
 _SCRIPTS = Path(__file__).resolve().parents[2] / "scripts"
 if str(_SCRIPTS) not in sys.path:
@@ -321,7 +323,8 @@ def test_refused_files_raise_unsupported_dialect(name: str):
 def test_system_4_2_index_counts_and_identities():
     """Measured index: 157 identifiables, 22 packages, and both §8 identities."""
     path = _FIXTURES / "system-4.2.arxml"
-    index, report = read_arxml([path], source_id="system-4.2")
+    items, report = read_arxml([path], source_id="system-4.2")
+    index = _index_of(items)
 
     assert len(index) == report["identifiables"] == 157
     assert sum(tag == "AR-PACKAGE" for tag in index.values()) == report["packages"] == 22
@@ -432,7 +435,8 @@ def test_reference_bases_are_recorded_and_not_indexed(tmp_path: Path):
         encoding="utf-8",
     )
 
-    index, report = read_arxml([path], source_id="bases")
+    items, report = read_arxml([path], source_id="bases")
+    index = _index_of(items)
 
     assert set(index) == {"/Pkg", "/Pkg/Visible"}
     assert index["/Pkg"] == "AR-PACKAGE"
@@ -475,6 +479,36 @@ def _category_sum(report: dict) -> int:
     return sum(report[name] for name in _CATEGORIES)
 
 
+def _index_of(items) -> dict[str, str]:
+    """Path to tag, for identifiable items. Placeholders have no tag."""
+    return {
+        item.item_id: item.attributes["tag"]
+        for item in items
+        if item.kind_hint != "unresolved"
+    }
+
+
+def _assert_sampled_ref_links(item, report: dict) -> None:
+    """Emitting references in the report match that item's refers_to links.
+
+    The report keeps at most 50 references, a prefix of the full sequence.
+    When the prefix is the whole sequence, every link is checked. Otherwise
+    the prefix of that item's links is checked, and the integer totals stay
+    outside this helper.
+    """
+    owned_refs = [
+        ref for ref in report["references"]
+        if ref.owner == item.item_id and ref.category in _LINK_CATEGORIES
+    ]
+    got = [link for link in item.links if link.type == "refers_to"]
+    assert all(link.context == [] and link.role for link in got)
+    compared = got if len(report["references"]) == report["references_seen"] else got[:len(owned_refs)]
+    assert [link.target_id for link in compared] == [ref.target for ref in owned_refs]
+    for link, ref in zip(compared, owned_refs, strict=True):
+        if ref.role != "VALUE-REF":
+            assert link.role == ref.role
+
+
 @pytest.mark.parametrize(
     ("name", "identifiables", "packages", "references_seen", "counts"),
     _LOADABLE_REFERENCES,
@@ -484,12 +518,13 @@ def test_loadable_files_match_measured_reference_counts(
 ):
     """§8 reference counts for the four loadable fixtures, and conservation."""
     path = _FIXTURES / name
-    index, report = read_arxml([path], source_id=path.stem)
+    items, report = read_arxml([path], source_id=path.stem)
+    index = _index_of(items)
 
     assert len(index) == report["identifiables"] == identifiables
     assert report["files"] == 1
     assert report["references_seen"] == references_seen
-    assert len(report["references"]) == references_seen
+    assert len(report["references"]) == min(50, references_seen)
     for category, expected in zip(_CATEGORIES, counts, strict=True):
         assert report[category] == expected
     assert _category_sum(report) == references_seen
@@ -497,8 +532,12 @@ def test_loadable_files_match_measured_reference_counts(
         assert report["packages"] == packages
 
     counted = Counter(ref.category for ref in report["references"])
-    for category in _CATEGORIES:
-        assert counted[category] == report[category]
+    if references_seen <= 50:
+        for category in _CATEGORIES:
+            assert counted[category] == report[category]
+    else:
+        assert set(counted) <= set(_CATEGORIES)
+        assert sum(counted.values()) == 50
 
     for category in ("dest_mismatch", "dangling", "unresolvable_relative", "empty"):
         listed = report["entries"][category]
@@ -509,22 +548,25 @@ def test_loadable_files_match_measured_reference_counts(
 def test_system_4_2_three_relative_references_resolve():
     """125 resolved references include 3 relative ones: one named base, two default."""
     path = _FIXTURES / "system-4.2.arxml"
-    _index, report = read_arxml([path], source_id="system-4.2")
+    items, report = read_arxml([path], source_id="system-4.2")
 
     assert report["base_declarations"] == 2
+    assert [(base.label, base.base_path, base.is_default) for base in report["bases"]] == [
+        ("ConstantBase", "/Constants", True),
+        ("SystemSignalBase", "/SystemSignal", False),
+    ]
     assert report["references_seen"] == 125
     assert report["resolved"] == 125
-    relative = [ref for ref in report["references"] if not ref.text.startswith("/")]
-    assert len(relative) == 3
-    assert {ref.category for ref in relative} == {"resolved"}
-    assert Counter(ref.base for ref in relative) == Counter({
-        "SystemSignalBase": 1,
-        None: 2,
-    })
-    assert Counter(ref.target for ref in relative) == Counter({
-        "/SystemSignal/SystemSignalInner/Signal2": 1,
-        "/Constants/BooleanFalse": 2,
-    })
+    assert len(report["references"]) == 50
+    targets = Counter(
+        link.target_id
+        for item in items
+        for link in item.links
+        if link.type == "refers_to"
+    )
+    assert targets["/SystemSignal/SystemSignalInner/Signal2"] == 1
+    assert targets["/Constants/BooleanFalse"] == 2
+    assert sum(targets.values()) == 125
 
 
 def _outer_base_file(is_global: bool) -> str:
@@ -569,7 +611,8 @@ def test_outer_global_base_resolves(tmp_path: Path):
     path = tmp_path / "global.arxml"
     path.write_text(_outer_base_file(True), encoding="utf-8")
 
-    index, report = read_arxml([path], source_id="global")
+    items, report = read_arxml([path], source_id="global")
+    index = _index_of(items)
 
     assert index["/Outer/Inner/Sig"] == "I-SIGNAL"
     assert report["references_seen"] == 1
@@ -589,7 +632,7 @@ def test_outer_base_not_global_is_unresolvable(tmp_path: Path):
     path = tmp_path / "local.arxml"
     path.write_text(_outer_base_file(False), encoding="utf-8")
 
-    _index, report = read_arxml([path], source_id="local")
+    _items, report = read_arxml([path], source_id="local")
 
     assert report["references_seen"] == 1
     assert report["unresolvable_relative"] == 1
@@ -704,9 +747,10 @@ def _refers(target_id: str, role: str) -> SourceLink:
 def test_signal1_mapping_has_position_byte_order_and_signal_ref():
     """The mapping keeps START-POSITION, PACKING-BYTE-ORDER, and I-SIGNAL-REF."""
     path = _FIXTURES / "system-4.2.arxml"
-    index, report = read_arxml([path], source_id="system-4.2")
+    items, report = read_arxml([path], source_id="system-4.2")
+    index = _index_of(items)
     item = next(
-        one for one in report["items"]
+        one for one in items
         if one.item_id == "/ISignalIPdu/message1/Signal1"
     )
 
@@ -720,7 +764,6 @@ def test_signal1_mapping_has_position_byte_order_and_signal_ref():
     assert item.attributes == {
         "tag": "I-SIGNAL-TO-I-PDU-MAPPING",
         "short_name": "Signal1",
-        "SHORT-NAME": "Signal1",
         "PACKING-BYTE-ORDER": "MOST-SIGNIFICANT-BYTE-FIRST",
         "START-POSITION": "36",
     }
@@ -735,8 +778,8 @@ def test_signal1_mapping_has_position_byte_order_and_signal_ref():
 def test_dangling_fixture_yields_one_unresolved_item():
     """Four identifiables, one dangling reference, one unresolved placeholder."""
     path = _FIXTURES / "system-dangling-reference-4.2.arxml"
-    index, report = read_arxml([path], source_id="dangling")
-    items = report["items"]
+    items, report = read_arxml([path], source_id="dangling")
+    index = _index_of(items)
     digest = hashlib.sha256(path.read_bytes()).hexdigest()
 
     assert report["identifiables"] == len(index) == 4
@@ -763,28 +806,24 @@ def test_dangling_fixture_yields_one_unresolved_item():
     assert package.attributes == {
         "tag": "AR-PACKAGE",
         "short_name": "Cluster",
-        "SHORT-NAME": "Cluster",
     }
     assert cluster.links == [_part_of("/Cluster")]
     assert cluster.heading_path == ["Cluster"]
     assert cluster.attributes == {
         "tag": "CAN-CLUSTER",
         "short_name": "Cluster0",
-        "SHORT-NAME": "Cluster0",
         "CAN-CLUSTER-VARIANTS.CAN-CLUSTER-CONDITIONAL.BAUDRATE": "500000",
     }
     assert channel.links == [_part_of("/Cluster/Cluster0")]
     assert channel.attributes == {
         "tag": "CAN-PHYSICAL-CHANNEL",
         "short_name": "Pch0",
-        "SHORT-NAME": "Pch0",
     }
     assert triggering.heading_path == ["Cluster"]
     assert triggering.text == "message1"
     assert triggering.attributes == {
         "tag": "CAN-FRAME-TRIGGERING",
         "short_name": "message1",
-        "SHORT-NAME": "message1",
         "CAN-ADDRESSING-MODE": "STANDARD",
         "IDENTIFIER": "5",
     }
@@ -813,8 +852,8 @@ def test_dangling_fixture_yields_one_unresolved_item():
 def test_items_match_the_index_and_every_emitting_reference():
     """Identifiable items follow the index. Link-emitting references are kept."""
     path = _FIXTURES / "system-4.2.arxml"
-    index, report = read_arxml([path], source_id="system-4.2")
-    items = list(report["items"])
+    items, report = read_arxml([path], source_id="system-4.2")
+    index = _index_of(items)
     owned = [item for item in items if item.kind_hint != "unresolved"]
     placeholders = [item for item in items if item.kind_hint == "unresolved"]
 
@@ -843,6 +882,7 @@ def test_items_match_the_index_and_every_emitting_reference():
     for item in owned:
         assert item.kind_hint == _expected_kind(item.attributes["tag"])
         assert item.attributes["short_name"]
+        assert "SHORT-NAME" not in item.attributes
         assert item.attributes["tag"] == index[item.item_id]
         parts = [link for link in item.links if link.type == "part_of"]
         if item.item_id.count("/") == 1:
@@ -851,16 +891,7 @@ def test_items_match_the_index_and_every_emitting_reference():
             parent = item.item_id.rsplit("/", 1)[0]
             assert parts == [_part_of(parent)]
             assert parent in index
-        owned_refs = [
-            ref for ref in report["references"]
-            if ref.owner == item.item_id and ref.category in _LINK_CATEGORIES
-        ]
-        got = [link for link in item.links if link.type == "refers_to"]
-        assert [link.target_id for link in got] == [ref.target for ref in owned_refs]
-        assert all(link.context == [] and link.role for link in got)
-        for link, ref in zip(got, owned_refs, strict=True):
-            if ref.role != "VALUE-REF":
-                assert link.role == ref.role
+        _assert_sampled_ref_links(item, report)
 
     refers = sum(
         link.type == "refers_to" for item in items for link in item.links
@@ -919,8 +950,8 @@ def test_items_match_the_index_and_every_emitting_reference():
 def test_other_loadable_files_keep_items_and_links(name):
     """The other three loadable files: one item per index path, no dropped link."""
     path = _FIXTURES / name
-    index, report = read_arxml([path], source_id=path.stem)
-    items = list(report["items"])
+    items, report = read_arxml([path], source_id=path.stem)
+    index = _index_of(items)
     owned = [item for item in items if item.kind_hint != "unresolved"]
     placeholders = [item for item in items if item.kind_hint == "unresolved"]
 
@@ -933,16 +964,8 @@ def test_other_loadable_files_keep_items_and_links(name):
     for item in owned:
         assert item.kind_hint == _expected_kind(item.attributes["tag"])
         assert "tag" in item.attributes and "short_name" in item.attributes
-        owned_refs = [
-            ref for ref in report["references"]
-            if ref.owner == item.item_id and ref.category in _LINK_CATEGORIES
-        ]
-        got = [link for link in item.links if link.type == "refers_to"]
-        assert [link.target_id for link in got] == [ref.target for ref in owned_refs]
-        for link, ref in zip(got, owned_refs, strict=True):
-            assert link.context == []
-            if ref.role != "VALUE-REF":
-                assert link.role == ref.role
+        assert "SHORT-NAME" not in item.attributes
+        _assert_sampled_ref_links(item, report)
 
     seen: set[str] = set()
     order: list[str] = []
@@ -952,20 +975,33 @@ def test_other_loadable_files_keep_items_and_links(name):
             seen.add(ref.target)
             order.append(ref.target)
             first_dest[ref.target] = ref.dest
-    assert [item.item_id for item in placeholders] == order
+    complete = len(report["references"]) == report["references_seen"]
+    if complete:
+        assert [item.item_id for item in placeholders] == order
+    else:
+        assert len(report["references"]) == 50
+        assert [item.item_id for item in placeholders if item.item_id in seen] == order
+        assert len(placeholders) > len(order)
+        assert len(placeholders) == len({item.item_id for item in placeholders})
     for item in placeholders:
         assert item.kind_hint == "unresolved"
         assert item.text == ""
-        assert item.attributes == {"expected_kind": first_dest[item.item_id]}
         assert item.links == []
+        if item.item_id in first_dest:
+            assert item.attributes == {"expected_kind": first_dest[item.item_id]}
+        else:
+            assert set(item.attributes) == {"expected_kind"}
+            assert item.attributes["expected_kind"]
 
     refers = sum(link.type == "refers_to" for item in items for link in item.links)
     emitted = sum(report[name] for name in _LINK_CATEGORIES)
     assert refers == emitted
     assert (
         refers + report["unresolvable_relative"] + report["empty"]
-        == report["references_seen"] == len(report["references"])
+        == report["references_seen"]
     )
+    if complete:
+        assert len(report["references"]) == report["references_seen"]
 
 
 def _write_arxml(tmp_path: Path, name: str, body: str, schema: str | None) -> Path:
@@ -1020,8 +1056,8 @@ def test_desc_prefers_en_and_falls_through_when_empty(tmp_path: Path):
 """,
         "AUTOSAR_00046.xsd",
     )
-    _index, report = read_arxml([path], source_id="lang")
-    by_id = {item.item_id: item for item in report["items"]}
+    items, report = read_arxml([path], source_id="lang")
+    by_id = {item.item_id: item for item in items}
 
     signal = by_id["/P/S"]
     assert signal.text == "DescEn"
@@ -1045,8 +1081,8 @@ def test_release_from_schema_file_name(tmp_path: Path):
     )
     for name, schema, expected in cases:
         path = _write_arxml(tmp_path, name, body, schema)
-        _index, report = read_arxml([path], source_id=path.stem)
-        item = next(one for one in report["items"] if one.item_id == "/P/S")
+        items, report = read_arxml([path], source_id=path.stem)
+        item = next(one for one in items if one.item_id == "/P/S")
         assert item.release == expected
 
 
@@ -1064,10 +1100,10 @@ def test_unlisted_and_suffix_kinds(tmp_path: Path):
         <NOT-A-KIND><SHORT-NAME>N</SHORT-NAME></NOT-A-KIND>
 """
     path = _write_arxml(tmp_path, "kinds.arxml", body, None)
-    _index, report = read_arxml([path], source_id="kinds")
+    items, _report = read_arxml([path], source_id="kinds")
     kinds = {
         item.item_id: item.kind_hint
-        for item in report["items"]
+        for item in items
         if item.kind_hint != "package"
     }
     assert kinds == {
@@ -1106,8 +1142,8 @@ def test_depth_and_count_limits_set_truncated(tmp_path: Path):
 """,
         None,
     )
-    _index, report = read_arxml([path], source_id="deep")
-    item = next(one for one in report["items"] if one.item_id == "/P/Deep")
+    items, report = read_arxml([path], source_id="deep")
+    item = next(one for one in items if one.item_id == "/P/Deep")
     assert item.attributes["A.B.C.D.E.F.G.H.I.J"] == "leaf10"
     assert "A.B.C.D.E.F.G.H.I.J.K" not in item.attributes
     assert item.attributes["_truncated"] == "true"
@@ -1125,12 +1161,12 @@ def test_depth_and_count_limits_set_truncated(tmp_path: Path):
 """,
         None,
     )
-    _index, wide_report = read_arxml([wide], source_id="wide")
-    wide_item = next(one for one in wide_report["items"] if one.item_id == "/P/Wide")
-    assert wide_item.attributes["SHORT-NAME"] == "Wide"
+    wide_items, wide_report = read_arxml([wide], source_id="wide")
+    wide_item = next(one for one in wide_items if one.item_id == "/P/Wide")
+    assert "SHORT-NAME" not in wide_item.attributes
     assert wide_item.attributes["N[0]"] == "0"
     assert wide_item.attributes["N[298]"] == "298"
-    assert "N[299]" not in wide_item.attributes
+    assert wide_item.attributes["N[299]"] == "299"
     assert "N[300]" not in wide_item.attributes
     assert wide_item.attributes["_truncated"] == "true"
     assert wide_item.attributes["tag"] == "I-SIGNAL"
@@ -1157,11 +1193,132 @@ def test_variation_point_is_flagged_and_counted(tmp_path: Path):
 """,
         None,
     )
-    _index, report = read_arxml([path], source_id="variant")
-    by_id = {item.item_id: item for item in report["items"]}
+    items, report = read_arxml([path], source_id="variant")
+    by_id = {item.item_id: item for item in items}
     flagged = by_id["/P/S"]
     assert flagged.attributes["_has_variation_point"] == "true"
     assert flagged.attributes["VARIATION-POINT.SHORT-LABEL"] == "Cond"
     assert flagged.attributes["LENGTH"] == "1"
     assert "_has_variation_point" not in by_id["/P/Plain"].attributes
     assert report["variation_points"] == 1
+
+
+def _zero_counts() -> dict[str, int]:
+    return {name: 0 for name in _CATEGORIES}
+
+
+def test_conservation_sum_mismatch_raises_arxml_error():
+    """F21. A broken category sum is ArxmlError, not an assertion."""
+    counts = _zero_counts()
+    counts["resolved"] = 1
+
+    with pytest.raises(ArxmlError, match="conservation") as caught:
+        _conserve("probe", 2, counts, 2)
+
+    message = str(caught.value)
+    assert "references_seen=2" in message
+    assert "n=2" in message
+    assert "sum=1" in message
+    assert "resolved=1" in message
+
+
+def test_conservation_sum_mismatch_raises_under_optimise():
+    """F21. python -O must not skip the conservation check."""
+    script = """
+from grap_mcp.readers.arxml import ArxmlError, _conserve
+counts = {name: 0 for name in (
+    "resolved", "dest_mismatch", "unresolved_definition",
+    "dangling", "unresolvable_relative", "empty",
+)}
+counts["resolved"] = 1
+try:
+    _conserve("probe", 2, counts, 2)
+except ArxmlError as exc:
+    text = str(exc)
+    assert "conservation" in text
+    assert "references_seen=2" in text and "n=2" in text
+    assert "sum=1" in text
+else:
+    raise SystemExit("no error")
+"""
+    env = os.environ.copy()
+    env["PYTHONPATH"] = str(Path(__file__).resolve().parents[1])
+    completed = subprocess.run(
+        [sys.executable, "-O", "-c", script],
+        check=False,
+        capture_output=True,
+        text=True,
+        env=env,
+    )
+
+    assert completed.returncode == 0, completed.stdout + completed.stderr
+
+
+def test_dropped_dest_fails_independent_count(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    """F22. A DEST the collector misses is a conservation error."""
+    path = _write_arxml(
+        tmp_path,
+        "drop.arxml",
+        """\
+        <I-SIGNAL>
+          <SHORT-NAME>S</SHORT-NAME>
+          <I-SIGNAL-REF DEST="I-SIGNAL">/P/S</I-SIGNAL-REF>
+        </I-SIGNAL>
+""",
+        None,
+    )
+    original = arxml_reader._walk
+
+    def drop_refs(*args, **kwargs):
+        seen = args[7]
+        start = len(seen)
+        original(*args, **kwargs)
+        del seen[start:]
+
+    monkeypatch.setattr(arxml_reader, "_walk", drop_refs)
+
+    with pytest.raises(ArxmlError, match="conservation") as caught:
+        read_arxml([path], source_id="drop")
+
+    message = str(caught.value)
+    assert "references_seen=0" in message
+    assert "n=0" in message
+    assert "dest_elements=1" in message
+    assert "n_dest=1" in message
+
+
+def test_returns_items_and_caps_every_report_list():
+    """F23. (items, report), and no report list is longer than 50."""
+    path = _FIXTURES / "system-4.2.arxml"
+    items, report = read_arxml([path], source_id="system-4.2")
+
+    assert isinstance(items, tuple)
+    assert len(items) == report["identifiables"] == 157
+    assert items[0].item_id
+    assert "items" not in report
+    assert report["references_seen"] == 125
+    assert len(report["references"]) == 50
+
+    def lists_in(value, prefix):
+        if isinstance(value, (list, tuple)):
+            assert len(value) <= 50, prefix
+        elif isinstance(value, dict):
+            for key, child in value.items():
+                lists_in(child, f"{prefix}.{key}")
+
+    lists_in(report, "report")
+
+
+def test_short_name_is_not_also_an_attribute():
+    """The duplicate SHORT-NAME leaf is omitted. short_name stays."""
+    path = _FIXTURES / "system-4.2.arxml"
+    items, _report = read_arxml([path], source_id="system-4.2")
+    item = next(
+        one for one in items
+        if one.item_id == "/ISignalIPdu/message1/Signal1"
+    )
+
+    assert "SHORT-NAME" not in item.attributes
+    assert item.attributes["short_name"] == "Signal1"
+    assert item.attributes["START-POSITION"] == "36"
+    assert item.attributes["PACKING-BYTE-ORDER"] == "MOST-SIGNIFICANT-BYTE-FIRST"
