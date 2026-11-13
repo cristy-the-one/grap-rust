@@ -1,6 +1,7 @@
 # Spec — automotive graph schema (card V-01)
 
-**Status:** draft for the owner's review. Nothing is implemented. **Date:** 2026-11-13.
+**Status:** approved by the owner on 2026-11-13, with the decisions recorded in §11. Nothing is
+implemented yet.
 **Decides:** which kinds of things the knowledge graph holds for the automotive goal, which
 relations may connect them, how each is identified, and how reader output maps onto them.
 
@@ -8,8 +9,7 @@ This is a design, not a measurement. Its test is §9: eight questions a test eng
 with the path through the graph that must answer it. If a question cannot be answered by its path,
 the schema is wrong, whatever else is true of it.
 
-**How to review:** §11 lists the seven decisions I am least sure of. Start there. Everything else
-follows from two constraints in §1 and the standards' own vocabulary.
+Everything here follows from two constraints in §1 and the standards' own vocabulary.
 
 ---
 
@@ -19,6 +19,11 @@ follows from two constraints in §1 and the standards' own vocabulary.
 properties, and the engine's fast pruning works on property *names*. So the relation vocabulary
 must be small and closed. This schema uses **30 relations and 3 metadata names — 33 of 64.** The
 law pilot produced 418 free-text verbs; that cannot be stored this way at all.
+
+The owner offered to raise the limit if it proves too tight. **Decision: keep it.** It is not
+tight — 31 names remain free — and a small closed vocabulary is what this schema wants anyway. The
+engine is frozen, and the limit is a bit-mask width in its core. Revisit only if the procedure
+graph and the event log together need more than the 31 that remain.
 
 **A node in the engine has only text, one label and an embedding. It has no attributes.** So the
 engine graph is a retrieval view. Attributes, provenance and edge details live in the extraction
@@ -49,7 +54,7 @@ each with its own condition — exactly how Sheet 1 of the labelling guide is fi
 
 ---
 
-## 3. Node types (21)
+## 3. Node types (22)
 
 | Tier | Type | What it is | Typical origin |
 |---|---|---|---|
@@ -72,6 +77,7 @@ each with its own condition — exactly how Sheet 1 of the labelling guide is fi
 | Entity | `Parameter` | A configuration container, a configuration parameter, or a calibration value | ARXML, specification |
 | Entity | `State` | A mode or a state | ARXML, specification |
 | Entity | `Fault` | A diagnostic trouble code, diagnostic event, or development error code | specification, ARXML |
+| Entity | `DiagnosticService` | A diagnostic service, data identifier, routine or input-output control | ARXML, specification |
 | Entity | `Term` | A glossary term or abbreviation, valid in a stated scope | any |
 | Entity | `Element` | **Fallback:** an item no other type fits | ARXML mostly |
 
@@ -115,7 +121,8 @@ written**; it goes to a review list and is counted (§7).
 
 `part_of` is allowed for: `Signal` → `Pdu`, `Frame` or `Signal` (group); `Pdu` → `Frame` or `Pdu`;
 `InterfaceElement` → `Interface`; `Parameter` → `Parameter` or `Component`; `Component` →
-`Component`; `State` → `State`; `Requirement` → `Requirement`; `Element` → `Element`.
+`Component`; `State` → `State`; `Requirement` → `Requirement`; `DiagnosticService` →
+`DiagnosticService`; `Element` → `Element`.
 
 ### Requirements and test
 | Relation | From → To | Meaning |
@@ -130,7 +137,7 @@ written**; it goes to a review list and is counted (§7).
 ### Architecture
 | Relation | From → To | Meaning |
 |---|---|---|
-| `provides` | `Component` → `Interface` | offers it (a provide port, or an implemented API) |
+| `provides` | `Component` → `Interface` or `DiagnosticService` | offers it (a provide port, an implemented API, a supported service) |
 | `requires` | `Component` → `Interface` | needs it (a require port, or a called API) |
 | `connects_to` | `Component` → `Component` | a connector links them |
 | `runs_on` | `Component` → `Ecu` | mapped to this ECU |
@@ -149,9 +156,9 @@ written**; it goes to a review list and is counted (§7).
 ### Behaviour
 | Relation | From → To | Meaning |
 |---|---|---|
-| `applies_in` | `Statement` → `State` | holds only in this mode or state |
+| `applies_in` | `Statement` or `DiagnosticService` → `State` | holds, or is available, only in this mode, state or session |
 | `transitions_to` | `State` → `State` | a transition |
-| `raises` | `Component` or `Statement` → `Fault` | reports or sets this fault |
+| `raises` | `Component`, `Statement` or `DiagnosticService` → `Fault` | reports, sets or reads out this fault |
 
 ### Terminology and versions
 | Relation | From → To | Meaning |
@@ -246,6 +253,8 @@ be confirmed with the inventory tool (card AR-07) on real files.
 | ARXML ○ | `VARIABLE-DATA-PROTOTYPE`, `CLIENT-SERVER-OPERATION`, `ARGUMENT-DATA-PROTOTYPE` | `InterfaceElement` |
 | ARXML ○ | `MODE-DECLARATION-GROUP`, `MODE-DECLARATION` | `State` |
 | ARXML ○ | application and implementation data types, `DATA-CONSTR` | `DataType` |
+| ARXML ○ | diagnostic trouble codes and diagnostic events | `Fault` |
+| ARXML ○ | diagnostic services, data identifiers, routines | `DiagnosticService` |
 | ARXML | everything else, including runnables and events | `Element` |
 | ReqIF | specification object | `Requirement` |
 | Specification PDF | bracketed, numbered item | `Requirement` |
@@ -321,7 +330,6 @@ in that column are therefore a direct test of this schema, not only of the tool.
   test-generation case needs them.
 - **Variants.** Items under a variation point are flagged by the reader; conditions are not
   evaluated.
-- **Diagnostic services** (identifiers, routines, sessions). See §11.5.
 - **The procedure graph and the event log.** Their labels are not defined here. 31 property names
   remain free for them.
 - **The ASPICE process model** already in the tool. It stays as it is, under its own labels.
@@ -329,25 +337,21 @@ in that column are therefore a direct test of this schema, not only of the tool.
 
 ---
 
-## 11. Decisions for the owner — where I am least sure
+## 11. Decisions (owner, 2026-11-13)
 
-1. **`TestConcept`.** I kept the goal document's word. The nearest standard term I know is ISTQB's
-   "test condition". Keep, or rename?
-2. **Ports are folded into edges.** A port becomes a `provides` or `requires` edge carrying the
-   port's name. That loses nothing a test needs, as far as I can see — but if tests are written
-   *per port*, the port should be a node.
-3. **`Frame` and `Pdu` stay separate.** A DBC has no PDUs, so its signals attach straight to the
-   frame. Queries must then handle both shapes (question 3 has an optional middle step). The
-   alternative is one merged type, which misdescribes AUTOSAR.
-4. **Specification items are `Requirement`s.** A software-specification item and a customer
-   requirement get the same type, distinguished by an attribute for the level. Is one type right,
-   and which levels do you use?
-5. **`Fault` covers three things** — trouble codes, diagnostic events, development errors — and
-   diagnostic services are left out entirely. For a diagnostics-heavy function that is too thin.
-   Add a `DiagnosticService` type now, or wait?
-6. **`depends_on` is the riskiest relation.** It invites everything vague. It is limited to
-   dependencies a source states outright. Would you rather drop it?
-7. **Twenty percent** as the alarm level for untyped items and fallback links (§7) is a guess.
+| # | Question | Decision |
+|---|---|---|
+| 1 | `TestConcept`, or the ISTQB term "test condition"? | **Keep `TestConcept`.** |
+| 2 | Ports folded into `provides` / `requires` edges? | **Agreed.** |
+| 3 | `Frame` and `Pdu`: separate or merged? | **Separate.** Where the source has no PDUs, as in a DBC, signals attach straight to the frame. |
+| 4 | Specification items and customer requirements: one type? | **One type, `Requirement`.** The level is an attribute, taken from the source; no fixed list of levels is imposed. |
+| 5 | Diagnostics too thin? | **Add `DiagnosticService`.** Done in §3, §4 and §8. No new relation was needed. |
+| 6 | Drop `depends_on`? | **Keep, for now.** Still limited to dependencies a source states outright. |
+| 7 | 20% as the alarm level in §7? | **Accepted.** |
+| — | Raise the engine's 64-name limit? | **No.** See §1. |
+
+The diagnostic rows in §8 are marked ○: their ARXML tag names come from the standard and must be
+confirmed with the inventory tool on real files before the projection relies on them.
 
 ---
 
@@ -355,7 +359,7 @@ in that column are therefore a direct test of this schema, not only of the tool.
 
 | Card | Tag | Does |
 |---|---|---|
-| **S-01** Schema as data | [S] | Transcribe §3, §4 and §8 into `mcp-server/grap_mcp/schema/automotive.yaml`, with a loader. Test: 21 node types, 30 relations, every relation's ends are known types. |
+| **S-01** Schema as data | [S] | Transcribe §3, §4 and §8 into `mcp-server/grap_mcp/schema/automotive.yaml`, with a loader. Test: 22 node types, 30 relations, every relation's ends are known types. |
 | **S-02** Validator | [S] | Given a node type pair and a relation, say allowed or not, per §4. Test: one allowed and one refused example per relation. |
 | **S-03** Projection | [M] | Turn `SourceItem`s into typed nodes and edges per §5 and §8, with the four counts of §7. Test first on the ARXML fixtures: `/ISignalIPdu/message1/Signal1` yields one `part_of` edge from a `Signal` to a `Pdu`, and no node for the mapping object. |
 | **S-04** The eight questions | [M] | One executable check per row of §9, on fixture data. Needs S-03. |
