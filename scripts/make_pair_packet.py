@@ -11,10 +11,13 @@ embedder. The packet is 200 pairs in four disjoint bands:
 - 30 with cosine below 0.70 (the seeded stand-in for a random draw)
 - 30 whose names are string-identical and whose documents differ
 
-Within a band the kept pairs are the first ones in ``sha256(seed + mention
-keys)`` order, not file order. A pair is written to the sealed sheet when
-either document is sealed in the statement sample, so a sealed sentence never
-lands in the open sheet. Label columns are left blank.
+Each band is drawn over distinct name pairs: one occurrence pair per name
+pair, the occurrence ``sha256(seed + mention keys)`` ranks first. No name is
+written on more than 3 rows. A name that occurs in more than 20% of the
+sampled documents is page furniture and is dropped; the report prints how
+many names were dropped out of how many distinct names. A pair is written to
+the sealed sheet when either document is sealed in the statement sample, so
+a sealed sentence never lands in the open sheet. Label columns are left blank.
 
 Stops, without writing, when any band is short. The shortfall is printed and
 nothing is borrowed from another band. Every count is printed with its
@@ -46,6 +49,8 @@ from grap_mcp.kee.legal import _REF_PATTERN  # noqa: E402
 from grap_mcp.kee.legal_rules import _ARTICLE  # noqa: E402
 
 # 80 / 60 / 30 / 30. Identical strings are their own band even when cosine is 1.
+# A name may occupy at most this many rows in the whole packet.
+_NAME_CAP = 3
 _BANDS = (
     ("cosine_high", 80),
     ("cosine_mid", 60),
@@ -280,43 +285,76 @@ def _collect(chosen, root: Path) -> list[Mention]:
     return mentions
 
 
-def _pools(mentions: list[Mention], vectors: dict[str, list[float]]) -> dict[str, list[tuple[Mention, Mention]]]:
+def _drop_common(mentions: list[Mention], n_docs: int):
+    """Drop names that occur in more than 20% of the sampled documents.
+
+    ``len(docs) * 5 > n_docs`` is the integer form of ``len(docs) / n_docs > 1/5``.
+    Returns the kept mentions and ``(dropped, distinct names)``, or ``None``
+    when there are no documents or no names to measure.
+    """
+    by_docs: dict[str, set[str]] = {}
+    for mention in mentions:
+        by_docs.setdefault(mention.name, set()).add(mention.source_id)
+    total = len(by_docs)
+    if n_docs <= 0 or total == 0:
+        return mentions, None
+    dropped = {name for name, docs in by_docs.items() if len(docs) * 5 > n_docs}
+    kept = [mention for mention in mentions if mention.name not in dropped]
+    return kept, (len(dropped), total)
+
+
+def _pair_sort_key(seed: str, left: Mention, right: Mention):
+    return (_rank(seed, left, right), _key(left), _key(right))
+
+
+def _pools(mentions: list[Mention], vectors: dict[str, list[float]], seed: str):
+    """One occurrence pair per distinct name pair: the seeded-hash minimum."""
     by_name: dict[str, list[Mention]] = {}
     for mention in mentions:
         by_name.setdefault(mention.name, []).append(mention)
-    pools = {band: [] for band, _target in _BANDS}
-    for group in by_name.values():
+    grouped: dict[tuple[str, str], tuple[str, list[tuple[Mention, Mention]]]] = {}
+    for name, group in by_name.items():
+        occurrences = []
         for left, right in itertools.combinations(group, 2):
             if left.source_id == right.source_id:
                 continue
-            pools["identical"].append(_canonical(left, right))
+            occurrences.append(_canonical(left, right))
+        if occurrences:
+            grouped[(name, name)] = ("identical", occurrences)
     names = sorted(by_name)
     for index, left_name in enumerate(names):
         for right_name in names[index + 1:]:
             kind = band_for_cosine(_cosine(vectors[left_name], vectors[right_name]))
-            for left in by_name[left_name]:
-                for right in by_name[right_name]:
-                    pools[kind].append(_canonical(left, right))
+            occurrences = [
+                _canonical(left, right)
+                for left in by_name[left_name]
+                for right in by_name[right_name]
+            ]
+            grouped[(left_name, right_name)] = (kind, occurrences)
+    pools = {band: [] for band, _target in _BANDS}
+    for band, occurrences in grouped.values():
+        best = min(occurrences, key=lambda pair: _pair_sort_key(seed, pair[0], pair[1]))
+        pools[band].append(best)
     return pools
 
 
-def _take(pool: list[tuple[Mention, Mention]], target: int, seed: str):
-    def rank(pair):
-        left, right = pair
-        return (_rank(seed, left, right), _key(left), _key(right))
-
-    seen = set()
-    unique = []
-    for left, right in sorted(pool, key=rank):
-        token = (_key(left), _key(right))
-        if token in seen:
+def _take(pool: list[tuple[Mention, Mention]], target: int, seed: str, used: dict[str, int]):
+    """Walk name pairs in hash order, skipping any name already on 3 rows."""
+    taken = []
+    for left, right in sorted(pool, key=lambda pair: _pair_sort_key(seed, pair[0], pair[1])):
+        names = {left.name, right.name}
+        if any(used.get(name, 0) >= _NAME_CAP for name in names):
             continue
-        seen.add(token)
-        unique.append((left, right))
-    return unique[:target], len(unique)
+        taken.append((left, right))
+        for name in names:
+            used[name] = used.get(name, 0) + 1
+        if len(taken) == target:
+            break
+    return taken, len(pool)
 
 
-def _report(taken, pool_sizes, n_mentions, n_docs, n_files, n_open, n_sealed, wrote: bool) -> None:
+def _report(taken, pool_sizes, n_mentions, n_docs, n_files, n_open, n_sealed,
+            names_dropped, wrote: bool) -> None:
     parts = []
     filled_sum = 0
     target_sum = 0
@@ -332,6 +370,11 @@ def _report(taken, pool_sizes, n_mentions, n_docs, n_files, n_open, n_sealed, wr
     parts.append(f"n_mentions={n_mentions}")
     parts.append(f"n_docs={n_docs}")
     parts.append(f"n_files_reached={n_files}")
+    if names_dropped is None:
+        parts.append("names_dropped=n/a")
+    else:
+        dropped, total = names_dropped
+        parts.append(f"names_dropped={dropped}/{total}")
     parts.append(f"n_pairs={filled_sum}/{target_sum}")
     if wrote:
         parts.append(f"n_open={n_open}")
@@ -375,7 +418,7 @@ def build_packet(corpus_root: Path, corpus: str, seed: str, items: int, out: Pat
         raise RuntimeError(f"unknown corpus: {corpus}")
     root = Path(corpus_root)
     chosen, n_files = statements._select(statements.read_law_files(root), str(seed), items)
-    mentions = _collect(chosen, root)
+    mentions, names_dropped = _drop_common(_collect(chosen, root), len(chosen))
     if embedder is None:
         embedder = get_embedder()
     names = sorted({mention.name for mention in mentions})
@@ -385,14 +428,17 @@ def build_packet(corpus_root: Path, corpus: str, seed: str, items: int, out: Pat
         if len(embedded) != len(names):
             raise RuntimeError("embedder returned a different number of vectors than names")
         vectors = dict(zip(names, embedded))
-    pools = _pools(mentions, vectors)
+    pools = _pools(mentions, vectors, str(seed))
+    used: dict[str, int] = {}
     taken = {}
     pool_sizes = {}
     for band, target in _BANDS:
-        taken[band], pool_sizes[band] = _take(pools[band], target, str(seed))
+        taken[band], pool_sizes[band] = _take(pools[band], target, str(seed), used)
     short = any(len(taken[band]) < target for band, target in _BANDS)
     if short:
-        _report(taken, pool_sizes, len(mentions), len(chosen), n_files, 0, 0, wrote=False)
+        _report(
+            taken, pool_sizes, len(mentions), len(chosen), n_files, 0, 0, names_dropped, wrote=False,
+        )
         raise SystemExit(1)
 
     open_rows = []
@@ -410,7 +456,7 @@ def build_packet(corpus_root: Path, corpus: str, seed: str, items: int, out: Pat
                 open_rows.append(row)
     _report(
         taken, pool_sizes, len(mentions), len(chosen), n_files,
-        len(open_rows), len(sealed_rows), wrote=True,
+        len(open_rows), len(sealed_rows), names_dropped, wrote=True,
     )
     destination = Path(out)
     _write_csv(destination / "open" / "pairs.csv", open_rows)
