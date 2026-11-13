@@ -1,8 +1,10 @@
-"""AR-07: the inventory prints tags, DEST values, roles, and iref shapes only.
+"""ARXML reader tests.
 
-system-4.2.arxml is not in this tree (AR-01 has not landed). The file below
-stands in for that check: it has SHORT-NAMEs, reference paths, and values.
-None of those strings may appear in the output.
+AR-07: the inventory prints tags, DEST values, roles, and iref shapes only.
+The synthetic file below stands in for that check: it has SHORT-NAMEs,
+reference paths, and values. None of those strings may appear in the output.
+
+AR-02: a file set is refused with a named reason, or it yields the identity index.
 """
 
 import re
@@ -13,6 +15,8 @@ from collections import Counter
 from pathlib import Path
 
 import pytest
+
+from grap_mcp.readers.arxml import ArxmlError, read_arxml
 
 _SCRIPTS = Path(__file__).resolve().parents[2] / "scripts"
 if str(_SCRIPTS) not in sys.path:
@@ -277,3 +281,161 @@ def test_nonstandard_names_are_not_printed(tmp_path: Path):
     disallowed = [token for token in _tokens(output) if not _allowed_token(token)]
     assert disallowed == []
     assert _NON_STANDARD in output
+
+
+# The five files §8 refuses. system-4.2.arxml is the measured index.
+_FIXTURES = Path(__file__).resolve().parent / "fixtures" / "arxml"
+_REFUSED = (
+    "system-3.2.3.arxml",
+    "system-DAI-3.1.2.arxml",
+    "system-bad-root-tag-4.2.arxml",
+    "system-illegal-namespace-4.2.arxml",
+    "system-illegal-version-4.2.2.1.0.arxml",
+)
+
+
+@pytest.mark.parametrize("name", _REFUSED)
+def test_refused_files_raise_unsupported_dialect(name: str):
+    """Each of the five files is refused, naming unsupported-dialect, the file, and its root tag."""
+    path = _FIXTURES / name
+    root_tag = ET.parse(path).getroot().tag
+
+    with pytest.raises(ArxmlError) as caught:
+        read_arxml([path], source_id=path.stem)
+
+    message = str(caught.value)
+    assert "unsupported-dialect" in message
+    assert name in message
+    assert root_tag in message
+
+
+def test_system_4_2_index_counts_and_identities():
+    """Measured index: 157 identifiables, 22 packages, and both §8 identities."""
+    path = _FIXTURES / "system-4.2.arxml"
+    index, report = read_arxml([path], source_id="system-4.2")
+
+    assert len(index) == report["identifiables"] == 157
+    assert sum(tag == "AR-PACKAGE" for tag in index.values()) == report["packages"] == 22
+    assert report["files"] == 1
+    assert report["base_declarations"] == 2
+    assert [(base.label, base.base_path, base.is_default) for base in report["bases"]] == [
+        ("ConstantBase", "/Constants", True),
+        ("SystemSignalBase", "/SystemSignal", False),
+    ]
+    assert index["/Cluster/Cluster0/Pch0/message1"] == "CAN-FRAME-TRIGGERING"
+    assert index["/ISignalIPdu/message1/Signal1"] == "I-SIGNAL-TO-I-PDU-MAPPING"
+
+
+def test_thirty_byte_doctype_raises_dtd_not_allowed(tmp_path: Path):
+    """A 30-byte file that contains <!DOCTYPE is refused before it is parsed."""
+    payload = b"<!DOCTYPE " + b"x" * 20
+    assert len(payload) == 30
+    path = tmp_path / "doctype.arxml"
+    path.write_bytes(payload)
+
+    with pytest.raises(ArxmlError) as caught:
+        read_arxml([path], source_id="doctype")
+
+    message = str(caught.value)
+    assert "dtd-not-allowed" in message
+    assert path.name in message
+    assert "not-xml" not in message
+
+
+def test_entity_declaration_raises_dtd_not_allowed(tmp_path: Path):
+    path = tmp_path / "entity.arxml"
+    path.write_bytes(b"<!ENTITY e 'x'>")
+
+    with pytest.raises(ArxmlError) as caught:
+        read_arxml([path], source_id="entity")
+
+    message = str(caught.value)
+    assert "dtd-not-allowed" in message
+    assert path.name in message
+
+
+def test_not_well_formed_raises_not_xml(tmp_path: Path):
+    path = tmp_path / "broken.arxml"
+    path.write_text("<AUTOSAR>", encoding="utf-8")
+
+    with pytest.raises(ArxmlError) as caught:
+        read_arxml([path], source_id="broken")
+
+    message = str(caught.value)
+    assert "not-xml" in message
+    assert path.name in message
+    assert "unsupported-dialect" not in message
+
+
+def test_packages_only_is_vacuous(tmp_path: Path):
+    """Packages are identifiables, and a set with nothing else is refused."""
+    path = tmp_path / "packages.arxml"
+    path.write_text(
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        '<AUTOSAR xmlns="http://autosar.org/schema/r4.0">\n'
+        "  <AR-PACKAGES>\n"
+        "    <AR-PACKAGE><SHORT-NAME>Only</SHORT-NAME></AR-PACKAGE>\n"
+        "  </AR-PACKAGES>\n"
+        "</AUTOSAR>\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ArxmlError) as caught:
+        read_arxml([path], source_id="packages")
+
+    message = str(caught.value)
+    assert "vacuous" in message
+    assert path.name in message
+
+
+def test_reference_bases_are_recorded_and_not_indexed(tmp_path: Path):
+    """Step 2 records bases and does not walk into REFERENCE-BASES."""
+    path = tmp_path / "bases.arxml"
+    path.write_text(
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        '<AUTOSAR xmlns="http://autosar.org/schema/r4.0">\n'
+        "  <AR-PACKAGES>\n"
+        "    <AR-PACKAGE>\n"
+        "      <SHORT-NAME>Pkg</SHORT-NAME>\n"
+        "      <REFERENCE-BASES>\n"
+        "        <REFERENCE-BASE>\n"
+        "          <SHORT-LABEL>Hidden</SHORT-LABEL>\n"
+        "          <IS-DEFAULT>true</IS-DEFAULT>\n"
+        "          <IS-GLOBAL>false</IS-GLOBAL>\n"
+        "          <BASE-IS-THIS-PACKAGE>true</BASE-IS-THIS-PACKAGE>\n"
+        "          <PACKAGE-REF DEST=\"AR-PACKAGE\">/Ignored</PACKAGE-REF>\n"
+        "          <AR-PACKAGE><SHORT-NAME>ShouldNotIndex</SHORT-NAME></AR-PACKAGE>\n"
+        "        </REFERENCE-BASE>\n"
+        "        <REFERENCE-BASE>\n"
+        "          <SHORT-LABEL> Elsewhere </SHORT-LABEL>\n"
+        "          <IS-DEFAULT>false</IS-DEFAULT>\n"
+        "          <IS-GLOBAL>true</IS-GLOBAL>\n"
+        "          <BASE-IS-THIS-PACKAGE>false</BASE-IS-THIS-PACKAGE>\n"
+        '          <PACKAGE-REF DEST="AR-PACKAGE">  /Other  </PACKAGE-REF>\n'
+        "        </REFERENCE-BASE>\n"
+        "      </REFERENCE-BASES>\n"
+        "      <ELEMENTS>\n"
+        "        <I-SIGNAL><SHORT-NAME> Visible </SHORT-NAME></I-SIGNAL>\n"
+        "      </ELEMENTS>\n"
+        "    </AR-PACKAGE>\n"
+        "  </AR-PACKAGES>\n"
+        "</AUTOSAR>\n",
+        encoding="utf-8",
+    )
+
+    index, report = read_arxml([path], source_id="bases")
+
+    assert set(index) == {"/Pkg", "/Pkg/Visible"}
+    assert index["/Pkg"] == "AR-PACKAGE"
+    assert index["/Pkg/Visible"] == "I-SIGNAL"
+    assert report["identifiables"] == 2
+    assert report["packages"] == 1
+    assert report["base_declarations"] == 2
+    recorded = [
+        (base.label, base.base_path, base.is_default, base.is_global, base.package)
+        for base in report["bases"]
+    ]
+    assert recorded == [
+        ("Hidden", "/Pkg", True, False, "/Pkg"),
+        ("Elsewhere", "/Other", False, True, "/Pkg"),
+    ]
