@@ -5,8 +5,10 @@ Two implementations behind one protocol:
     as the fallback when sentence-transformers is unavailable.
   - LocalEmbedder: sentence-transformers (real semantic vectors), lazy-loaded.
 
-`get_embedder()` tries the local model and falls back to hashing with a warning,
-so ingest never blocks on a missing/offline model.
+`get_embedder()` loads the chosen backend. If that backend cannot be loaded it
+raises RuntimeError naming the backend and the fix, unless
+GRAP_EMBED_ALLOW_STUB=1, which falls back to hashing and logs a WARNING.
+GRAP_EMBED_BACKEND=hashing stays allowed without that flag.
 """
 
 from __future__ import annotations
@@ -25,13 +27,13 @@ from typing import List, Optional, Protocol, Sequence, runtime_checkable
 logger = logging.getLogger("grap-mcp.kee")
 
 # Default OpenAI-compatible endpoint (Ollama). Reused for the HTTP embedder so
-# embeddings can be fully local via Ollama (e.g. nomic-embed-text).
+# embeddings can be fully local via Ollama (default model bge-m3).
 # 127.0.0.1, NOT "localhost": on Windows dual-stack, "localhost" resolves to
 # ::1 first, and Ollama listens on IPv4 only. urllib then blocks in SYN_SENT
 # instead of falling back to IPv4 — a law-ro pipeline run hung there for 24
 # minutes without the socket timeout ever firing.
 _DEFAULT_EMBED_BASE_URL = "http://127.0.0.1:11434/v1"
-_DEFAULT_OLLAMA_EMBED_MODEL = "nomic-embed-text"
+_DEFAULT_OLLAMA_EMBED_MODEL = "bge-m3"
 
 _TOKEN_RE = re.compile(r"[a-z0-9]+")
 
@@ -113,10 +115,10 @@ EMBED_BATCH = 128
 class OpenAICompatEmbedder:
     """Embedder backed by an OpenAI-compatible /embeddings endpoint.
 
-    Works with Ollama (`http://127.0.0.1:11434/v1`, e.g. model
-    `nomic-embed-text`), vLLM, and hosted APIs — so embeddings can be fully
-    local via Ollama. Stdlib urllib only; vectors are L2-normalized for
-    consistency with the other embedders.
+    Works with Ollama (`http://127.0.0.1:11434/v1`, default model `bge-m3`),
+    vLLM, and hosted APIs — so embeddings can be fully local via Ollama.
+    Stdlib urllib only; vectors are L2-normalized for consistency with the
+    other embedders.
     """
 
     name = "ollama"
@@ -212,21 +214,49 @@ class OpenAICompatEmbedder:
 
 
 _HTTP_BACKENDS = {"ollama", "http", "openai", "openai-compat"}
+_VALID_BACKENDS = _HTTP_BACKENDS | {"", "auto", "hashing", "local"}
+
+
+def _allow_stub() -> bool:
+    return os.environ.get("GRAP_EMBED_ALLOW_STUB", "").strip() == "1"
+
+
+def _raise_unrecognised_backend(backend: str) -> None:
+    names = ", ".join(sorted(name for name in _VALID_BACKENDS if name))
+    raise RuntimeError(
+        f"KEE embedder: unrecognised backend '{backend}'. Valid names: {names}."
+    )
+
+
+def _raise_backend_unavailable(backend: str, exc: BaseException) -> None:
+    raise RuntimeError(
+        f"KEE embedder: backend '{backend}' could not be loaded ({exc}). "
+        "Fix: make that backend available, or set GRAP_EMBED_ALLOW_STUB=1 "
+        "to allow the hashing stub."
+    ) from exc
 
 
 def get_embedder(prefer_local: bool = True) -> Embedder:
     """Return an embedder, chosen by GRAP_EMBED_BACKEND:
 
-      - "ollama"/"http"  : OpenAI-compatible HTTP embedder (fully local via
-                           Ollama, e.g. nomic-embed-text); falls back to hashing
-                           if the endpoint is unreachable.
-      - "hashing"        : deterministic offline hashing embedder.
+      - "ollama"/"http"  : OpenAI-compatible HTTP embedder (default model
+                           bge-m3). If the endpoint cannot be loaded, raise
+                           RuntimeError naming the backend and the fix, unless
+                           GRAP_EMBED_ALLOW_STUB=1, which falls back to hashing
+                           and logs a WARNING.
+      - "hashing"        : deterministic offline hashing embedder. Allowed
+                           without GRAP_EMBED_ALLOW_STUB.
       - "local"          : sentence-transformers only (no fallback).
-      - unset/"auto"     : try sentence-transformers, fall back to hashing.
+      - unset/"auto"     : try sentence-transformers. If it cannot be loaded,
+                           raise as above unless GRAP_EMBED_ALLOW_STUB=1, which
+                           falls back to hashing and logs a WARNING.
 
-    Every fallback keeps ingest working offline / without a model.
+    An unrecognised name raises RuntimeError listing the valid names. It never
+    falls through to the hashing stub, even when GRAP_EMBED_ALLOW_STUB=1.
     """
     backend = os.environ.get("GRAP_EMBED_BACKEND", "").strip().lower()
+    if backend not in _VALID_BACKENDS:
+        _raise_unrecognised_backend(backend)
 
     if backend in _HTTP_BACKENDS:
         try:
@@ -236,6 +266,8 @@ def get_embedder(prefer_local: bool = True) -> Embedder:
                         emb.model, emb.base_url, emb.dim)
             return emb
         except Exception as exc:  # noqa: BLE001 - endpoint unreachable / bad shape
+            if not _allow_stub():
+                _raise_backend_unavailable(backend, exc)
             logger.warning("KEE embedder: HTTP embedder unavailable (%s); "
                            "falling back to hashing embedder", exc)
             return HashingEmbedder()
@@ -252,6 +284,8 @@ def get_embedder(prefer_local: bool = True) -> Embedder:
         except Exception as exc:  # noqa: BLE001 - any load/import/network failure
             if backend == "local":
                 raise
+            if not _allow_stub():
+                _raise_backend_unavailable("local", exc)
             logger.warning("KEE embedder: local model unavailable (%s); "
                            "falling back to hashing embedder", exc)
     return HashingEmbedder()

@@ -2,10 +2,12 @@
 
 import io
 import json
+import logging
 import tempfile
 from pathlib import Path
 
 import pygrap
+import pytest
 from grap_mcp.kee import embeddings as emb_mod
 from grap_mcp.kee.embeddings import HashingEmbedder, OpenAICompatEmbedder, get_embedder
 from grap_mcp import ingest
@@ -102,6 +104,50 @@ def test_get_embedder_backend_ollama_falls_back_when_unreachable(monkeypatch):
 
     monkeypatch.setattr(emb_mod.urllib.request, "urlopen", boom)
     assert get_embedder().name == "hashing"     # graceful fallback
+
+
+def test_unreachable_endpoint_raises_unless_stub_allowed(monkeypatch, caplog):
+    """A chosen backend that cannot be loaded raises, naming the backend and the fix.
+
+    GRAP_EMBED_ALLOW_STUB=1 keeps today's hashing fallback and logs a WARNING.
+    GRAP_EMBED_BACKEND=hashing stays allowed without that flag.
+    """
+    monkeypatch.delenv("GRAP_EMBED_ALLOW_STUB", raising=False)
+    monkeypatch.setenv("GRAP_EMBED_BACKEND", "hashing")
+    assert get_embedder().name == "hashing"
+
+    monkeypatch.setenv("GRAP_EMBED_BACKEND", "ollama")
+    monkeypatch.setattr(emb_mod.time, "sleep", lambda *_a, **_k: None)
+
+    def boom(req, timeout=None):
+        raise OSError("connection refused")
+
+    monkeypatch.setattr(emb_mod.urllib.request, "urlopen", boom)
+    with pytest.raises(RuntimeError, match="ollama") as raised:
+        get_embedder()
+    assert "GRAP_EMBED_ALLOW_STUB=1" in str(raised.value)
+
+    monkeypatch.setenv("GRAP_EMBED_ALLOW_STUB", "1")
+    with caplog.at_level(logging.WARNING, logger="grap-mcp.kee"):
+        assert get_embedder().name == "hashing"
+    assert any(record.levelno >= logging.WARNING for record in caplog.records)
+
+
+def test_unrecognised_embed_backend_raises_and_lists_valid_names(monkeypatch):
+    """A mistyped backend name must not fall through to the hashing stub."""
+    monkeypatch.setenv("GRAP_EMBED_BACKEND", "olama")
+    monkeypatch.setenv("GRAP_EMBED_ALLOW_STUB", "1")
+    with pytest.raises(RuntimeError, match="olama") as raised:
+        get_embedder()
+    message = str(raised.value)
+    for name in ("auto", "hashing", "http", "local", "ollama", "openai", "openai-compat"):
+        assert name in message
+
+
+def test_default_http_embed_model_is_bge_m3(monkeypatch):
+    monkeypatch.delenv("GRAP_EMBED_MODEL", raising=False)
+    embedder = OpenAICompatEmbedder(base_url="http://host/v1")
+    assert embedder.model == "bge-m3"
 
 
 def test_ingest_without_embedder_is_unchanged(tmp_path):
