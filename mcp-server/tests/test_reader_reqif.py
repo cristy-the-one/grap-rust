@@ -284,10 +284,12 @@ def test_reqif_items_attributes_headings_and_links(tmp_path: Path):
     assert all("Vehicle spec" not in item.heading_path for item in items)
     assert all("Appendix" not in item.heading_path for item in items)
 
+    assert items[0].item_id == "_parent"
     assert items[0].text == "The vehicle shall remain controllable."
     assert items[0].attributes == {
         "req_if_text": "The vehicle shall remain controllable.",
         "req_if_foreign_id": "SYS-1",
+        "native_id": "SYS-1",
         "factor": "0.10",
         "status": "Approved",
     }
@@ -295,6 +297,7 @@ def test_reqif_items_attributes_headings_and_links(tmp_path: Path):
 
     assert items[1].text == "1 Chassis"
     assert items[1].attributes == {"req_if_chapter_name": "1 Chassis"}
+    assert "native_id" not in items[1].attributes
     assert items[1].links == []
 
     assert items[2].text == "The system shall modulate brake pressure."
@@ -304,10 +307,12 @@ def test_reqif_items_attributes_headings_and_links(tmp_path: Path):
     }
     assert items[2].links == [_link("traces_to", "_brake", "Refinement")]
 
+    assert items[3].item_id == "_brake"
     assert items[3].text == "The system shall brake."
     assert items[3].attributes == {
         "req_if_text": "The system shall brake.",
         "req_if_foreign_id": "SYS-BRK-1",
+        "native_id": "SYS-BRK-1",
         "asil": "D",
         "priority": "2",
         "is_mandatory": "true",
@@ -350,6 +355,22 @@ def test_identical_bytes_give_identical_items(tmp_path: Path):
     left.write_bytes(payload)
     right.write_bytes(payload)
     assert read_reqif(left, corpus_root=left_root) == read_reqif(right, corpus_root=right_root)
+
+
+@pytest.mark.parametrize("marker", [b"<!DOCTYPE", b"<!ENTITY"])
+def test_dtd_markers_are_refused(tmp_path: Path, marker: bytes):
+    # The marker sits in a comment after the XML declaration, so the file is
+    # still well-formed. A byte scan has to refuse it; a parser that skips
+    # comments would return the item.
+    declaration, rest = BARE.split("\n", 1)
+    payload = (
+        declaration + "\n<!-- " + marker.decode("ascii") + " -->\n" + rest
+    ).encode("utf-8")
+    assert marker in payload
+    path = tmp_path / "marked.reqif"
+    path.write_bytes(payload)
+    with pytest.raises(Exception, match="dtd-not-allowed"):
+        read_reqif(path, corpus_root=tmp_path)
 
 
 def test_corrupt_reqif_raises(tmp_path: Path):

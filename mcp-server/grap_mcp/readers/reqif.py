@@ -42,12 +42,16 @@ def read_reqif(path: str | Path, corpus_root: str | Path | None = None) -> list[
     An empty identifier uses ``{source_id}#{n}`` with `n` the 0-based index
     in that order. `release` is None: a ReqIF header does not state a
     document release. Attribute keys are snake_case of the attribute
-    definition's LONG-NAME. `text` is the ReqIF.Text value when that
-    attribute is present, otherwise the only XHTML value, otherwise the
-    chapter name.
+    definition's LONG-NAME. When that name is ``ReqIF.ForeignID``,
+    ``attributes["native_id"]`` is the same value. `text` is the ReqIF.Text
+    value when that attribute is present, otherwise the only XHTML value,
+    otherwise the chapter name. Bytes containing ``<!DOCTYPE`` or
+    ``<!ENTITY`` raise ``dtd-not-allowed``.
     """
     file_path = Path(path)
     data = file_path.read_bytes()
+    if b"<!DOCTYPE" in data or b"<!ENTITY" in data:
+        raise ReqifError(f"ReqIF reader cannot parse {file_path}: dtd-not-allowed")
     root = ET.fromstring(data)
     if _local(root.tag) != "REQ-IF":
         raise ReqifError(f"ReqIF reader cannot parse {file_path}: root is not REQ-IF")
@@ -153,16 +157,22 @@ def _attributes(element, definitions, enums, file_path):
                 f"ReqIF reader cannot parse {file_path}: "
                 f"unknown attribute value {tag}"
             )
-        key = _attribute_key(value, definitions, file_path)
+        key, long_name = _attribute_key(value, definitions, file_path)
         if key in attributes:
             raise ReqifError(
                 f"ReqIF reader cannot parse {file_path}: duplicate attribute {key!r}"
             )
         attributes[key] = rendered
+        if long_name == "ReqIF.ForeignID":
+            if "native_id" in attributes:
+                raise ReqifError(
+                    f"ReqIF reader cannot parse {file_path}: duplicate attribute 'native_id'"
+                )
+            attributes["native_id"] = rendered
     return attributes, xhtml_values
 
 
-def _attribute_key(value, definitions, file_path) -> str:
+def _attribute_key(value, definitions, file_path) -> tuple[str, str]:
     definition = _child(value, "DEFINITION")
     if definition is None:
         raise ReqifError(
@@ -178,7 +188,7 @@ def _attribute_key(value, definitions, file_path) -> str:
             f"ReqIF reader cannot parse {file_path}: unresolved attribute definition {ref!r}"
         )
     long_name, identifier = definitions[ref]
-    return _snake(long_name or identifier, file_path)
+    return _snake(long_name or identifier, file_path), long_name
 
 
 def _enumeration(value, enums, file_path) -> str:
