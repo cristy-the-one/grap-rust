@@ -251,7 +251,7 @@ Cards below are deliberately coarse. Each **[L]** must be done before its **[S]*
 | T-01 Batching server and concurrency | **[M] + [H]** | Serve through vLLM; concurrent requests | Environment-specific (WSL, drivers); failures are not code bugs |
 | E-01 Entity resolution redesign | **[L]** | Mentions as truth, entities as a recomputable grouping; blocking → pairwise → grouping with never-merge constraints | Storage and identity design; errors are silent and permanent |
 | E-02 … children of E-01 | [S] | Written by E-01 | — |
-| V-01 Typed vocabulary applied to the graph | **[L]** | Entity types, small relation set, qualifiers on edges | Schema choices decide what the product can ever answer |
+| V-01 Automotive schema | **spec approved** | See [spec-automotive-schema.md](spec-automotive-schema.md): 22 node types, 30 relations. Cards S-01 … S-05 are ready ([S] and [M]); S-06 is [L] and waits for E-01 | — |
 | C-01 Confidence and abstention on claims | **[L]** | Calibrated score, explicit "don't know" | Statistical; easy to produce numbers that look calibrated and are not |
 | Q-01 Retrieval evaluation and reranking | **[L]** then [S] | Only after gold exists | Interpreting ablations |
 | P-01 Minimal procedure runtime | **[L]** | One real test-specification procedure, executed step by step | Core product semantics |
