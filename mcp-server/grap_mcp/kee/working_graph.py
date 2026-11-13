@@ -85,6 +85,9 @@ class WorkingGraph:
         self.node_sources: Dict[int, Set[str]] = {}    # node -> source chunks
         self.relations: List[dict] = []                # [{from_id,to_id,type}]
         self._edge_types: Dict[Tuple[int, int, str], str] = {}
+        # Relations already stored between a pair, so a new one can be told
+        # apart from a repeat without scanning every edge.
+        self._pair_types: Dict[Tuple[int, int], set] = {}
         self._rel_sources: Dict[Tuple[int, str, int], Set[str]] = {}
         self.rel_vocab: List[str] = []
         self.parked: List[dict] = []
@@ -517,8 +520,17 @@ class WorkingGraph:
             # bridge (they start as disconnected singletons).
             bridge = (fn in self._has_edge and tn in self._has_edge
                       and self._find(fn) != self._find(tn))
+            # A different relation between the same pair used to be parked as
+            # a conflict. Both are kept now, but the second-look signal stays:
+            # whether it should fire for a legitimate pair such as sends and
+            # receives is a tuning question for when labelled data exists, not
+            # something to change silently along with the storage key.
+            if self._pair_types.get((fn, tn)):
+                sig.conflicts.append({"kind": "relation",
+                                      "names": [f, t], "type": ty})
             self.kg.add_edge(self._concept_to_node[fn], self._concept_to_node[tn], 1.0, {"rel": ty})
             self._edge_types[key] = ty
+            self._pair_types.setdefault((fn, tn), set()).add(ty)
             self.relations.append({"from_id": fn, "to_id": tn, "type": ty})
             self._rel_sources[(fn, ty, tn)] = {source}
             self._chunk_contrib[source]["edges"].add((fn, tn, ty))
@@ -616,6 +628,11 @@ class WorkingGraph:
     def _remove_edge(self, fn: int, tn: int, ty: str) -> None:
         self._edges_dirty = True
         self._edge_types.pop((fn, tn, ty), None)
+        others = self._pair_types.get((fn, tn))
+        if others is not None:
+            others.discard(ty)
+            if not others:
+                del self._pair_types[(fn, tn)]
         self._rel_sources.pop((fn, ty, tn), None)
         self.relations = [e for e in self.relations
                           if not (e["from_id"] == fn and e["to_id"] == tn and e["type"] == ty)]
@@ -916,6 +933,9 @@ class WorkingGraph:
         self._char_sources = {k: set(v) for k, v in st.char_sources.items()}
         self.relations = [{"from_id": f, "to_id": t, "type": ty} for (f, t, ty) in st.edges]
         self._edge_types = {(f, t, ty): ty for (f, t, ty) in st.edges}
+        self._pair_types = {}
+        for (f, t, ty) in st.edges:
+            self._pair_types.setdefault((f, t), set()).add(ty)
         self._rel_sources = {(f, ty, t): set(st.edge_sources.get((f, t, ty), []))
                              for (f, t, ty) in st.edges}
         self.rel_vocab = list(st.rel_vocab)
