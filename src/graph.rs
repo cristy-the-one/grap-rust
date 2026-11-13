@@ -23,7 +23,7 @@ pub(crate) struct Node {
     pub(crate) incoming: Vec<EdgeId>,
     pub(crate) label: Option<String>,
     pub(crate) outgoing_property_mask: u64,
-    /// SHA-256 of the node's text blob at write time (lean [u8;32] form).
+    /// SHA-256 of the node's text blob at write time (lean `[u8; 32]` form).
     /// Back-filled on load of legacy graphs.
     pub(crate) content_hash: [u8; 32],
 }
@@ -204,7 +204,7 @@ impl KnowledgeGraph {
             .and_then(|r| self.blobs.read_embedding(r))
     }
 
-    /// Bounds-checked variant of [`read_blob`]. Returns `None` if the node id is out of range.
+    /// Bounds-checked variant of `read_blob`. Returns `None` if the node id is out of range.
     pub fn try_read_blob(&self, node: NodeId) -> Option<&str> {
         let n = self.nodes.get(node.0 as usize)?;
         Some(self.blobs.read(&n.blob))
@@ -215,7 +215,7 @@ impl KnowledgeGraph {
         self.nodes[node.0 as usize].label.as_deref()
     }
 
-    /// Bounds-checked variant of [`node_label`]. Returns `None` if id is out of range.
+    /// Bounds-checked variant of `node_label`. Returns `None` if id is out of range.
     pub fn try_node_label(&self, node: NodeId) -> Option<Option<&str>> {
         self.nodes.get(node.0 as usize).map(|n| n.label.as_deref())
     }
@@ -243,14 +243,14 @@ impl KnowledgeGraph {
     }
 
     /// Size of the node id-space, including tombstoned (logically deleted)
-    /// nodes. Used as the upper bound for id iteration; see [`live_node_count`]
+    /// nodes. Used as the upper bound for id iteration; see `live_node_count`
     /// for the count of nodes that are actually still present.
     pub fn node_count(&self) -> usize {
         self.nodes.len()
     }
 
     /// Number of live (non-tombstoned) nodes. After `remove_node` / `merge_nodes`
-    /// this is less than [`node_count`]; it is the count a caller means by
+    /// this is less than `node_count`; it is the count a caller means by
     /// "how many nodes are in the graph".
     pub fn live_node_count(&self) -> usize {
         (0..self.nodes.len())

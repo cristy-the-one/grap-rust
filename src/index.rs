@@ -724,7 +724,7 @@ impl InvertedIndex {
     /// # Single-term phrases
     ///
     /// When `phrase` tokenises to fewer than two terms (after stop-word removal),
-    /// the method falls back to a plain [`search`] call. The result ranking is
+    /// the method falls back to a plain `search` call. The result ranking is
     /// identical to calling `search` directly — there is no proximity penalty.
     pub fn phrase_search(
         &self,
@@ -918,7 +918,7 @@ pub struct IndexedKnowledgeGraph {
     merge_workers: Vec<crate::MergeWorkerHandle>,
 
     /// Lazily-computed global PageRank, invalidated on topology mutation.
-    /// Mutex (NOT RefCell) so the graph stays Send + Sync — pygrap's #[pyclass]
+    /// Mutex (NOT RefCell) so the graph stays Send + Sync — pygrap's `#[pyclass]`
     /// and background workers depend on that.
     pagerank_cache: std::sync::Mutex<Option<Vec<f64>>>,
 }
@@ -1634,7 +1634,7 @@ impl IndexedKnowledgeGraph {
         self.fuse_combined(combined, weights, max_results)
     }
 
-    /// Like [`search_and_traverse_hybrid`] but with sensible default [`HybridWeights`].
+    /// Like `search_and_traverse_hybrid` but with sensible default [`HybridWeights`].
     #[expect(
         clippy::too_many_arguments,
         reason = "retain the established positional query API for callers"
@@ -1691,7 +1691,7 @@ impl IndexedKnowledgeGraph {
         self.graph.read_embedding(node)
     }
 
-    /// Phrase-aware high-level query (see [`search_and_traverse`] for details).
+    /// Phrase-aware high-level query (see `search_and_traverse` for details).
     ///
     /// Uses the hybrid phrase + BM25 scoring for seed selection.
     #[expect(
