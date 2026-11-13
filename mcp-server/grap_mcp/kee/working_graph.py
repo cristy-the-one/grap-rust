@@ -84,7 +84,7 @@ class WorkingGraph:
         self.chars: Dict[int, List[str]] = {}          # node -> characteristics
         self.node_sources: Dict[int, Set[str]] = {}    # node -> source chunks
         self.relations: List[dict] = []                # [{from_id,to_id,type}]
-        self._edge_types: Dict[Tuple[int, int], str] = {}
+        self._edge_types: Dict[Tuple[int, int, str], str] = {}
         self._rel_sources: Dict[Tuple[int, str, int], Set[str]] = {}
         self.rel_vocab: List[str] = []
         self.parked: List[dict] = []
@@ -368,7 +368,7 @@ class WorkingGraph:
             [n for p in ungrounded for n in (p.get("from"), p.get("to"))])
 
         # Re-attempt the parked relations through the normal path, so the
-        # self-loop guard, conflict detection and provenance all still apply.
+        # self-loop guard and provenance still apply.
         # Drop them first; whatever still fails simply gets re-parked.
         self.parked = [p for p in self.parked if p.get("reason") != "ungrounded"]
         by_source: Dict[str, List[dict]] = {}
@@ -504,16 +504,12 @@ class WorkingGraph:
                 # carries no relational information and pollutes edge counts.
                 self._park(f, ty, t, source, "self_loop")
                 continue
-            key = (fn, tn)
-            existing = self._edge_types.get(key)
-            if existing is not None and existing != ty:
-                self._park(f, ty, t, source, "conflict")
-                sig.conflicts.append({"kind": "relation",
-                                      "names": [f, t], "type": ty})
-                continue
-            if existing == ty:
+            # The key is the relation, not the node pair: sends and receives
+            # between the same nodes are two edges.
+            key = (fn, tn, ty)
+            if key in self._edge_types:
                 self._rel_sources[(fn, ty, tn)].add(source)
-                self._chunk_contrib[source]["edges"].add((fn, tn))
+                self._chunk_contrib[source]["edges"].add((fn, tn, ty))
                 continue
             # A "bridge" connects two pieces of EXISTING structure: it only
             # counts when both endpoints already had an edge and sit in different
@@ -525,7 +521,7 @@ class WorkingGraph:
             self._edge_types[key] = ty
             self.relations.append({"from_id": fn, "to_id": tn, "type": ty})
             self._rel_sources[(fn, ty, tn)] = {source}
-            self._chunk_contrib[source]["edges"].add((fn, tn))
+            self._chunk_contrib[source]["edges"].add((fn, tn, ty))
             if ty not in self.rel_vocab:
                 self.rel_vocab.append(ty)
             self._has_edge.add(fn)
@@ -586,9 +582,8 @@ class WorkingGraph:
                 self._char_sources.pop((node, text), None)
                 if node in self.chars and text in self.chars[node]:
                     self.chars[node].remove(text)
-        for (fn, tn) in contrib["edges"]:
-            ty = self._edge_types.get((fn, tn))
-            if ty is None:
+        for (fn, tn, ty) in contrib["edges"]:
+            if (fn, tn, ty) not in self._edge_types:
                 continue
             key = (fn, ty, tn)
             srcs = self._rel_sources.get(key)
@@ -620,10 +615,10 @@ class WorkingGraph:
 
     def _remove_edge(self, fn: int, tn: int, ty: str) -> None:
         self._edges_dirty = True
-        self._edge_types.pop((fn, tn), None)
+        self._edge_types.pop((fn, tn, ty), None)
         self._rel_sources.pop((fn, ty, tn), None)
         self.relations = [e for e in self.relations
-                          if not (e["from_id"] == fn and e["to_id"] == tn)]
+                          if not (e["from_id"] == fn and e["to_id"] == tn and e["type"] == ty)]
 
     def _retract_concept(self, node: int) -> None:
         self._retracted.add(node)
@@ -897,7 +892,7 @@ class WorkingGraph:
             if f in live_ids and t in live_ids:
                 st.edges.append((f, t, e["type"]))
                 srcs = self._rel_sources.get((f, e["type"], t), set())
-                st.edge_sources[(f, t)] = sorted(srcs)
+                st.edge_sources[(f, t, e["type"])] = sorted(srcs)
         st.manifest = dict(self.manifest)
         st.chunk_failures = {k: dict(v) for k, v in self.chunk_failures.items()}
         st.extractions = dict(self.extractions)
@@ -920,8 +915,8 @@ class WorkingGraph:
         self.node_sources = {cid: set(s) for cid, s in st.concept_sources.items()}
         self._char_sources = {k: set(v) for k, v in st.char_sources.items()}
         self.relations = [{"from_id": f, "to_id": t, "type": ty} for (f, t, ty) in st.edges]
-        self._edge_types = {(f, t): ty for (f, t, ty) in st.edges}
-        self._rel_sources = {(f, ty, t): set(st.edge_sources.get((f, t), []))
+        self._edge_types = {(f, t, ty): ty for (f, t, ty) in st.edges}
+        self._rel_sources = {(f, ty, t): set(st.edge_sources.get((f, t, ty), []))
                              for (f, t, ty) in st.edges}
         self.rel_vocab = list(st.rel_vocab)
         self.parked = [{"from": p["from"], "type": p["type"], "to": p["to"],
@@ -944,9 +939,9 @@ class WorkingGraph:
         for key, sources in self._char_sources.items():
             for source in sources:
                 contribution(source)["chars"].add(key)
-        for (f, _ty, t), sources in self._rel_sources.items():
+        for (f, ty, t), sources in self._rel_sources.items():
             for source in sources:
-                contribution(source)["edges"].add((f, t))
+                contribution(source)["edges"].add((f, t, ty))
         for source in self.extractions:
             contribution(source)
         for parked in self.parked:
