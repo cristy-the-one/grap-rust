@@ -152,8 +152,14 @@ references_seen == resolved + dest_mismatch + unresolved_definition
                  + dangling + unresolvable_relative + empty
 ```
 
-The reader asserts this before returning. It is the single most important line in the
-implementation: it is what makes a dropped reference impossible rather than unlikely.
+The reader checks this before returning and raises `ArxmlError` if it fails — a real error, not
+an `assert`, which Python skips under its optimise flag.
+
+On its own that sum cannot fail, because the six counts are tallied from the same list. What can
+go wrong is a reference never being collected. So `references_seen` must also equal an
+**independent count**: the number of elements carrying a `DEST` attribute, counted in a separate
+plain pass over each file that skips `REFERENCE-BASES`. Together the two checks are what make a
+dropped reference impossible rather than unlikely.
 
 ### 4.4 The same path in more than one place
 

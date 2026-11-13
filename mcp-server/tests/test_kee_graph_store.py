@@ -13,7 +13,7 @@ def _state():
         edges=[(1, 0, "uses")],
         concept_sources={0: ["a#0", "b#0"], 1: ["a#0"]},
         char_sources={(0, "coverage"): ["a#0"]},
-        edge_sources={(1, 0): ["a#0"]},
+        edge_sources={(1, 0, "uses"): ["a#0"]},
         manifest={"a#0": "h1", "b#0": "h2"},
         rel_vocab=["uses"],
         parked=[{"from": "X", "type": "rel", "to": "Y", "chunk_id": "a#0", "reason": "ungrounded"}],

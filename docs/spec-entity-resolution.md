@@ -147,8 +147,10 @@ a `link_decision` with origin `human` and, where the reviewer says it holds gene
   `reconcile.greedy_cluster` for concepts.
 - **Kept:** exact alias and content-hash matching; the regex veto, absorbed into the conflict flag.
 - **Not touched:** the Rust engine; extraction prompts; the legal claim store.
-- **Existing stores** are migrated without any model call: mentions are rebuilt from the receipts
-  already saved per chunk, which hold every name with its quote.
+- **Existing stores that have receipts** are migrated without any model call: mentions are rebuilt
+  from the receipts saved per chunk, which hold every name with its quote. **Stores written before
+  receipts existed cannot be migrated** — the large law-pilot stores are in this group — and must
+  be re-extracted. The backfill reports `n/a` on them rather than an empty success.
 
 One existing limit is in the way and is fixed first: the `edges` table allows **one relation per
 pair of nodes**. The schema needs several (`about` and `refers_to`; `sends` and `receives`).
@@ -177,7 +179,7 @@ Rules of Part A in the work-packages file apply. New code goes in
 
 | Card | Tag | Does | Needs gold? |
 |---|---|---|---|
-| **E-10** Several relations per pair | [S] | Change the `edges` key to include the relation type, with a migration. Test: two relations between the same pair both survive save and reload. | no |
+| **E-10** Several relations per pair | [M] | Key by `(from, to, relation)` in **all three places**: the `edges` table, `WorkingGraph._edge_types`, and edge provenance (`edge_sources`), including the retraction paths. Test **through `WorkingGraph`**: `EcuA sends FrameX` and `EcuA receives FrameX` both survive `upsert`, `save` and `open`; retracting one chunk removes only its own relation. | no |
 | **E-11** Tables | [S] | The four tables of §3 and their accessors. Test: a decision appended later wins; `mentions` cannot be updated in place. | no |
 | **E-12** Backfill | [S] | Rebuild `mentions` from stored receipts, no model call. Test: counts equal the names in the receipts; a second run adds nothing. | no |
 | **E-13** Normalise | [S] | Stage 0, table-driven. Test: `[SWS_Com_00123]`, `Com_SendSignal()`, and both encodings of a Romanian letter. | no |

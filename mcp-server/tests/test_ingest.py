@@ -160,3 +160,56 @@ def test_embedding_batch_size_is_bounded(tmp_path):
     assert emb.calls == 4          # ceil(10/3)
     # embeddings still land on the right nodes, in order
     assert [n[2][0] for n in kg.nodes] == [float(len(n[0])) for n in kg.nodes]
+
+
+# Same two-message file the DBC reader test parses. Signal order is file order.
+DBC = """\
+VERSION "REL-2026.11"
+
+NS_ :
+
+BS_:
+
+BU_: Engine Gateway Abs
+
+BO_ 256 EngineData: 8 Engine
+ SG_ EngineTemp : 16|8@1- (1,-40) [-40|215] "C" Gateway
+ SG_ EngineSpeed : 0|16@1+ (0.1,0) [0|8000] "rpm" Gateway,Abs
+
+BO_ 512 VehicleStatus: 4 Gateway
+ SG_ Ignition : 7|2@0+ (1,0) [0|3] "" Engine
+
+CM_ BO_ 256 "Engine measurements";
+CM_ SG_ 256 EngineSpeed "Crankshaft speed";
+
+BA_DEF_ BO_ "GenMsgCycleTime" INT 0 65535;
+BA_DEF_DEF_ "GenMsgCycleTime" 0;
+BA_ "GenMsgCycleTime" BO_ 256 10;
+
+VAL_ 512 Ignition 0 "Off" 1 "Run" 3 "Start" ;
+"""
+
+
+def _reader_node_text(item):
+    """item_id, kind_hint, text, then one key=value attribute per line."""
+    lines = [item.item_id, item.kind_hint, item.text]
+    lines.extend(f"{key}={value}" for key, value in item.attributes.items())
+    return "\n".join(lines)
+
+
+def test_dbc_fixture_yields_items(tmp_path):
+    """R-06: a .dbc file yields one node per item, and each node contains its name."""
+    from grap_mcp.readers.dbc import read_dbc
+
+    path = tmp_path / "vehicle.dbc"
+    path.write_text(DBC, encoding="utf-8")
+    items = read_dbc(path, corpus_root=tmp_path)
+    kg = FakeKG()
+    res = ingest_paths(kg, str(tmp_path))
+    assert res["files"] == 1
+    assert res["nodes_added"] == len(items)
+    assert len(kg.nodes) == len(items)
+    for item, (text, label) in zip(items, kg.nodes, strict=True):
+        assert item.item_id in text
+        assert label == item.kind_hint
+        assert text == _reader_node_text(item)

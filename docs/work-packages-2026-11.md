@@ -129,8 +129,11 @@ those in the two labelling guides, lower-case with underscores, preceded by `pac
   mention names with the configured embedder. Emit 200 pairs: 80 with cosine ≥ 0.86, 60 with cosine
   in [0.70, 0.86), 30 random, and 30 that are string-identical but from different documents. Each
   row carries both sentences and both document IDs.
+- **Diversity:** draw over distinct *name pairs* — one occurrence pair per name pair, chosen by the
+  seeded hash — and let no single name appear in more than 3 rows. Drop any name that occurs in
+  more than 20% of the sampled documents (page furniture) and print how many were dropped.
 - **Test first:** band counts are exact; no pair appears twice in either order; a pair never puts
-  one mention against itself.
+  one mention against itself; no name pair repeats; no name appears more than 3 times.
 - **Stop if:** any band cannot be filled — report the shortfall, do not top it up from another band.
 
 ### G-03 [S] Scorer
@@ -211,7 +214,10 @@ split across files.
 ### R-06 [S] Wire readers into ingestion
 - **File:** `mcp-server/grap_mcp/ingest.py` — extend `_ALL_EXTS` and dispatch by extension to the
   readers. Existing `.md/.txt/.json` behaviour must be byte-for-byte unchanged.
-- **Test first:** an existing ingest test still passes untouched; a `.dbc` fixture now yields items.
+- **Node content:** text = `item_id`, then `kind_hint`, then `text`, then `key=value` per
+  attribute, one per line. Label = `kind_hint`. An item's own text is often empty.
+- **Test first:** an existing ingest test still passes untouched; a `.dbc` fixture now yields
+  items, and every node contains its own name.
 
 ### R-07 [S] Fail loudly on the stub embedder
 - **File:** `mcp-server/grap_mcp/kee/embeddings.py`, function `get_embedder`.
@@ -227,16 +233,25 @@ split across files.
 - **Stop if:** more than 25 existing tests fail after that.
 
 ### R-08 [S] Format links become graph edges
-- `links` on a `SourceItem` are written as typed edges with property `origin=format`. A link whose
-  target is not in the corpus creates a placeholder node with label `unresolved` — never dropped.
-- **Test first:** two items, one linking to a missing ID → 3 nodes, 1 edge, 1 `unresolved`.
+- Implements schema §6. `links` on a `SourceItem` become edges with properties
+  `{<link type>: true, "origin": "format", "role": <role>}` — the relation is the property
+  **name**. `context` is not written to the engine; it is returned to the caller.
+- Items are keyed by `(source_id, item_id)`. Node label = `kind_hint`. A link whose target is not
+  in the corpus creates a placeholder node with label `unresolved` — never dropped.
+- Returns counts: items, links, unresolved targets.
+- **Test first:** two items, one linking to a missing ID → 3 nodes, 1 edge, 1 `unresolved`; two
+  sources each with an item of the same ID keep their links apart.
 
 ### R-09 [M] Identifier-first resolution
-- **File:** `kee/working_graph.py`, `_resolve_outcome`. Before the embedding step: if the name
-  matches a configured identifier pattern (default `\b[A-Z][A-Za-z0-9]*(?:_[A-Za-z0-9]+)+\b` or
-  `\[[A-Z]+_\w+\]`), resolve by exact string only and **skip** the similarity merge entirely.
-- **Test first:** `Com_SendSignal` and `Com_SendSignalGroup` forced to identical vectors stay two
-  nodes; the same identifier seen twice is one node.
+- **File:** `kee/working_graph.py`, `_resolve_outcome`. Before the embedding step: if the name is
+  an identifier, resolve by exact string only and **skip** the similarity merge entirely.
+- **What counts as an identifier:** a name with no whitespace and at least one of — an underscore,
+  a slash, a dot, a digit, or an uppercase letter after its first character; or a bracketed ID
+  such as `[SWS_Com_00123]`. A phrase that *contains* an identifier is exempt from merging too.
+- **Test first:** forced to identical vectors, each of these pairs stays two nodes:
+  `Com_SendSignal` / `Com_SendSignalGroup`, `VehSpdFL` / `VehSpdFR`, `BrakePedalPosition` /
+  `BrakePedalPressure`, `vehicle_speed` / `vehicle_speed_raw`, `/ISignal/SigA` / `/ISignal/SigB`.
+  The same identifier seen twice is one node.
 
 ---
 
