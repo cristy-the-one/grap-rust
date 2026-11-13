@@ -88,8 +88,10 @@ def test_two_message_dbc_items_ids_and_links(tmp_path: Path):
 
     assert items[0].text == "Engine measurements"
     assert items[0].attributes == {
+        "frame_id": "0x100",
+        "is_extended_frame": "false",
         "length": "8",
-        "cycle time": "10",
+        "cycle_time": "10",
         "senders": "Engine",
     }
     assert items[1].text == ""
@@ -100,8 +102,13 @@ def test_two_message_dbc_items_ids_and_links(tmp_path: Path):
         "min": "-40",
         "max": "215",
         "length": "8",
-        "start bit": "16",
-        "byte order": "little_endian",
+        "start_bit": "16",
+        "byte_order": "little_endian",
+        "is_signed": "true",
+        "is_float": "false",
+        "is_multiplexer": "false",
+        "multiplexer_ids": "",
+        "multiplexer_signal": "",
         "receivers": "Gateway",
     }
     assert items[2].text == "Crankshaft speed"
@@ -112,12 +119,19 @@ def test_two_message_dbc_items_ids_and_links(tmp_path: Path):
         "min": "0",
         "max": "8000",
         "length": "16",
-        "start bit": "0",
-        "byte order": "little_endian",
+        "start_bit": "0",
+        "byte_order": "little_endian",
+        "is_signed": "false",
+        "is_float": "false",
+        "is_multiplexer": "false",
+        "multiplexer_ids": "",
+        "multiplexer_signal": "",
         "receivers": "Gateway,Abs",
     }
     assert items[3].text == ""
     assert items[3].attributes == {
+        "frame_id": "0x200",
+        "is_extended_frame": "false",
         "length": "4",
         "senders": "Gateway",
     }
@@ -129,11 +143,17 @@ def test_two_message_dbc_items_ids_and_links(tmp_path: Path):
         "min": "0",
         "max": "3",
         "length": "2",
-        "start bit": "7",
-        "byte order": "big_endian",
+        "start_bit": "7",
+        "byte_order": "big_endian",
+        "is_signed": "false",
+        "is_float": "false",
+        "is_multiplexer": "false",
+        "multiplexer_ids": "",
+        "multiplexer_signal": "",
         "receivers": "Engine",
-        "value table": '{"0": "Off", "1": "Run", "3": "Start"}',
+        "value_table": '{"0": "Off", "1": "Run", "3": "Start"}',
     }
+    assert all(" " not in key for item in items for key in item.attributes)
 
 
 def test_identical_bytes_give_identical_items(tmp_path: Path):
@@ -147,6 +167,69 @@ def test_identical_bytes_give_identical_items(tmp_path: Path):
     left.write_bytes(payload)
     right.write_bytes(payload)
     assert read_dbc(left, corpus_root=left_root) == read_dbc(right, corpus_root=right_root)
+
+
+# 2147483904 is 0x80000100: CAN id 0x100 with the DBC extended-frame bit set.
+FEATURES = """\
+VERSION "1"
+
+NS_ :
+
+BS_:
+
+BU_: Node
+
+BO_ 2147483904 ExtStatus: 8 Node
+ SG_ SignedVal : 0|8@1- (1,0) [-10|10] "u" Node
+
+BO_ 100 MuxMsg: 8 Node
+ SG_ Muxer M : 0|4@1+ (1,0) [0|3] "" Node
+ SG_ Speed m0 : 8|16@1+ (1,0) [0|100] "kph" Node
+ SG_ Temp m1 : 8|16@1- (0.1,0) [-40|150] "C" Node
+
+SIG_VALTYPE_ 100 Speed : 1;
+"""
+
+
+def test_extended_mux_signed_and_float_attributes(tmp_path: Path):
+    path = tmp_path / "features.dbc"
+    path.write_bytes(FEATURES.encode("utf-8"))
+    items = read_dbc(path, corpus_root=tmp_path)
+    assert [item.item_id for item in items] == [
+        "ExtStatus",
+        "ExtStatus.SignedVal",
+        "MuxMsg",
+        "MuxMsg.Muxer",
+        "MuxMsg.Speed",
+        "MuxMsg.Temp",
+    ]
+    assert items[0].attributes == {
+        "frame_id": "0x100",
+        "is_extended_frame": "true",
+        "length": "8",
+        "senders": "Node",
+    }
+    assert items[1].links == [_part_of("ExtStatus")]
+    assert items[1].attributes["is_signed"] == "true"
+    assert items[1].attributes["is_float"] == "false"
+    assert items[1].attributes["is_multiplexer"] == "false"
+    assert items[1].attributes["multiplexer_ids"] == ""
+    assert items[1].attributes["multiplexer_signal"] == ""
+    assert items[2].attributes["frame_id"] == "0x64"
+    assert items[2].attributes["is_extended_frame"] == "false"
+    assert items[3].links == [_part_of("MuxMsg")]
+    assert items[3].attributes["is_multiplexer"] == "true"
+    assert items[3].attributes["multiplexer_signal"] == ""
+    assert items[4].attributes["is_float"] == "true"
+    assert items[4].attributes["is_signed"] == "false"
+    assert items[4].attributes["is_multiplexer"] == "false"
+    assert items[4].attributes["multiplexer_ids"] == "[0]"
+    assert items[4].attributes["multiplexer_signal"] == "Muxer"
+    assert items[5].attributes["is_signed"] == "true"
+    assert items[5].attributes["is_float"] == "false"
+    assert items[5].attributes["multiplexer_ids"] == "[1]"
+    assert items[5].attributes["multiplexer_signal"] == "Muxer"
+    assert items[5].links == [_part_of("MuxMsg")]
 
 
 def test_corrupt_dbc_raises(tmp_path: Path):

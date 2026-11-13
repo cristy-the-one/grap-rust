@@ -93,6 +93,10 @@ def _own_text(comment: str | None) -> str:
     return comment
 
 
+def _flag(value: bool) -> str:
+    return "true" if value else "false"
+
+
 def _message_item(
     message: Message,
     source_id: str,
@@ -101,9 +105,13 @@ def _message_item(
     relative: str,
     digest: str,
 ) -> SourceItem:
-    attributes: dict[str, str] = {"length": str(message.length)}
+    attributes: dict[str, str] = {
+        "frame_id": f"0x{message.frame_id:x}",
+        "is_extended_frame": _flag(message.is_extended_frame),
+        "length": str(message.length),
+    }
     if message.cycle_time is not None:
-        attributes["cycle time"] = str(message.cycle_time)
+        attributes["cycle_time"] = str(message.cycle_time)
     attributes["senders"] = ",".join(message.senders)
     return SourceItem(
         source_id=source_id,
@@ -138,12 +146,20 @@ def _signal_item(
     if signal.maximum is not None:
         attributes["max"] = str(signal.maximum)
     attributes["length"] = str(signal.length)
-    attributes["start bit"] = str(signal.start)
-    attributes["byte order"] = signal.byte_order
+    attributes["start_bit"] = str(signal.start)
+    attributes["byte_order"] = signal.byte_order
+    attributes["is_signed"] = _flag(signal.is_signed)
+    attributes["is_float"] = _flag(signal.is_float)
+    attributes["is_multiplexer"] = _flag(signal.is_multiplexer)
+    if signal.multiplexer_ids is None:
+        attributes["multiplexer_ids"] = ""
+    else:
+        attributes["multiplexer_ids"] = json.dumps(sorted(signal.multiplexer_ids))
+    attributes["multiplexer_signal"] = signal.multiplexer_signal or ""
     attributes["receivers"] = ",".join(signal.receivers)
     if signal.choices:
         table = {str(raw): str(name) for raw, name in signal.choices.items()}
-        attributes["value table"] = json.dumps(table, ensure_ascii=False)
+        attributes["value_table"] = json.dumps(table, ensure_ascii=False)
     return SourceItem(
         source_id=source_id,
         release=release,
