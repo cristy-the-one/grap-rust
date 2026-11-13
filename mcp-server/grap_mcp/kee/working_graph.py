@@ -11,6 +11,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import re
 import tempfile
 import time
 from dataclasses import dataclass, field
@@ -30,6 +31,40 @@ logger = logging.getLogger("grap-mcp.kee")
 
 EMBED_BATCH = 128     # texts per /embeddings request; bounds payload + peak memory
 REL_VOCAB_CAP = 40    # most-frequent relation types injected into extraction context
+# A bracketed id such as [SWS_Com_00123], found anywhere in the name.
+_BRACKETED_ID = re.compile(r"\[[^\]\s]+\]")
+# A lower-case letter followed by a capital: the inside of a CamelCase name.
+_CAMEL_HUMP = re.compile(r"[a-z][A-Z]")
+
+
+def _name_is_identifier(name: str) -> bool:
+    """A name written as one token: no whitespace, and an underscore, slash,
+    dot, digit, or a capital after the first character."""
+    if not name or any(ch.isspace() for ch in name):
+        return False
+    if any(ch in "_/." or ch.isdigit() for ch in name):
+        return True
+    return any(ch.isupper() for ch in name[1:])
+
+
+def _token_is_strong_identifier(token: str) -> bool:
+    """Inside a phrase, only an unmistakable identifier counts.
+
+    Ordinary prose carries dots and digits ("nr. 58/1998", "art. 5", "S.A."),
+    so those do not mark a phrase. An underscore, a CamelCase hump, or an
+    absolute path does. This keeps the rule free of any one domain's wording.
+    """
+    return "_" in token or token.startswith("/") or _CAMEL_HUMP.search(token) is not None
+
+
+def _contains_identifier(name: str) -> bool:
+    """The name is an identifier, or a phrase that contains an unmistakable one."""
+    if _BRACKETED_ID.search(name):
+        return True
+    tokens = re.findall(r"\S+", name)
+    if len(tokens) == 1:
+        return _name_is_identifier(tokens[0])
+    return any(_token_is_strong_identifier(token) for token in tokens)
 
 
 @dataclass
@@ -60,6 +95,7 @@ class _Resolution:
 class WorkingGraph:
     def __init__(self, embedder, *, merge_threshold: float = 0.86,
                  context_cap: int = 8, workdir: Optional[str] = None,
+                 identifier_pattern: Optional[str] = None,
                  _state: Optional[GraphState] = None) -> None:
         """Build an empty working graph.
 
@@ -73,6 +109,8 @@ class WorkingGraph:
         self.embedder = embedder
         self.merge_threshold = merge_threshold
         self.context_cap = context_cap
+        # None selects the default identifier rule. A caller pattern is still searched.
+        self._identifier_re = None if identifier_pattern is None else re.compile(identifier_pattern)
         self._owned_workdir = workdir is None
         self._dir = workdir or tempfile.mkdtemp(prefix="kee-wg-")
         Path(self._dir).mkdir(parents=True, exist_ok=True)
@@ -251,13 +289,19 @@ class WorkingGraph:
                 self._register_alias(name, node)
                 return _Resolution(node, False)
 
+        # Decided before embedding. An identifier that missed exact alias and
+        # content-hash resolution is its own node: do not similarity-merge.
+        identifier = (self._identifier_re.search(name) is not None
+                      if self._identifier_re is not None
+                      else _contains_identifier(name))
         vec = self._embed_one(name)
-        matches = self._compatible_matches(name, vec)
-        if matches and matches[0][1] >= self.merge_threshold:
-            node = matches[0][0]
-            ambiguous = len(matches) > 1 and matches[1][1] >= self.merge_threshold
-            self._register_alias(name, node)
-            return _Resolution(node, ambiguous)
+        if not identifier:
+            matches = self._compatible_matches(name, vec)
+            if matches and matches[0][1] >= self.merge_threshold:
+                node = matches[0][0]
+                ambiguous = len(matches) > 1 and matches[1][1] >= self.merge_threshold
+                self._register_alias(name, node)
+                return _Resolution(node, ambiguous)
         node = self._next_concept_id
         native = self.kg.add_node(text=name, label="concept", embedding=vec)
         self._next_concept_id += 1
@@ -1010,7 +1054,7 @@ class WorkingGraph:
 
     @classmethod
     def open(cls, workdir: str, embedder, *, merge_threshold: float = 0.86,
-             context_cap: int = 8) -> "WorkingGraph":
+             context_cap: int = 8, identifier_pattern: Optional[str] = None) -> "WorkingGraph":
         """Load authoritative records and rebuild views using cached embeddings.
 
         Older stores migrate in place. Legacy graphs need one embedding pass;
@@ -1021,4 +1065,5 @@ class WorkingGraph:
         with GraphStore(str(Path(workdir) / "graph_store.db")) as store:
             st = store.load()
         return cls(embedder, merge_threshold=merge_threshold,
-                   context_cap=context_cap, workdir=workdir, _state=st)
+                   context_cap=context_cap, identifier_pattern=identifier_pattern,
+                   workdir=workdir, _state=st)
