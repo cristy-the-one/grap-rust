@@ -76,7 +76,7 @@ jobs:
           maturin build -m crates/pygrap/Cargo.toml -o dist
           pip install dist/*.whl
       - name: Install MCP server test dependencies
-        run: pip install "mcp>=1.0.0" "PyYAML>=6.0" "pytest>=8.0"
+        run: pip install "mcp>=1.0.0,<2" "PyYAML>=6.0" "pytest>=8.0"
       - name: Run pytest
         run: python -m pytest mcp-server/tests -q
 
@@ -105,10 +105,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+      # PyO3 0.23 (crates/pygrap) supports Python up to 3.13; the runner default is newer.
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
       - uses: taiki-e/install-action@cargo-llvm-cov
       - run: cargo llvm-cov --all-features --workspace --lcov --output-path lcov.info
       - uses: codecov/codecov-action@v4
         with:
           files: lcov.info
-          fail_ci_if_error: true
-          token: ${{ secrets.CODECOV_TOKEN }} # Optional: add if you have a token
+          # No CODECOV_TOKEN is configured, so the upload cannot succeed; it must
+          # not fail the job. Set this back to true once the secret exists.
+          fail_ci_if_error: false
+          token: ${{ secrets.CODECOV_TOKEN }}
