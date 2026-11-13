@@ -40,6 +40,11 @@ Read these before every card. They are not optional.
 9. **Stop conditions on the card are real.** When one is met, stop, change nothing further, and
    report what you found. Stopping is a correct outcome.
 10. **No customer or sealed data in a prompt, a log, or a commit.** Ever.
+11. **A tool that scores or samples prints its denominators.** Every figure is shown with the
+    number of rows and documents behind it. Where there is nothing to measure it prints `n/a`,
+    never a number.
+12. **Run a new tool once on the real corpus before asking for review**, and paste the output
+    into the report. Unit tests do not show a skewed sample or a vacuous score.
 
 **Report format** (use exactly these headings): `Card` · `What I changed (files)` ·
 `Failing test output (before)` · `Passing output (after)` · `Full suite result` ·
@@ -84,7 +89,7 @@ those in the two labelling guides, lower-case with underscores, preceded by `pac
 
 ### B3. What counts as a match when scoring
 
-- **Statement match:** same `item_id`, same `kind`, and subject agreement — both subjects
+- **Statement match:** same `source_id` **and** `item_id`, same `kind`, and subject agreement — both subjects
   lower-cased and whitespace-collapsed, then either equal or token-level F1 ≥ 0.8.
 - **Pair labels** collapse for scoring: `same` and `same only here` count as *same*;
   `same, other release`, `part of`, `realises` and `different` count as *not same*; `unclear`
@@ -105,13 +110,16 @@ those in the two labelling guides, lower-case with underscores, preceded by `pac
   `--out`. Read `SourceItem`s (law: one item per article, using the existing `_ARTICLE` pattern in
   `kee/legal_rules.py`; automotive: from the readers in Part D). Keep items whose `text` is 80 to
   1,500 characters. Order source files by `sha256(seed + file path)`; walk files in that order
-  taking at most 4 items per file (the first 4 in file order) until `--items` is reached. Mark
+  taking at most 4 items per file until `--items` is reached. Within a file, order the eligible
+  items by `sha256(seed + file path + item_id)` and take the first 4 — **not** the first 4 in file
+  order, which on the law corpus yields almost only articles 1–4 (review finding F5). Mark
   every fourth *file* as sealed. Write the CSVs with label columns empty, and `manifest.json`.
 - **Test first:** same seed twice → byte-identical output; different seed → different selection;
   no file contributes more than 4 items; sealed and open share no `source_id`.
 - **Do not:** call any model; use the statement splitter `source_units` to choose passages (that
   would hide the splitter's own misses from the gold set).
-- **Stop if:** fewer than 40 distinct source files can be reached.
+- **Stop if (exit non-zero, print the counts):** fewer than 40 distinct source files were reached;
+  fewer than `--items` rows were produced; the sealed sheet is empty.
 
 ### G-02 [M] Pair packet generator
 - **Goal:** the empty Sheet 2, with enough hard cases to be informative.
@@ -128,15 +136,24 @@ those in the two labelling guides, lower-case with underscores, preceded by `pac
 ### G-03 [S] Scorer
 - **New file:** `scripts/score_gold.py`; test `mcp-server/tests/test_score_gold.py`.
 - **Behaviour:** implements B3 exactly. Reads a gold folder and a system-output JSON; prints
-  precision, recall and F1 for statements, pair F1, question hit rate, each with its interval.
+  precision, recall and F1 for statements, pair F1, question hit rate, each with its interval and
+  its counts (gold rows, predicted rows, documents).
+- **Which sheets:** by default `open/` only (a flat folder counts as open). With `--sealed`,
+  `sealed/` only. Never both in one run.
+- **Nothing to measure:** a metric with no gold rows prints `n/a`; precision with no predictions
+  prints `n/a`. Never 1.0.
+- **Refuse, naming the sheet and the count,** when any gold row has a blank `kind`, a pair label
+  outside the guide's list, or an answerable question with an empty `where`.
 - **Test first:** a hand-built gold of 6 rows and a system output with known hits gives the exact
   expected precision and recall; subject F1 of 0.79 is a miss and 0.80 is a hit; `unclear` rows
   are excluded and counted.
 - **Do not:** print, log or write any individual row from `sealed/`.
 
 ### G-04 [S] Sealed-set guard
-- **Behaviour:** `score_gold.py --sealed` appends `timestamp, git commit, user, metric summary` to
-  `gold/ACCESS.log`. Add a test that walks every `.py` under `mcp-server/` and `scripts/` and fails
+- **Behaviour:** `--sealed` is the **only** way the scorer reads `sealed/`. It appends
+  `timestamp, git commit, user, metric summary` to `gold/ACCESS.log` **before** printing; if the
+  log cannot be written, nothing is scored.
+- **Test first:** scoring without the flag gives the same result whether or not `sealed/` exists. Add a test that walks every `.py` under `mcp-server/` and `scripts/` and fails
   if any file other than `score_gold.py` contains the string `gold/` followed by `sealed`.
 - **Test first:** add a throwaway file that opens `gold/x/sealed/a.csv`; the test must go red;
   delete the file; green.
@@ -159,8 +176,11 @@ those in the two labelling guides, lower-case with underscores, preceded by `pac
 - **New file:** `mcp-server/grap_mcp/readers/dbc.py`; test `test_reader_dbc.py`. Dependency:
   `cantools` (allowed).
 - **Behaviour:** one `SourceItem` per message (`kind_hint=message`) and per signal
-  (`kind_hint=signal`, link `part_of` → its message). Attributes: unit, factor, offset, min, max,
-  length, start bit, byte order, cycle time, senders, receivers, value table as JSON.
+  (`kind_hint=signal`, link `part_of` → its message). Attribute keys are `snake_case`.
+  Message: `frame_id` (hex string), `is_extended_frame`, `length`, `cycle_time`, `senders`.
+  Signal: `unit`, `factor`, `offset`, `min`, `max`, `length`, `start_bit`, `byte_order`,
+  `is_signed`, `is_float`, `is_multiplexer`, `multiplexer_ids`, `multiplexer_signal`, `receivers`,
+  `value_table` as JSON.
 - **Test first:** a 2-message fixture gives the expected item count, IDs and one `part_of` link per
   signal; a corrupt file raises.
 - **Do not:** import anything from the VSS-engine project.
@@ -197,7 +217,8 @@ split across files.
 - **File:** `mcp-server/grap_mcp/kee/embeddings.py`, function `get_embedder`.
 - **Behaviour:** when the chosen backend cannot be loaded, raise `RuntimeError` naming the backend
   and the fix — unless `GRAP_EMBED_ALLOW_STUB=1`, in which case fall back as today and log a
-  WARNING. `GRAP_EMBED_BACKEND=hashing` stays allowed without the flag. Change the default HTTP
+  WARNING. `GRAP_EMBED_BACKEND=hashing` stays allowed without the flag. An unrecognised
+  backend name raises and lists the valid names — it must never fall through to the stub. Change the default HTTP
   model from `nomic-embed-text` to `bge-m3`.
 - **Test first:** unreachable endpoint with the flag unset raises; with the flag set returns the
   hashing embedder.
