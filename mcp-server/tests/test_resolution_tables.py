@@ -4,7 +4,7 @@ import sqlite3
 
 import pytest
 
-from grap_mcp.kee.graph_store import GraphState, GraphStore
+from grap_mcp.kee.graph_store import SCHEMA_VERSION, GraphState, GraphStore
 
 WIDGET = "Signal | demo | Widget"
 GADGET = "Signal | demo | Gadget"
@@ -146,7 +146,8 @@ def test_e10_store_migrates_to_resolution_tables_and_keeps_both_edges(tmp_path):
     state = GraphState(edges=[(1, 0, "uses"), (1, 0, "cites")])
     with GraphStore(path) as store:
         store.save(state)
-        store.conn.execute("PRAGMA user_version = 5")
+        # One step back: every migration before the resolution tables has run.
+        store.conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION - 1}")
         for table in ("mentions", "link_decisions", "constraints", "groupings"):
             store.conn.execute(f"DROP TABLE IF EXISTS {table}")
         store.conn.commit()
@@ -158,6 +159,6 @@ def test_e10_store_migrates_to_resolution_tables_and_keeps_both_edges(tmp_path):
             for row in store.conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'")
         }
         loaded = store.load()
-    assert version == 6
+    assert version == SCHEMA_VERSION
     assert {"mentions", "link_decisions", "constraints", "groupings"} <= names
     assert sorted(loaded.edges) == [(1, 0, "cites"), (1, 0, "uses")]
