@@ -1,0 +1,3 @@
+# Stored byte-for-byte: their hashes are checked and the ARXML spec quotes counts for these exact bytes.
+mcp-server/tests/fixtures/arxml/*.arxml -text
+mcp-server/tests/fixtures/arxml/SHA256SUMS -text

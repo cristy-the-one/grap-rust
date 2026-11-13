@@ -11,6 +11,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import re
 import tempfile
 import time
 from dataclasses import dataclass, field
@@ -30,6 +31,40 @@ logger = logging.getLogger("grap-mcp.kee")
 
 EMBED_BATCH = 128     # texts per /embeddings request; bounds payload + peak memory
 REL_VOCAB_CAP = 40    # most-frequent relation types injected into extraction context
+# A bracketed id such as [SWS_Com_00123], found anywhere in the name.
+_BRACKETED_ID = re.compile(r"\[[^\]\s]+\]")
+# A lower-case letter followed by a capital: the inside of a CamelCase name.
+_CAMEL_HUMP = re.compile(r"[a-z][A-Z]")
+
+
+def _name_is_identifier(name: str) -> bool:
+    """A name written as one token: no whitespace, and an underscore, slash,
+    dot, digit, or a capital after the first character."""
+    if not name or any(ch.isspace() for ch in name):
+        return False
+    if any(ch in "_/." or ch.isdigit() for ch in name):
+        return True
+    return any(ch.isupper() for ch in name[1:])
+
+
+def _token_is_strong_identifier(token: str) -> bool:
+    """Inside a phrase, only an unmistakable identifier counts.
+
+    Ordinary prose carries dots and digits ("nr. 58/1998", "art. 5", "S.A."),
+    so those do not mark a phrase. An underscore, a CamelCase hump, or an
+    absolute path does. This keeps the rule free of any one domain's wording.
+    """
+    return "_" in token or token.startswith("/") or _CAMEL_HUMP.search(token) is not None
+
+
+def _contains_identifier(name: str) -> bool:
+    """The name is an identifier, or a phrase that contains an unmistakable one."""
+    if _BRACKETED_ID.search(name):
+        return True
+    tokens = re.findall(r"\S+", name)
+    if len(tokens) == 1:
+        return _name_is_identifier(tokens[0])
+    return any(_token_is_strong_identifier(token) for token in tokens)
 
 
 def _relation_properties(rel_type: str) -> dict:
@@ -69,6 +104,7 @@ class _Resolution:
 class WorkingGraph:
     def __init__(self, embedder, *, merge_threshold: float = 0.86,
                  context_cap: int = 8, workdir: Optional[str] = None,
+                 identifier_pattern: Optional[str] = None,
                  _state: Optional[GraphState] = None) -> None:
         """Build an empty working graph.
 
@@ -82,6 +118,8 @@ class WorkingGraph:
         self.embedder = embedder
         self.merge_threshold = merge_threshold
         self.context_cap = context_cap
+        # None selects the default identifier rule. A caller pattern is still searched.
+        self._identifier_re = None if identifier_pattern is None else re.compile(identifier_pattern)
         self._owned_workdir = workdir is None
         self._dir = workdir or tempfile.mkdtemp(prefix="kee-wg-")
         Path(self._dir).mkdir(parents=True, exist_ok=True)
@@ -93,7 +131,10 @@ class WorkingGraph:
         self.chars: Dict[int, List[str]] = {}          # node -> characteristics
         self.node_sources: Dict[int, Set[str]] = {}    # node -> source chunks
         self.relations: List[dict] = []                # [{from_id,to_id,type}]
-        self._edge_types: Dict[Tuple[int, int], str] = {}
+        self._edge_types: Dict[Tuple[int, int, str], str] = {}
+        # Relations already stored between a pair, so a new one can be told
+        # apart from a repeat without scanning every edge.
+        self._pair_types: Dict[Tuple[int, int], set] = {}
         self._rel_sources: Dict[Tuple[int, str, int], Set[str]] = {}
         self.rel_vocab: List[str] = []
         self.parked: List[dict] = []
@@ -260,13 +301,19 @@ class WorkingGraph:
                 self._register_alias(name, node)
                 return _Resolution(node, False)
 
+        # Decided before embedding. An identifier that missed exact alias and
+        # content-hash resolution is its own node: do not similarity-merge.
+        identifier = (self._identifier_re.search(name) is not None
+                      if self._identifier_re is not None
+                      else _contains_identifier(name))
         vec = self._embed_one(name)
-        matches = self._compatible_matches(name, vec)
-        if matches and matches[0][1] >= self.merge_threshold:
-            node = matches[0][0]
-            ambiguous = len(matches) > 1 and matches[1][1] >= self.merge_threshold
-            self._register_alias(name, node)
-            return _Resolution(node, ambiguous)
+        if not identifier:
+            matches = self._compatible_matches(name, vec)
+            if matches and matches[0][1] >= self.merge_threshold:
+                node = matches[0][0]
+                ambiguous = len(matches) > 1 and matches[1][1] >= self.merge_threshold
+                self._register_alias(name, node)
+                return _Resolution(node, ambiguous)
         node = self._next_concept_id
         native = self.kg.add_node(text=name, label="concept", embedding=vec)
         self._next_concept_id += 1
@@ -377,7 +424,7 @@ class WorkingGraph:
             [n for p in ungrounded for n in (p.get("from"), p.get("to"))])
 
         # Re-attempt the parked relations through the normal path, so the
-        # self-loop guard, conflict detection and provenance all still apply.
+        # self-loop guard and provenance still apply.
         # Drop them first; whatever still fails simply gets re-parked.
         self.parked = [p for p in self.parked if p.get("reason") != "ungrounded"]
         by_source: Dict[str, List[dict]] = {}
@@ -513,16 +560,12 @@ class WorkingGraph:
                 # carries no relational information and pollutes edge counts.
                 self._park(f, ty, t, source, "self_loop")
                 continue
-            key = (fn, tn)
-            existing = self._edge_types.get(key)
-            if existing is not None and existing != ty:
-                self._park(f, ty, t, source, "conflict")
-                sig.conflicts.append({"kind": "relation",
-                                      "names": [f, t], "type": ty})
-                continue
-            if existing == ty:
+            # The key is the relation, not the node pair: sends and receives
+            # between the same nodes are two edges.
+            key = (fn, tn, ty)
+            if key in self._edge_types:
                 self._rel_sources[(fn, ty, tn)].add(source)
-                self._chunk_contrib[source]["edges"].add((fn, tn))
+                self._chunk_contrib[source]["edges"].add((fn, tn, ty))
                 continue
             # A "bridge" connects two pieces of EXISTING structure: it only
             # counts when both endpoints already had an edge and sit in different
@@ -530,12 +573,21 @@ class WorkingGraph:
             # bridge (they start as disconnected singletons).
             bridge = (fn in self._has_edge and tn in self._has_edge
                       and self._find(fn) != self._find(tn))
+            # A different relation between the same pair used to be parked as
+            # a conflict. Both are kept now, but the second-look signal stays:
+            # whether it should fire for a legitimate pair such as sends and
+            # receives is a tuning question for when labelled data exists, not
+            # something to change silently along with the storage key.
+            if self._pair_types.get((fn, tn)):
+                sig.conflicts.append({"kind": "relation",
+                                      "names": [f, t], "type": ty})
             self.kg.add_edge(self._concept_to_node[fn], self._concept_to_node[tn], 1.0,
                              _relation_properties(ty))
             self._edge_types[key] = ty
+            self._pair_types.setdefault((fn, tn), set()).add(ty)
             self.relations.append({"from_id": fn, "to_id": tn, "type": ty})
             self._rel_sources[(fn, ty, tn)] = {source}
-            self._chunk_contrib[source]["edges"].add((fn, tn))
+            self._chunk_contrib[source]["edges"].add((fn, tn, ty))
             if ty not in self.rel_vocab:
                 self.rel_vocab.append(ty)
             self._has_edge.add(fn)
@@ -596,9 +648,8 @@ class WorkingGraph:
                 self._char_sources.pop((node, text), None)
                 if node in self.chars and text in self.chars[node]:
                     self.chars[node].remove(text)
-        for (fn, tn) in contrib["edges"]:
-            ty = self._edge_types.get((fn, tn))
-            if ty is None:
+        for (fn, tn, ty) in contrib["edges"]:
+            if (fn, tn, ty) not in self._edge_types:
                 continue
             key = (fn, ty, tn)
             srcs = self._rel_sources.get(key)
@@ -630,10 +681,15 @@ class WorkingGraph:
 
     def _remove_edge(self, fn: int, tn: int, ty: str) -> None:
         self._edges_dirty = True
-        self._edge_types.pop((fn, tn), None)
+        self._edge_types.pop((fn, tn, ty), None)
+        others = self._pair_types.get((fn, tn))
+        if others is not None:
+            others.discard(ty)
+            if not others:
+                del self._pair_types[(fn, tn)]
         self._rel_sources.pop((fn, ty, tn), None)
         self.relations = [e for e in self.relations
-                          if not (e["from_id"] == fn and e["to_id"] == tn)]
+                          if not (e["from_id"] == fn and e["to_id"] == tn and e["type"] == ty)]
 
     def _retract_concept(self, node: int) -> None:
         self._retracted.add(node)
@@ -907,7 +963,7 @@ class WorkingGraph:
             if f in live_ids and t in live_ids:
                 st.edges.append((f, t, e["type"]))
                 srcs = self._rel_sources.get((f, e["type"], t), set())
-                st.edge_sources[(f, t)] = sorted(srcs)
+                st.edge_sources[(f, t, e["type"])] = sorted(srcs)
         st.manifest = dict(self.manifest)
         st.chunk_failures = {k: dict(v) for k, v in self.chunk_failures.items()}
         st.extractions = dict(self.extractions)
@@ -930,8 +986,11 @@ class WorkingGraph:
         self.node_sources = {cid: set(s) for cid, s in st.concept_sources.items()}
         self._char_sources = {k: set(v) for k, v in st.char_sources.items()}
         self.relations = [{"from_id": f, "to_id": t, "type": ty} for (f, t, ty) in st.edges]
-        self._edge_types = {(f, t): ty for (f, t, ty) in st.edges}
-        self._rel_sources = {(f, ty, t): set(st.edge_sources.get((f, t), []))
+        self._edge_types = {(f, t, ty): ty for (f, t, ty) in st.edges}
+        self._pair_types = {}
+        for (f, t, ty) in st.edges:
+            self._pair_types.setdefault((f, t), set()).add(ty)
+        self._rel_sources = {(f, ty, t): set(st.edge_sources.get((f, t, ty), []))
                              for (f, t, ty) in st.edges}
         self.rel_vocab = list(st.rel_vocab)
         self.parked = [{"from": p["from"], "type": p["type"], "to": p["to"],
@@ -954,9 +1013,9 @@ class WorkingGraph:
         for key, sources in self._char_sources.items():
             for source in sources:
                 contribution(source)["chars"].add(key)
-        for (f, _ty, t), sources in self._rel_sources.items():
+        for (f, ty, t), sources in self._rel_sources.items():
             for source in sources:
-                contribution(source)["edges"].add((f, t))
+                contribution(source)["edges"].add((f, t, ty))
         for source in self.extractions:
             contribution(source)
         for parked in self.parked:
@@ -1044,7 +1103,7 @@ class WorkingGraph:
 
     @classmethod
     def open(cls, workdir: str, embedder, *, merge_threshold: float = 0.86,
-             context_cap: int = 8) -> "WorkingGraph":
+             context_cap: int = 8, identifier_pattern: Optional[str] = None) -> "WorkingGraph":
         """Load authoritative records and rebuild views using cached embeddings.
 
         Older stores migrate in place. Legacy graphs need one embedding pass;
@@ -1055,4 +1114,5 @@ class WorkingGraph:
         with GraphStore(str(Path(workdir) / "graph_store.db")) as store:
             st = store.load()
         return cls(embedder, merge_threshold=merge_threshold,
-                   context_cap=context_cap, workdir=workdir, _state=st)
+                   context_cap=context_cap, identifier_pattern=identifier_pattern,
+                   workdir=workdir, _state=st)

@@ -1,5 +1,6 @@
 """Phase 1 graph-augmented extraction: the live WorkingGraph."""
 
+import pytest
 import pygrap  # noqa: F401  (ensures the binding is importable in this env)
 
 from grap_mcp.kee.working_graph import WorkingGraph, Signals
@@ -188,6 +189,72 @@ def test_merge_threshold_high_keeps_them_separate(tmp_path):
     assert wg.node_count() == 2
 
 
+def test_identifier_names_resolve_by_exact_string(tmp_path):
+    # Identical vectors must not merge two identifier-shaped names. The same
+    # identifier seen twice is one node.
+    same = [1.0, 0.0]
+    emb = {"Com_SendSignal": list(same), "Com_SendSignalGroup": list(same)}
+    wg = _wg_fake(tmp_path, emb, merge_threshold=0.86)
+    wg.upsert_fragment(
+        {"source": "s1", "outcomes": [{"name": "Com_SendSignal", "characteristics": []}], "relations": []},
+        "s1",
+    )
+    wg.upsert_fragment(
+        {"source": "s2", "outcomes": [{"name": "Com_SendSignalGroup", "characteristics": []}], "relations": []},
+        "s2",
+    )
+    assert wg.node_count() == 2
+    wg.upsert_fragment(
+        {"source": "s3", "outcomes": [{"name": "Com_SendSignal", "characteristics": []}], "relations": []},
+        "s3",
+    )
+    assert wg.node_count() == 2
+
+
+@pytest.mark.parametrize("left,right", [
+    ("VehSpdFL", "VehSpdFR"),
+    ("BrakePedalPosition", "BrakePedalPressure"),
+    ("vehicle_speed", "vehicle_speed_raw"),
+    ("/ISignal/SigA", "/ISignal/SigB"),
+])
+def test_automotive_identifier_pairs_stay_two_nodes(tmp_path, left, right):
+    # Identical vectors must not merge these identifier shapes.
+    same = [1.0, 0.0]
+    wg = _wg_fake(tmp_path, {left: list(same), right: list(same)}, merge_threshold=0.86)
+    wg.upsert_fragment(
+        {"source": "s1", "outcomes": [{"name": left, "characteristics": []}], "relations": []},
+        "s1",
+    )
+    wg.upsert_fragment(
+        {"source": "s2", "outcomes": [{"name": right, "characteristics": []}], "relations": []},
+        "s2",
+    )
+    assert wg.node_count() == 2
+
+
+@pytest.mark.parametrize("act,reference", [
+    ("Legea", "Legea nr. 101/1998"),
+    ("Lege", "Lege nr. 58/1998"),
+    ("OUG", "OUG nr. 12/2020"),
+    ("HG", "HG nr. 7/1999"),
+    ("Ordonanța", "Ordonanța nr. 33/2000"),
+    ("Decizia", "Decizia nr. 4/2001"),
+])
+def test_legal_act_reference_is_not_an_identifier(tmp_path, act, reference):
+    # A legal act reference still similarity-merges. Identical vectors, one node.
+    same = [1.0, 0.0]
+    wg = _wg_fake(tmp_path, {act: list(same), reference: list(same)}, merge_threshold=0.86)
+    wg.upsert_fragment(
+        {"source": "s1", "outcomes": [{"name": act, "characteristics": []}], "relations": []},
+        "s1",
+    )
+    wg.upsert_fragment(
+        {"source": "s2", "outcomes": [{"name": reference, "characteristics": []}], "relations": []},
+        "s2",
+    )
+    assert wg.node_count() == 1
+
+
 class CountingEmb:
     """Embedder that records how many HTTP-shaped calls it received."""
     name = "counting"
@@ -249,16 +316,63 @@ def test_self_loop_relation_is_parked_not_added(tmp_path):
     assert wg.parked[0]["reason"] == "self_loop"
 
 
-def test_conflicting_relation_type_is_parked_and_signaled(tmp_path):
+def test_sends_and_receives_both_survive_upsert_save_open_and_retract(tmp_path):
+    """F26: two relations between the same nodes are kept, including provenance.
+
+    ``EcuA sends FrameX`` and ``EcuA receives FrameX`` come from different
+    chunks. Both are present after upsert, after save, and after open.
+    Retracting the sends chunk removes only that relation.
+    """
+    wd = str(tmp_path / "wd")
+    emb = HashingEmbedder()
+    wg = WorkingGraph(emb, workdir=wd, merge_threshold=0.99)
+    outcomes = [
+        {"name": "EcuA", "characteristics": []},
+        {"name": "FrameX", "characteristics": []},
+    ]
+    wg.upsert_fragment({
+        "source": "sends#0",
+        "outcomes": outcomes,
+        "relations": [{"from": "EcuA", "type": "sends", "to": "FrameX"}],
+    }, "sends#0")
+    wg.upsert_fragment({
+        "source": "receives#0",
+        "outcomes": outcomes,
+        "relations": [{"from": "EcuA", "type": "receives", "to": "FrameX"}],
+    }, "receives#0")
+
+    def relations(graph):
+        onto = graph.to_candidate_ontology("v")
+        return sorted((r["from"], r["type"], r["to"]) for r in onto["relations"])
+
+    assert relations(wg) == [("EcuA", "receives", "FrameX"), ("EcuA", "sends", "FrameX")]
+    wg.save()
+    wg.close()
+
+    opened = WorkingGraph.open(wd, emb, merge_threshold=0.99)
+    assert relations(opened) == [("EcuA", "receives", "FrameX"), ("EcuA", "sends", "FrameX")]
+    opened.retract_chunk("sends#0")
+    assert relations(opened) == [("EcuA", "receives", "FrameX")]
+
+
+def test_second_relation_type_between_the_same_pair_is_kept(tmp_path):
+    """A second relation type between the same nodes is kept, not parked.
+
+    F26 replaced the one-type-per-pair rule. ``uses`` and ``blocks`` are two
+    relations. Neither is a conflict, and neither is dropped.
+    """
     wg = _wg(tmp_path, merge_threshold=0.95)
     base = {"outcomes": [{"name": "A", "characteristics": []}, {"name": "B", "characteristics": []}]}
     wg.upsert_fragment({"source": "s1", **base, "relations": [{"from": "A", "type": "uses", "to": "B"}]}, "s1")
     sig = wg.upsert_fragment({"source": "s2", **base, "relations": [{"from": "A", "type": "blocks", "to": "B"}]}, "s2")
-    assert any(c["kind"] == "relation" for c in sig.conflicts)
-    assert any(p["reason"] == "conflict" for p in wg.parked)
-    # original edge preserved (first-writer-wins)
+    # Nothing is parked or dropped. The second-look signal still fires once,
+    # as it did before the key changed; whether it should for a legitimate
+    # pair is left for tuning against labelled data.
+    assert [c["type"] for c in sig.conflicts] == ["blocks"]
+    assert not any(p["reason"] == "conflict" for p in wg.parked)
     onto = wg.to_candidate_ontology("v")
-    assert [(r["from"], r["type"], r["to"]) for r in onto["relations"]] == [("A", "uses", "B")]
+    assert sorted((r["from"], r["type"], r["to"]) for r in onto["relations"]) == [
+        ("A", "blocks", "B"), ("A", "uses", "B")]
 
 
 def test_bridge_relation_raises_correlation(tmp_path):
@@ -631,3 +745,25 @@ def test_structural_labels_excluded_from_export_but_kept_in_the_graph(tmp_path):
         assert wg.chars[[n for n, v in wg.canonical.items() if v == "Anexa 1"][0]]
     finally:
         wg.close()
+
+
+@pytest.mark.parametrize("left,right", [
+    ("Normele nr. 2/1999", "Normelor nr. 2/1999"),
+    ("art. 5 alin. 2", "art. 5 alin. (2)"),
+    ("Banca Comerciala S.A.", "Băncii Comerciale S.A."),
+])
+def test_prose_with_dots_and_digits_is_not_an_identifier(left, right):
+    """No domain wording is special-cased: ordinary phrases still merge by similarity."""
+    from grap_mcp.kee.working_graph import _contains_identifier
+    assert not _contains_identifier(left)
+    assert not _contains_identifier(right)
+
+
+@pytest.mark.parametrize("name", [
+    "VehSpdFL", "BrakePedalPosition", "vehicle_speed", "/ISignal/SigA", "Com_SendSignal",
+    "the Com_SendSignal function", "signal VehSpdFL of the brake ECU", "see [SWS_Com_00123]",
+    "path /ISignal/SigA here",
+])
+def test_identifiers_alone_and_inside_phrases(name):
+    from grap_mcp.kee.working_graph import _contains_identifier
+    assert _contains_identifier(name)
