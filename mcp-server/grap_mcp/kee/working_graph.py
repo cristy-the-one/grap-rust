@@ -11,6 +11,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import re
 import tempfile
 import time
 from dataclasses import dataclass, field
@@ -30,6 +31,10 @@ logger = logging.getLogger("grap-mcp.kee")
 
 EMBED_BATCH = 128     # texts per /embeddings request; bounds payload + peak memory
 REL_VOCAB_CAP = 40    # most-frequent relation types injected into extraction context
+# Com_SendSignal, or a bracketed id such as [SWS_Can_00001].
+_DEFAULT_IDENTIFIER_PATTERN = (
+    r"\b[A-Z][A-Za-z0-9]*(?:_[A-Za-z0-9]+)+\b|\[[A-Z]+_\w+\]"
+)
 
 
 @dataclass
@@ -60,6 +65,7 @@ class _Resolution:
 class WorkingGraph:
     def __init__(self, embedder, *, merge_threshold: float = 0.86,
                  context_cap: int = 8, workdir: Optional[str] = None,
+                 identifier_pattern: Optional[str] = None,
                  _state: Optional[GraphState] = None) -> None:
         """Build an empty working graph.
 
@@ -73,6 +79,8 @@ class WorkingGraph:
         self.embedder = embedder
         self.merge_threshold = merge_threshold
         self.context_cap = context_cap
+        self._identifier_re = re.compile(
+            _DEFAULT_IDENTIFIER_PATTERN if identifier_pattern is None else identifier_pattern)
         self._owned_workdir = workdir is None
         self._dir = workdir or tempfile.mkdtemp(prefix="kee-wg-")
         Path(self._dir).mkdir(parents=True, exist_ok=True)
@@ -251,13 +259,17 @@ class WorkingGraph:
                 self._register_alias(name, node)
                 return _Resolution(node, False)
 
+        # Pattern is decided before embedding. An identifier that missed exact
+        # alias and content-hash resolution is its own node: do not similarity-merge.
+        identifier = self._identifier_re.search(name) is not None
         vec = self._embed_one(name)
-        matches = self._compatible_matches(name, vec)
-        if matches and matches[0][1] >= self.merge_threshold:
-            node = matches[0][0]
-            ambiguous = len(matches) > 1 and matches[1][1] >= self.merge_threshold
-            self._register_alias(name, node)
-            return _Resolution(node, ambiguous)
+        if not identifier:
+            matches = self._compatible_matches(name, vec)
+            if matches and matches[0][1] >= self.merge_threshold:
+                node = matches[0][0]
+                ambiguous = len(matches) > 1 and matches[1][1] >= self.merge_threshold
+                self._register_alias(name, node)
+                return _Resolution(node, ambiguous)
         node = self._next_concept_id
         native = self.kg.add_node(text=name, label="concept", embedding=vec)
         self._next_concept_id += 1
@@ -1010,7 +1022,7 @@ class WorkingGraph:
 
     @classmethod
     def open(cls, workdir: str, embedder, *, merge_threshold: float = 0.86,
-             context_cap: int = 8) -> "WorkingGraph":
+             context_cap: int = 8, identifier_pattern: Optional[str] = None) -> "WorkingGraph":
         """Load authoritative records and rebuild views using cached embeddings.
 
         Older stores migrate in place. Legacy graphs need one embedding pass;
@@ -1021,4 +1033,5 @@ class WorkingGraph:
         with GraphStore(str(Path(workdir) / "graph_store.db")) as store:
             st = store.load()
         return cls(embedder, merge_threshold=merge_threshold,
-                   context_cap=context_cap, workdir=workdir, _state=st)
+                   context_cap=context_cap, identifier_pattern=identifier_pattern,
+                   workdir=workdir, _state=st)

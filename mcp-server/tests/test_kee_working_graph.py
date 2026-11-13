@@ -100,6 +100,28 @@ def test_merge_threshold_high_keeps_them_separate(tmp_path):
     assert wg.node_count() == 2
 
 
+def test_identifier_names_resolve_by_exact_string(tmp_path):
+    # Identical vectors must not merge two identifier-shaped names. The same
+    # identifier seen twice is one node.
+    same = [1.0, 0.0]
+    emb = {"Com_SendSignal": list(same), "Com_SendSignalGroup": list(same)}
+    wg = _wg_fake(tmp_path, emb, merge_threshold=0.86)
+    wg.upsert_fragment(
+        {"source": "s1", "outcomes": [{"name": "Com_SendSignal", "characteristics": []}], "relations": []},
+        "s1",
+    )
+    wg.upsert_fragment(
+        {"source": "s2", "outcomes": [{"name": "Com_SendSignalGroup", "characteristics": []}], "relations": []},
+        "s2",
+    )
+    assert wg.node_count() == 2
+    wg.upsert_fragment(
+        {"source": "s3", "outcomes": [{"name": "Com_SendSignal", "characteristics": []}], "relations": []},
+        "s3",
+    )
+    assert wg.node_count() == 2
+
+
 class CountingEmb:
     """Embedder that records how many HTTP-shaped calls it received."""
     name = "counting"
