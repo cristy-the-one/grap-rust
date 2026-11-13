@@ -5,7 +5,7 @@ use crate::ids::{EdgeId, NodeId};
 use crate::KnowledgeGraph;
 use std::collections::VecDeque;
 
-/// Masked INCOMING adjacency: inc[t] = source nodes s with live edge s->t.
+/// Masked INCOMING adjacency: `inc[t]` = source nodes s with live edge s->t.
 fn incoming_adjacency(g: &KnowledgeGraph, mask: Option<u64>) -> Vec<Vec<u32>> {
     let n = g.node_count();
     let live: Vec<bool> = (0..n)
@@ -27,7 +27,7 @@ fn incoming_adjacency(g: &KnowledgeGraph, mask: Option<u64>) -> Vec<Vec<u32>> {
     inc
 }
 
-/// Masked OUTGOING adjacency: out[s] = target nodes t with live edge s->t.
+/// Masked OUTGOING adjacency: `out[s]` = target nodes t with live edge s->t.
 fn outgoing_adjacency(g: &KnowledgeGraph, mask: Option<u64>) -> Vec<Vec<u32>> {
     let n = g.node_count();
     let live: Vec<bool> = (0..n)

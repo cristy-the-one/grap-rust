@@ -324,7 +324,7 @@ impl OnDiskSegment {
         Ok(())
     }
 
-    /// Deserialize a segment from a binary file written by [`write_to_disk`].
+    /// Deserialize a segment from a binary file written by `write_to_disk`.
     pub fn load_from_disk(path: &Path) -> std::io::Result<Self> {
         let mut r = BufReader::new(File::open(path)?);
         let mut buf = Vec::new();
@@ -567,11 +567,11 @@ pub(crate) struct SealedSegment {
 /// The main on-disk inverted index engine.
 ///
 /// Documents are added to an in-memory [`ActiveBuffer`] which is periodically
-/// flushed into immutable [`SealedSegment`]s. A configurable [`TieredMergePolicy`]
+/// flushed into immutable `SealedSegment`s. A configurable [`TieredMergePolicy`]
 /// merges small segments together to keep query performance high.
 ///
 /// Use [`OnDiskIndex::new`] for a simple in-memory-only index, or pair it with
-/// an explicit [`save_to_dir`] / [`load_from_dir`] round-trip for durability.
+/// an explicit `save_to_dir` / `load_from_dir` round-trip for durability.
 #[derive(Debug)]
 pub struct OnDiskIndex {
     active: ActiveBuffer,
