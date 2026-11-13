@@ -74,8 +74,8 @@ impl OnDiskTextIndex {
     ///
     /// **Note:** This method does *not* associate the index with the directory —
     /// it is only a convenience for callers that want to pre-create the target
-    /// directory before calling [`save_to_dir`]. The index data is kept in memory
-    /// until an explicit call to [`save_to_dir`] is made.
+    /// directory before calling `save_to_dir`. The index data is kept in memory
+    /// until an explicit call to `save_to_dir` is made.
     ///
     /// To load an existing index from disk, use [`TextIndex::load_from_dir`] instead.
     pub fn new_in_dir(dir: &std::path::Path) -> std::io::Result<Self> {

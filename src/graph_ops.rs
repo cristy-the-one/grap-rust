@@ -275,9 +275,9 @@ impl KnowledgeGraph {
 
     /// Compact the blob store: rebuild it from only the live nodes' current
     /// blob + embedding bytes and remap each [`BlobRef`](crate::blob_store::BlobRef).
-    /// Reclaims bytes orphaned by [`update_node_content`](Self::update_node_content),
+    /// Reclaims bytes orphaned by `update_node_content`,
     /// [`merge_nodes`](Self::merge_nodes), and tombstoned nodes. Node ids,
-    /// edges, and all indexes are untouched (they key on [`NodeId`](crate::ids::NodeId)).
+    /// edges, and all indexes are untouched (they key on [`NodeId`]).
     ///
     /// Notes: a tombstoned node's bytes are dropped (empty blob), so its
     /// `content_hash` becomes meaningless after compaction (it is never

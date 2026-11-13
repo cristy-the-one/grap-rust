@@ -147,7 +147,7 @@ pub struct ShardedQueryResult {
     pub vector_score: f64,
     /// Cumulative strength of the best graph path from a seed to this node.
     pub graph_strength: f64,
-    /// Final blended score using [`HybridWeights`] (or legacy FusionWeights for non-hybrid paths).
+    /// Final blended score using `HybridWeights` (or legacy FusionWeights for non-hybrid paths).
     pub fused_score: f64,
     /// Number of hops from the nearest seed node.
     pub depth: u32,
@@ -558,7 +558,7 @@ impl ShardRouter {
     /// Save the entire sharded graph to a directory.
     ///
     /// Layout:
-    ///   <dir>/
+    ///   `<dir>/`
     ///     manifest.json
     ///     ghost_edges.json
     ///     shards/
@@ -569,7 +569,7 @@ impl ShardRouter {
     /// Save the entire sharded graph to a directory.
     ///
     /// Layout:
-    ///   <dir>/
+    ///   `<dir>/`
     ///     manifest.json        ← written last (commit record)
     ///     ghost_edges.json
     ///     shards/
@@ -1615,7 +1615,7 @@ impl ShardedGraph {
     /// thread cannot actually mutate the graph. It only sleeps in a loop and performs
     /// no real work (vacuum, compaction, ghost-edge cleanup).
     ///
-    /// Use [`start_background_maintenance_with_shared`] with an `Arc<Mutex<ShardedGraph>>`
+    /// Use `start_background_maintenance_with_shared` with an `Arc<Mutex<ShardedGraph>>`
     /// for a worker that actually runs maintenance.
     #[deprecated(
         note = "This variant performs no maintenance work. Use start_background_maintenance_with_shared instead."
