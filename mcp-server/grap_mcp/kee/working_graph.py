@@ -32,6 +32,15 @@ EMBED_BATCH = 128     # texts per /embeddings request; bounds payload + peak mem
 REL_VOCAB_CAP = 40    # most-frequent relation types injected into extraction context
 
 
+def _relation_properties(rel_type: str) -> dict:
+    """Engine encoding: the relation is the property name, value true.
+
+    Legacy projections stored ``{"rel": "<verb>"}``. The property name is what
+    the engine prunes on, so each relation has to be its own name.
+    """
+    return {rel_type: True}
+
+
 @dataclass
 class Context:
     """The compact known-graph slice fed back to the LLM for a chunk."""
@@ -142,7 +151,7 @@ class WorkingGraph:
         for e in self.relations:
             f, t = e["from_id"], e["to_id"]
             self.kg.add_edge(self._concept_to_node[f], self._concept_to_node[t],
-                             1.0, {"rel": e["type"]})
+                             1.0, _relation_properties(e["type"]))
             self._has_edge.update((f, t))
             self._union(f, t)
         self._edges_dirty = False
@@ -521,7 +530,8 @@ class WorkingGraph:
             # bridge (they start as disconnected singletons).
             bridge = (fn in self._has_edge and tn in self._has_edge
                       and self._find(fn) != self._find(tn))
-            self.kg.add_edge(self._concept_to_node[fn], self._concept_to_node[tn], 1.0, {"rel": ty})
+            self.kg.add_edge(self._concept_to_node[fn], self._concept_to_node[tn], 1.0,
+                             _relation_properties(ty))
             self._edge_types[key] = ty
             self.relations.append({"from_id": fn, "to_id": tn, "type": ty})
             self._rel_sources[(fn, ty, tn)] = {source}
@@ -996,7 +1006,31 @@ class WorkingGraph:
                 self._register_alias(alias, cid)
         for e in self.relations:
             self.kg.add_edge(self._concept_to_node[e["from_id"]],
-                             self._concept_to_node[e["to_id"]], 1.0, {"rel": e["type"]})
+                             self._concept_to_node[e["to_id"]], 1.0,
+                             _relation_properties(e["type"]))
+
+    def migrate_edge_encoding(self) -> dict:
+        """Rewrite projected edges from ``{"rel": verb}`` to ``{verb: true}``.
+
+        The relation list is the authority — the sqlite store keeps the verb
+        in the edge row, and ``open`` rebuilds a fresh projection from it.
+        This rewrites a projection that is already in memory. Idempotent.
+        """
+        n = len(self.relations)
+        legacy = 0
+        for edge in self.relations:
+            src = self._concept_to_node[edge["from_id"]]
+            dst = self._concept_to_node[edge["to_id"]]
+            hits = self.kg.neighbors_by_relation(src, "rel", edge["type"])
+            if any(nid == dst for nid, _strength in hits):
+                legacy += 1
+        self.kg.clear_edges()
+        for edge in self.relations:
+            self.kg.add_edge(self._concept_to_node[edge["from_id"]],
+                             self._concept_to_node[edge["to_id"]], 1.0,
+                             _relation_properties(edge["type"]))
+        print(f"edge_encoding: migrated={legacy} rewritten={n} n={n}")
+        return {"migrated": legacy, "rewritten": n, "n": n}
 
     def save(self) -> None:
         """Commit changed extraction records. Retrieval views are rebuildable.
