@@ -214,10 +214,18 @@ class OpenAICompatEmbedder:
 
 
 _HTTP_BACKENDS = {"ollama", "http", "openai", "openai-compat"}
+_VALID_BACKENDS = _HTTP_BACKENDS | {"", "auto", "hashing", "local"}
 
 
 def _allow_stub() -> bool:
     return os.environ.get("GRAP_EMBED_ALLOW_STUB", "").strip() == "1"
+
+
+def _raise_unrecognised_backend(backend: str) -> None:
+    names = ", ".join(sorted(name for name in _VALID_BACKENDS if name))
+    raise RuntimeError(
+        f"KEE embedder: unrecognised backend '{backend}'. Valid names: {names}."
+    )
 
 
 def _raise_backend_unavailable(backend: str, exc: BaseException) -> None:
@@ -242,8 +250,13 @@ def get_embedder(prefer_local: bool = True) -> Embedder:
       - unset/"auto"     : try sentence-transformers. If it cannot be loaded,
                            raise as above unless GRAP_EMBED_ALLOW_STUB=1, which
                            falls back to hashing and logs a WARNING.
+
+    An unrecognised name raises RuntimeError listing the valid names. It never
+    falls through to the hashing stub, even when GRAP_EMBED_ALLOW_STUB=1.
     """
     backend = os.environ.get("GRAP_EMBED_BACKEND", "").strip().lower()
+    if backend not in _VALID_BACKENDS:
+        _raise_unrecognised_backend(backend)
 
     if backend in _HTTP_BACKENDS:
         try:

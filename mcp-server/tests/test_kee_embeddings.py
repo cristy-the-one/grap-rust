@@ -133,6 +133,17 @@ def test_unreachable_endpoint_raises_unless_stub_allowed(monkeypatch, caplog):
     assert any(record.levelno >= logging.WARNING for record in caplog.records)
 
 
+def test_unrecognised_embed_backend_raises_and_lists_valid_names(monkeypatch):
+    """A mistyped backend name must not fall through to the hashing stub."""
+    monkeypatch.setenv("GRAP_EMBED_BACKEND", "olama")
+    monkeypatch.setenv("GRAP_EMBED_ALLOW_STUB", "1")
+    with pytest.raises(RuntimeError, match="olama") as raised:
+        get_embedder()
+    message = str(raised.value)
+    for name in ("auto", "hashing", "http", "local", "ollama", "openai", "openai-compat"):
+        assert name in message
+
+
 def test_default_http_embed_model_is_bge_m3(monkeypatch):
     monkeypatch.delenv("GRAP_EMBED_MODEL", raising=False)
     embedder = OpenAICompatEmbedder(base_url="http://host/v1")
