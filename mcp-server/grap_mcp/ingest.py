@@ -80,6 +80,9 @@ EMBED_BATCH = 128     # texts per /embeddings request; bounds payload size
 def ingest_paths(kg, root: str, embedder=None, batch_size: int = EMBED_BATCH) -> Dict[str, Any]:
     """Add every .md/.txt/.json under `root`, and one node per reader item. Returns counts.
 
+    A reader node's text is item_id, kind_hint, text, then key=value attributes,
+    one field per line. Its label is kind_hint.
+
     If `embedder` is supplied (a kee.embeddings.Embedder), each chunk is embedded
     and stored on its node, enabling vector / hybrid search and semantic dedup.
 
@@ -104,8 +107,14 @@ def ingest_paths(kg, root: str, embedder=None, batch_size: int = EMBED_BATCH) ->
         for f in files:
             reader = _READERS.get(f.suffix.lower())
             if reader is not None:
-                for i, item in enumerate(reader(f, corpus_root=corpus_root)):
-                    yield (f"doc:{f.stem}#{i}", item.text)
+                for item in reader(f, corpus_root=corpus_root):
+                    # item_id, kind, own text, then attributes. Own text is
+                    # often empty, so the name has to be in the node.
+                    lines = [item.item_id, item.kind_hint, item.text]
+                    lines.extend(
+                        f"{key}={value}" for key, value in item.attributes.items()
+                    )
+                    yield (item.kind_hint, "\n".join(lines))
                 continue
             text = read_document(f)
             if text is None:

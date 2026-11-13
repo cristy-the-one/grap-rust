@@ -190,8 +190,15 @@ VAL_ 512 Ignition 0 "Off" 1 "Run" 3 "Start" ;
 """
 
 
+def _reader_node_text(item):
+    """item_id, kind_hint, text, then one key=value attribute per line."""
+    lines = [item.item_id, item.kind_hint, item.text]
+    lines.extend(f"{key}={value}" for key, value in item.attributes.items())
+    return "\n".join(lines)
+
+
 def test_dbc_fixture_yields_items(tmp_path):
-    """R-06: a .dbc file is dispatched to the reader and yields one node per item."""
+    """R-06: a .dbc file yields one node per item, and each node contains its name."""
     from grap_mcp.readers.dbc import read_dbc
 
     path = tmp_path / "vehicle.dbc"
@@ -199,8 +206,10 @@ def test_dbc_fixture_yields_items(tmp_path):
     items = read_dbc(path, corpus_root=tmp_path)
     kg = FakeKG()
     res = ingest_paths(kg, str(tmp_path))
-    assert kg.nodes == [
-        (item.text, f"doc:{path.stem}#{i}") for i, item in enumerate(items)
-    ]
     assert res["files"] == 1
     assert res["nodes_added"] == len(items)
+    assert len(kg.nodes) == len(items)
+    for item, (text, label) in zip(items, kg.nodes, strict=True):
+        assert item.item_id in text
+        assert label == item.kind_hint
+        assert text == _reader_node_text(item)
