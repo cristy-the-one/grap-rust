@@ -6,7 +6,7 @@ quote does not add a row. The mention count equals those occurrences. A second
 run inserts nothing.
 """
 
-from grap_mcp.kee.graph_store import GraphState, GraphStore
+from grap_mcp.kee.graph_store import SCHEMA_VERSION, GraphState, GraphStore
 from grap_mcp.kee.resolution import ResolutionTables
 
 EXTRACTOR = "stub-extractor"
@@ -123,7 +123,7 @@ def test_backfill_counts_equal_receipt_names_and_second_run_adds_nothing(tmp_pat
     path = str(tmp_path / "graph_store.db")
     with GraphStore(path) as store:
         store.save(GraphState(extractions=_receipts()))
-        assert store.conn.execute("PRAGMA user_version").fetchone()[0] == 6
+        assert store.conn.execute("PRAGMA user_version").fetchone()[0] == SCHEMA_VERSION
         assert store.conn.execute("SELECT COUNT(*) FROM mentions").fetchone()[0] == 0
 
         first = backfill_mentions(store)
@@ -178,7 +178,7 @@ def test_backfill_counts_equal_receipt_names_and_second_run_adds_nothing(tmp_pat
         assert third["added"] == 0
         assert third["mentions"] == len(EXPECTED)
         assert [m.mention_id for m in _stored(reopened)] == ids
-        assert reopened.conn.execute("PRAGMA user_version").fetchone()[0] == 6
+        assert reopened.conn.execute("PRAGMA user_version").fetchone()[0] == SCHEMA_VERSION
 
 
 def test_backfill_does_not_invent_a_span_for_a_name_absent_from_its_quote(tmp_path, capsys):
@@ -258,4 +258,4 @@ def test_backfill_with_no_receipts_prints_na_and_a_second_run_adds_nothing(tmp_p
         assert out2 == out
         assert second["added"] is None
         assert store.conn.execute("SELECT COUNT(*) FROM mentions").fetchone()[0] == 0
-        assert store.conn.execute("PRAGMA user_version").fetchone()[0] == 6
+        assert store.conn.execute("PRAGMA user_version").fetchone()[0] == SCHEMA_VERSION
