@@ -58,19 +58,20 @@ def _endpoints(wg, relation):
 
 def test_relation_encoded_as_property_name_with_value_true(tmp_path):
     """The relation is the edge property name, value true, so the engine can
-    prune on the name. The legacy form {"rel": "<verb>"} does not."""
+    prune on the name. The legacy form {"rel": "<verb>"} does not.
+    ``depends_on`` is a schema relation; a free verb takes the role form instead."""
     wg = _wg(tmp_path, merge_threshold=0.95)
     wg.upsert_fragment({
         "source": "s#0",
         "outcomes": [{"name": "Verification", "characteristics": []},
                      {"name": "Test Plan", "characteristics": []}],
-        "relations": [{"from": "Verification", "type": "uses", "to": "Test Plan"}],
+        "relations": [{"from": "Verification", "type": "depends_on", "to": "Test Plan"}],
     }, "s#0")
     src, dst = _endpoints(wg, wg.relations[0])
-    assert wg.kg.neighbors_by_relation(src, "uses", True) == [(dst, 1.0)]
-    assert wg.kg.neighbors_by_relation(src, "rel", "uses") == []
+    assert wg.kg.neighbors_by_relation(src, "depends_on", True) == [(dst, 1.0)]
+    assert wg.kg.neighbors_by_relation(src, "rel", "depends_on") == []
     hits = wg.kg.search_and_traverse(
-        "Verification", max_seeds=5, required_properties=["uses"],
+        "Verification", max_seeds=5, required_properties=["depends_on"],
         min_strength=0.0, max_depth=2)
     assert any(h.node == dst and h.depth == 1 for h in hits)
     blocked = wg.kg.search_and_traverse(
@@ -88,14 +89,14 @@ def test_reopened_graph_projects_relation_as_property_name(tmp_path):
         "source": "s#0",
         "outcomes": [{"name": "Verification", "characteristics": []},
                      {"name": "Test Plan", "characteristics": []}],
-        "relations": [{"from": "Verification", "type": "uses", "to": "Test Plan"}],
+        "relations": [{"from": "Verification", "type": "depends_on", "to": "Test Plan"}],
     }, "s#0")
     wg.save()
     wg.close()
     reopened = WorkingGraph.open(wd, HashingEmbedder(), merge_threshold=0.95)
     src, dst = _endpoints(reopened, reopened.relations[0])
-    assert reopened.kg.neighbors_by_relation(src, "uses", True) == [(dst, 1.0)]
-    assert reopened.kg.neighbors_by_relation(src, "rel", "uses") == []
+    assert reopened.kg.neighbors_by_relation(src, "depends_on", True) == [(dst, 1.0)]
+    assert reopened.kg.neighbors_by_relation(src, "rel", "depends_on") == []
 
 
 def test_migrate_legacy_rel_property_rewrites_edges(tmp_path, capsys):
@@ -108,7 +109,7 @@ def test_migrate_legacy_rel_property_rewrites_edges(tmp_path, capsys):
                      {"name": "Test Plan", "characteristics": []},
                      {"name": "Requirement", "characteristics": []}],
         "relations": [
-            {"from": "Verification", "type": "uses", "to": "Test Plan"},
+            {"from": "Verification", "type": "depends_on", "to": "Test Plan"},
             {"from": "Test Plan", "type": "verifies", "to": "Requirement"},
         ],
     }, "s#0")
@@ -791,3 +792,31 @@ def test_prose_with_dots_and_digits_is_not_an_identifier(left, right):
 def test_identifiers_alone_and_inside_phrases(name):
     from grap_mcp.kee.working_graph import _contains_identifier
     assert _contains_identifier(name)
+
+
+def test_seventy_free_verbs_do_not_exhaust_the_engine_names(tmp_path):
+    """F27: the engine allows 64 property names. Free verbs must not use them up."""
+    from grap_mcp.kee.working_graph import _relation_filter
+    wg = _wg(tmp_path)
+    for i in range(70):
+        wg.upsert_fragment({
+            "source": f"d#{i}",
+            "outcomes": [{"name": f"Thing{i}a", "characteristics": []},
+                         {"name": f"Thing{i}b", "characteristics": []}],
+            "relations": [{"from": f"Thing{i}a", "type": f"verb number {i}", "to": f"Thing{i}b"}],
+        }, f"d#{i}")
+    assert len(wg.relations) == 70
+    for edge in wg.relations:
+        name, value = _relation_filter(edge["type"])
+        assert name == "role"
+        src = wg._concept_to_node[edge["from_id"]]
+        dst = wg._concept_to_node[edge["to_id"]]
+        assert dst in [nid for nid, _strength in wg.kg.neighbors_by_relation(src, name, value)]
+        assert dst in [nid for nid, _strength in wg.kg.neighbors_by_relation(src, "refers_to", True)]
+
+
+def test_schema_relation_is_its_own_property_name(tmp_path):
+    from grap_mcp.kee.working_graph import _relation_filter, _relation_properties
+    assert _relation_properties("part_of") == {"part_of": True}
+    assert _relation_filter("part_of") == ("part_of", True)
+    assert _relation_properties("emite") == {"refers_to": True, "role": "emite"}

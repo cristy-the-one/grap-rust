@@ -67,29 +67,38 @@ def _contains_identifier(name: str) -> bool:
     return any(_token_is_strong_identifier(token) for token in tokens)
 
 
-_SCHEMA_RELATION_NAMES: Optional[frozenset] = None
+_SCHEMA_RELATIONS: Optional[frozenset] = None
 
 
-def _schema_relation_names() -> frozenset:
-    """The closed relation vocabulary. Loaded once from the automotive schema."""
-    global _SCHEMA_RELATION_NAMES
-    if _SCHEMA_RELATION_NAMES is None:
-        from grap_mcp.schema.loader import load_automotive_schema
-        _SCHEMA_RELATION_NAMES = frozenset(
+def _schema_relations() -> frozenset:
+    """The closed relation vocabulary, loaded once."""
+    global _SCHEMA_RELATIONS
+    if _SCHEMA_RELATIONS is None:
+        from ..schema.loader import load_automotive_schema
+        _SCHEMA_RELATIONS = frozenset(
             relation.name for relation in load_automotive_schema().relations)
-    return _SCHEMA_RELATION_NAMES
+    return _SCHEMA_RELATIONS
 
 
 def _relation_properties(rel_type: str) -> dict:
-    """Engine encoding of one stored relation.
+    """Engine encoding of a relation (schema spec §6).
 
-    A schema relation is the property name, value true. Any other verb is
-    ``{"refers_to": True, "role": <verb>}``. The engine allows 64 property
-    names in total, and free-text verbs are not a closed set.
+    A relation of the schema is its own property name with value true: the
+    name is what the engine prunes on. The engine allows 64 names in all, and
+    text extraction still produces free verbs, so any other verb is stored as
+    ``refers_to`` with the verb as ``role``. Nothing is dropped and the name
+    budget cannot run out.
     """
-    if rel_type in _schema_relation_names():
+    if rel_type in _schema_relations():
         return {rel_type: True}
     return {"refers_to": True, "role": rel_type}
+
+
+def _relation_filter(rel_type: str) -> tuple:
+    """`(property name, value)` that finds edges of `rel_type` in the engine."""
+    if rel_type in _schema_relations():
+        return rel_type, True
+    return "role", rel_type
 
 
 @dataclass
