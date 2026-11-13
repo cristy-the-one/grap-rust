@@ -15,6 +15,10 @@ dangling or undefined targets become one unresolved placeholder each.
 
 AR-05: an -IREF with exactly one TARGET- child is one refers_to link.
 Its other children are that link's context. Any other -IREF is malformed.
+
+AR-06: an ECUC-CONTAINER-VALUE gains param.<name> attributes from
+PARAMETER-VALUES, and a VALUE-REF under REFERENCE-VALUES takes its link
+role from the sibling DEFINITION-REF's last path segment.
 """
 
 import hashlib
@@ -716,7 +720,8 @@ _KIND_BY_TAG = {
     "ECUC-CONTAINER-VALUE": "config_container",
 }
 
-# Categories that emit a link (§4.3). VALUE-REF roles are renamed by AR-06.
+# Categories that emit a link (§4.3). A reference role stays the element tag.
+# AR-06 renames the link role of a VALUE-REF under REFERENCE-VALUES.
 _LINK_CATEGORIES = (
     "resolved",
     "dest_mismatch",
@@ -1468,3 +1473,169 @@ def test_iref_without_exactly_one_target_is_malformed(tmp_path: Path):
     assert entries[3].owner == "/P/Comp/E0"
     assert entries[-1].owner == "/P/Comp/E46"
     assert all(entry.owner != "/P/Comp/E50" for entry in entries)
+
+
+def test_ecu_extract_config_values_name_params_and_reference_roles():
+    """ECU extract: Message3's direction and ComPduIdRef; Message2's signals.
+
+    The generic VALUE leaf stays. DEFINITION-REF links stay the element tag.
+    The ComPduIdRef target is a placeholder. The three signal links resolve.
+    """
+    path = _FIXTURES / "ecu-extract-4.2.arxml"
+    items, report = read_arxml([path], source_id="ecu-extract")
+    by_id = {item.item_id: item for item in items}
+    unresolved = {
+        item.item_id
+        for item in items
+        if item.kind_hint == "unresolved"
+    }
+    message3 = by_id["/MyEcu/Com/ComConfig/Message3"]
+    message2 = by_id["/MyEcu/Com/ComConfig/Message2"]
+
+    pdu_links = [
+        (link.role, link.target_id, link.target_id in unresolved, link.context)
+        for link in message3.links
+        if link.type == "refers_to" and (
+            link.role in ("ComPduIdRef", "VALUE-REF")
+            or link.target_id.endswith("/message3")
+        )
+    ]
+    signal_links = [
+        (link.role, link.target_id.rsplit("/", 1)[-1], link.context)
+        for link in message2.links
+        if link.type == "refers_to" and (
+            link.role == "ComIPduSignalRef"
+            or link.target_id.rsplit("/", 1)[-1] in {"Signal2", "Signal3", "Signal4"}
+        )
+    ]
+    assert message3.attributes[
+        "PARAMETER-VALUES.ECUC-TEXTUAL-PARAM-VALUE.VALUE"
+    ] == "RECEIVE"
+    assert (
+        message3.attributes.get("param.ComIPduDirection"),
+        pdu_links,
+        signal_links,
+    ) == (
+        "RECEIVE",
+        [("ComPduIdRef", "/MyEcu/EcuC/EcucPduCollection/message3", True, [])],
+        [
+            ("ComIPduSignalRef", "Signal2", []),
+            ("ComIPduSignalRef", "Signal3", []),
+            ("ComIPduSignalRef", "Signal4", []),
+        ],
+    )
+    assert [
+        link.target_id
+        for link in message3.links
+        if link.type == "refers_to" and link.role == "DEFINITION-REF"
+    ] == [
+        "/Com/ComConfig/ComIPdu",
+        "/MyEcu/Com/ComConfig/ComIPdu/ComIPduDirection",
+        "/MyEcu/Com/ComConfig/ComIPdu/ComPduIdRef",
+    ]
+    assert all(link.role != "VALUE-REF" for link in message3.links)
+    assert report["references_seen"] == 69
+    assert _category_sum(report) == 69
+
+
+def test_config_value_repeats_and_unpaired_refs_stay_literal(tmp_path: Path):
+    """Repeats are param.Name[n]. A VALUE-REF with no DEFINITION-REF keeps its tag.
+
+    A nested container takes its own role. A missing VALUE adds no attribute.
+    Definition references are still links.
+    """
+    path = _write_arxml(
+        tmp_path,
+        "config.arxml",
+        """\
+        <ECUC-CONTAINER-VALUE>
+          <SHORT-NAME>Box</SHORT-NAME>
+          <PARAMETER-VALUES>
+            <ECUC-TEXTUAL-PARAM-VALUE>
+              <DEFINITION-REF DEST="ECUC-STRING-PARAM-DEF">/Defs/SameName</DEFINITION-REF>
+              <VALUE>first</VALUE>
+            </ECUC-TEXTUAL-PARAM-VALUE>
+            <ECUC-NUMERICAL-PARAM-VALUE>
+              <DEFINITION-REF DEST="ECUC-INTEGER-PARAM-DEF">/Defs/SameName</DEFINITION-REF>
+              <VALUE>second</VALUE>
+            </ECUC-NUMERICAL-PARAM-VALUE>
+            <ECUC-TEXTUAL-PARAM-VALUE>
+              <DEFINITION-REF DEST="ECUC-STRING-PARAM-DEF">/Defs/Only</DEFINITION-REF>
+              <VALUE>once</VALUE>
+            </ECUC-TEXTUAL-PARAM-VALUE>
+            <ECUC-TEXTUAL-PARAM-VALUE>
+              <DEFINITION-REF DEST="ECUC-STRING-PARAM-DEF">/Defs/NoValue</DEFINITION-REF>
+            </ECUC-TEXTUAL-PARAM-VALUE>
+          </PARAMETER-VALUES>
+          <REFERENCE-VALUES>
+            <ECUC-REFERENCE-VALUE>
+              <DEFINITION-REF DEST="ECUC-REFERENCE-DEF">/Defs/ComIPduSignalRef</DEFINITION-REF>
+              <VALUE-REF DEST="ECUC-CONTAINER-VALUE">/P/Target</VALUE-REF>
+            </ECUC-REFERENCE-VALUE>
+            <ECUC-REFERENCE-VALUE>
+              <VALUE-REF DEST="ECUC-CONTAINER-VALUE">/P/Bare</VALUE-REF>
+            </ECUC-REFERENCE-VALUE>
+          </REFERENCE-VALUES>
+          <OTHER>
+            <VALUE-REF DEST="ECUC-CONTAINER-VALUE">/P/Outside</VALUE-REF>
+          </OTHER>
+          <SUB-CONTAINERS>
+            <ECUC-CONTAINER-VALUE>
+              <SHORT-NAME>Inner</SHORT-NAME>
+              <REFERENCE-VALUES>
+                <ECUC-REFERENCE-VALUE>
+                  <DEFINITION-REF DEST="ECUC-REFERENCE-DEF">/Defs/InnerRef</DEFINITION-REF>
+                  <VALUE-REF DEST="ECUC-CONTAINER-VALUE">/P/InnerTarget</VALUE-REF>
+                </ECUC-REFERENCE-VALUE>
+              </REFERENCE-VALUES>
+            </ECUC-CONTAINER-VALUE>
+          </SUB-CONTAINERS>
+        </ECUC-CONTAINER-VALUE>
+""",
+        None,
+    )
+    items, report = read_arxml([path], source_id="config")
+    by_id = {item.item_id: item for item in items}
+    box = by_id["/P/Box"]
+    inner = by_id["/P/Box/Inner"]
+
+    assert box.attributes["param.SameName[0]"] == "first"
+    assert box.attributes["param.SameName[1]"] == "second"
+    assert box.attributes["param.Only"] == "once"
+    assert "param.SameName" not in box.attributes
+    assert "param.NoValue" not in box.attributes
+    assert box.attributes[
+        "PARAMETER-VALUES.ECUC-TEXTUAL-PARAM-VALUE.VALUE[0]"
+    ] == "first"
+    assert box.attributes[
+        "PARAMETER-VALUES.ECUC-TEXTUAL-PARAM-VALUE.VALUE[1]"
+    ] == "once"
+    assert [
+        (link.role, link.target_id)
+        for link in box.links
+        if link.type == "refers_to" and link.role != "DEFINITION-REF"
+    ] == [
+        ("ComIPduSignalRef", "/P/Target"),
+        ("VALUE-REF", "/P/Bare"),
+        ("VALUE-REF", "/P/Outside"),
+    ]
+    assert [
+        link.target_id
+        for link in box.links
+        if link.role == "DEFINITION-REF"
+    ] == [
+        "/Defs/SameName",
+        "/Defs/SameName",
+        "/Defs/Only",
+        "/Defs/NoValue",
+        "/Defs/ComIPduSignalRef",
+    ]
+    assert [
+        (link.role, link.target_id)
+        for link in inner.links
+        if link.type == "refers_to"
+    ] == [
+        ("DEFINITION-REF", "/Defs/InnerRef"),
+        ("InnerRef", "/P/InnerTarget"),
+    ]
+    assert _category_sum(report) == report["references_seen"]
