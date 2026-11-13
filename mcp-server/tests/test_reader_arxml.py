@@ -19,6 +19,11 @@ Its other children are that link's context. Any other -IREF is malformed.
 AR-06: an ECUC-CONTAINER-VALUE gains param.<name> attributes from
 PARAMETER-VALUES, and a VALUE-REF under REFERENCE-VALUES takes its link
 role from the sibling DEFINITION-REF's last path segment.
+
+AR-08: files are read in sorted path order. The two main fixtures together
+match the measured counts. A repeated non-package path is a split when the
+tag matches and a path conflict when it does not. Repeated packages are not
+recorded.
 """
 
 import hashlib
@@ -1639,3 +1644,326 @@ def test_config_value_repeats_and_unpaired_refs_stay_literal(tmp_path: Path):
         ("InnerRef", "/P/InnerTarget"),
     ]
     assert _category_sum(report) == report["references_seen"]
+
+
+def test_two_main_fixtures_together_match_measured_counts():
+    """§8: system-4.2 and the ECU extract are one set, in sorted path order.
+
+    174 identifiables, 194 references: 132 resolved, 55 unresolved_definition,
+    7 dangling. Passing the later path first must not change that order.
+    """
+    system = _FIXTURES / "system-4.2.arxml"
+    extract = _FIXTURES / "ecu-extract-4.2.arxml"
+    items, report = read_arxml(
+        [system, extract], source_id="system-and-extract",
+    )
+    index = _index_of(items)
+
+    assert report["files"] == 2
+    assert len(index) == report["identifiables"] == 174
+    assert report["references_seen"] == 194
+    # The report keeps at most 50 entries per list; the count is the total.
+    assert len(report["references"]) == 50
+    assert report["resolved"] == 132
+    assert report["unresolved_definition"] == 55
+    assert report["dangling"] == 7
+    assert report["dest_mismatch"] == 0
+    assert report["unresolvable_relative"] == 0
+    assert report["empty"] == 0
+    assert _category_sum(report) == 194
+    assert index["/Cluster/Cluster0/Pch0/message1"] == "CAN-FRAME-TRIGGERING"
+    assert index["/ISignalIPdu/message1/Signal1"] == "I-SIGNAL-TO-I-PDU-MAPPING"
+    # ecu-extract-4.2.arxml sorts before system-4.2.arxml.
+    assert items[0].file == extract.as_posix()
+    owned_files = {
+        item.file for item in items if item.kind_hint != "unresolved"
+    }
+    assert owned_files == {extract.as_posix(), system.as_posix()}
+
+
+def test_same_path_different_tags_is_one_path_conflict(tmp_path: Path):
+    """One non-package path, two tags: one path_conflicts entry.
+
+    The sorted-earlier file wins text, attributes, and the index tag.
+    The later file's child is still indexed, and both references are kept.
+    The shared package is not a conflict.
+    """
+    early = _write_arxml(
+        tmp_path,
+        "a-early.arxml",
+        """\
+        <I-SIGNAL>
+          <SHORT-NAME>Item</SHORT-NAME>
+          <DESC>FromEarly</DESC>
+          <LENGTH>1</LENGTH>
+          <I-SIGNAL-REF DEST="I-SIGNAL">/P/EarlyTarget</I-SIGNAL-REF>
+          <I-SIGNAL>
+            <SHORT-NAME>ChildA</SHORT-NAME>
+          </I-SIGNAL>
+        </I-SIGNAL>
+        <I-SIGNAL>
+          <SHORT-NAME>EarlyTarget</SHORT-NAME>
+        </I-SIGNAL>
+""",
+        None,
+    )
+    late = _write_arxml(
+        tmp_path,
+        "b-late.arxml",
+        """\
+        <CAN-FRAME>
+          <SHORT-NAME>Item</SHORT-NAME>
+          <DESC>FromLate</DESC>
+          <LENGTH>8</LENGTH>
+          <FRAME-REF DEST="CAN-FRAME">/P/Item/ChildB</FRAME-REF>
+          <CAN-FRAME>
+            <SHORT-NAME>ChildB</SHORT-NAME>
+          </CAN-FRAME>
+        </CAN-FRAME>
+""",
+        None,
+    )
+    items, report = read_arxml([late, early], source_id="conflict")
+    index = _index_of(items)
+
+    assert report["path_conflicts"] == 1
+    assert report["split_elements"] == 0
+    (entry,) = report["entries"]["path_conflicts"]
+    assert entry.path == "/P/Item"
+    assert entry.first_file == early.as_posix()
+    assert entry.first_tag == "I-SIGNAL"
+    assert entry.other_file == late.as_posix()
+    assert entry.other_tag == "CAN-FRAME"
+    assert report["entries"]["split_elements"] == ()
+
+    assert index["/P/Item"] == "I-SIGNAL"
+    assert index["/P/Item/ChildA"] == "I-SIGNAL"
+    assert index["/P/Item/ChildB"] == "CAN-FRAME"
+    assert index["/P/EarlyTarget"] == "I-SIGNAL"
+    assert index["/P"] == "AR-PACKAGE"
+    by_id = {item.item_id: item for item in items}
+    item = by_id["/P/Item"]
+    assert item.text == "FromEarly"
+    assert item.attributes["LENGTH"] == "1"
+    assert item.attributes["tag"] == "I-SIGNAL"
+    assert item.file == early.as_posix()
+    assert [link.target_id for link in item.links] == [
+        "/P",
+        "/P/EarlyTarget",
+        "/P/Item/ChildB",
+    ]
+    assert report["references_seen"] == 2
+    assert report["resolved"] == 2
+    assert report["dangling"] == 0
+    assert _category_sum(report) == 2
+    assert by_id["/P/Item/ChildB"].links == [_part_of("/P/Item")]
+
+
+def test_same_path_same_tag_is_one_split_and_keeps_both(tmp_path: Path):
+    """Same non-package path and tag: one split_elements entry, both files.
+
+    The sorted-earlier file supplies text and attributes. Children and
+    references of both occurrences are kept. The shared package is not a split.
+    """
+    early = _write_arxml(
+        tmp_path,
+        "a-early.arxml",
+        """\
+        <I-SIGNAL>
+          <SHORT-NAME>Sig</SHORT-NAME>
+          <DESC>FromEarly</DESC>
+          <LENGTH>1</LENGTH>
+          <I-SIGNAL-REF DEST="I-SIGNAL">/P/TargetA</I-SIGNAL-REF>
+          <I-SIGNAL>
+            <SHORT-NAME>KidA</SHORT-NAME>
+          </I-SIGNAL>
+        </I-SIGNAL>
+        <I-SIGNAL>
+          <SHORT-NAME>TargetA</SHORT-NAME>
+        </I-SIGNAL>
+""",
+        None,
+    )
+    late = _write_arxml(
+        tmp_path,
+        "b-late.arxml",
+        """\
+        <I-SIGNAL>
+          <SHORT-NAME>Sig</SHORT-NAME>
+          <DESC>FromLate</DESC>
+          <LENGTH>9</LENGTH>
+          <I-SIGNAL-REF DEST="I-SIGNAL">/P/TargetB</I-SIGNAL-REF>
+          <I-SIGNAL>
+            <SHORT-NAME>KidB</SHORT-NAME>
+          </I-SIGNAL>
+        </I-SIGNAL>
+        <I-SIGNAL>
+          <SHORT-NAME>TargetB</SHORT-NAME>
+        </I-SIGNAL>
+""",
+        None,
+    )
+    items, report = read_arxml([late, early], source_id="split")
+    index = _index_of(items)
+
+    assert report["split_elements"] == 1
+    assert report["path_conflicts"] == 0
+    (entry,) = report["entries"]["split_elements"]
+    assert entry.path == "/P/Sig"
+    assert entry.tag == "I-SIGNAL"
+    assert entry.first_file == early.as_posix()
+    assert entry.other_file == late.as_posix()
+    assert report["entries"]["path_conflicts"] == ()
+
+    assert index["/P/Sig/KidA"] == "I-SIGNAL"
+    assert index["/P/Sig/KidB"] == "I-SIGNAL"
+    assert index["/P/TargetA"] == "I-SIGNAL"
+    assert index["/P/TargetB"] == "I-SIGNAL"
+    by_id = {item.item_id: item for item in items}
+    sig = by_id["/P/Sig"]
+    assert sig.text == "FromEarly"
+    assert sig.attributes["LENGTH"] == "1"
+    assert "FromLate" not in sig.attributes.values()
+    assert sig.file == early.as_posix()
+    assert [(link.role, link.target_id) for link in sig.links] == [
+        ("", "/P"),
+        ("I-SIGNAL-REF", "/P/TargetA"),
+        ("I-SIGNAL-REF", "/P/TargetB"),
+    ]
+    assert report["references_seen"] == 2
+    assert report["resolved"] == 2
+    assert _category_sum(report) == 2
+    assert by_id["/P/Sig/KidB"].file == late.as_posix()
+
+
+def test_repeat_in_one_file_is_a_split(tmp_path: Path):
+    """The same path twice in one file records that file as both sides."""
+    path = _write_arxml(
+        tmp_path,
+        "twice.arxml",
+        """\
+        <I-SIGNAL>
+          <SHORT-NAME>Sig</SHORT-NAME>
+          <DESC>First</DESC>
+          <LENGTH>1</LENGTH>
+        </I-SIGNAL>
+        <I-SIGNAL>
+          <SHORT-NAME>Sig</SHORT-NAME>
+          <DESC>Second</DESC>
+          <LENGTH>9</LENGTH>
+          <I-SIGNAL>
+            <SHORT-NAME>Kid</SHORT-NAME>
+          </I-SIGNAL>
+        </I-SIGNAL>
+""",
+        None,
+    )
+    items, report = read_arxml([path], source_id="twice")
+    index = _index_of(items)
+
+    assert report["split_elements"] == 1
+    assert report["path_conflicts"] == 0
+    (entry,) = report["entries"]["split_elements"]
+    assert entry.path == "/P/Sig"
+    assert entry.tag == "I-SIGNAL"
+    assert entry.first_file == path.as_posix()
+    assert entry.other_file == path.as_posix()
+    assert index["/P/Sig"] == "I-SIGNAL"
+    assert index["/P/Sig/Kid"] == "I-SIGNAL"
+    sig = next(item for item in items if item.item_id == "/P/Sig")
+    assert sig.text == "First"
+    assert sig.attributes["LENGTH"] == "1"
+
+
+def test_duplicate_packages_are_not_recorded(tmp_path: Path):
+    """Two AR-PACKAGE elements at one path merge. Nothing is recorded."""
+    early = _write_arxml(
+        tmp_path,
+        "a-early.arxml",
+        """\
+        <I-SIGNAL>
+          <SHORT-NAME>SigA</SHORT-NAME>
+        </I-SIGNAL>
+""",
+        None,
+    )
+    late = _write_arxml(
+        tmp_path,
+        "b-late.arxml",
+        """\
+        <CAN-FRAME>
+          <SHORT-NAME>SigB</SHORT-NAME>
+        </CAN-FRAME>
+""",
+        None,
+    )
+    items, report = read_arxml([late, early], source_id="packages")
+    index = _index_of(items)
+
+    assert report["split_elements"] == 0
+    assert report["path_conflicts"] == 0
+    assert report["entries"]["split_elements"] == ()
+    assert report["entries"]["path_conflicts"] == ()
+    assert index["/P"] == "AR-PACKAGE"
+    assert index["/P/SigA"] == "I-SIGNAL"
+    assert index["/P/SigB"] == "CAN-FRAME"
+    assert report["identifiables"] == 3
+    assert report["packages"] == 1
+    assert items[0].file == early.as_posix()
+
+
+def test_duplicate_lists_hold_at_most_fifty(tmp_path: Path):
+    """51 later occurrences: the count is the total and the list keeps 50."""
+    conflicts = "\n".join(
+        f"        <T{i}>\n"
+        f"          <SHORT-NAME>Item</SHORT-NAME>\n"
+        f"        </T{i}>"
+        for i in range(51)
+    )
+    conflict_path = _write_arxml(
+        tmp_path,
+        "conflicts.arxml",
+        "        <I-SIGNAL>\n"
+        "          <SHORT-NAME>Item</SHORT-NAME>\n"
+        "        </I-SIGNAL>\n"
+        f"{conflicts}\n",
+        None,
+    )
+    splits = "\n".join(
+        f"        <I-SIGNAL>\n"
+        f"          <SHORT-NAME>Sig</SHORT-NAME>\n"
+        f"          <DESC>D{i}</DESC>\n"
+        f"        </I-SIGNAL>"
+        for i in range(51)
+    )
+    split_path = _write_arxml(
+        tmp_path,
+        "splits.arxml",
+        "        <I-SIGNAL>\n"
+        "          <SHORT-NAME>Sig</SHORT-NAME>\n"
+        "          <DESC>First</DESC>\n"
+        "        </I-SIGNAL>\n"
+        f"{splits}\n",
+        None,
+    )
+
+    _index, conflict_report = read_arxml([conflict_path], source_id="conflicts")
+    conflict_entries = conflict_report["entries"]["path_conflicts"]
+    assert conflict_report["path_conflicts"] == 51
+    assert len(conflict_entries) == 50
+    assert [entry.other_tag for entry in conflict_entries] == [
+        f"T{i}" for i in range(50)
+    ]
+    assert conflict_entries[0].path == "/P/Item"
+    assert conflict_entries[0].first_tag == "I-SIGNAL"
+    assert conflict_entries[0].first_file == conflict_path.as_posix()
+    assert all(entry.other_tag != "T50" for entry in conflict_entries)
+
+    _index, split_report = read_arxml([split_path], source_id="splits")
+    split_entries = split_report["entries"]["split_elements"]
+    assert split_report["split_elements"] == 51
+    assert len(split_entries) == 50
+    assert split_entries[0].path == "/P/Sig"
+    assert split_entries[0].tag == "I-SIGNAL"
+    assert split_entries[0].first_file == split_path.as_posix()
+    assert split_entries[-1].other_file == split_path.as_posix()
