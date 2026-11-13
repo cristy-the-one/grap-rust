@@ -21,8 +21,10 @@ System JSON::
 
 Every figure includes a 95% bootstrap interval, resampling source documents
 with replacement (2,000 resamples, seed 20261112). No row is printed.
-``--sealed`` appends one line to the gold-root access log: timestamp, git
-commit, user, and that same aggregate summary. The line never contains a row.
+``--sealed`` is the only way sealed sheets are read. It appends one line to
+the gold-root access log before printing: timestamp, git commit, user, and
+that same aggregate summary. If the log cannot be written, nothing is scored
+and nothing is printed. The line never contains a row.
 """
 
 from __future__ import annotations
@@ -453,12 +455,25 @@ def _git_commit() -> str:
     return completed.stdout.strip() or "unknown"
 
 
+def _access_log_path(gold_dir: Path) -> Path:
+    return _gold_root(gold_dir) / "ACCESS.log"
+
+
+def _prepare_access_log(gold_dir: Path) -> Path:
+    """Prove the access log can be written before any sealed sheet is read."""
+    path = _access_log_path(gold_dir)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a", encoding="utf-8", newline=""):
+        pass
+    return path
+
+
 def _append_access_log(gold_dir: Path, report: str) -> None:
     """Append timestamp, git commit, user, and the metric summary.
 
     The summary is the aggregate report on one line. Sheet rows are not written.
     """
-    path = _gold_root(gold_dir) / "ACCESS.log"
+    path = _access_log_path(gold_dir)
     summary = " ".join(report.splitlines())
     stamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     row = [stamp, _git_commit(), getpass.getuser(), summary]
@@ -476,18 +491,28 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument(
         "--sealed",
         action="store_true",
-        help="Score sealed sheets only and append timestamp, git commit, user, and metric summary to gold/ACCESS.log.",
+        help="Score sealed sheets only. Append timestamp, git commit, user, and metric summary to gold/ACCESS.log before printing.",
     )
     args = parser.parse_args(argv)
     system = json.loads(args.system.read_text(encoding="utf-8"))
+    if args.sealed:
+        try:
+            _prepare_access_log(args.gold)
+        except OSError as exc:
+            sys.stderr.write(f"cannot write access log: {exc}\n")
+            raise SystemExit(1) from exc
     try:
         report = format_report(score(args.gold, system, sealed=args.sealed))
     except ScoreRefusal as exc:
         sys.stderr.write(str(exc) + "\n")
         raise SystemExit(1) from exc
-    sys.stdout.write(report)
     if args.sealed:
-        _append_access_log(args.gold, report)
+        try:
+            _append_access_log(args.gold, report)
+        except OSError as exc:
+            sys.stderr.write(f"cannot write access log: {exc}\n")
+            raise SystemExit(1) from exc
+    sys.stdout.write(report)
 
 
 if __name__ == "__main__":

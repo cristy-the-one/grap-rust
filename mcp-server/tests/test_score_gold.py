@@ -687,3 +687,76 @@ def test_sealed_flag_reads_sealed_only(tmp_path, capsys):
     captured = capsys.readouterr()
     assert canary not in captured.out
     assert canary not in captured.err
+
+
+def test_score_without_flag_ignores_sealed_directory(tmp_path, capsys):
+    """A run without ``--sealed`` is unchanged by the presence of a sealed sheet."""
+    canary = "SEALEDROWCANARY9f3a7c"
+    payload = {"statements": [{
+        "source_id": "open-doc", "item_id": "art-1", "kind": "obligation", "subject": "the bank",
+    }]}
+    present = tmp_path / "present"
+    absent = tmp_path / "absent"
+    open_row = _statement("open-doc", "art-1", "obligation", "the bank")
+    _write_csv(present / "open" / "statements.csv", _STATEMENT_COLUMNS, [open_row])
+    held = _statement("held-doc", "art-9", "prohibition", canary, passage=canary)
+    held["note"] = canary
+    _write_csv(present / "sealed" / "statements.csv", _STATEMENT_COLUMNS, [held])
+    _write_csv(absent / "open" / "statements.csv", _STATEMENT_COLUMNS, [open_row])
+    assert score_gold.score(present, payload) == score_gold.score(absent, payload)
+
+    body = json.dumps(payload)
+    system_present = tmp_path / "system-present.json"
+    system_absent = tmp_path / "system-absent.json"
+    system_present.write_text(body, encoding="utf-8")
+    system_absent.write_text(body, encoding="utf-8")
+    score_gold.main(["--gold", str(present), "--system", str(system_present)])
+    out_present = capsys.readouterr().out
+    score_gold.main(["--gold", str(absent), "--system", str(system_absent)])
+    out_absent = capsys.readouterr().out
+    assert out_present == out_absent
+    assert canary not in out_present
+    assert not (tmp_path / "ACCESS.log").exists()
+
+
+def test_sealed_log_is_written_before_printing(tmp_path, monkeypatch):
+    canary = "SEALEDROWCANARY9f3a7c"
+    corpus = tmp_path / "x"
+    _write_csv(corpus / "sealed" / "statements.csv", _STATEMENT_COLUMNS, [
+        _statement("held-doc", "art-9", "prohibition", "the bank"),
+    ])
+    system_path = tmp_path / "system.json"
+    system_path.write_text(json.dumps({"statements": [{
+        "source_id": "held-doc", "item_id": "art-9", "kind": "prohibition", "subject": "the bank",
+    }]}), encoding="utf-8")
+    log = tmp_path / "ACCESS.log"
+    seen = {}
+    real_write = sys.stdout.write
+
+    def spy(text):
+        seen["log"] = log.read_text(encoding="utf-8") if log.is_file() else ""
+        return real_write(text)
+
+    monkeypatch.setattr(sys.stdout, "write", spy)
+    score_gold.main(["--gold", str(corpus), "--system", str(system_path), "--sealed"])
+    assert canary not in seen.get("log", "")
+    assert "statements_precision=" in seen.get("log", "")
+
+
+def test_unwritable_access_log_scores_nothing(tmp_path, capsys):
+    corpus = tmp_path / "x"
+    _write_csv(corpus / "sealed" / "statements.csv", _STATEMENT_COLUMNS, [
+        _statement("held-doc", "art-9", "prohibition", "the bank"),
+    ])
+    system_path = corpus / "system.json"
+    system_path.write_text("{}", encoding="utf-8")
+    tmp_path.chmod(0o555)
+    try:
+        with pytest.raises(SystemExit) as caught:
+            score_gold.main(["--gold", str(corpus), "--system", str(system_path), "--sealed"])
+        assert caught.value.code == 1
+    finally:
+        tmp_path.chmod(0o755)
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert not (tmp_path / "ACCESS.log").exists()
