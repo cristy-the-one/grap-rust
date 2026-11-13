@@ -1,5 +1,6 @@
 """Phase 1 graph-augmented extraction: the live WorkingGraph."""
 
+import pytest
 import pygrap  # noqa: F401  (ensures the binding is importable in this env)
 
 from grap_mcp.kee.working_graph import WorkingGraph, Signals
@@ -120,6 +121,50 @@ def test_identifier_names_resolve_by_exact_string(tmp_path):
         "s3",
     )
     assert wg.node_count() == 2
+
+
+@pytest.mark.parametrize("left,right", [
+    ("VehSpdFL", "VehSpdFR"),
+    ("BrakePedalPosition", "BrakePedalPressure"),
+    ("vehicle_speed", "vehicle_speed_raw"),
+    ("/ISignal/SigA", "/ISignal/SigB"),
+])
+def test_automotive_identifier_pairs_stay_two_nodes(tmp_path, left, right):
+    # Identical vectors must not merge these identifier shapes.
+    same = [1.0, 0.0]
+    wg = _wg_fake(tmp_path, {left: list(same), right: list(same)}, merge_threshold=0.86)
+    wg.upsert_fragment(
+        {"source": "s1", "outcomes": [{"name": left, "characteristics": []}], "relations": []},
+        "s1",
+    )
+    wg.upsert_fragment(
+        {"source": "s2", "outcomes": [{"name": right, "characteristics": []}], "relations": []},
+        "s2",
+    )
+    assert wg.node_count() == 2
+
+
+@pytest.mark.parametrize("act,reference", [
+    ("Legea", "Legea nr. 101/1998"),
+    ("Lege", "Lege nr. 58/1998"),
+    ("OUG", "OUG nr. 12/2020"),
+    ("HG", "HG nr. 7/1999"),
+    ("Ordonanța", "Ordonanța nr. 33/2000"),
+    ("Decizia", "Decizia nr. 4/2001"),
+])
+def test_legal_act_reference_is_not_an_identifier(tmp_path, act, reference):
+    # A legal act reference still similarity-merges. Identical vectors, one node.
+    same = [1.0, 0.0]
+    wg = _wg_fake(tmp_path, {act: list(same), reference: list(same)}, merge_threshold=0.86)
+    wg.upsert_fragment(
+        {"source": "s1", "outcomes": [{"name": act, "characteristics": []}], "relations": []},
+        "s1",
+    )
+    wg.upsert_fragment(
+        {"source": "s2", "outcomes": [{"name": reference, "characteristics": []}], "relations": []},
+        "s2",
+    )
+    assert wg.node_count() == 1
 
 
 class CountingEmb:

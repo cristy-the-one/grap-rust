@@ -31,10 +31,33 @@ logger = logging.getLogger("grap-mcp.kee")
 
 EMBED_BATCH = 128     # texts per /embeddings request; bounds payload + peak memory
 REL_VOCAB_CAP = 40    # most-frequent relation types injected into extraction context
-# Com_SendSignal, or a bracketed id such as [SWS_Can_00001].
-_DEFAULT_IDENTIFIER_PATTERN = (
-    r"\b[A-Z][A-Za-z0-9]*(?:_[A-Za-z0-9]+)+\b|\[[A-Z]+_\w+\]"
+# A bracketed id such as [SWS_Com_00123], found anywhere in the name.
+_BRACKETED_ID = re.compile(r"\[[^\]\s]+\]")
+# "Legea nr. 101/1998" and the same shape. These tokens are not identifiers.
+_LEGAL_ACT_REFERENCE = re.compile(
+    r"\b(?:Legea|Lege|OUG|HG|Ordonanța|Decizia)\s+nr\.\s+\d+/\d+\b"
 )
+
+
+def _token_is_identifier(token: str) -> bool:
+    """No whitespace, and an underscore, slash, dot, digit, or a later capital."""
+    if not token or any(ch.isspace() for ch in token):
+        return False
+    if any(ch in "_/." or ch.isdigit() for ch in token):
+        return True
+    return any(ch.isupper() for ch in token[1:])
+
+
+def _contains_identifier(name: str) -> bool:
+    """Search: the name is an identifier, or a phrase that contains one.
+
+    A legal act reference is removed first, so `nr.` and `101/1998` inside
+    `Legea nr. 101/1998` do not count.
+    """
+    if _BRACKETED_ID.search(name):
+        return True
+    residual = _LEGAL_ACT_REFERENCE.sub(" ", name)
+    return any(_token_is_identifier(token) for token in re.findall(r"\S+", residual))
 
 
 @dataclass
@@ -79,8 +102,8 @@ class WorkingGraph:
         self.embedder = embedder
         self.merge_threshold = merge_threshold
         self.context_cap = context_cap
-        self._identifier_re = re.compile(
-            _DEFAULT_IDENTIFIER_PATTERN if identifier_pattern is None else identifier_pattern)
+        # None selects the default identifier rule. A caller pattern is still searched.
+        self._identifier_re = None if identifier_pattern is None else re.compile(identifier_pattern)
         self._owned_workdir = workdir is None
         self._dir = workdir or tempfile.mkdtemp(prefix="kee-wg-")
         Path(self._dir).mkdir(parents=True, exist_ok=True)
@@ -259,9 +282,11 @@ class WorkingGraph:
                 self._register_alias(name, node)
                 return _Resolution(node, False)
 
-        # Pattern is decided before embedding. An identifier that missed exact
-        # alias and content-hash resolution is its own node: do not similarity-merge.
-        identifier = self._identifier_re.search(name) is not None
+        # Decided before embedding. An identifier that missed exact alias and
+        # content-hash resolution is its own node: do not similarity-merge.
+        identifier = (self._identifier_re.search(name) is not None
+                      if self._identifier_re is not None
+                      else _contains_identifier(name))
         vec = self._embed_one(name)
         if not identifier:
             matches = self._compatible_matches(name, vec)
