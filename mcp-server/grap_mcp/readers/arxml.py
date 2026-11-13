@@ -1,9 +1,9 @@
 """ARXML reader: refusals, the identity index, references, and items.
 
-Implements §3, §4.1 steps 1, 2, 3, and 5, §4.2, §4.3, and §5 of
+Implements §3, §4.1 steps 1, 2, 3, and 5, §4.2, §4.3, §4.5, and §5 of
 docs/spec-arxml-reader.md. `read_arxml` returns `(items, report)`.
-Release text on an item comes from §7. Collapsing an instance reference
-into one link is a later card.
+Release text on an item comes from §7. An -IREF with exactly one TARGET-
+child is one refers_to link (§4.5).
 """
 
 from __future__ import annotations
@@ -64,6 +64,24 @@ class ArxmlReference:
 
 
 @dataclass(frozen=True)
+class MalformedIref:
+    """An -IREF that does not have exactly one TARGET- child (§4.5)."""
+
+    file: str
+    owner: str
+    role: str
+
+
+@dataclass(frozen=True)
+class _IrefGroup:
+    """One -IREF element, in document order. `role` is its tag."""
+
+    file: str
+    owner: str
+    role: str
+
+
+@dataclass(frozen=True)
 class _SeenReference:
     """A DEST element collected in pass 1, before classification."""
 
@@ -75,6 +93,7 @@ class _SeenReference:
     base: str | None
     packages: tuple[str, ...]
     iref: str | None
+    iref_group: int | None
 
 
 @dataclass(frozen=True)
@@ -223,18 +242,21 @@ def read_arxml(
     Returns `(items, report)`. Items are one SourceItem per identifiable, in
     first-occurrence order, then one placeholder per distinct dangling or
     undefined target. The report counts every reference. Each list in it holds
-    at most 50 entries. A refusal raises `ArxmlError` and returns nothing.
+    at most 50 entries. `malformed_irefs` counts -IREF elements that do not
+    have exactly one TARGET- child. A refusal raises `ArxmlError` and returns
+    nothing.
     """
     files = sorted((Path(path) for path in paths), key=lambda path: path.as_posix())
     index: dict[str, str] = {}
     bases: list[ReferenceBase] = []
     seen: list[_SeenReference] = []
     raw_items: list[_RawItem] = []
+    iref_groups: list[_IrefGroup] = []
     for path in files:
         root, digest = _root(path)
         _walk(
             root, "", "", [], None, index, bases, seen, path.as_posix(),
-            raw_items, _release(root), digest,
+            raw_items, _release(root), digest, None, "", iref_groups,
         )
 
     packages = sum(tag == "AR-PACKAGE" for tag in index.values())
@@ -261,9 +283,12 @@ def read_arxml(
         "index and items diverged: "
         f"identifiables={len(index)} items={len(raw_items)}"
     )
-    items, tag_counts, truncated, variations = _build_items(
-        source_id, raw_items, references,
+    group_ids = [ref.iref_group for ref in seen]
+    items, tag_counts, truncated, variations, malformed = _build_items(
+        source_id, raw_items, references, iref_groups, group_ids,
     )
+    listed = {name: tuple(entries[name]) for name in _ENTRY_CATEGORIES}
+    listed["malformed_irefs"] = tuple(malformed[:_ENTRY_LIMIT])
 
     report = {
         "source_id": source_id,
@@ -275,10 +300,11 @@ def read_arxml(
         "base_declarations": len(bases),
         "bases": tuple(bases[:_ENTRY_LIMIT]),
         "references": references[:_ENTRY_LIMIT],
-        "entries": {name: tuple(entries[name]) for name in _ENTRY_CATEGORIES},
+        "entries": listed,
         "tag_counts": tag_counts,
         "attributes_truncated": truncated,
         "variation_points": variations,
+        "malformed_irefs": len(malformed),
     }
     return tuple(items), report
 
@@ -367,8 +393,15 @@ def _walk(
     raw_items: list[_RawItem],
     release: str | None,
     digest: str,
+    iref_group: int | None,
+    iref_owner: str,
+    iref_groups: list[_IrefGroup],
 ) -> None:
-    """Depth-first. Steps 1, 2, 3, and 5. Children of an -IREF keep its tag."""
+    """Depth-first. Steps 1, 2, 3, and 5. Children of an -IREF keep its tag.
+
+    A DEST descendant is a member of that -IREF only while the owner is still
+    the owner at the -IREF. A nested identifiable keeps its own references.
+    """
     local = _local(element.tag)
     short = _short_name(element)
     if short is not None:
@@ -408,14 +441,26 @@ def _walk(
             base=_attribute(element, "BASE"),
             packages=tuple(packages),
             iref=iref,
+            iref_group=(
+                iref_group if iref_group is not None and owner == iref_owner else None
+            ),
         ))
-    child_iref = local if local.endswith("-IREF") else iref
+    if local.endswith("-IREF"):
+        child_iref = local
+        child_group = len(iref_groups)
+        child_owner = owner
+        iref_groups.append(_IrefGroup(file=file_name, owner=owner, role=local))
+    else:
+        child_iref = iref
+        child_group = iref_group
+        child_owner = iref_owner
     for child in element:
         if local == "AR-PACKAGE" and _local(child.tag) == "REFERENCE-BASES":
             continue
         _walk(
             child, path, owner, packages, child_iref,
             index, bases, seen, file_name, raw_items, release, digest,
+            child_group, child_owner, iref_groups,
         )
 
 
@@ -543,12 +588,32 @@ def _build_items(
     source_id: str,
     raw_items: Sequence[_RawItem],
     references: Sequence[ArxmlReference],
-) -> tuple[list[SourceItem], dict[str, int], int, int]:
-    """§5. Identifiable items, then one placeholder per distinct target path."""
+    iref_groups: Sequence[_IrefGroup],
+    group_ids: Sequence[int | None],
+) -> tuple[list[SourceItem], dict[str, int], int, int, list[MalformedIref]]:
+    """§5 items, with §4.5 collapsing an -IREF into one link."""
+    collapsed, malformed = _iref_links(references, iref_groups, group_ids)
     refers: dict[str, list[SourceLink]] = {}
     placeholder_dest: dict[str, str] = {}
     placeholder_order: list[str] = []
-    for ref in references:
+    emitted_groups: set[int] = set()
+    for ref, gid in zip(references, group_ids, strict=True):
+        # Placeholders follow classification, including children of a collapsed
+        # instance reference. The collapse changes the link, not the count.
+        if (
+            ref.category in _PLACEHOLDER_CATEGORIES
+            and ref.target is not None
+            and ref.target not in placeholder_dest
+        ):
+            placeholder_dest[ref.target] = ref.dest
+            placeholder_order.append(ref.target)
+        if gid is not None and gid in collapsed:
+            if gid not in emitted_groups:
+                emitted_groups.add(gid)
+                link = collapsed[gid]
+                if link is not None:
+                    refers.setdefault(ref.owner, []).append(link)
+            continue
         if ref.category not in _LINK_CATEGORIES:
             continue
         assert ref.target is not None, ref
@@ -558,9 +623,6 @@ def _build_items(
             role=ref.role,
             context=[],
         ))
-        if ref.category in _PLACEHOLDER_CATEGORIES and ref.target not in placeholder_dest:
-            placeholder_dest[ref.target] = ref.dest
-            placeholder_order.append(ref.target)
 
     items: list[SourceItem] = []
     tag_counts: dict[str, int] = {}
@@ -607,7 +669,50 @@ def _build_items(
             file="",
             sha256="",
         ))
-    return items, tag_counts, truncated, variations
+    return items, tag_counts, truncated, variations, malformed
+
+
+def _iref_links(
+    references: Sequence[ArxmlReference],
+    groups: Sequence[_IrefGroup],
+    group_ids: Sequence[int | None],
+) -> tuple[dict[int, SourceLink | None], list[MalformedIref]]:
+    """One link per -IREF that has exactly one TARGET- child.
+
+    `context` is the paths of the other children, in document order. A child
+    with no path (empty or unresolvable) is left out of the context. Any other
+    -IREF is malformed, and the caller emits its children as ordinary links.
+    A collapsed group whose TARGET- child has no path contributes no link.
+    """
+    members: dict[int, list[ArxmlReference]] = {gid: [] for gid in range(len(groups))}
+    for ref, gid in zip(references, group_ids, strict=True):
+        if gid is not None:
+            members[gid].append(ref)
+    collapsed: dict[int, SourceLink | None] = {}
+    malformed: list[MalformedIref] = []
+    for gid, group in enumerate(groups):
+        targets = [ref for ref in members[gid] if ref.role.startswith("TARGET-")]
+        if len(targets) != 1:
+            malformed.append(MalformedIref(
+                file=group.file, owner=group.owner, role=group.role,
+            ))
+            continue
+        target = targets[0]
+        if target.target is None:
+            collapsed[gid] = None
+            continue
+        context = [
+            ref.target
+            for ref in members[gid]
+            if ref is not target and ref.target is not None
+        ]
+        collapsed[gid] = SourceLink(
+            type="refers_to",
+            target_id=target.target,
+            role=group.role,
+            context=context,
+        )
+    return collapsed, malformed
 
 
 def _kind_hint(tag: str) -> str:
