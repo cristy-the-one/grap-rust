@@ -213,3 +213,50 @@ def test_dbc_fixture_yields_items(tmp_path):
         assert item.item_id in text
         assert label == item.kind_hint
         assert text == _reader_node_text(item)
+
+
+def test_two_main_arxml_fixtures_ingest_to_174_plus_placeholders(tmp_path, capsys):
+    """AR-09: a folder of the two main fixtures ingests to 174 items plus placeholders.
+
+    174 is the measured identifiable count in spec §8 for these two files read
+    together. The placeholder count is whatever read_arxml returns; it is not
+    a second expected constant. The printed line carries n and documents.
+    """
+    import shutil
+    from pathlib import Path
+
+    from grap_mcp.readers.arxml import read_arxml
+
+    fixtures = Path(__file__).resolve().parent / "fixtures" / "arxml"
+    names = ("ecu-extract-4.2.arxml", "system-4.2.arxml")
+    folder = tmp_path / "two-main"
+    folder.mkdir()
+    for name in names:
+        shutil.copyfile(fixtures / name, folder / name)
+
+    items, report = read_arxml(
+        [folder / name for name in names], source_id=folder.name,
+    )
+    placeholders = sum(item.kind_hint == "unresolved" for item in items)
+    # §8 measured value. Do not change this if the reader disagrees.
+    assert report["identifiables"] == 174
+    assert report["files"] == 2
+    assert sum(item.kind_hint != "unresolved" for item in items) == 174
+    assert len(items) == 174 + placeholders
+
+    kg = FakeKG()
+    res = ingest_paths(kg, str(folder))
+    assert res["files"] == 2
+    assert res["nodes_added"] == len(items)
+    assert len(kg.nodes) == 174 + placeholders
+    for item, (text, label) in zip(items, kg.nodes, strict=True):
+        assert label == item.kind_hint
+        assert item.item_id in text
+        assert text == _reader_node_text(item)
+
+    printed = capsys.readouterr().out
+    assert (
+        f"items=174 n=174 documents=2\n"
+        f"placeholders={placeholders} n={placeholders} documents=2\n"
+        f"nodes={len(items)} n={len(items)} documents=2\n"
+    ) in printed

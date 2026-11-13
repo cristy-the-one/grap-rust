@@ -3,6 +3,7 @@
 import json
 from itertools import islice
 from .native_graph import add_node_batch
+from .readers.arxml import read_arxml
 from .readers.dbc import read_dbc
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
@@ -16,7 +17,7 @@ _EXTS = {".md", ".txt", ".markdown"}
 _READERS = {
     ".dbc": read_dbc,
 }
-_ALL_EXTS = _EXTS | {".json"} | set(_READERS)
+_ALL_EXTS = _EXTS | {".json", ".arxml"} | set(_READERS)
 
 
 def _text_and_label_from_json(obj: Any, stem: str) -> Tuple[str, str]:
@@ -83,6 +84,11 @@ def ingest_paths(kg, root: str, embedder=None, batch_size: int = EMBED_BATCH) ->
     A reader node's text is item_id, kind_hint, text, then key=value attributes,
     one field per line. Its label is kind_hint.
 
+    Every `.arxml` file under `root` is one `read_arxml` call. That call returns
+    `(items, report)`. Each item, including an unresolved placeholder, becomes
+    one node. The call prints `items`, `placeholders`, and `nodes`, each with
+    `n` and `documents`.
+
     If `embedder` is supplied (a kee.embeddings.Embedder), each chunk is embedded
     and stored on its node, enabling vector / hybrid search and semantic dedup.
 
@@ -104,7 +110,27 @@ def ingest_paths(kg, root: str, embedder=None, batch_size: int = EMBED_BATCH) ->
         raise FileNotFoundError(f"ingest path not found: {root}")
 
     def records():
+        arxml_files = [f for f in files if f.suffix.lower() == ".arxml"]
+        if arxml_files:
+            source_id = p.stem if p.is_file() else p.name
+            items, report = read_arxml(arxml_files, source_id=source_id)
+            placeholders = sum(item.kind_hint == "unresolved" for item in items)
+            identifiables = report["identifiables"]
+            documents = report["files"]
+            print(
+                f"items={identifiables} n={identifiables} documents={documents}\n"
+                f"placeholders={placeholders} n={placeholders} documents={documents}\n"
+                f"nodes={len(items)} n={len(items)} documents={documents}"
+            )
+            for item in items:
+                lines = [item.item_id, item.kind_hint, item.text]
+                lines.extend(
+                    f"{key}={value}" for key, value in item.attributes.items()
+                )
+                yield (item.kind_hint, "\n".join(lines))
         for f in files:
+            if f.suffix.lower() == ".arxml":
+                continue
             reader = _READERS.get(f.suffix.lower())
             if reader is not None:
                 for item in reader(f, corpus_root=corpus_root):
