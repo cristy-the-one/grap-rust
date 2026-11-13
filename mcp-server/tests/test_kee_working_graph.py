@@ -51,6 +51,119 @@ def test_relation_with_grounded_endpoints_is_added(tmp_path):
     assert wg.parked == []
 
 
+def _endpoints(wg, relation):
+    return (wg._concept_to_node[relation["from_id"]],
+            wg._concept_to_node[relation["to_id"]])
+
+
+def test_relation_encoded_as_property_name_with_value_true(tmp_path):
+    """The relation is the edge property name, value true, so the engine can
+    prune on the name. The legacy form {"rel": "<verb>"} does not.
+    ``depends_on`` is a schema relation; a free verb takes the role form instead."""
+    wg = _wg(tmp_path, merge_threshold=0.95)
+    wg.upsert_fragment({
+        "source": "s#0",
+        "outcomes": [{"name": "Verification", "characteristics": []},
+                     {"name": "Test Plan", "characteristics": []}],
+        "relations": [{"from": "Verification", "type": "depends_on", "to": "Test Plan"}],
+    }, "s#0")
+    src, dst = _endpoints(wg, wg.relations[0])
+    assert wg.kg.neighbors_by_relation(src, "depends_on", True) == [(dst, 1.0)]
+    assert wg.kg.neighbors_by_relation(src, "rel", "depends_on") == []
+    hits = wg.kg.search_and_traverse(
+        "Verification", max_seeds=5, required_properties=["depends_on"],
+        min_strength=0.0, max_depth=2)
+    assert any(h.node == dst and h.depth == 1 for h in hits)
+    blocked = wg.kg.search_and_traverse(
+        "Verification", max_seeds=5, required_properties=["rel"],
+        min_strength=0.0, max_depth=2)
+    assert all(h.node != dst for h in blocked)
+
+
+def test_reopened_graph_projects_relation_as_property_name(tmp_path):
+    """A saved graph stores the verb in the edge row. Reopening rebuilds the
+    engine projection, which is how an existing graph picks up the encoding."""
+    wd = str(tmp_path / "g")
+    wg = WorkingGraph(HashingEmbedder(), merge_threshold=0.95, workdir=wd)
+    wg.upsert_fragment({
+        "source": "s#0",
+        "outcomes": [{"name": "Verification", "characteristics": []},
+                     {"name": "Test Plan", "characteristics": []}],
+        "relations": [{"from": "Verification", "type": "depends_on", "to": "Test Plan"}],
+    }, "s#0")
+    wg.save()
+    wg.close()
+    reopened = WorkingGraph.open(wd, HashingEmbedder(), merge_threshold=0.95)
+    src, dst = _endpoints(reopened, reopened.relations[0])
+    assert reopened.kg.neighbors_by_relation(src, "depends_on", True) == [(dst, 1.0)]
+    assert reopened.kg.neighbors_by_relation(src, "rel", "depends_on") == []
+
+
+def test_migrate_legacy_rel_property_rewrites_edges(tmp_path, capsys):
+    """An existing projection that still has {"rel": "<verb>"} is rewritten
+    in place from the relation list. A second run finds nothing left to migrate."""
+    wg = _wg(tmp_path, merge_threshold=0.95)
+    wg.upsert_fragment({
+        "source": "s#0",
+        "outcomes": [{"name": "Verification", "characteristics": []},
+                     {"name": "Test Plan", "characteristics": []},
+                     {"name": "Requirement", "characteristics": []}],
+        "relations": [
+            {"from": "Verification", "type": "depends_on", "to": "Test Plan"},
+            {"from": "Test Plan", "type": "verifies", "to": "Requirement"},
+        ],
+    }, "s#0")
+    assert len(wg.relations) == 2
+    wg.kg.clear_edges()
+    for edge in wg.relations:
+        src, dst = _endpoints(wg, edge)
+        wg.kg.add_edge(src, dst, 1.0, {"rel": edge["type"]})
+        assert wg.kg.neighbors_by_relation(src, "rel", edge["type"]) == [(dst, 1.0)]
+    report = wg.migrate_edge_encoding()
+    assert report == {"migrated": 2, "rewritten": 2, "n": 2}
+    printed = capsys.readouterr().out
+    assert "migrated=2" in printed and "rewritten=2" in printed and "n=2" in printed
+    for edge in wg.relations:
+        src, dst = _endpoints(wg, edge)
+        assert wg.kg.neighbors_by_relation(src, edge["type"], True) == [(dst, 1.0)]
+        assert wg.kg.neighbors_by_relation(src, "rel", edge["type"]) == []
+    again = wg.migrate_edge_encoding()
+    assert again == {"migrated": 0, "rewritten": 2, "n": 2}
+    assert wg.kg.edge_count() == 2
+
+
+def test_migrate_empty_graph_prints_zero_denominator(tmp_path, capsys):
+    wg = _wg(tmp_path)
+    report = wg.migrate_edge_encoding()
+    assert report == {"migrated": 0, "rewritten": 0, "n": 0}
+    assert "n=0" in capsys.readouterr().out
+    assert wg.kg.edge_count() == 0
+
+
+def test_seventy_free_verbs_are_accepted_and_retrievable_by_role(tmp_path):
+    """A verb outside the schema is refers_to with that verb as role.
+
+    Seventy distinct free verbs stay under the engine's 64 property-name
+    limit, and each edge is found again by its role.
+    """
+    from grap_mcp.schema.loader import load_automotive_schema
+    schema = {relation.name for relation in load_automotive_schema().relations}
+    verbs = [f"free_verb_{i:02d}" for i in range(70)]
+    assert schema.isdisjoint(verbs)
+    outcomes = [{"name": "Hub", "characteristics": []}]
+    outcomes += [{"name": f"Target {i:02d}", "characteristics": []} for i in range(70)]
+    relations = [{"from": "Hub", "type": verb, "to": f"Target {i:02d}"}
+                 for i, verb in enumerate(verbs)]
+    wg = _wg(tmp_path, merge_threshold=0.95)
+    wg.upsert_fragment({"source": "s#0", "outcomes": outcomes, "relations": relations}, "s#0")
+    assert len(wg.relations) == 70
+    src = wg._concept_to_node[wg.relations[0]["from_id"]]
+    by_type = {edge["type"]: edge for edge in wg.relations}
+    for verb in verbs:
+        dst = wg._concept_to_node[by_type[verb]["to_id"]]
+        assert wg.kg.neighbors_by_relation(src, "role", verb) == [(dst, 1.0)]
+
+
 def test_relation_with_ungrounded_endpoint_is_parked(tmp_path):
     wg = _wg(tmp_path, merge_threshold=0.95)
     frag = {
@@ -679,3 +792,31 @@ def test_prose_with_dots_and_digits_is_not_an_identifier(left, right):
 def test_identifiers_alone_and_inside_phrases(name):
     from grap_mcp.kee.working_graph import _contains_identifier
     assert _contains_identifier(name)
+
+
+def test_seventy_free_verbs_do_not_exhaust_the_engine_names(tmp_path):
+    """F27: the engine allows 64 property names. Free verbs must not use them up."""
+    from grap_mcp.kee.working_graph import _relation_filter
+    wg = _wg(tmp_path)
+    for i in range(70):
+        wg.upsert_fragment({
+            "source": f"d#{i}",
+            "outcomes": [{"name": f"Thing{i}a", "characteristics": []},
+                         {"name": f"Thing{i}b", "characteristics": []}],
+            "relations": [{"from": f"Thing{i}a", "type": f"verb number {i}", "to": f"Thing{i}b"}],
+        }, f"d#{i}")
+    assert len(wg.relations) == 70
+    for edge in wg.relations:
+        name, value = _relation_filter(edge["type"])
+        assert name == "role"
+        src = wg._concept_to_node[edge["from_id"]]
+        dst = wg._concept_to_node[edge["to_id"]]
+        assert dst in [nid for nid, _strength in wg.kg.neighbors_by_relation(src, name, value)]
+        assert dst in [nid for nid, _strength in wg.kg.neighbors_by_relation(src, "refers_to", True)]
+
+
+def test_schema_relation_is_its_own_property_name(tmp_path):
+    from grap_mcp.kee.working_graph import _relation_filter, _relation_properties
+    assert _relation_properties("part_of") == {"part_of": True}
+    assert _relation_filter("part_of") == ("part_of", True)
+    assert _relation_properties("emite") == {"refers_to": True, "role": "emite"}
