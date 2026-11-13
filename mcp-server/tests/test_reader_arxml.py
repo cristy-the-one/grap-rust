@@ -5,6 +5,7 @@ stands in for that check: it has SHORT-NAMEs, reference paths, and values.
 None of those strings may appear in the output.
 """
 
+import re
 import subprocess
 import sys
 import xml.etree.ElementTree as ET
@@ -212,3 +213,67 @@ def test_cli_matches_render(tmp_path: Path):
     assert completed.stdout == arxml_inventory.render([path])
     assert "WidgetAlpha" not in completed.stdout
     assert "/" not in completed.stdout
+
+
+# AUTOSAR's upper-hyphen form. Anything else is the bucket "<non-standard>".
+_STANDARD_NAME = re.compile(r"^[A-Z][A-Z0-9-]*$")
+_FIXED_LABELS = frozenset({
+    "documents",
+    "n",
+    "tag",
+    "dest",
+    "role",
+    "iref_shape",
+    "count",
+    "n/a",
+})
+_NON_STANDARD = "<non-standard>"
+
+_NONSTANDARD_FILE = """\
+<?xml version="1.0" encoding="UTF-8"?>
+<AUTOSAR>
+  <odd-tag>
+    <I-SIGNAL-SignalZebra DEST="/WidgetAlpha/SignalZebra">SecretValue</I-SIGNAL-SignalZebra>
+  </odd-tag>
+</AUTOSAR>
+"""
+
+
+def _tokens(output: str) -> list[str]:
+    """Split on whitespace, '=', and ',' so a shape's tags are separate tokens."""
+    tokens = []
+    for word in output.split():
+        tokens.extend(word.replace("=", " ").replace(",", " ").split())
+    return tokens
+
+
+def _allowed_token(token: str) -> bool:
+    if token in _FIXED_LABELS or token == _NON_STANDARD:
+        return True
+    if token.isdigit():
+        return True
+    return _STANDARD_NAME.fullmatch(token) is not None
+
+
+def test_nonstandard_names_are_not_printed(tmp_path: Path):
+    """A lowercase tag, a tag that contains a short name, and a path DEST stay out.
+
+    Every token is a number, a fixed label, "<non-standard>", or upper-hyphen.
+    """
+    path = tmp_path / "mixed.arxml"
+    path.write_text(_NONSTANDARD_FILE, encoding="utf-8")
+    output = arxml_inventory.render([path])
+
+    for secret in (
+        "odd-tag",
+        "I-SIGNAL-SignalZebra",
+        "SignalZebra",
+        "/WidgetAlpha/SignalZebra",
+        "WidgetAlpha",
+        "SecretValue",
+    ):
+        assert secret not in output
+
+    disallowed = [token for token in _tokens(output) if not _allowed_token(token)]
+    assert disallowed == []
+    assert _NON_STANDARD in output

@@ -4,8 +4,10 @@
 Every figure is printed with ``n`` (the rows behind it) and ``documents``
 (the files in the set). A distribution with no rows prints ``n/a``.
 
-Short names, paths, and values are never printed. A role is the tag of the
-element that carries ``DEST``, not a path segment. An instance-reference
+Short names, paths, and values are never printed. A tag name or a ``DEST``
+value is printed only when it matches ``^[A-Z][A-Z0-9-]*$``. Anything else
+is counted under the literal bucket ``<non-standard>``. A role is the tag of
+the element that carries ``DEST``, not a path segment. An instance-reference
 shape is the tags of that element's children, in document order, joined by
 commas.
 """
@@ -13,10 +15,15 @@ commas.
 from __future__ import annotations
 
 import argparse
+import re
 import sys
 import xml.etree.ElementTree as ET
 from collections import Counter
 from pathlib import Path
+
+# AUTOSAR's upper-hyphen form. Any other tag or DEST is counted, not printed.
+_STANDARD_NAME = re.compile(r"^[A-Z][A-Z0-9-]*$")
+_NON_STANDARD = "<non-standard>"
 
 
 class InventoryError(Exception):
@@ -27,6 +34,13 @@ def _local(tag: str) -> str:
     if tag.startswith("{"):
         return tag.split("}", 1)[1]
     return tag
+
+
+def _publish(name: str) -> str:
+    """Return the name when it is upper-hyphen, otherwise the shared bucket."""
+    if _STANDARD_NAME.fullmatch(name):
+        return name
+    return _NON_STANDARD
 
 
 def _dest(element: ET.Element) -> str | None:
@@ -51,13 +65,14 @@ def _count(paths: list[Path]):
             raise InventoryError("unreadable")
         for element in root.iter():
             tag = _local(element.tag)
-            tags[tag] += 1
+            tags[_publish(tag)] += 1
             dest = _dest(element)
             if dest is not None:
-                dests[dest] += 1
-                roles[tag] += 1
+                dests[_publish(dest)] += 1
+                roles[_publish(tag)] += 1
             if tag.endswith("-IREF"):
-                shape = ",".join(_local(child.tag) for child in list(element))
+                children = [_publish(_local(child.tag)) for child in list(element)]
+                shape = ",".join(children) if children else _NON_STANDARD
                 shapes[shape] += 1
     return tags, dests, roles, shapes
 
@@ -67,7 +82,7 @@ def _lines(kind: str, counts: Counter[str], documents: int) -> list[str]:
     if total == 0:
         return [f"{kind} n/a n=0 documents={documents}"]
     return [
-        f"{kind} {name if name else '-'} count={counts[name]} n={total} documents={documents}"
+        f"{kind} {name if name else _NON_STANDARD} count={counts[name]} n={total} documents={documents}"
         for name in sorted(counts)
     ]
 
