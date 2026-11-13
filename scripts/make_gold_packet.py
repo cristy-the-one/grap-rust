@@ -27,6 +27,7 @@ _BODY_KEYS = {"text_complet", "text", "content", "body"}
 _MIN_CHARS = 80
 _MAX_CHARS = 1500
 _MAX_PER_FILE = 4
+_MIN_SOURCE_FILES = 40
 
 # Sheet 1 columns from the labelling guides: lower-case, spaces and
 # punctuation runs turned into a single underscore.
@@ -74,6 +75,10 @@ class _FileItems:
 
 def _rank(seed: str, relative: str) -> str:
     return hashlib.sha256(f"{seed}{relative}".encode("utf-8")).hexdigest()
+
+
+def _item_rank(seed: str, relative: str, item_id: str) -> str:
+    return hashlib.sha256(f"{seed}{relative}{item_id}".encode("utf-8")).hexdigest()
 
 
 def _article_label(match: re.Match) -> str:
@@ -174,10 +179,18 @@ def _select(files: list[_FileItems], seed: str, items: int):
     for index, group in enumerate(ordered):
         if remaining <= 0:
             break
-        take = group.items[: min(_MAX_PER_FILE, remaining)]
+        ranked = tuple(sorted(
+            group.items,
+            key=lambda item: (_item_rank(seed, group.file, item.item_id), item.item_id),
+        ))
+        take = ranked[: min(_MAX_PER_FILE, remaining)]
         chosen.append((group, take, (index + 1) % 4 == 0))
         remaining -= len(take)
-    return chosen
+    return chosen, len(ordered)
+
+
+def _counts_line(source_files: int, rows: int, sealed_rows: int) -> str:
+    return f"source_files={source_files} rows={rows} sealed_rows={sealed_rows}"
 
 
 def _rows(taken: tuple[SourceItem, ...]) -> list[dict[str, str]]:
@@ -214,12 +227,16 @@ def build_packet(corpus_root: Path, corpus: str, seed: str, items: int, out: Pat
         raise RuntimeError(f"unknown corpus: {corpus}")
     if items < 0:
         raise RuntimeError("--items must be zero or greater")
-    chosen = _select(read_law_files(corpus_root), str(seed), items)
+    chosen, source_files = _select(read_law_files(corpus_root), str(seed), items)
     open_rows = []
     sealed_rows = []
     for group, taken, sealed in chosen:
         target = sealed_rows if sealed else open_rows
         target.extend(_rows(taken))
+    rows = len(open_rows) + len(sealed_rows)
+    print(_counts_line(source_files, rows, len(sealed_rows)))
+    if source_files < _MIN_SOURCE_FILES or rows < items or not sealed_rows:
+        raise SystemExit(1)
     destination = Path(out)
     _write_csv(destination / "open" / "statements.csv", open_rows)
     _write_csv(destination / "sealed" / "statements.csv", sealed_rows)
