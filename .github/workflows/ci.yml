@@ -78,7 +78,9 @@ jobs:
       - name: Install MCP server test dependencies
         run: pip install "mcp>=1.0.0,<2" "PyYAML>=6.0" "pytest>=8.0"
       - name: Run pytest
-        run: python -m pytest mcp-server/tests -q
+        # Two tests start a fresh interpreter that imports grap_mcp, so the
+        # package must be importable outside pytest's own path handling.
+        run: PYTHONPATH=mcp-server python -m pytest mcp-server/tests -q
 
   doc:
     name: Documentation
