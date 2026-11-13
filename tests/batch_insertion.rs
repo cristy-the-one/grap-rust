@@ -23,7 +23,10 @@ fn batch_matches_scalar_order_search_and_embeddings() {
         assert_eq!(batch.graph.node_label(id), scalar.graph.node_label(id));
     }
     assert_eq!(batch.vector_search(&a, 100), scalar.vector_search(&a, 100));
-    assert_eq!(batch.search("lege", 10).len(), scalar.search("lege", 10).len());
+    assert_eq!(
+        batch.search("lege", 10).len(),
+        scalar.search("lege", 10).len()
+    );
 }
 
 #[test]

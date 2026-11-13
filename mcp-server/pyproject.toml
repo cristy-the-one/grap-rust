@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "MCP server for the grap engine (POC)"
 requires-python = ">=3.11"
 dependencies = [
-    "mcp>=1.0.0,<2",       # Official MCP Python SDK (FastMCP style)
+    "mcp>=1.0.0,<2",          # Official MCP Python SDK (FastMCP style)
     "pygrap",              # Local pygrap bindings (installed via maturin develop)
     "PyYAML>=6.0",         # Procedure Graph YAML parsing
     "cantools>=45.1.2",    # DBC reader
