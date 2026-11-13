@@ -268,7 +268,9 @@ Cards below are deliberately coarse. Each **[L]** must be done before its **[S]*
 | V-01 Automotive schema | **spec approved** | See [spec-automotive-schema.md](spec-automotive-schema.md): 22 node types, 30 relations. Cards S-01 … S-05 are ready ([S] and [M]); S-06 is [L] and waits for E-01 | — |
 | C-01 Confidence and abstention on claims | **[L]** | Calibrated score, explicit "don't know" | Statistical; easy to produce numbers that look calibrated and are not |
 | Q-01 Retrieval evaluation and reranking | **[L]** then [S] | Only after gold exists | Interpreting ablations |
-| P-01 Minimal procedure runtime | **[L]** | One real test-specification procedure, executed step by step | Core product semantics |
+| P-01 Procedure runtime | **draft for the owner** | See [spec-procedure-runtime.md](spec-procedure-runtime.md): eight operations, checked before running, one bounded refine loop, an event per step. Cards P-10 … P-17 are issued only after its §10 is answered | — |
+| S-06 Statements from prose | **spec done** | See [spec-statements.md](spec-statements.md): the model marks parts, the code copies them verbatim. Cards ST-01 … ST-07 | — |
+| Gold tooling for automotive and Sheet 4 | **spec done** | See [spec-testpoint-tooling.md](spec-testpoint-tooling.md). Cards TP-01 … TP-05 | — |
 
 ## Part F — Order
 

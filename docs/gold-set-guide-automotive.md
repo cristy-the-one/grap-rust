@@ -135,7 +135,7 @@ competent test specification has to contain. Here your engineering judgement **i
 | **pass criterion** | Including tolerances and timing. |
 | **variants** | Configuration variants or boundary values that each need their own case. |
 | **negative cases** | What must *not* happen, and the fault cases the requirement implies. |
-| **needs from elsewhere** | Other items, parameters or interfaces a tester must read to write this test. List their IDs. |
+| **needs from elsewhere** | Other items, parameters or interfaces a tester must read to write this test. List their IDs, separated by semicolons. If the requirement needs nothing else, write `none`. Do not leave the cell empty — an empty cell counts as not labelled. |
 
 Guidance:
 
