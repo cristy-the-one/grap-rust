@@ -228,16 +228,63 @@ def test_self_loop_relation_is_parked_not_added(tmp_path):
     assert wg.parked[0]["reason"] == "self_loop"
 
 
-def test_conflicting_relation_type_is_parked_and_signaled(tmp_path):
+def test_sends_and_receives_both_survive_upsert_save_open_and_retract(tmp_path):
+    """F26: two relations between the same nodes are kept, including provenance.
+
+    ``EcuA sends FrameX`` and ``EcuA receives FrameX`` come from different
+    chunks. Both are present after upsert, after save, and after open.
+    Retracting the sends chunk removes only that relation.
+    """
+    wd = str(tmp_path / "wd")
+    emb = HashingEmbedder()
+    wg = WorkingGraph(emb, workdir=wd, merge_threshold=0.99)
+    outcomes = [
+        {"name": "EcuA", "characteristics": []},
+        {"name": "FrameX", "characteristics": []},
+    ]
+    wg.upsert_fragment({
+        "source": "sends#0",
+        "outcomes": outcomes,
+        "relations": [{"from": "EcuA", "type": "sends", "to": "FrameX"}],
+    }, "sends#0")
+    wg.upsert_fragment({
+        "source": "receives#0",
+        "outcomes": outcomes,
+        "relations": [{"from": "EcuA", "type": "receives", "to": "FrameX"}],
+    }, "receives#0")
+
+    def relations(graph):
+        onto = graph.to_candidate_ontology("v")
+        return sorted((r["from"], r["type"], r["to"]) for r in onto["relations"])
+
+    assert relations(wg) == [("EcuA", "receives", "FrameX"), ("EcuA", "sends", "FrameX")]
+    wg.save()
+    wg.close()
+
+    opened = WorkingGraph.open(wd, emb, merge_threshold=0.99)
+    assert relations(opened) == [("EcuA", "receives", "FrameX"), ("EcuA", "sends", "FrameX")]
+    opened.retract_chunk("sends#0")
+    assert relations(opened) == [("EcuA", "receives", "FrameX")]
+
+
+def test_second_relation_type_between_the_same_pair_is_kept(tmp_path):
+    """A second relation type between the same nodes is kept, not parked.
+
+    F26 replaced the one-type-per-pair rule. ``uses`` and ``blocks`` are two
+    relations. Neither is a conflict, and neither is dropped.
+    """
     wg = _wg(tmp_path, merge_threshold=0.95)
     base = {"outcomes": [{"name": "A", "characteristics": []}, {"name": "B", "characteristics": []}]}
     wg.upsert_fragment({"source": "s1", **base, "relations": [{"from": "A", "type": "uses", "to": "B"}]}, "s1")
     sig = wg.upsert_fragment({"source": "s2", **base, "relations": [{"from": "A", "type": "blocks", "to": "B"}]}, "s2")
-    assert any(c["kind"] == "relation" for c in sig.conflicts)
-    assert any(p["reason"] == "conflict" for p in wg.parked)
-    # original edge preserved (first-writer-wins)
+    # Nothing is parked or dropped. The second-look signal still fires once,
+    # as it did before the key changed; whether it should for a legitimate
+    # pair is left for tuning against labelled data.
+    assert [c["type"] for c in sig.conflicts] == ["blocks"]
+    assert not any(p["reason"] == "conflict" for p in wg.parked)
     onto = wg.to_candidate_ontology("v")
-    assert [(r["from"], r["type"], r["to"]) for r in onto["relations"]] == [("A", "uses", "B")]
+    assert sorted((r["from"], r["type"], r["to"]) for r in onto["relations"]) == [
+        ("A", "blocks", "B"), ("A", "uses", "B")]
 
 
 def test_bridge_relation_raises_correlation(tmp_path):

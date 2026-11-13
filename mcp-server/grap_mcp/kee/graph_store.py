@@ -14,18 +14,87 @@ import sqlite3
 from dataclasses import dataclass, field
 from typing import Dict, List, Tuple
 
+
+def _migrate_edges_include_relation(c) -> None:
+    """Rebuild `edges` so the relation type is part of the primary key.
+
+    The previous key was (from_id, to_id), so a second relation between the
+    same nodes replaced the first. One pair has to be able to carry several
+    (`about` and `refers_to`; `sends` and `receives`). A store already on the
+    new key is left untouched, so a run that committed the rebuild but not
+    user_version can be repeated, and so can a fresh database whose first
+    migration already created the new key.
+    """
+    info = list(c.execute("PRAGMA table_info(edges)"))
+    pk = [row["name"] for row in sorted(info, key=lambda row: row["pk"]) if row["pk"]]
+    if pk == ["from_id", "to_id", "type"]:
+        return
+    # One transaction: a failure rolls the old table back into place.
+    c.executescript(
+        """
+        BEGIN;
+        DROP TABLE IF EXISTS edges_with_relation;
+        CREATE TABLE edges_with_relation (
+            from_id INTEGER,
+            to_id INTEGER,
+            type TEXT,
+            PRIMARY KEY(from_id, to_id, type)
+        );
+        INSERT INTO edges_with_relation (from_id, to_id, type)
+            SELECT from_id, to_id, type FROM edges;
+        DROP TABLE edges;
+        ALTER TABLE edges_with_relation RENAME TO edges;
+        COMMIT;
+        """
+    )
+
+
+def _migrate_edge_sources_include_relation(c) -> None:
+    """Rebuild `edge_sources` so the relation type is part of the primary key.
+
+    The previous key was (from_id, to_id, chunk_id). Two relations between the
+    same nodes then shared one source list. A store already on the new key is
+    left untouched. An older row records no relation, so it is copied onto each
+    edge that still exists for that pair.
+    """
+    info = list(c.execute("PRAGMA table_info(edge_sources)"))
+    pk = [row["name"] for row in sorted(info, key=lambda row: row["pk"]) if row["pk"]]
+    if pk == ["from_id", "to_id", "type", "chunk_id"]:
+        return
+    c.executescript(
+        """
+        BEGIN;
+        DROP TABLE IF EXISTS edge_sources_with_relation;
+        CREATE TABLE edge_sources_with_relation (
+            from_id INTEGER,
+            to_id INTEGER,
+            type TEXT,
+            chunk_id TEXT,
+            PRIMARY KEY(from_id, to_id, type, chunk_id)
+        );
+        INSERT INTO edge_sources_with_relation (from_id, to_id, type, chunk_id)
+            SELECT s.from_id, s.to_id, e.type, s.chunk_id
+            FROM edge_sources s
+            JOIN edges e ON e.from_id = s.from_id AND e.to_id = s.to_id;
+        DROP TABLE edge_sources;
+        ALTER TABLE edge_sources_with_relation RENAME TO edge_sources;
+        COMMIT;
+        """
+    )
+
+
 _MIGRATIONS = [
     lambda c: c.executescript(
         """
         CREATE TABLE IF NOT EXISTS concepts (concept_id INTEGER PRIMARY KEY, canonical TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS aliases (concept_id INTEGER, alias TEXT, PRIMARY KEY(concept_id, alias));
         CREATE TABLE IF NOT EXISTS characteristics (concept_id INTEGER, text TEXT, PRIMARY KEY(concept_id, text));
-        CREATE TABLE IF NOT EXISTS edges (from_id INTEGER, to_id INTEGER, type TEXT, PRIMARY KEY(from_id, to_id));  -- one edge type per (from,to) pair; matches WorkingGraph._edge_types
+        CREATE TABLE IF NOT EXISTS edges (from_id INTEGER, to_id INTEGER, type TEXT, PRIMARY KEY(from_id, to_id, type));
         CREATE TABLE IF NOT EXISTS chunks (chunk_id TEXT PRIMARY KEY, content_hash TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS concept_hashes (concept_id INTEGER PRIMARY KEY, content_hash TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS concept_sources (concept_id INTEGER, chunk_id TEXT, PRIMARY KEY(concept_id, chunk_id));
         CREATE TABLE IF NOT EXISTS char_sources (concept_id INTEGER, text TEXT, chunk_id TEXT, PRIMARY KEY(concept_id, text, chunk_id));
-        CREATE TABLE IF NOT EXISTS edge_sources (from_id INTEGER, to_id INTEGER, chunk_id TEXT, PRIMARY KEY(from_id, to_id, chunk_id));
+        CREATE TABLE IF NOT EXISTS edge_sources (from_id INTEGER, to_id INTEGER, type TEXT, chunk_id TEXT, PRIMARY KEY(from_id, to_id, type, chunk_id));
         CREATE TABLE IF NOT EXISTS parked (from_concept TEXT, type TEXT, to_concept TEXT, chunk_id TEXT, reason TEXT, PRIMARY KEY(from_concept, type, to_concept, chunk_id));
         CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT);
         """
@@ -54,6 +123,14 @@ _MIGRATIONS = [
     lambda c: c.execute(
         "CREATE TABLE IF NOT EXISTS extractions (chunk_id TEXT PRIMARY KEY, record TEXT NOT NULL)"
     ),
+    _migrate_edges_include_relation,
+    # Provenance was keyed by the node pair, so two relations between the same
+    # nodes shared one source list and the second write replaced the first.
+    # The relation is now part of the key. A store already on that key is left
+    # untouched. An older row has no relation of its own: it is copied onto
+    # each edge that still exists for that pair, which is one edge for every
+    # store written before a pair could hold two relations.
+    _migrate_edge_sources_include_relation,
 ]
 
 SCHEMA_VERSION = len(_MIGRATIONS)
@@ -67,7 +144,7 @@ class GraphState:
     edges: List[Tuple[int, int, str]] = field(default_factory=list)
     concept_sources: Dict[int, List[str]] = field(default_factory=dict)
     char_sources: Dict[Tuple[int, str], List[str]] = field(default_factory=dict)
-    edge_sources: Dict[Tuple[int, int], List[str]] = field(default_factory=dict)
+    edge_sources: Dict[Tuple[int, int, str], List[str]] = field(default_factory=dict)
     manifest: Dict[str, str] = field(default_factory=dict)
     rel_vocab: List[str] = field(default_factory=list)
     parked: List[dict] = field(default_factory=list)
@@ -110,12 +187,12 @@ class GraphStore:
             "concepts": (1, list(state.concepts.items())),
             "aliases": (2, [(cid, a) for cid, al in state.aliases.items() for a in al]),
             "characteristics": (2, [(cid, t) for cid, ts in state.chars.items() for t in ts]),
-            "edges": (2, [tuple(e) for e in state.edges]),
+            "edges": (3, [tuple(e) for e in state.edges]),
             "chunks": (1, list(state.manifest.items())),
             "concept_hashes": (1, list(state.concept_hashes.items())),
             "concept_sources": (2, [(cid, ch) for cid, chs in state.concept_sources.items() for ch in chs]),
             "char_sources": (3, [(cid, txt, ch) for (cid, txt), chs in state.char_sources.items() for ch in chs]),
-            "edge_sources": (3, [(f, t, ch) for (f, t), chs in state.edge_sources.items() for ch in chs]),
+            "edge_sources": (4, [(f, t, ty, ch) for (f, t, ty), chs in state.edge_sources.items() for ch in chs]),
             "parked": (4, [(p["from"], p["type"], p["to"], p["chunk_id"], p["reason"]) for p in state.parked]),
             "chunk_failures": (1, [
                 (cid, f.get("content_hash", ""), int(f.get("attempts", 0)),
@@ -178,7 +255,7 @@ class GraphStore:
         for r in c.execute("SELECT * FROM char_sources"):
             s.char_sources.setdefault((r["concept_id"], r["text"]), []).append(r["chunk_id"])
         for r in c.execute("SELECT * FROM edge_sources"):
-            s.edge_sources.setdefault((r["from_id"], r["to_id"]), []).append(r["chunk_id"])
+            s.edge_sources.setdefault((r["from_id"], r["to_id"], r["type"]), []).append(r["chunk_id"])
         s.manifest = {r["chunk_id"]: r["content_hash"] for r in c.execute("SELECT * FROM chunks")}
         s.concept_hashes = {r["concept_id"]: r["content_hash"]
                             for r in c.execute("SELECT * FROM concept_hashes")}
