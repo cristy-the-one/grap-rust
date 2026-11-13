@@ -1,9 +1,11 @@
 """ARXML reader: refusals, the identity index, references, and items.
 
-Implements §3, §4.1 steps 1, 2, 3, and 5, §4.2, §4.3, §4.5, and §5 of
+Implements §3, §4.1 steps 1, 2, 3, and 5, §4.2, §4.3, §4.5, §5, and §6 of
 docs/spec-arxml-reader.md. `read_arxml` returns `(items, report)`.
 Release text on an item comes from §7. An -IREF with exactly one TARGET-
-child is one refers_to link (§4.5).
+child is one refers_to link (§4.5). An ECUC-CONTAINER-VALUE also carries
+param.* attributes. A VALUE-REF under its REFERENCE-VALUES takes its link
+role from the DEFINITION-REF (§6).
 """
 
 from __future__ import annotations
@@ -61,6 +63,8 @@ class ArxmlReference:
     iref: str | None
     category: str
     target: str | None
+    # §6. The SourceLink role when it differs from the element tag.
+    link_role: str | None = None
 
 
 @dataclass(frozen=True)
@@ -94,6 +98,8 @@ class _SeenReference:
     packages: tuple[str, ...]
     iref: str | None
     iref_group: int | None
+    # §6. Set only for a VALUE-REF whose link role is a definition segment.
+    link_role: str | None = None
 
 
 @dataclass(frozen=True)
@@ -243,8 +249,10 @@ def read_arxml(
     first-occurrence order, then one placeholder per distinct dangling or
     undefined target. The report counts every reference. Each list in it holds
     at most 50 entries. `malformed_irefs` counts -IREF elements that do not
-    have exactly one TARGET- child. A refusal raises `ArxmlError` and returns
-    nothing.
+    have exactly one TARGET- child. An ECUC-CONTAINER-VALUE also gains §6
+    parameter attributes, and a qualifying VALUE-REF link uses the
+    definition's last path segment as its role. A refusal raises `ArxmlError`
+    and returns nothing.
     """
     files = sorted((Path(path) for path in paths), key=lambda path: path.as_posix())
     index: dict[str, str] = {}
@@ -396,6 +404,8 @@ def _walk(
     iref_group: int | None,
     iref_owner: str,
     iref_groups: list[_IrefGroup],
+    config_role: str | None = None,
+    config_owner: str = "",
 ) -> None:
     """Depth-first. Steps 1, 2, 3, and 5. Children of an -IREF keep its tag.
 
@@ -432,6 +442,13 @@ def _walk(
                 bases.extend(_reference_bases(path, child))
     dest = _attribute(element, "DEST")
     if dest is not None:
+        link_role = None
+        if (
+            local == "VALUE-REF"
+            and config_role is not None
+            and owner == config_owner
+        ):
+            link_role = config_role
         seen.append(_SeenReference(
             file=file_name,
             owner=owner,
@@ -444,6 +461,7 @@ def _walk(
             iref_group=(
                 iref_group if iref_group is not None and owner == iref_owner else None
             ),
+            link_role=link_role,
         ))
     if local.endswith("-IREF"):
         child_iref = local
@@ -457,10 +475,19 @@ def _walk(
     for child in element:
         if local == "AR-PACKAGE" and _local(child.tag) == "REFERENCE-BASES":
             continue
+        child_config_role = config_role
+        child_config_owner = config_owner
+        if (
+            local == "REFERENCE-VALUES"
+            and index.get(owner) == "ECUC-CONTAINER-VALUE"
+        ):
+            child_config_role = _reference_value_role(child)
+            child_config_owner = owner
         _walk(
             child, path, owner, packages, child_iref,
             index, bases, seen, file_name, raw_items, release, digest,
             child_group, child_owner, iref_groups,
+            child_config_role, child_config_owner,
         )
 
 
@@ -481,6 +508,7 @@ def _classify(
         iref=seen.iref,
         category=category,
         target=target,
+        link_role=seen.link_role,
     )
 
 
@@ -620,7 +648,7 @@ def _build_items(
         refers.setdefault(ref.owner, []).append(SourceLink(
             type="refers_to",
             target_id=ref.target,
-            role=ref.role,
+            role=ref.role if ref.link_role is None else ref.link_role,
             context=[],
         ))
 
@@ -630,6 +658,9 @@ def _build_items(
     variations = 0
     for raw in raw_items:
         attributes, hit_limit, has_variation = _attributes(raw.element, raw.tag, raw.short_name)
+        if raw.tag == "ECUC-CONTAINER-VALUE":
+            for key, value in _config_params(raw.element):
+                attributes.setdefault(key, value)
         if hit_limit:
             truncated += 1
         if has_variation:
@@ -818,6 +849,35 @@ def _number_repeats(leaves: list[tuple[str, str]]) -> list[tuple[str, str]]:
         seen[key] = index + 1
         numbered.append((f"{key}[{index}]", value))
     return numbered
+
+
+def _reference_value_role(element: ET.Element) -> str | None:
+    """Last DEFINITION-REF segment, when this element has both children (§6)."""
+    if _child(element, "VALUE-REF") is None:
+        return None
+    segment = _text(element, "DEFINITION-REF").rsplit("/", 1)[-1]
+    if segment == "":
+        return None
+    return segment
+
+
+def _config_params(element: ET.Element) -> list[tuple[str, str]]:
+    """param.<segment> for each PARAMETER-VALUES child that has both (§6).
+
+    A repeated name becomes param.Name[0], param.Name[1], … on every occurrence.
+    """
+    found: list[tuple[str, str]] = []
+    for values in element:
+        if _local(values.tag) != "PARAMETER-VALUES":
+            continue
+        for child in values:
+            if _child(child, "VALUE") is None:
+                continue
+            segment = _text(child, "DEFINITION-REF").rsplit("/", 1)[-1]
+            if segment == "":
+                continue
+            found.append((f"param.{segment}", _text(child, "VALUE")))
+    return _number_repeats(found)
 
 
 def _release(root: ET.Element) -> str | None:
