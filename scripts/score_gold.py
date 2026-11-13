@@ -11,12 +11,21 @@ questions, which hit only when the system declines.
 A metric with no gold rows prints ``n/a``. Precision with no predictions prints
 ``n/a``. Each figure is printed with gold rows, predicted rows, and documents.
 
+Sheet 4 (``testpoints.csv``) is read under those same rules. ``needs_from_elsewhere``
+is scored against the IDs the system fetched for that requirement, after
+``normalise()``. Recall is found ÷ needed and precision is found ÷ fetched,
+both micro. A gold cell of ``none`` adds nothing to recall and adds to
+precision only when the system fetched something. A blank cell is refused.
+``testable_as_written`` is exact agreement on yes / partly / no. When the
+system output has no ``testable`` field, that figure is ``n/a``.
+
 System JSON::
 
     {
       "statements": [{"source_id", "item_id", "kind", "subject"}],
       "pairs": [{"packet_id", "label"}],
-      "questions": [{"packet_id", "cited": ["..."], "declined": false}]
+      "questions": [{"packet_id", "cited": ["..."], "declined": false}],
+      "testpoints": [{"source_id", "item_id", "needs": ["..."], "testable": "yes"}]
     }
 
 Every figure includes a 95% bootstrap interval, resampling source documents
@@ -41,6 +50,12 @@ from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
 
+_MCP = Path(__file__).resolve().parents[1] / "mcp-server"
+if str(_MCP) not in sys.path:
+    sys.path.insert(0, str(_MCP))
+
+from grap_mcp.kee.resolution.normalise import normalise  # noqa: E402
+
 BOOTSTRAP_SEED = 20261112
 BOOTSTRAP_RESAMPLES = 2000
 
@@ -53,6 +68,7 @@ _PAIR_LABELS = _SAME_LABELS | {
     "unclear",
 }
 _NA = "n/a"
+_TESTABLE = {"yes", "partly", "no"}
 
 
 class ScoreRefusal(Exception):
@@ -366,12 +382,195 @@ def _score_questions(rows: list[dict], system_questions: list[dict]) -> dict:
     }
 
 
-def _refuse_unscorable(statements: list[dict], pairs: list[dict], questions: list[dict]) -> None:
+def _split_ids(text) -> list[str]:
+    """Identifiers separated by ``;`` or a newline. Empty pieces are dropped."""
+    parts = []
+    normalised = str(text).replace("\r\n", "\n").replace("\r", "\n")
+    for chunk in normalised.replace("\n", ";").split(";"):
+        piece = chunk.strip()
+        if piece:
+            parts.append(piece)
+    return parts
+
+
+def _is_none_needs(text) -> bool:
+    """The literal ``none``: this requirement needs nothing else."""
+    return _norm(text) == "none"
+
+
+def _needs_unlabelled(text) -> bool:
+    """A blank cell is unlabelled. ``none`` is a label, not a blank."""
+    if _is_none_needs(text):
+        return False
+    return not _split_ids(text)
+
+
+def _needed_ids(text) -> set[str]:
+    if _is_none_needs(text):
+        return set()
+    return {normalise(part) for part in _split_ids(text)}
+
+
+def _fetched_ids(needs) -> set[str]:
+    """System IDs for one requirement. A missing list fetches nothing."""
+    if needs is None:
+        return set()
+    if isinstance(needs, str):
+        parts = _split_ids(needs)
+    else:
+        parts = [str(item).strip() for item in needs if str(item).strip()]
+    return {normalise(part) for part in parts}
+
+
+def _requirement_key(row: dict) -> tuple[str, str]:
+    return (str(row.get("source_id") or ""), str(row.get("item_id") or ""))
+
+
+def _testable_label(value) -> str | None:
+    if value is None:
+        return None
+    text = _norm(value)
+    if text in _TESTABLE:
+        return text
+    return None
+
+
+def _micro_needs(rows: list[dict]) -> tuple[float, float]:
+    """Micro recall and precision. A side with nothing to divide by is 1.0.
+
+    That 1.0 is only for a bootstrap draw. The printed figure is ``n/a`` when
+    the whole sheet has nothing on that side.
+    """
+    found = needed = fetched = 0
+    for row in rows:
+        found += len(row["needed"] & row["fetched"])
+        needed += len(row["needed"])
+        fetched += len(row["fetched"])
+    recall = 1.0 if needed == 0 else found / needed
+    precision = 1.0 if fetched == 0 else found / fetched
+    return recall, precision
+
+
+def _score_testpoints(rows: list[dict], system_rows: list[dict]) -> dict:
+    """Sheet 4. Needs are micro recall and precision; testable is agreement.
+
+    A requirement is judged only against the system row with the same
+    source_id and item_id. Rows for any other requirement are left out.
+    """
+    by_key: dict[tuple[str, str], dict] = {}
+    for row in system_rows:
+        by_key[_requirement_key(row)] = row
+
+    scored = []
+    grouped = defaultdict(list)
+    for row in rows:
+        key = _requirement_key(row)
+        system = by_key.get(key, {})
+        item = {
+            "source_id": key[0],
+            "needed": _needed_ids(row.get("needs_from_elsewhere") or ""),
+            "fetched": _fetched_ids(system.get("needs")),
+        }
+        scored.append(item)
+        grouped[item["source_id"]].append(item)
+
+    found, needed, fetched = 0, 0, 0
+    for item in scored:
+        found += len(item["needed"] & item["fetched"])
+        needed += len(item["needed"])
+        fetched += len(item["fetched"])
+    n_requirements = len(scored)
+    n_docs = len(grouped)
+    if n_requirements == 0 or needed == 0:
+        recall = recall_low = recall_high = _NA
+    else:
+        recall = found / needed
+    if n_requirements == 0 or fetched == 0:
+        precision = precision_low = precision_high = _NA
+    else:
+        precision = found / fetched
+    if recall != _NA or precision != _NA:
+        def evaluate(drawn):
+            values = _micro_needs(_expand(drawn, grouped))
+            if recall == _NA:
+                return (values[1],)
+            if precision == _NA:
+                return (values[0],)
+            return values
+
+        intervals = _bootstrap(grouped, evaluate)
+        if recall != _NA and precision != _NA:
+            recall_low, recall_high = _bounds(recall, None if intervals is None else intervals[0])
+            precision_low, precision_high = _bounds(precision, None if intervals is None else intervals[1])
+        elif recall != _NA:
+            recall_low, recall_high = _bounds(recall, None if intervals is None else intervals[0])
+        else:
+            precision_low, precision_high = _bounds(precision, None if intervals is None else intervals[0])
+
+    labelled = []
+    labelled_by = defaultdict(list)
+    n_pred = 0
+    matches = 0
+    for row in rows:
+        label = _testable_label(row.get("testable_as_written"))
+        if label is None:
+            continue
+        system = by_key.get(_requirement_key(row))
+        present = system is not None and "testable" in system
+        predicted = _testable_label(system.get("testable")) if present else None
+        hit = predicted == label
+        if present:
+            n_pred += 1
+        if hit:
+            matches += 1
+        item = {"source_id": str(row.get("source_id") or ""), "hit": hit}
+        labelled.append(item)
+        labelled_by[item["source_id"]].append(item)
+    n_gold = len(labelled)
+    testable_docs = len(labelled_by)
+    if n_gold == 0 or n_pred == 0:
+        agreement = agreement_low = agreement_high = _NA
+    else:
+        agreement = matches / n_gold
+
+        def evaluate_agreement(drawn):
+            taken = _expand(drawn, labelled_by)
+            if not taken:
+                return (1.0,)
+            return (sum(1 for item in taken if item["hit"]) / len(taken),)
+
+        intervals = _bootstrap(labelled_by, evaluate_agreement)
+        agreement_low, agreement_high = _bounds(agreement, None if intervals is None else intervals[0])
+    return {
+        "testpoints_needs_recall": recall,
+        "testpoints_needs_recall_low": recall_low,
+        "testpoints_needs_recall_high": recall_high,
+        "testpoints_needs_precision": precision,
+        "testpoints_needs_precision_low": precision_low,
+        "testpoints_needs_precision_high": precision_high,
+        "testpoints_n_requirements": n_requirements,
+        "testpoints_n_needed": needed,
+        "testpoints_n_fetched": fetched,
+        "testpoints_n_docs": n_docs,
+        "testpoints_testable_agreement": agreement,
+        "testpoints_testable_agreement_low": agreement_low,
+        "testpoints_testable_agreement_high": agreement_high,
+        "testpoints_testable_n_gold": n_gold,
+        "testpoints_testable_n_pred": n_pred,
+        "testpoints_testable_n_docs": testable_docs,
+    }
+
+
+def _refuse_unscorable(statements: list[dict], pairs: list[dict], questions: list[dict],
+                       testpoints: list[dict]) -> None:
     blank_kind = sum(1 for row in statements if not str(row.get("kind") or "").strip())
     bad_labels = sum(1 for row in pairs if _norm(row.get("label") or "") not in _PAIR_LABELS)
     empty_where = sum(
         1 for row in questions
         if not _unanswerable(row) and not _where_entries(row.get("where") or "")
+    )
+    blank_needs = sum(
+        1 for row in testpoints if _needs_unlabelled(row.get("needs_from_elsewhere") or "")
     )
     problems = []
     if blank_kind:
@@ -380,12 +579,14 @@ def _refuse_unscorable(statements: list[dict], pairs: list[dict], questions: lis
         problems.append(f"pairs: {bad_labels} label outside the guide list")
     if empty_where:
         problems.append(f"questions: {empty_where} answerable with empty where")
+    if blank_needs:
+        problems.append(f"testpoints: {blank_needs} blank needs_from_elsewhere")
     if problems:
         raise ScoreRefusal("; ".join(problems))
 
 
 def score(gold_dir, system: dict, sealed: bool = False) -> dict:
-    """Return statement, pair, and question aggregates for one gold folder.
+    """Return statement, pair, question, and test-point aggregates for one gold folder.
 
     ``sealed=False`` reads open sheets and a flat folder. ``sealed=True`` reads
     sealed sheets only. The two are never combined.
@@ -395,11 +596,13 @@ def score(gold_dir, system: dict, sealed: bool = False) -> dict:
     statements = _read_rows(_sheet_paths(folder, "statements.csv", sealed))
     pairs = _read_rows(_sheet_paths(folder, "pairs.csv", sealed))
     questions = _read_rows(_sheet_paths(folder, "questions.csv", sealed))
-    _refuse_unscorable(statements, pairs, questions)
+    testpoints = _read_rows(_sheet_paths(folder, "testpoints.csv", sealed))
+    _refuse_unscorable(statements, pairs, questions, testpoints)
     result = {}
     result.update(_score_statements(statements, list(system.get("statements") or [])))
     result.update(_score_pairs(pairs, list(system.get("pairs") or [])))
     result.update(_score_questions(questions, list(system.get("questions") or [])))
+    result.update(_score_testpoints(testpoints, list(system.get("testpoints") or [])))
     return result
 
 
@@ -424,10 +627,29 @@ def format_report(result: dict) -> str:
             f"n_docs={result[group + '_n_docs']}"
         )
     lines.append(f"pairs_unclear={result['pairs_unclear']}")
+    needs_counts = (
+        f"n_requirements={result['testpoints_n_requirements']} "
+        f"n_needed={result['testpoints_n_needed']} "
+        f"n_fetched={result['testpoints_n_fetched']} "
+        f"n_docs={result['testpoints_n_docs']}"
+    )
+    for key in ("testpoints_needs_recall", "testpoints_needs_precision"):
+        lines.append(
+            f"{key}={_fmt(result[key])} [{_fmt(result[key + '_low'])}, {_fmt(result[key + '_high'])}] "
+            f"{needs_counts}"
+        )
+    lines.append(
+        f"testpoints_testable_agreement={_fmt(result['testpoints_testable_agreement'])} "
+        f"[{_fmt(result['testpoints_testable_agreement_low'])}, "
+        f"{_fmt(result['testpoints_testable_agreement_high'])}] "
+        f"n_gold={result['testpoints_testable_n_gold']} "
+        f"n_pred={result['testpoints_testable_n_pred']} "
+        f"n_docs={result['testpoints_testable_n_docs']}"
+    )
     return "\n".join(lines) + "\n"
 
 
-_SHEET_FILES = ("statements.csv", "pairs.csv", "questions.csv")
+_SHEET_FILES = ("statements.csv", "pairs.csv", "questions.csv", "testpoints.csv")
 
 
 def _gold_root(gold_dir: Path) -> Path:

@@ -18,6 +18,7 @@ if str(_SCRIPTS) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS))
 
 import score_gold  # noqa: E402
+from grap_mcp.kee.resolution.normalise import normalise  # noqa: E402
 
 _SEED = 20261112
 _RESAMPLES = 2000
@@ -36,6 +37,13 @@ _QUESTION_COLUMNS = (
     "packet_id", "source_id", "item_id", "passage",
     "question", "type", "answer", "where", "note",
 )
+_TESTPOINT_COLUMNS = (
+    "packet_id", "source_id", "item_id", "passage",
+    "testable_as_written", "preconditions", "stimulus",
+    "expected_observable_result", "pass_criterion", "variants",
+    "negative_cases", "needs_from_elsewhere", "note",
+)
+_TESTABLE = {"yes", "partly", "no"}
 
 
 def _norm(value):
@@ -796,3 +804,370 @@ def test_predictions_for_documents_outside_the_scored_sheet_are_ignored(tmp_path
     assert result["statements_precision"] == 1.0
     assert result["statements_n_pred"] == 1
     assert result["statements_n_docs"] == 1
+
+
+def _split_ids(text):
+    parts = []
+    for chunk in str(text).replace("\n", ";").split(";"):
+        piece = chunk.strip()
+        if piece:
+            parts.append(piece)
+    return parts
+
+
+def _needed_ids(cell):
+    """Gold IDs after normalise(). The literal ``none`` needs nothing."""
+    if _norm(cell) == "none":
+        return set()
+    return {normalise(part) for part in _split_ids(cell)}
+
+
+def _fetched_ids(needs):
+    if not needs:
+        return set()
+    return {normalise(str(item).strip()) for item in needs if str(item).strip()}
+
+
+def _testpoint(source_id, item_id, needs, testable, passage="synthetic passage"):
+    return {
+        "packet_id": f"{source_id}#{item_id}",
+        "source_id": source_id,
+        "item_id": item_id,
+        "passage": passage,
+        "testable_as_written": testable,
+        "preconditions": "",
+        "stimulus": "",
+        "expected_observable_result": "",
+        "pass_criterion": "",
+        "variants": "",
+        "negative_cases": "",
+        "needs_from_elsewhere": needs,
+        "note": "",
+    }
+
+
+def _four_requirements():
+    """Gold of 4 requirements and a system output with known hits.
+
+    Req 1 finds 2 of 2. One gold ID is bracketed and the system ID is bare;
+    the other gold ID is bare and the system ID is bracketed.
+    Req 2 finds 1 of 1 and fetches one extra ID.
+    Req 3 is ``none`` and the system fetched one ID: nothing for recall, one
+    false ID for precision.
+    Req 4 finds 1 of 2. The gold cell separates the IDs with a newline.
+    """
+    rows = [
+        _testpoint("src-a", "req-1", "[SWS_Com_00123]; SWS_Can_00010", "yes"),
+        _testpoint("src-a", "req-2", "SWS_Com_00999", "partly"),
+        _testpoint("src-b", "req-3", "none", "no"),
+        _testpoint("src-c", "req-4", "SWS_Xfrm_00999\nSWS_Xfrm_00001", "yes"),
+    ]
+    system = [
+        {"source_id": "src-a", "item_id": "req-1",
+         "needs": ["SWS_Com_00123", "[SWS_Can_00010]"], "testable": "yes"},
+        {"source_id": "src-a", "item_id": "req-2",
+         "needs": ["SWS_Com_00999", "SWS_Extra_00001"], "testable": "no"},
+        {"source_id": "src-b", "item_id": "req-3",
+         "needs": ["SWS_Can_00010"], "testable": "no"},
+        {"source_id": "src-c", "item_id": "req-4",
+         "needs": ["SWS_Xfrm_00999"], "testable": "yes"},
+        {"source_id": "src-z", "item_id": "req-z",
+         "needs": ["SWS_Decoy_00001"], "testable": "yes"},
+    ]
+    return rows, system
+
+
+def _needs_bounds(rows, system):
+    """Micro recall and precision, then the bootstrap interval by source.
+
+    A draw with nothing needed, or nothing fetched, uses the vacuous 1.0 the
+    other metrics use inside a resample. The printed point estimate is ``n/a``
+    in that case; this helper is only called when the point estimate exists.
+    """
+    by_id = {(row["source_id"], row["item_id"]): row for row in system}
+    grouped = defaultdict(list)
+    for row in rows:
+        fetched = _fetched_ids(by_id.get((row["source_id"], row["item_id"]), {}).get("needs"))
+        grouped[row["source_id"]].append({
+            "needed": _needed_ids(row["needs_from_elsewhere"]),
+            "fetched": fetched,
+        })
+
+    def _recall(drawn):
+        taken = _expand(drawn, grouped)
+        found = sum(len(item["needed"] & item["fetched"]) for item in taken)
+        needed = sum(len(item["needed"]) for item in taken)
+        return 1.0 if needed == 0 else found / needed
+
+    def _precision(drawn):
+        taken = _expand(drawn, grouped)
+        found = sum(len(item["needed"] & item["fetched"]) for item in taken)
+        fetched = sum(len(item["fetched"]) for item in taken)
+        return 1.0 if fetched == 0 else found / fetched
+
+    recall_low, recall_high = _interval(grouped, _recall)
+    precision_low, precision_high = _interval(grouped, _precision)
+    return recall_low, recall_high, precision_low, precision_high
+
+
+def _agreement_bounds(rows, system):
+    by_id = {(row["source_id"], row["item_id"]): row for row in system}
+    grouped = defaultdict(list)
+    for row in rows:
+        label = _norm(row["testable_as_written"])
+        if label not in _TESTABLE:
+            continue
+        pred = by_id.get((row["source_id"], row["item_id"]), {})
+        got = _norm(pred["testable"]) if "testable" in pred else ""
+        grouped[row["source_id"]].append(got == label)
+
+    def _rate(drawn):
+        taken = _expand(drawn, grouped)
+        return sum(1 for hit in taken if hit) / len(taken)
+
+    return _interval(grouped, _rate)
+
+
+def _fmt_num(value):
+    return f"{float(value):.10f}"
+
+
+def test_four_requirement_testpoints_recall_and_precision(tmp_path, capsys):
+    """Bracketed and bare IDs match. ``none`` is out of recall and in precision.
+
+    Found 4, needed 5, fetched 6. Recall 4/5, precision 4/6.
+    Testable labels agree on 3 of 4. The fifth system row is not in the sheet.
+    """
+    assert normalise("[SWS_Com_00123]") == normalise("SWS_Com_00123")
+    assert normalise("[SWS_Can_00010]") == normalise("SWS_Can_00010")
+    rows, system = _four_requirements()
+    assert len(rows) == 4
+    folder = tmp_path / "packet"
+    _write_csv(folder / "open" / "testpoints.csv", _TESTPOINT_COLUMNS, rows)
+    result = score_gold.score(folder, {"testpoints": system})
+
+    assert result["testpoints_needs_recall"] == 4 / 5
+    assert result["testpoints_needs_precision"] == 4 / 6
+    assert result["testpoints_n_requirements"] == 4
+    assert result["testpoints_n_needed"] == 5
+    assert result["testpoints_n_fetched"] == 6
+    assert result["testpoints_n_docs"] == 3
+    assert result["testpoints_testable_agreement"] == 3 / 4
+    assert result["testpoints_testable_n_gold"] == 4
+    assert result["testpoints_testable_n_pred"] == 4
+    assert result["testpoints_testable_n_docs"] == 3
+
+    recall_low, recall_high, precision_low, precision_high = _needs_bounds(rows, system)
+    agree_low, agree_high = _agreement_bounds(rows, system)
+    assert result["testpoints_needs_recall_low"] == recall_low
+    assert result["testpoints_needs_recall_high"] == recall_high
+    assert result["testpoints_needs_precision_low"] == precision_low
+    assert result["testpoints_needs_precision_high"] == precision_high
+    assert result["testpoints_testable_agreement_low"] == agree_low
+    assert result["testpoints_testable_agreement_high"] == agree_high
+    assert result == score_gold.score(folder, {"testpoints": system})
+
+    counts = "n_requirements=4 n_needed=5 n_fetched=6 n_docs=3"
+    report = score_gold.format_report(result)
+    recall_line = (
+        f"testpoints_needs_recall={_fmt_num(4 / 5)} "
+        f"[{_fmt_num(recall_low)}, {_fmt_num(recall_high)}] {counts}"
+    )
+    precision_line = (
+        f"testpoints_needs_precision={_fmt_num(4 / 6)} "
+        f"[{_fmt_num(precision_low)}, {_fmt_num(precision_high)}] {counts}"
+    )
+    agreement_line = (
+        f"testpoints_testable_agreement={_fmt_num(3 / 4)} "
+        f"[{_fmt_num(agree_low)}, {_fmt_num(agree_high)}] n_gold=4 n_pred=4 n_docs=3"
+    )
+    assert recall_line in report
+    assert precision_line in report
+    assert agreement_line in report
+    assert report.index(recall_line) < report.index(precision_line) < report.index(agreement_line)
+
+    system_path = tmp_path / "system.json"
+    system_path.write_text(json.dumps({"testpoints": system}), encoding="utf-8")
+    score_gold.main(["--gold", str(folder), "--system", str(system_path)])
+    assert recall_line in capsys.readouterr().out
+
+
+def test_testpoints_blank_cell_is_refused(tmp_path, capsys):
+    """A blank ``needs_from_elsewhere`` is unlabelled. The sheet and the count are named."""
+    canary = "ROWTEXTMUSTNOTLEAK"
+    folder = tmp_path / "packet"
+    _write_csv(folder / "open" / "testpoints.csv", _TESTPOINT_COLUMNS, [
+        _testpoint("src-a", "req-1", "", "yes", passage=canary),
+        _testpoint("src-a", "req-2", "   ", "no"),
+        _testpoint("src-a", "req-3", "SWS_Com_00123", "yes"),
+    ])
+    with pytest.raises(score_gold.ScoreRefusal) as caught:
+        score_gold.score(folder, {"testpoints": []})
+    message = str(caught.value)
+    assert message == "testpoints: 2 blank needs_from_elsewhere"
+    assert canary not in message
+
+    system_path = tmp_path / "system.json"
+    system_path.write_text("{}", encoding="utf-8")
+    with pytest.raises(SystemExit) as exit_info:
+        score_gold.main(["--gold", str(folder), "--system", str(system_path)])
+    assert exit_info.value.code == 1
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert message in captured.err
+    assert canary not in captured.out
+    assert canary not in captured.err
+
+
+def test_testpoints_sealed_rows_untouched_without_flag(tmp_path, capsys):
+    """Without ``--sealed``, a held row does not move the score and is not printed.
+
+    The held requirement is a total miss. Reading it would make recall 0.
+    ``--sealed`` scores that row only.
+    """
+    canary = "SEALEDROWCANARY9f3a7c"
+    folder = tmp_path / "packet"
+    open_row = _testpoint("open-doc", "req-1", "SWS_Com_00123", "yes")
+    held = _testpoint("held-doc", "req-9", "SWS_Other_00001", "no", passage=canary)
+    held["note"] = canary
+    _write_csv(folder / "open" / "testpoints.csv", _TESTPOINT_COLUMNS, [open_row])
+    _write_csv(folder / "sealed" / "testpoints.csv", _TESTPOINT_COLUMNS, [held])
+    system = {"testpoints": [
+        {"source_id": "open-doc", "item_id": "req-1",
+         "needs": ["[SWS_Com_00123]"], "testable": "yes"},
+        {"source_id": "held-doc", "item_id": "req-9",
+         "needs": ["SWS_Wrong_00001"], "testable": "yes"},
+    ]}
+    opened = score_gold.score(folder, system)
+    assert opened["testpoints_needs_recall"] == 1.0
+    assert opened["testpoints_needs_precision"] == 1.0
+    assert opened["testpoints_n_requirements"] == 1
+    assert opened["testpoints_n_fetched"] == 1
+    assert opened["testpoints_testable_agreement"] == 1.0
+
+    absent = tmp_path / "absent"
+    _write_csv(absent / "open" / "testpoints.csv", _TESTPOINT_COLUMNS, [open_row])
+    assert score_gold.score(folder, system) == score_gold.score(absent, system)
+
+    held_only = score_gold.score(folder, system, sealed=True)
+    assert held_only["testpoints_needs_recall"] == 0.0
+    assert held_only["testpoints_needs_precision"] == 0.0
+    assert held_only["testpoints_n_requirements"] == 1
+    assert held_only["testpoints_n_needed"] == 1
+    assert held_only["testpoints_n_fetched"] == 1
+    assert held_only["testpoints_testable_agreement"] == 0.0
+
+    system_path = tmp_path / "system.json"
+    system_path.write_text(json.dumps(system), encoding="utf-8")
+    score_gold.main(["--gold", str(folder), "--system", str(system_path)])
+    captured = capsys.readouterr()
+    assert canary not in captured.out
+    assert canary not in captured.err
+    assert "testpoints_needs_recall=1.0000000000" in captured.out
+
+
+def test_testpoints_none_contributes_only_when_something_was_fetched(tmp_path):
+    """``none`` adds nothing to recall. An empty fetch adds nothing to precision."""
+    folder = tmp_path / "fetched"
+    _write_csv(folder / "open" / "testpoints.csv", _TESTPOINT_COLUMNS, [
+        _testpoint("src-b", "req-3", "none", "no"),
+    ])
+    fetched = score_gold.score(folder, {"testpoints": [
+        {"source_id": "src-b", "item_id": "req-3", "needs": ["SWS_Can_00010"], "testable": "no"},
+    ]})
+    assert fetched["testpoints_needs_recall"] == "n/a"
+    assert fetched["testpoints_needs_recall_low"] == "n/a"
+    assert fetched["testpoints_needs_recall_high"] == "n/a"
+    assert fetched["testpoints_needs_precision"] == 0.0
+    assert fetched["testpoints_n_requirements"] == 1
+    assert fetched["testpoints_n_needed"] == 0
+    assert fetched["testpoints_n_fetched"] == 1
+    assert fetched["testpoints_n_docs"] == 1
+    assert fetched["testpoints_testable_agreement"] == 1.0
+
+    quiet = tmp_path / "quiet"
+    _write_csv(quiet / "open" / "testpoints.csv", _TESTPOINT_COLUMNS, [
+        _testpoint("src-b", "req-3", "none", "yes"),
+    ])
+    empty_fetch = score_gold.score(quiet, {"testpoints": [
+        {"source_id": "src-b", "item_id": "req-3", "needs": [], "testable": "yes"},
+    ]})
+    assert empty_fetch["testpoints_needs_recall"] == "n/a"
+    assert empty_fetch["testpoints_needs_precision"] == "n/a"
+    assert empty_fetch["testpoints_n_requirements"] == 1
+    assert empty_fetch["testpoints_n_needed"] == 0
+    assert empty_fetch["testpoints_n_fetched"] == 0
+    assert empty_fetch["testpoints_testable_agreement"] == 1.0
+
+
+def test_testpoints_testable_absent_is_na(tmp_path, capsys):
+    """No ``testable`` field: agreement is ``n/a``. The needs figures still score."""
+    folder = tmp_path / "packet"
+    _write_csv(folder / "open" / "testpoints.csv", _TESTPOINT_COLUMNS, [
+        _testpoint("src-a", "req-1", "[SWS_Com_00123]", "yes"),
+    ])
+    result = score_gold.score(folder, {"testpoints": [
+        {"source_id": "src-a", "item_id": "req-1", "needs": ["SWS_Com_00123"]},
+    ]})
+    assert result["testpoints_needs_recall"] == 1.0
+    assert result["testpoints_needs_precision"] == 1.0
+    assert result["testpoints_testable_agreement"] == "n/a"
+    assert result["testpoints_testable_agreement_low"] == "n/a"
+    assert result["testpoints_testable_agreement_high"] == "n/a"
+    assert result["testpoints_testable_n_gold"] == 1
+    assert result["testpoints_testable_n_pred"] == 0
+    assert result["testpoints_testable_n_docs"] == 1
+
+    system_path = tmp_path / "system.json"
+    system_path.write_text(json.dumps({"testpoints": [
+        {"source_id": "src-a", "item_id": "req-1", "needs": ["SWS_Com_00123"]},
+    ]}), encoding="utf-8")
+    score_gold.main(["--gold", str(folder), "--system", str(system_path)])
+    out = capsys.readouterr().out
+    assert "testpoints_testable_agreement=n/a [n/a, n/a] n_gold=1 n_pred=0 n_docs=1" in out
+    assert "testpoints_needs_recall=1.0000000000" in out
+
+
+def test_testpoints_nothing_to_measure_is_na(tmp_path, capsys):
+    """A missing sheet prints ``n/a`` and the zero counts. Never 1.0.
+
+    A flat ``testpoints.csv`` counts as open.
+    """
+    empty = tmp_path / "empty"
+    empty.mkdir()
+    nothing = score_gold.score(empty, {"testpoints": [
+        {"source_id": "src-a", "item_id": "req-1", "needs": ["SWS_Com_00123"], "testable": "yes"},
+    ]})
+    assert nothing["testpoints_needs_recall"] == "n/a"
+    assert nothing["testpoints_needs_precision"] == "n/a"
+    assert nothing["testpoints_testable_agreement"] == "n/a"
+    assert nothing["testpoints_n_requirements"] == 0
+    assert nothing["testpoints_n_needed"] == 0
+    assert nothing["testpoints_n_fetched"] == 0
+    assert nothing["testpoints_n_docs"] == 0
+    assert nothing["testpoints_testable_n_gold"] == 0
+    assert nothing["testpoints_testable_n_pred"] == 0
+    assert nothing["testpoints_testable_n_docs"] == 0
+
+    flat = tmp_path / "flat"
+    _write_csv(flat / "testpoints.csv", _TESTPOINT_COLUMNS, [
+        _testpoint("src-a", "req-1", "SWS_Com_00123", "partly"),
+    ])
+    flat_score = score_gold.score(flat, {"testpoints": [
+        {"source_id": "src-a", "item_id": "req-1", "needs": ["[SWS_Com_00123]"], "testable": "partly"},
+    ]})
+    assert flat_score["testpoints_needs_recall"] == 1.0
+    assert flat_score["testpoints_needs_precision"] == 1.0
+    assert flat_score["testpoints_testable_agreement"] == 1.0
+    assert flat_score["testpoints_n_docs"] == 1
+
+    system_path = tmp_path / "system.json"
+    system_path.write_text("{}", encoding="utf-8")
+    score_gold.main(["--gold", str(empty), "--system", str(system_path)])
+    out = capsys.readouterr().out
+    assert "testpoints_needs_recall=n/a [n/a, n/a] n_requirements=0 n_needed=0 n_fetched=0 n_docs=0" in out
+    assert "testpoints_needs_precision=n/a [n/a, n/a] n_requirements=0 n_needed=0 n_fetched=0 n_docs=0" in out
+    assert "testpoints_testable_agreement=n/a [n/a, n/a] n_gold=0 n_pred=0 n_docs=0" in out
+    assert "testpoints_needs_recall=1" not in out
+    assert "testpoints_needs_precision=1" not in out
+    assert "testpoints_testable_agreement=1" not in out
