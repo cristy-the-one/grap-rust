@@ -21,17 +21,24 @@ System JSON::
 
 Every figure includes a 95% bootstrap interval, resampling source documents
 with replacement (2,000 resamples, seed 20261112). No row is printed.
+``--sealed`` is the only way sealed sheets are read. It appends one line to
+the gold-root access log before printing: timestamp, git commit, user, and
+that same aggregate summary. If the log cannot be written, nothing is scored
+and nothing is printed. The line never contains a row.
 """
 
 from __future__ import annotations
 
 import argparse
 import csv
+import getpass
 import json
 import math
 import random
+import subprocess
 import sys
 from collections import defaultdict
+from datetime import datetime, timezone
 from pathlib import Path
 
 BOOTSTRAP_SEED = 20261112
@@ -415,6 +422,66 @@ def format_report(result: dict) -> str:
     return "\n".join(lines) + "\n"
 
 
+_SHEET_FILES = ("statements.csv", "pairs.csv", "questions.csv")
+
+
+def _gold_root(gold_dir: Path) -> Path:
+    """Directory that holds the access log.
+
+    ``--gold`` is a corpus directory: ``open/`` and ``sealed/`` inside it, or
+    the CSV sheets themselves. The log is one level above that directory.
+    A directory with neither is already the root.
+    """
+    folder = Path(gold_dir)
+    nested = (folder / "open").is_dir() or (folder / "sealed").is_dir()
+    flat = any((folder / name).is_file() for name in _SHEET_FILES)
+    if nested or flat:
+        return folder.parent
+    return folder
+
+
+def _git_commit() -> str:
+    repo = Path(__file__).resolve().parents[1]
+    try:
+        completed = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=repo,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+    except (OSError, subprocess.CalledProcessError):
+        return "unknown"
+    return completed.stdout.strip() or "unknown"
+
+
+def _access_log_path(gold_dir: Path) -> Path:
+    return _gold_root(gold_dir) / "ACCESS.log"
+
+
+def _prepare_access_log(gold_dir: Path) -> Path:
+    """Prove the access log can be written before any sealed sheet is read."""
+    path = _access_log_path(gold_dir)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a", encoding="utf-8", newline=""):
+        pass
+    return path
+
+
+def _append_access_log(gold_dir: Path, report: str) -> None:
+    """Append timestamp, git commit, user, and the metric summary.
+
+    The summary is the aggregate report on one line. Sheet rows are not written.
+    """
+    path = _access_log_path(gold_dir)
+    summary = " ".join(report.splitlines())
+    stamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    row = [stamp, _git_commit(), getpass.getuser(), summary]
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a", encoding="utf-8", newline="") as handle:
+        csv.writer(handle, lineterminator="\n").writerow(row)
+
+
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(
         description="Score a gold folder against system output. Prints aggregates only."
@@ -424,15 +491,27 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument(
         "--sealed",
         action="store_true",
-        help="Score sealed sheets only. Default scores open sheets only.",
+        help="Score sealed sheets only. Append timestamp, git commit, user, and metric summary to gold/ACCESS.log before printing.",
     )
     args = parser.parse_args(argv)
     system = json.loads(args.system.read_text(encoding="utf-8"))
+    if args.sealed:
+        try:
+            _prepare_access_log(args.gold)
+        except OSError as exc:
+            sys.stderr.write(f"cannot write access log: {exc}\n")
+            raise SystemExit(1) from exc
     try:
         report = format_report(score(args.gold, system, sealed=args.sealed))
     except ScoreRefusal as exc:
         sys.stderr.write(str(exc) + "\n")
         raise SystemExit(1) from exc
+    if args.sealed:
+        try:
+            _append_access_log(args.gold, report)
+        except OSError as exc:
+            sys.stderr.write(f"cannot write access log: {exc}\n")
+            raise SystemExit(1) from exc
     sys.stdout.write(report)
 
 

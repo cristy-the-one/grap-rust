@@ -1,13 +1,16 @@
 """Scorer tests for Sheet 1–3 gold. Fixtures are synthetic and live under tmp_path."""
 
 import csv
+import getpass
 import json
 import math
 import random
+import subprocess
 import sys
 
 import pytest
 from collections import Counter, defaultdict
+from datetime import datetime
 from pathlib import Path
 
 _SCRIPTS = Path(__file__).resolve().parents[2] / "scripts"
@@ -423,6 +426,103 @@ def test_sealed_rows_are_scored_and_not_emitted(tmp_path, capsys, caplog):
     assert recall["statements_precision"] == 1.0
 
 
+def _held_sheet_mentions(text):
+    """True when the held-sheet directory prefix occurs and the sheet name follows.
+
+    The two pieces are built here so this file does not itself contain that
+    sequence. The walker below reads every other Python file as text.
+    """
+    head = "gol" + "d/"
+    tail = "sea" + "led"
+    start = 0
+    while True:
+        found = text.find(head, start)
+        if found < 0:
+            return False
+        if tail in text[found + len(head):]:
+            return True
+        start = found + 1
+
+
+def test_only_score_gold_py_mentions_held_sheet_paths():
+    """Every .py under mcp-server/ and scripts/ except the scorer."""
+    repo = Path(__file__).resolve().parents[2]
+    hits = []
+    for base in ("mcp-server", "scripts"):
+        for path in (repo / base).rglob("*.py"):
+            if path.name == "score_gold.py":
+                continue
+            text = path.read_text(encoding="utf-8", errors="replace")
+            if _held_sheet_mentions(text):
+                hits.append(path.relative_to(repo).as_posix())
+    assert hits == []
+
+
+def test_sealed_flag_appends_one_access_log_line(tmp_path, capsys):
+    """``--sealed`` appends one aggregate line under a tmp gold root.
+
+    tmp_path stands in for the gold directory. The corpus is a child of that
+    root, and the log file is the root's ACCESS.log. A canary that exists
+    only on a held row must not appear in the line.
+    """
+    canary = "SEALEDROWCANARY9f3a7c"
+    corpus = tmp_path / "x"
+    _write_csv(corpus / "open" / "statements.csv", _STATEMENT_COLUMNS, [
+        _statement("open-doc", "art-1", "obligation", "the bank"),
+    ])
+    held = _statement("held-doc", "art-9", "prohibition", canary, passage=canary)
+    held["note"] = canary
+    _write_csv(corpus / "sealed" / "statements.csv", _STATEMENT_COLUMNS, [held])
+    payload = {"statements": [{
+        "source_id": "open-doc", "item_id": "art-1", "kind": "obligation", "subject": "the bank",
+    }]}
+    system_path = tmp_path / "system.json"
+    system_path.write_text(json.dumps(payload), encoding="utf-8")
+    log = tmp_path / "ACCESS.log"
+    repo_gold = Path(__file__).resolve().parents[2] / "gold"
+
+    score_gold.main(["--gold", str(corpus), "--system", str(system_path)])
+    assert not log.exists()
+    capsys.readouterr()
+
+    score_gold.main(["--gold", str(corpus), "--system", str(system_path), "--sealed"])
+    captured = capsys.readouterr()
+    assert canary not in captured.out
+    assert canary not in captured.err
+    text = log.read_text(encoding="utf-8")
+    assert canary not in text
+    assert text.endswith("\n")
+    assert text.count("\n") == 1
+    assert log.resolve().is_relative_to(tmp_path.resolve())
+    assert not str(log.resolve()).startswith(str(repo_gold.resolve()))
+    row = next(csv.reader(text.splitlines()))
+    assert len(row) == 4
+    stamp, commit, user, summary = row
+    datetime.strptime(stamp, "%Y-%m-%dT%H:%M:%SZ")
+    expected_commit = subprocess.check_output(
+        ["git", "rev-parse", "HEAD"],
+        cwd=Path(__file__).resolve().parents[2],
+        text=True,
+    ).strip()
+    assert commit == expected_commit
+    assert user == getpass.getuser()
+    assert summary == " ".join(captured.out.splitlines())
+    scored = score_gold.score(corpus, payload, sealed=True)
+    assert scored["statements_recall"] == 0.0
+    assert scored["statements_precision"] == 0.0
+    assert "statements_recall=0.0000000000" in summary
+    assert f"pairs_unclear={scored['pairs_unclear']}" in summary
+
+    score_gold.main(["--gold", str(corpus), "--system", str(system_path), "--sealed"])
+    text2 = log.read_text(encoding="utf-8")
+    assert canary not in text2
+    lines = text2.splitlines()
+    assert len(lines) == 2
+    assert lines[0] == text.splitlines()[0]
+    second = next(csv.reader([lines[1]]))
+    assert len(second) == 4
+    assert canary not in second[3]
+    assert "statements_precision=" in second[3]
 def test_statement_match_requires_source_and_item(tmp_path):
     """The same article label in two acts is not one statement."""
     folder = tmp_path / "packet"
@@ -587,3 +687,76 @@ def test_sealed_flag_reads_sealed_only(tmp_path, capsys):
     captured = capsys.readouterr()
     assert canary not in captured.out
     assert canary not in captured.err
+
+
+def test_score_without_flag_ignores_sealed_directory(tmp_path, capsys):
+    """A run without ``--sealed`` is unchanged by the presence of a sealed sheet."""
+    canary = "SEALEDROWCANARY9f3a7c"
+    payload = {"statements": [{
+        "source_id": "open-doc", "item_id": "art-1", "kind": "obligation", "subject": "the bank",
+    }]}
+    present = tmp_path / "present"
+    absent = tmp_path / "absent"
+    open_row = _statement("open-doc", "art-1", "obligation", "the bank")
+    _write_csv(present / "open" / "statements.csv", _STATEMENT_COLUMNS, [open_row])
+    held = _statement("held-doc", "art-9", "prohibition", canary, passage=canary)
+    held["note"] = canary
+    _write_csv(present / "sealed" / "statements.csv", _STATEMENT_COLUMNS, [held])
+    _write_csv(absent / "open" / "statements.csv", _STATEMENT_COLUMNS, [open_row])
+    assert score_gold.score(present, payload) == score_gold.score(absent, payload)
+
+    body = json.dumps(payload)
+    system_present = tmp_path / "system-present.json"
+    system_absent = tmp_path / "system-absent.json"
+    system_present.write_text(body, encoding="utf-8")
+    system_absent.write_text(body, encoding="utf-8")
+    score_gold.main(["--gold", str(present), "--system", str(system_present)])
+    out_present = capsys.readouterr().out
+    score_gold.main(["--gold", str(absent), "--system", str(system_absent)])
+    out_absent = capsys.readouterr().out
+    assert out_present == out_absent
+    assert canary not in out_present
+    assert not (tmp_path / "ACCESS.log").exists()
+
+
+def test_sealed_log_is_written_before_printing(tmp_path, monkeypatch):
+    canary = "SEALEDROWCANARY9f3a7c"
+    corpus = tmp_path / "x"
+    _write_csv(corpus / "sealed" / "statements.csv", _STATEMENT_COLUMNS, [
+        _statement("held-doc", "art-9", "prohibition", "the bank"),
+    ])
+    system_path = tmp_path / "system.json"
+    system_path.write_text(json.dumps({"statements": [{
+        "source_id": "held-doc", "item_id": "art-9", "kind": "prohibition", "subject": "the bank",
+    }]}), encoding="utf-8")
+    log = tmp_path / "ACCESS.log"
+    seen = {}
+    real_write = sys.stdout.write
+
+    def spy(text):
+        seen["log"] = log.read_text(encoding="utf-8") if log.is_file() else ""
+        return real_write(text)
+
+    monkeypatch.setattr(sys.stdout, "write", spy)
+    score_gold.main(["--gold", str(corpus), "--system", str(system_path), "--sealed"])
+    assert canary not in seen.get("log", "")
+    assert "statements_precision=" in seen.get("log", "")
+
+
+def test_unwritable_access_log_scores_nothing(tmp_path, capsys):
+    corpus = tmp_path / "x"
+    _write_csv(corpus / "sealed" / "statements.csv", _STATEMENT_COLUMNS, [
+        _statement("held-doc", "art-9", "prohibition", "the bank"),
+    ])
+    system_path = corpus / "system.json"
+    system_path.write_text("{}", encoding="utf-8")
+    tmp_path.chmod(0o555)
+    try:
+        with pytest.raises(SystemExit) as caught:
+            score_gold.main(["--gold", str(corpus), "--system", str(system_path), "--sealed"])
+        assert caught.value.code == 1
+    finally:
+        tmp_path.chmod(0o755)
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert not (tmp_path / "ACCESS.log").exists()
