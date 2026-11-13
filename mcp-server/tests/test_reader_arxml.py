@@ -5,6 +5,9 @@ The synthetic file below stands in for that check: it has SHORT-NAMEs,
 reference paths, and values. None of those strings may appear in the output.
 
 AR-02: a file set is refused with a named reason, or it yields the identity index.
+
+AR-03: every DEST outside REFERENCE-BASES is classified, relative bases
+resolve, and the six categories sum to references_seen.
 """
 
 import re
@@ -439,3 +442,155 @@ def test_reference_bases_are_recorded_and_not_indexed(tmp_path: Path):
         ("Hidden", "/Pkg", True, False, "/Pkg"),
         ("Elsewhere", "/Other", False, True, "/Pkg"),
     ]
+
+
+# §4.3 categories, in the conservation-sum order.
+_CATEGORIES = (
+    "resolved",
+    "dest_mismatch",
+    "unresolved_definition",
+    "dangling",
+    "unresolvable_relative",
+    "empty",
+)
+
+# §8 measured rows for the four loadable files.
+# packages is None where §8 does not state one.
+# Category order matches _CATEGORIES.
+_LOADABLE_REFERENCES = (
+    ("system-4.2.arxml", 157, 22, 125, (125, 0, 0, 0, 0, 0)),
+    ("ecu-extract-4.2.arxml", 17, 1, 69, (7, 0, 55, 7, 0, 0)),
+    ("system-dangling-reference-4.2.arxml", 4, None, 1, (0, 0, 0, 1, 0, 0)),
+    ("system-missing-factor-4.2.arxml", 16, None, 5, (5, 0, 0, 0, 0, 0)),
+)
+
+
+def _category_sum(report: dict) -> int:
+    return sum(report[name] for name in _CATEGORIES)
+
+
+@pytest.mark.parametrize(
+    ("name", "identifiables", "packages", "references_seen", "counts"),
+    _LOADABLE_REFERENCES,
+)
+def test_loadable_files_match_measured_reference_counts(
+    name, identifiables, packages, references_seen, counts,
+):
+    """§8 reference counts for the four loadable fixtures, and conservation."""
+    path = _FIXTURES / name
+    index, report = read_arxml([path], source_id=path.stem)
+
+    assert len(index) == report["identifiables"] == identifiables
+    assert report["files"] == 1
+    assert report["references_seen"] == references_seen
+    assert len(report["references"]) == references_seen
+    for category, expected in zip(_CATEGORIES, counts, strict=True):
+        assert report[category] == expected
+    assert _category_sum(report) == references_seen
+    if packages is not None:
+        assert report["packages"] == packages
+
+    counted = Counter(ref.category for ref in report["references"])
+    for category in _CATEGORIES:
+        assert counted[category] == report[category]
+
+    for category in ("dest_mismatch", "dangling", "unresolvable_relative", "empty"):
+        listed = report["entries"][category]
+        assert len(listed) == min(50, report[category])
+        assert all(entry.category == category for entry in listed)
+
+
+def test_system_4_2_three_relative_references_resolve():
+    """125 resolved references include 3 relative ones: one named base, two default."""
+    path = _FIXTURES / "system-4.2.arxml"
+    _index, report = read_arxml([path], source_id="system-4.2")
+
+    assert report["base_declarations"] == 2
+    assert report["references_seen"] == 125
+    assert report["resolved"] == 125
+    relative = [ref for ref in report["references"] if not ref.text.startswith("/")]
+    assert len(relative) == 3
+    assert {ref.category for ref in relative} == {"resolved"}
+    assert Counter(ref.base for ref in relative) == Counter({
+        "SystemSignalBase": 1,
+        None: 2,
+    })
+    assert Counter(ref.target for ref in relative) == Counter({
+        "/SystemSignal/SystemSignalInner/Signal2": 1,
+        "/Constants/BooleanFalse": 2,
+    })
+
+
+def _outer_base_file(is_global: bool) -> str:
+    """A default base on Outer, and a relative reference owned inside Inner."""
+    flag = "true" if is_global else "false"
+    return f"""\
+<?xml version="1.0" encoding="UTF-8"?>
+<AUTOSAR xmlns="http://autosar.org/schema/r4.0">
+  <AR-PACKAGES>
+    <AR-PACKAGE>
+      <SHORT-NAME>Outer</SHORT-NAME>
+      <REFERENCE-BASES>
+        <REFERENCE-BASE>
+          <SHORT-LABEL>OuterBase</SHORT-LABEL>
+          <IS-DEFAULT>true</IS-DEFAULT>
+          <IS-GLOBAL>{flag}</IS-GLOBAL>
+          <BASE-IS-THIS-PACKAGE>true</BASE-IS-THIS-PACKAGE>
+        </REFERENCE-BASE>
+      </REFERENCE-BASES>
+      <AR-PACKAGES>
+        <AR-PACKAGE>
+          <SHORT-NAME>Inner</SHORT-NAME>
+          <ELEMENTS>
+            <I-SIGNAL>
+              <SHORT-NAME>Sig</SHORT-NAME>
+            </I-SIGNAL>
+            <I-SIGNAL>
+              <SHORT-NAME>Owner</SHORT-NAME>
+              <I-SIGNAL-REF DEST="I-SIGNAL">Inner/Sig</I-SIGNAL-REF>
+            </I-SIGNAL>
+          </ELEMENTS>
+        </AR-PACKAGE>
+      </AR-PACKAGES>
+    </AR-PACKAGE>
+  </AR-PACKAGES>
+</AUTOSAR>
+"""
+
+
+def test_outer_global_base_resolves(tmp_path: Path):
+    """A default base on an outer package resolves when IS-GLOBAL is true."""
+    path = tmp_path / "global.arxml"
+    path.write_text(_outer_base_file(True), encoding="utf-8")
+
+    index, report = read_arxml([path], source_id="global")
+
+    assert index["/Outer/Inner/Sig"] == "I-SIGNAL"
+    assert report["references_seen"] == 1
+    assert report["resolved"] == 1
+    assert report["unresolvable_relative"] == 0
+    assert _category_sum(report) == 1
+    (ref,) = report["references"]
+    assert ref.category == "resolved"
+    assert ref.base is None
+    assert ref.target == "/Outer/Inner/Sig"
+    assert ref.role == "I-SIGNAL-REF"
+    assert ref.dest == "I-SIGNAL"
+
+
+def test_outer_base_not_global_is_unresolvable(tmp_path: Path):
+    """The same base with IS-GLOBAL false is not guessed."""
+    path = tmp_path / "local.arxml"
+    path.write_text(_outer_base_file(False), encoding="utf-8")
+
+    _index, report = read_arxml([path], source_id="local")
+
+    assert report["references_seen"] == 1
+    assert report["unresolvable_relative"] == 1
+    assert report["resolved"] == 0
+    assert report["dangling"] == 0
+    assert _category_sum(report) == 1
+    (ref,) = report["references"]
+    assert ref.category == "unresolvable_relative"
+    assert ref.target is None
+    assert len(report["entries"]["unresolvable_relative"]) == 1
