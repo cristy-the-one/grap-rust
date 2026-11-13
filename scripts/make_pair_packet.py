@@ -245,8 +245,27 @@ def _mentions_from_receipt(text: str, path: Path, source_id: str, sealed: bool) 
     return _pack(text, source_id, sealed, found)
 
 
+def _body_start(text: str) -> int:
+    """Where the first article begins, or 0 when the text has no article marker.
+
+    Everything before it is the document header: issuer, publication line,
+    title. Capitalised runs there are page furniture, not names, and each
+    document words its header a little differently, so a frequency filter
+    over whole names does not catch them.
+    """
+    match = _ARTICLE.search(text)
+    return match.start() if match else 0
+
+
+def _is_name(name: str) -> bool:
+    """At least four letters. Roman numerals and list markers are not names."""
+    return sum(1 for ch in name if ch.isalpha()) >= 4
+
+
 def _mentions_from_regex(text: str, source_id: str, sealed: bool) -> list[Mention]:
-    found = [(name, start, end) for name, start, end in _regex_spans(text)]
+    start_at = _body_start(text)
+    found = [(name, start, end) for name, start, end in _regex_spans(text)
+             if start >= start_at and _is_name(name)]
     return _pack(text, source_id, sealed, found)
 
 

@@ -629,3 +629,17 @@ def test_automotive_names_the_missing_readers(tmp_path):
 def test_generator_does_not_call_source_units():
     script = Path(__file__).resolve().parents[2] / "scripts" / "make_pair_packet.py"
     assert "source_units" not in script.read_text(encoding="utf-8")
+
+
+def test_header_runs_and_numerals_are_not_mentions():
+    """Names come from the article text. The header above the first article
+    and bare numerals are left out."""
+    text = " ".join([
+        "EMITENT GUVERNUL Publicat in MONITORUL OFICIAL nr. 1",
+        "+ Articolul 1 Ministerul Finantelor aproba Normele Metodologice.",
+        "Capitolul III si Capitolul IV raman in vigoare.",
+    ])
+    names = [m.name for m in pairs._mentions_from_regex(text, "doc", False)]
+    assert "Ministerul Finantelor" in names
+    assert not any("EMITENT" in name or "MONITORUL" in name for name in names)
+    assert "III" not in names and "IV" not in names
