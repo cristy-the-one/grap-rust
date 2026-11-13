@@ -49,6 +49,18 @@ def _migrate_edges_include_relation(c) -> None:
     )
 
 
+def _migrate_resolution_tables(c) -> None:
+    """Add the four entity-resolution tables (spec §3).
+
+    Chained after the edges-key migration. The statements are idempotent, so
+    a run that created the tables and stopped before user_version was bumped
+    can be repeated. Graph save and load do not read or write these tables.
+    """
+    from .resolution.schema import apply_resolution_schema
+
+    apply_resolution_schema(c)
+
+
 _MIGRATIONS = [
     lambda c: c.executescript(
         """
@@ -90,6 +102,7 @@ _MIGRATIONS = [
         "CREATE TABLE IF NOT EXISTS extractions (chunk_id TEXT PRIMARY KEY, record TEXT NOT NULL)"
     ),
     _migrate_edges_include_relation,
+    _migrate_resolution_tables,
 ]
 
 SCHEMA_VERSION = len(_MIGRATIONS)
@@ -126,6 +139,10 @@ class GraphStore:
         self.conn = sqlite3.connect(db_path)
         self.conn.row_factory = sqlite3.Row
         self._migrate()
+        # Default for the mentions DELETE trigger. ResolutionTables replaces
+        # this while it is replacing one item's rows. Absent here, a delete
+        # would fail as a missing function instead of the table's own refusal.
+        self.conn.create_function("grap_mention_replace_ok", 0, lambda: 0)
 
     def _migrate(self) -> None:
         v = self.conn.execute("PRAGMA user_version").fetchone()[0]
