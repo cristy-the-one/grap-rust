@@ -76,7 +76,7 @@ jobs:
           maturin build -m crates/pygrap/Cargo.toml -o dist
           pip install dist/*.whl
       - name: Install MCP server test dependencies
-        run: pip install "mcp>=1.0.0,<2" "PyYAML>=6.0" "pytest>=8.0" "cantools>=45.1.2"
+        run: pip install "mcp>=1.0.0,<2" "PyYAML>=6.0" "pytest>=8.0" "cantools>=45.1.2" "openpyxl>=3.1"
       - name: Run pytest
         # Two tests start a fresh interpreter that imports grap_mcp, so the
         # package must be importable outside pytest's own path handling.

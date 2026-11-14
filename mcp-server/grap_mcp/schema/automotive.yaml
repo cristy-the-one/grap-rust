@@ -338,7 +338,7 @@ item_mappings:
     node_type: Pdu
   - reader: ARXML
     mark: "✔"
-    tags: [SYSTEM-SIGNAL, I-SIGNAL, I-SIGNAL-GROUP]
+    tags: [SYSTEM-SIGNAL, I-SIGNAL, I-SIGNAL-GROUP, SYSTEM-SIGNAL-GROUP]
     node_type: Signal
   - reader: ARXML
     mark: "✔"
@@ -428,6 +428,31 @@ folded_edges:
     objects: [COMPU-METHOD-REF, UNIT-REF, BASE-TYPE-REF]
     relation: has_type
     to: DataType
+  - mark: "✔"
+    objects: ["I-PDU-REF on a MULTIPLEXED-I-PDU"]
+    from: Pdu
+    relation: part_of
+    to: Pdu
+  - mark: "✔"
+    objects: ["CONTAINED-PDU-TRIGGERING-REF on a CONTAINER-I-PDU"]
+    from: Pdu
+    relation: part_of
+    to: Pdu
+  - mark: "✔"
+    objects: ["PAYLOAD-REF on a SECURED-I-PDU"]
+    from: Pdu
+    relation: part_of
+    to: Pdu
+  - mark: "✔"
+    objects: ["I-SIGNAL-REF on an I-SIGNAL-GROUP"]
+    from: Signal
+    relation: part_of
+    to: Signal
+  - mark: "○"
+    objects: ["SYSTEM-SIGNAL-REF on a SYSTEM-SIGNAL-GROUP"]
+    from: Signal
+    relation: part_of
+    to: Signal
   - mark: "○"
     objects: [ports]
     from: Component
@@ -451,8 +476,8 @@ folded_edges:
     to: Ecu
 
 folded_edge_rule: >
-  An object that joins three or more things, or that other items refer to,
-  stays an Element.
+  An object that joins three or more things stays an Element. A reference to
+  an object that was folded is followed through to that edge's first end.
 
 reader_links:
   - link: part_of

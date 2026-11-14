@@ -7,6 +7,8 @@ with that verb as ``role``. This module does not encode relations itself.
 
 A projection prints the four §7 counts with the number of items or links
 and the number of documents behind each one. An empty total prints ``n/a``.
+Packages are namespaces (Amendment 1): ``namespace_items`` and
+``namespace_links`` are printed the same way and left out of the §7 totals.
 """
 
 from __future__ import annotations
@@ -24,6 +26,7 @@ _SIGNAL_KIND = {
     "SYSTEM-SIGNAL": "system_signal",
     "I-SIGNAL": "i_signal",
     "I-SIGNAL-GROUP": "signal_group",
+    "SYSTEM-SIGNAL-GROUP": "signal_group",
 }
 _KIND_WORD = {"system": "system_signal", "bus": "i_signal"}
 # AUTOSAR tags are uppercase segments. A segment may be a single letter (I-SIGNAL).
@@ -199,8 +202,11 @@ def _fold_rules(schema: AutomotiveSchema) -> tuple[dict[str, dict], list[tuple[s
         if "relation" not in row:
             continue
         for obj in row["objects"]:
-            if " on an " in obj:
-                role, owner = obj.split(" on an ", 1)
+            separator = next(
+                (sep for sep in (" on an ", " on a ") if sep in obj), None,
+            )
+            if separator is not None:
+                role, owner = obj.split(separator, 1)
                 by_role.append((role.strip(), owner.strip(), row))
                 continue
             if not _TAG.fullmatch(obj):
@@ -212,17 +218,23 @@ def _fold_rules(schema: AutomotiveSchema) -> tuple[dict[str, dict], list[tuple[s
     return by_tag, by_role
 
 
+def _is_package(item: SourceItem) -> bool:
+    return item.attributes.get("tag") == "AR-PACKAGE"
+
+
 def _folds(items, by_id, classes, schema) -> dict[tuple[str, str], tuple[_End, _End, dict]]:
+    """Fold an object that joins exactly two things.
+
+    Amendment 1 withdrew the exception for an object other items refer to.
+    A reference to the folded object is followed through to the edge's first
+    end, which is the ``from`` end.
+    """
     by_tag, _roles = _fold_rules(schema)
-    referenced: set[tuple[str, str]] = set()
-    for item in items:
-        for link in item.links:
-            referenced.add((item.source_id, link.target_id))
     chosen: dict[tuple[str, str], tuple[_End, _End, dict]] = {}
     for item in items:
         key = _id(item)
         rule = by_tag.get(item.attributes.get("tag", ""))
-        if rule is None or classes[key].placeholder or key in referenced:
+        if rule is None or classes[key].placeholder or _is_package(item):
             continue
         assigned = _assign_ends(item, rule, by_id, classes)
         if assigned is None:
@@ -286,7 +298,7 @@ def _create_nodes(items, classes, folds, built: _Built, kg) -> None:
     for item in items:
         key = _id(item)
         info = classes[key]
-        if info.placeholder or key in folds:
+        if info.placeholder or key in folds or _is_package(item):
             continue
         scope = _scope(item.source_id, item.release)
         if scope not in seen_scope:
@@ -355,7 +367,7 @@ def _structural_edges(items, classes, folds, built: _Built, kg) -> None:
     for item in items:
         key = _id(item)
         info = classes[key]
-        if info.placeholder or key in folds:
+        if info.placeholder or key in folds or _is_package(item):
             continue
         scope = _scope(item.source_id, item.release)
         _write(
@@ -394,13 +406,40 @@ def _remaining_links(items, by_id, classes, folds, schema, built: _Built, kg) ->
     _tags, roles = _fold_rules(schema)
     for item in items:
         key = _id(item)
-        if classes[key].placeholder or key in folds:
+        if classes[key].placeholder or key in folds or _is_package(item):
             continue
         info = classes[key]
         for link in item.links:
+            if _targets_package(item, link, by_id):
+                continue
+            link = _follow_folded(item.source_id, link, folds)
             if _write_role(item, info, link, roles, by_id, classes, built, kg):
                 continue
             _write_plain(item, info, link, by_id, classes, built, kg)
+
+
+def _targets_package(item: SourceItem, link: SourceLink, by_id) -> bool:
+    """A containment link whose target is a package is not written."""
+    if link.type != "part_of":
+        return False
+    target = by_id.get((item.source_id, link.target_id))
+    return target is not None and _is_package(target)
+
+
+def _follow_folded(source_id: str, link: SourceLink, folds) -> SourceLink:
+    """A reference to a folded object arrives at that edge's first end."""
+    chosen = folds.get((source_id, link.target_id))
+    if chosen is None:
+        return link
+    source_end, _target_end, _rule = chosen
+    if source_end.target_id == link.target_id:
+        return link
+    return SourceLink(
+        type=link.type,
+        target_id=source_end.target_id,
+        role=link.role,
+        context=list(link.context),
+    )
 
 
 def _write_role(item, info, link, roles, by_id, classes, built, kg) -> bool:
@@ -663,13 +702,28 @@ def _reject(built, item, link, relation, from_type, to_type) -> None:
 
 
 def _finish(items, classes, folds, built: _Built) -> dict:
-    real = [item for item in items if not classes[_id(item)].placeholder]
+    present = [item for item in items if not classes[_id(item)].placeholder]
+    packages = [item for item in present if _is_package(item)]
+    package_ids = {_id(item) for item in packages}
+    real = [item for item in present if _id(item) not in package_ids]
     documents = len({item.source_id for item in real})
     item_n = len(real)
     untyped = sum(
         1 for item in real
         if _id(item) not in folds and classes[_id(item)].untyped
     )
+    namespace_links = sum(
+        1
+        for item in present
+        for link in item.links
+        if link.type == "part_of" and (item.source_id, link.target_id) in package_ids
+    )
+    if not present:
+        namespace_items = None
+        namespace_link_count = None
+    else:
+        namespace_items = len(packages)
+        namespace_link_count = namespace_links
     counts = {
         "documents": documents,
         "items": item_n,
@@ -678,6 +732,8 @@ def _finish(items, classes, folds, built: _Built) -> dict:
         "fallback_links": None if built.link_n == 0 else built.fallback_n,
         "rejected_links": None if built.link_n == 0 else built.rejected_n,
         "unresolved": None if built.link_n == 0 else built.unresolved_n,
+        "namespace_items": namespace_items,
+        "namespace_links": namespace_link_count,
     }
     alarms = {
         "untyped_items": _exceeds(untyped, item_n),
@@ -720,6 +776,16 @@ def _print_counts(counts, alarms, untyped, built: _Built) -> None:
     line("fallback_links", counts["fallback_links"], counts["links"], "links")
     line("rejected_links", counts["rejected_links"], counts["links"], "links")
     line("unresolved", counts["unresolved"], counts["links"], "links")
+    line(
+        "namespace_items", counts["namespace_items"],
+        0 if counts["namespace_items"] is None else counts["namespace_items"],
+        "items",
+    )
+    line(
+        "namespace_links", counts["namespace_links"],
+        0 if counts["namespace_links"] is None else counts["namespace_links"],
+        "links",
+    )
     if alarms["untyped_items"]:
         print(
             f"alarm: untyped_items={untyped}/{counts['items']} exceeds 20% "

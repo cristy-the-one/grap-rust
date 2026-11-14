@@ -69,40 +69,78 @@ def involved_signals(kg, requirement: int) -> list[dict]:
 
 
 def signal_travel(kg, signal: int, projection: dict) -> list[dict]:
-    """Signal —part_of→ Pdu —part_of→ Frame —transmitted_on→ Network.
+    """Follow ``part_of`` through any number of Pdu and group steps to a Frame.
 
-    The frame identifier is the triggering edge's ``IDENTIFIER`` attribute.
-    It lives on the projection record, not on the engine edge. Absent is
-    ``None``.
+    Amendment 1. The PDU in a row is the last PDU before the frame. The frame
+    identifier is the triggering edge's ``IDENTIFIER`` attribute. It lives on
+    the projection record, not on the engine edge. Absent is ``None``. A
+    signal that reaches no frame is reported with the last node reached.
     """
     index = {node["engine_id"]: node for node in projection["nodes"]}
-    rows = []
-    for pdu in _out(kg, signal, "part_of"):
-        if _label(kg, pdu) != "Pdu":
-            continue
-        frames = [frame for frame in _out(kg, pdu, "part_of") if _label(kg, frame) == "Frame"]
-        if not frames:
-            rows.append(_travel(_native(kg, pdu), None, None, None))
-            continue
-        for frame in frames:
-            networks = [
-                network for network in _out(kg, frame, "transmitted_on")
-                if _label(kg, network) == "Network"
-            ]
-            if not networks:
-                rows.append(_travel(_native(kg, pdu), _native(kg, frame), None, None))
+    rows: list[dict] = []
+    seen_rows: set[tuple] = set()
+    reached_frame = False
+    terminals: list[tuple[int, str | None]] = []
+
+    def add(pdu, frame, network, identifier, last) -> None:
+        row = _travel(pdu, frame, network, identifier)
+        if frame is None:
+            row["last"] = last
+        key = (
+            row["pdu"], row["frame"], row["network"], row["identifier"], row.get("last"),
+        )
+        if key in seen_rows:
+            return
+        seen_rows.add(key)
+        rows.append(row)
+
+    def record_frame(frame: int, last_pdu: str | None) -> None:
+        nonlocal reached_frame
+        reached_frame = True
+        networks = [
+            network for network in _out(kg, frame, "transmitted_on")
+            if _label(kg, network) == "Network"
+        ]
+        if not networks:
+            add(last_pdu, _native(kg, frame), None, None, None)
+            return
+        for network in networks:
+            identifiers = _identifiers(projection["edges"], index, frame, network)
+            for identifier in identifiers:
+                add(
+                    last_pdu, _native(kg, frame), _native(kg, network), identifier, None,
+                )
+
+    def walk(node: int, last_pdu: str | None, seen: set[int]) -> None:
+        hops = [
+            hop for hop in _out(kg, node, "part_of")
+            if hop not in seen and _label(kg, hop) in ("Pdu", "Signal", "Frame")
+        ]
+        if not hops:
+            terminals.append((node, last_pdu))
+            return
+        for hop in hops:
+            label = _label(kg, hop)
+            if label == "Frame":
+                record_frame(hop, last_pdu)
                 continue
-            for network in networks:
-                identifiers = _identifiers(projection["edges"], index, frame, network)
-                for identifier in identifiers:
-                    rows.append(_travel(
-                        _native(kg, pdu), _native(kg, frame), _native(kg, network), identifier,
-                    ))
+            nxt_pdu = _native(kg, hop) if label == "Pdu" else last_pdu
+            walk(hop, nxt_pdu, seen | {hop})
+
+    walk(signal, None, {signal})
+    if not reached_frame:
+        if not terminals:
+            terminals = [(signal, None)]
+        for node, last_pdu in terminals:
+            last = _native(kg, node)
+            pdu = last if _label(kg, node) == "Pdu" else last_pdu
+            add(pdu, None, None, None, last)
     rows.sort(key=lambda row: (
         row["pdu"] or "",
         row["frame"] or "",
         row["network"] or "",
         row["identifier"] or "",
+        row.get("last") or "",
     ))
     return rows
 
@@ -227,7 +265,7 @@ def run_checks(kg, projection: dict) -> str:
                 f"(n={n_sig} signals, documents={documents})"
             )
             for row in rows:
-                lines.append(
+                line = (
                     "    pdu={pdu} frame={frame} identifier={identifier} network={network}".format(
                         pdu=_shown(row["pdu"]),
                         frame=_shown(row["frame"]),
@@ -235,6 +273,9 @@ def run_checks(kg, projection: dict) -> str:
                         network=_shown(row["network"]),
                     )
                 )
+                if row["frame"] is None:
+                    line += f" last={_shown(row.get('last'))}"
+                lines.append(line)
 
     if n_req == 0:
         lines.append(f"q4 n/a (n=0 requirements, documents={documents})")

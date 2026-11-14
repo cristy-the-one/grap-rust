@@ -269,21 +269,27 @@ class GrapApplication:
         """Best-effort restore of the active ontology after a process restart,
         from the latest ontology_adopted / ontology_rolled_back audit event
         (adoption re-publishes the same content, so the event subject's record is
-        the active yaml). Projected-node exclusion is NOT rebuilt — evidence
+        the active yaml). Equal timestamps break toward the later append in the
+        audit log. Projected-node exclusion is NOT rebuilt — evidence
         filtering falls back to _is_projected's label/text-prefix guards, which is
         why restarts stay safe even without this."""
         if self._state.ontology is not None:
             return
         try:
             ws = self._state.ws
-            candidates = []
-            for event_type in ("ontology_adopted", "ontology_rolled_back"):
-                evs = ws.query_events(event_type) or []
-                if evs:
-                    candidates.append(evs[-1])
-            if not candidates:
+            # Last write of each type, with its position in the append-only log.
+            # Timestamps are unix milliseconds, so two writes in the same
+            # millisecond compare equal. `max` by ts alone then keeps the first
+            # maximum — whichever type was scanned first — and a later rollback
+            # or adoption is dropped. Log position breaks that tie.
+            kinds = ("ontology_adopted", "ontology_rolled_back")
+            last = {}
+            for index, event in enumerate(ws.query_events() or []):
+                if getattr(event, "event_type", None) in kinds:
+                    last[event.event_type] = (index, event)
+            if not last:
                 return
-            ev = max(candidates, key=lambda e: e.ts)
+            _, ev = max(last.values(), key=lambda pair: (pair[1].ts, pair[0]))
             raw = ws.get_record(ev.subject)
             if not raw:
                 return
