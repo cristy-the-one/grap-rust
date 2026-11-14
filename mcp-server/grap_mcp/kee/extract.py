@@ -470,13 +470,15 @@ def normalize_fragment(obj: Dict[str, Any], source: str, class_vocab=None,
             "rejected_evidence": rejected_evidence, "rejected_proposals": rejected_proposals}
 
 
-def extract_chunk(provider, source: str, text: str, context=None, rule_context=None
-                  ) -> Tuple[Optional[dict], Optional[str]]:
+def extract_chunk(provider, source: str, text: str, context=None, rule_context=None, *,
+                  support_checker=None) -> Tuple[Optional[dict], Optional[str]]:
     """One model proposal with consistent parsing, schema and quote checks.
 
     A valid explicit empty result is a successful fragment. A fabricated quote
     is rejected; omitted evidence remains visibly unquoted for older providers.
     Neither a quote nor schema validity proves that an interpretation is correct.
+    ``support_checker`` is the optional shadow check that a located quote supports
+    its claim. It reports counts and does not change this function's result.
     """
     from . import qualified
     rule_context = rule_context if rule_context is not None else qualified.plan(text)
@@ -487,15 +489,23 @@ def extract_chunk(provider, source: str, text: str, context=None, rule_context=N
     except Exception as exc:
         logger.warning("extractor: provider failed on %s: %s", source, exc)
         return None, "provider"
-    return finalize_reply(raw, source, text, provider, rule_context)
+    return finalize_reply(raw, source, text, provider, rule_context, support_checker=support_checker)
 
 
-def finalize_reply(raw, source, text, provider, rule_context=None):
+def finalize_reply(raw, source, text, provider, rule_context=None, *, support_checker=None):
     """Parse and attempt one focused repair of unresolved legal labels."""
     from . import qualified
+
+    def report(fragment):
+        # Shadow only: the checker never edits the fragment this function returns.
+        if fragment is not None and support_checker is not None:
+            from .quote_support import check_quote_support
+            check_quote_support(fragment, support_checker, shadow=True)
+        return fragment
+
     fragment, failure = parse_reply(raw, source, text, provider, rule_context)
     if fragment is None or not fragment.get("rule_coverage", {}).get("unresolved"):
-        return fragment, failure
+        return report(fragment), failure
     context = rule_context if rule_context is not None else qualified.plan(text)
     try:
         repaired = qualified.repair_labels(provider, fragment, context)
@@ -506,7 +516,7 @@ def finalize_reply(raw, source, text, provider, rule_context=None):
             fragment["classification_repair"] = repaired
     except Exception as exc:
         fragment["classification_repair"] = {"error": str(exc)}
-    return fragment, failure
+    return report(fragment), failure
 
 
 def parse_reply(raw, source: str, text: str, provider, rule_context=None) -> Tuple[Optional[dict], Optional[str]]:
