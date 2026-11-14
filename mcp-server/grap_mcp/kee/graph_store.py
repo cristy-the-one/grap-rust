@@ -95,6 +95,19 @@ def _migrate_resolution_tables(c) -> None:
     apply_resolution_schema(c)
 
 
+def _migrate_statements_table(c) -> None:
+    """Add the statements table (spec-statements.md §3).
+
+    Chained after the resolution tables. The DDL is idempotent, so a run that
+    created the table and stopped before user_version was bumped can be
+    repeated. Rows are not updated in place. Graph save and load do not read
+    or write this table.
+    """
+    from .statements.schema import apply_statements_schema
+
+    apply_statements_schema(c)
+
+
 _MIGRATIONS = [
     lambda c: c.executescript(
         """
@@ -144,6 +157,7 @@ _MIGRATIONS = [
     # store written before a pair could hold two relations.
     _migrate_edge_sources_include_relation,
     _migrate_resolution_tables,
+    _migrate_statements_table,
 ]
 
 SCHEMA_VERSION = len(_MIGRATIONS)
@@ -184,6 +198,9 @@ class GraphStore:
         # this while it is replacing one item's rows. Absent here, a delete
         # would fail as a missing function instead of the table's own refusal.
         self.conn.create_function("grap_mention_replace_ok", 0, lambda: 0)
+        # Same gate for the statements table. StatementTables replaces this
+        # while it is replacing one item's rows.
+        self.conn.create_function("grap_statement_replace_ok", 0, lambda: 0)
 
     def _migrate(self) -> None:
         v = self.conn.execute("PRAGMA user_version").fetchone()[0]
