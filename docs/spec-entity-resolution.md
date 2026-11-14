@@ -109,8 +109,10 @@ The features give a score. Two thresholds split it:
 | at or below the lower threshold | `not_same` |
 | between | **undecided** — goes to the review list; optionally to a language model that answers same / not same / unsure with both contexts in front of it. "Unsure" stays undecided. |
 
-**Shadow mode.** Until the thresholds are fitted on the gold pairs, Stage 3 writes its scores to
-`link_decisions` marked as proposals and writes **nothing** to the graph. The graph then contains
+**Shadow mode.** Until the thresholds are fitted on the gold pairs, Stage 3 **returns** its
+scores as proposals and stores nothing: not in the graph, and not in `link_decisions` either. That
+table is append-only and its latest row wins, so a stored proposal would stand as a decision.
+(Corrected after card E-17, which got this right where the first draft of this spec did not.) The graph then contains
 only Stage 1 links. That is deliberately conservative: a missed link costs a retrieval hit; a wrong
 merge corrupts everything attached to it.
 
