@@ -485,6 +485,12 @@ def test_a_broken_later_guard_is_not_hidden_by_an_earlier_false_one():
             operation: select_requirements
             inputs:
               scope: 1
+          - id: gone
+            operation: select_requirements
+            inputs:
+              scope: 2
+            guards:
+              - {ref: select.outputs.requirements, op: eq, value: 0}
           - id: publish
             operation: emit
             inputs:
@@ -493,11 +499,13 @@ def test_a_broken_later_guard_is_not_hidden_by_an_earlier_false_one():
               passed: true
             guards:
               - {ref: select.outputs.requirements, op: eq, value: 0}
-              - {ref: missing.outputs.nope, op: eq, value: 1}
+              - {ref: gone.outputs.requirements, op: eq, value: 1}
         """
     )
+    # The load check (P-10a) accepts this file: an earlier step produces the
+    # output. At run time that step is skipped, so the output is not there.
     procedure = load_procedure(body)
-    with pytest.raises(ProcedureRunError, match="missing.outputs.nope"):
+    with pytest.raises(ProcedureRunError, match="gone.outputs.requirements"):
         interpret(procedure)
 
 
