@@ -140,7 +140,12 @@ def test_extend_concurrency_one_matches_default(tmp_path):
     out_c1 = extend_graph_ontology(str(tmp_path / "g2"), str(docs),
                                    StubProvider(handler=_handler),
                                    HashingEmbedder(), sim=0.9, concurrency=1)
-    assert out_c1 == out_default
+    # phase_s is wall-clock seconds rounded to one decimal. Two equivalent
+    # runs can disagree on it; every other field is still compared exactly.
+    assert out_c1.keys() == out_default.keys()
+    assert "phase_s" in out_c1
+    assert {k: v for k, v in out_c1.items() if k != "phase_s"} == {
+        k: v for k, v in out_default.items() if k != "phase_s"}
 
 
 def test_extend_concurrency_processes_all_chunks(tmp_path):
