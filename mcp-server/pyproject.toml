@@ -11,7 +11,8 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8.0"]
+# openpyxl is for scripts/split_reviewer_packet.py only. The server does not import it.
+dev = ["pytest>=8.0", "openpyxl>=3.1"]
 
 [tool.setuptools]
 packages = ["grap_mcp"]
