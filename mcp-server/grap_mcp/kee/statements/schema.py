@@ -100,12 +100,22 @@ def marking_rules() -> dict:
     known = set(statement_kinds())
     optional = _kind_list(raw, "subject_optional", known)
     required = _kind_list(raw, "required_behaviour_required", known)
+    normative = _kind_list(raw, "normative_kinds", known)
+    if normative != required:
+        raise ValueError(
+            "normative_kinds and required_behaviour_required must be the same kinds"
+        )
+    fallback_kind = raw.get("normative_fallback_kind")
+    if not isinstance(fallback_kind, str) or fallback_kind not in normative:
+        raise ValueError("the normative fallback kind must be one of normative_kinds")
     fallback = raw.get("no_statement_kind")
     if not isinstance(fallback, str) or fallback not in optional:
         raise ValueError("the no-statement kind must be one that may omit a subject")
     return {
         "subject_optional": optional,
         "required_behaviour_required": required,
+        "normative_kinds": normative,
+        "normative_fallback_kind": fallback_kind,
         "no_statement_kind": fallback,
     }
 

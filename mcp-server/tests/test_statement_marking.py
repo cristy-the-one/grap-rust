@@ -410,7 +410,11 @@ def test_required_behaviour_is_stored_when_it_is_verbatim(tmp_path):
 
 
 def test_a_rule_kind_wins_and_the_disagreement_is_counted(tmp_path):
-    """The stage-1 kind is the one stored. A different model kind is counted."""
+    """A shall unit the model calls informative is stored as requirement.
+
+    The unit has no rule-given kind. Informative is outside the normative
+    kinds, so the stored kind is requirement and the disagreement is counted.
+    """
     text = "The module shall start."
     raw = _reply({0: [_marked(text, kind="informative")]})
     provider = StubProvider(responses=[raw])
