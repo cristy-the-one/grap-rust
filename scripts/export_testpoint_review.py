@@ -8,7 +8,9 @@ or missing. Nothing is computed, and no row is printed.
 
 Reads the open sheet only: ``open/testpoints.csv``, and ``testpoints.csv``
 when that file sits directly in the directory (a flat directory counts as
-open). A directory named sealed is not a sheet and is not read.
+open). If both files exist, the tool refuses and writes nothing: reading
+both would emit each row twice. A directory named sealed is not a sheet
+and is not read.
 
 The system JSON is the object the scorer already reads. Generated text is
 taken from each testpoint under the six column names, matched on
@@ -17,7 +19,10 @@ this sheet; those two are scored elsewhere.
 
     python scripts/export_testpoint_review.py --gold <dir> --system <json> --out <csv>
 
-Prints ``rows=<n> n=<n> documents=<n>`` for the rows written.
+Prints ``rows=<n> n=<n> documents=<n> system_missing=<k>`` for the rows
+written. ``k`` is how many gold rows have no system testpoint, and ``n``
+is the gold-row denominator. When there are no gold rows, ``system_missing``
+prints ``n/a``.
 """
 
 from __future__ import annotations
@@ -25,6 +30,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import sys
 from pathlib import Path
 
 _FREE = (
@@ -45,15 +51,24 @@ _HELD_DIR = "sealed"
 
 
 def _open_paths(gold_dir: Path) -> list[Path]:
-    """Open sheet only. A flat file counts as open. The held directory does not."""
+    """Open sheet only. A flat file counts as open. The held directory does not.
+
+    Both the flat file and ``open/testpoints.csv`` together are a refusal:
+    the two sheets are not merged, because that would write each row twice.
+    """
     folder = Path(gold_dir)
     if folder.name == _HELD_DIR:
         return []
-    paths = []
     direct = folder / "testpoints.csv"
+    opened = folder / "open" / "testpoints.csv"
+    if direct.is_file() and opened.is_file():
+        sys.stderr.write(
+            "refusing: both testpoints.csv and open/testpoints.csv exist\n"
+        )
+        raise SystemExit(1)
+    paths = []
     if direct.is_file():
         paths.append(direct)
-    opened = folder / "open" / "testpoints.csv"
     if opened.is_file():
         paths.append(opened)
     return paths
@@ -112,17 +127,23 @@ def _write_csv(path: Path, rows: list[dict[str, str]]) -> None:
 
 
 def export(gold_dir, system: dict, out) -> None:
-    """Write one review row per open requirement. Prints the row count only."""
+    """Write one review row per open requirement. Prints counts only."""
     gold_rows = _read_rows(_open_paths(Path(gold_dir)))
     by_key = _system_index(system or {})
     written = []
+    missing = 0
     for gold in gold_rows:
         key = (str(gold.get("source_id") or ""), str(gold.get("item_id") or ""))
+        if key not in by_key:
+            missing += 1
         written.append(_review_row(gold, by_key.get(key, {})))
     _write_csv(Path(out), written)
     n = len(written)
     documents = len({row["source_id"] for row in written})
-    print(f"rows={n} n={n} documents={documents}")
+    # No gold rows means there is nothing to measure. A zero here would be a
+    # number with an empty denominator.
+    missing_field = "n/a" if n == 0 else str(missing)
+    print(f"rows={n} n={n} documents={documents} system_missing={missing_field}")
 
 
 def main(argv: list[str] | None = None) -> None:

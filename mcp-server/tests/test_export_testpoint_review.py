@@ -179,7 +179,7 @@ def test_one_row_per_open_requirement_and_no_sealed_packet_id(tmp_path, capsys):
     assert tuple(header) == _REVIEW_COLUMNS
     assert len(rows) == len(open_rows) == 2
     assert [row["packet_id"] for row in rows] == ["open-1", "open-2"]
-    assert captured.out == "rows=2 n=2 documents=2\n"
+    assert captured.out == "rows=2 n=2 documents=2 system_missing=0\n"
     assert captured.err == ""
 
     first, second = rows
@@ -253,7 +253,7 @@ def test_flat_sheet_is_open_and_held_sheet_is_unread(tmp_path, capsys):
     assert rows[0]["system_preconditions"] == "dark"
     assert rows[0]["system_stimulus"] == ""
     assert rows[0]["verdict"] == ""
-    assert captured.out == "rows=1 n=1 documents=1\n"
+    assert captured.out == "rows=1 n=1 documents=1 system_missing=0\n"
 
 
 def test_held_directory_itself_is_not_read(tmp_path, capsys):
@@ -274,4 +274,94 @@ def test_held_directory_itself_is_not_read(tmp_path, capsys):
     header, rows = _read_csv(out)
     assert tuple(header) == _REVIEW_COLUMNS
     assert rows == []
-    assert captured.out == "rows=0 n=0 documents=0\n"
+    assert captured.out == "rows=0 n=0 documents=0 system_missing=n/a\n"
+
+
+def test_system_missing_prints_count_with_gold_row_denominator(tmp_path, capsys):
+    """Gold rows with no system testpoint are counted, beside the gold-row n.
+
+    Three open rows, one of them matched. The other two have no system
+    testpoint, so the line is system_missing=2 with n=3. A system testpoint
+    for a requirement that is not on the sheet does not add a row. Columns
+    stay the review columns.
+    """
+    folder = tmp_path / "packet"
+    open_rows = [
+        _gold_row(
+            "open-1", "src-a", "req-1", "The unit shall start.",
+            stimulus="press start",
+        ),
+        _gold_row(
+            "open-2", "src-a", "req-2", "The unit must stop.",
+            stimulus="release",
+        ),
+        _gold_row(
+            "open-3", "src-b", "req-3", "The lamp shall light.",
+            stimulus="toggle",
+        ),
+    ]
+    _write_csv(folder / "open" / "testpoints.csv", _GOLD_COLUMNS, open_rows)
+    system_path = tmp_path / "system.json"
+    system_path.write_text(json.dumps({"testpoints": [
+        {"source_id": "src-a", "item_id": "req-1", "stimulus": "send start"},
+        {"source_id": "extra-doc", "item_id": "req-x", "stimulus": "NOT-IN-OPEN-SHEET"},
+    ]}), encoding="utf-8")
+    out = tmp_path / "review.csv"
+    review.main([
+        "--gold", str(folder), "--system", str(system_path), "--out", str(out),
+    ])
+    captured = capsys.readouterr()
+    header, rows = _read_csv(out)
+    assert tuple(header) == _REVIEW_COLUMNS
+    assert len(rows) == len(open_rows) == 3
+    assert [row["packet_id"] for row in rows] == ["open-1", "open-2", "open-3"]
+    assert rows[0]["system_stimulus"] == "send start"
+    assert rows[1]["system_stimulus"] == ""
+    assert rows[1]["stimulus"] == "release"
+    assert rows[2]["system_stimulus"] == ""
+    assert rows[2]["stimulus"] == "toggle"
+    assert all(row["verdict"] == "" for row in rows)
+    text = out.read_text(encoding="utf-8")
+    assert "NOT-IN-OPEN-SHEET" not in text
+    assert "NOT-IN-OPEN-SHEET" not in captured.out
+    assert captured.err == ""
+    assert captured.out == "rows=3 n=3 documents=2 system_missing=2\n"
+
+
+def test_both_flat_and_open_sheets_are_refused(tmp_path, capsys):
+    """Both testpoints.csv and open/testpoints.csv: non-zero exit, no output file."""
+    folder = tmp_path / "both"
+    _write_csv(folder / "testpoints.csv", _GOLD_COLUMNS, [
+        _gold_row("flat-1", "src-a", "req-1", "The unit shall start."),
+    ])
+    _write_csv(folder / "open" / "testpoints.csv", _GOLD_COLUMNS, [
+        _gold_row("open-1", "src-a", "req-1", "The unit shall start."),
+    ])
+    _write_csv(folder / "sealed" / "testpoints.csv", _GOLD_COLUMNS, [
+        _gold_row(_HELD_PACKET, "held-doc", "req-9", _HELD_PASSAGE),
+    ])
+    system_path = tmp_path / "system.json"
+    system_path.write_text(json.dumps({"testpoints": [
+        {"source_id": "src-a", "item_id": "req-1", "stimulus": "send start"},
+    ]}), encoding="utf-8")
+    out = tmp_path / "nested" / "review.csv"
+    code = 0
+    try:
+        review.main([
+            "--gold", str(folder), "--system", str(system_path), "--out", str(out),
+        ])
+    except SystemExit as exc:
+        code = exc.code if exc.code is not None else 0
+    captured = capsys.readouterr()
+    assert code != 0, (
+        f"expected a non-zero exit, got {code}; "
+        f"out_exists={out.exists()} stdout={captured.out!r}"
+    )
+    assert not out.exists()
+    assert not out.parent.exists()
+    assert captured.out == ""
+    assert _HELD_PACKET not in captured.out
+    assert _HELD_PASSAGE not in captured.err
+    assert captured.err == (
+        "refusing: both testpoints.csv and open/testpoints.csv exist\n"
+    )
