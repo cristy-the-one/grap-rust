@@ -152,6 +152,69 @@ def test_rehydration_follows_rollback(tmp_path, monkeypatch):
     assert s2._state.ontology.outcome("rv") is not None
 
 
+def test_rehydration_breaks_equal_timestamp_ties_by_append_order():
+    """Equal millisecond timestamps make 'latest event' ambiguous.
+
+    `max` by `ts` alone keeps the first maximum. The audit log is append-only,
+    so the later line must win the tie — a rollback written after an adoption,
+    and an adoption written after a rollback.
+    """
+    from grap_mcp.application import GrapApplication
+
+    class _Event:
+        def __init__(self, event_type, subject, ts):
+            self.event_type = event_type
+            self.subject = subject
+            self.ts = ts
+
+    class _Log:
+        def __init__(self, events):
+            self._events = events
+            self._records = {
+                "v1": _onto([("rv", "Requirement Verification", ["verification_method"])]),
+                "v2": _onto([("qa", "Quality Assurance", ["quality_plan"])]),
+            }
+
+        def query_events(self, event_type=None, since=None, until=None):
+            out = self._events
+            if event_type is not None:
+                out = [e for e in out if e.event_type == event_type]
+            return list(out)
+
+        def get_record(self, subject):
+            return self._records.get(subject)
+
+    def rehydrate(events):
+        s = GrapApplication()
+        s._state.ws = _Log(events)
+        s._state.ontology = None
+        s._rehydrate_active_ontology()
+        return s
+
+    same = 1_700_000_000_000
+    rolled = rehydrate([
+        _Event("ontology_adopted", "v1", same),
+        _Event("ontology_adopted", "v2", same),
+        _Event("ontology_rolled_back", "v1", same),
+    ])
+    assert rolled._state.ontology_version == "v1", (
+        "equal timestamps kept "
+        f"{rolled._state.ontology_version!r}, not the later rollback")
+    assert rolled._state.ontology.outcome("rv") is not None
+    assert rolled._state.ontology.outcome("qa") is None
+
+    # The tie-break is log order, not a preference for the rollback type.
+    adopted = rehydrate([
+        _Event("ontology_rolled_back", "v1", same),
+        _Event("ontology_adopted", "v2", same),
+    ])
+    assert adopted._state.ontology_version == "v2", (
+        "equal timestamps kept "
+        f"{adopted._state.ontology_version!r}, not the later adoption")
+    assert adopted._state.ontology.outcome("qa") is not None
+    assert adopted._state.ontology.outcome("rv") is None
+
+
 # ---- fix 4: PG write-back -------------------------------------------------------
 
 PG_V1 = """\
