@@ -137,3 +137,7 @@ terminals/
 
 # llama-server logs from scripts/serve-bonsai.ps1
 .logs/
+
+# Gold labels never enter the repository. The sealed part must stay unseen by
+# anything that develops against it.
+gold/

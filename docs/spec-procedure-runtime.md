@@ -1,6 +1,7 @@
 # Spec — the procedure runtime (card P-01)
 
-**Status:** draft for the owner's review. **Do not implement before §10 is answered.**
+**Status:** approved for implementation. The six decisions of §10 were delegated to the spec
+author by the owner and are recorded there.
 **Date:** 2026-11-13.
 **Decides:** what it means to *execute* a procedure graph, for one real procedure: generating a
 test specification from a set of requirements.
@@ -86,6 +87,36 @@ These fields are the columns of Sheet 4, so a generated case and a labelled one 
 The template decides how that structure is laid out as a document. The structure, not the
 rendering, is the stored artifact.
 
+### 5a. Template format
+
+A template is one Markdown file under `templates/test-spec/`, with a short header block:
+
+```
+---
+id: default
+name: Default test specification
+level: software
+---
+# Test specification: {{title}}
+
+{{#cases}}
+## {{id}} ({{kind}})
+Verifies: {{verifies}}
+Preconditions: {{preconditions}}
+Stimulus: {{stimulus}}
+Expected result: {{expected_observable_result}}
+Pass criterion: {{pass_criterion}}
+{{/cases}}
+```
+
+- `{{name}}` is replaced by a field of the specification or, inside `{{#cases}} … {{/cases}}`, of
+  the current test case. The block repeats once per case. Lists are joined with `, `.
+- Nothing else is supported: no conditions, no nesting, no expressions. A placeholder that names
+  no field is a load error. No template library is added.
+- `level` in the header is copied onto every test case.
+- One template, `default.md`, ships with the runtime so the procedure can run before the owner
+  supplies real ones.
+
 ---
 
 ## 6. Guards and the one loop
@@ -149,24 +180,23 @@ model the output can differ on a second run, and the record says so.
 
 ---
 
-## 10. Decisions for the owner
+## 10. Decisions (2026-11-14)
 
-1. **The eight operations (§4).** They are the eight steps of your goal document. Is anything
-   missing that you do by hand today when writing a test specification?
-2. **The test-case fields (§5).** They mirror Sheet 4. Do you need others — for example test
-   level, test environment, or priority?
-3. **"No invented names" (§7).** It rejects any identifier the context does not contain. That is
-   strict: a correct name the graph simply lacks is also rejected. I think strict is right, because
-   it turns a gap in the graph into a visible failure. Do you agree?
-4. **Negative cases (§7).** Required whenever a requirement has error handling or an exception.
-   Too strict, or right?
-5. **Templates.** They have to come from you. In what form do you have them today?
-6. **When refinement runs out (§6).** The run fails and emits nothing. The alternative is to emit
-   with the issues attached. I chose failure.
+The owner delegated these six to the spec author. They are recorded as the author's choices, to be
+revisited after the first real run (card P-17), when there is evidence instead of judgement.
+
+| # | Question | Decision |
+|---|---|---|
+| 1 | Anything missing from the eight operations? | **No. The eight stand.** Human review happens after `emit` and is recorded as an event when it occurs; it is not a step the runtime executes. |
+| 2 | More test-case fields than Sheet 4's? | **One: `level`.** It is copied from the template, never produced by the model. No priority and no environment in this version — nothing in the graph could ground them. |
+| 3 | "No invented names" — strict? | **Strict.** An identifier the context lacks fails validation, even when it is correct. That turns a gap in the graph into a visible failure. |
+| 4 | Negative case required when a requirement has error handling or an exception? | **Yes.** |
+| 5 | Where do templates come from? | **A plain file format, defined in §5a, with one default template shipped.** The owner replaces or adds templates later. |
+| 6 | When refinement runs out? | **The run fails and emits nothing.** The last draft is kept as a rejected artifact with its issues. |
 
 ---
 
-## 11. Cards — issued only after §10
+## 11. Cards
 
 | Card | Tag | Does |
 |---|---|---|
