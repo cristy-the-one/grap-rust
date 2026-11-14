@@ -73,7 +73,7 @@ never edited; an item's rows are replaced only when that item is re-extracted.
 | Pattern in the unit | Kind |
 |---|---|
 | no verb, or only a heading, caption or change-history line | `other` |
-| "shall" or "must", outside a note or rationale | `requirement` (spans still come from Stage 2) |
+| "shall" or "must", outside a note or rationale | **normative** — see Amendment 1 (spans still come from Stage 2) |
 | inside a block marked note, rationale or example | `informative`, whatever words it contains |
 | "may" as the only modal | `informative` |
 | "X is defined as …", "X means …", a glossary row | `definition` |
@@ -83,6 +83,34 @@ A unit with no certain label goes to Stage 2 with no kind. A unit labelled `othe
 
 The rule table is data, not code: one file, one row per pattern, each with an example that must
 match and one that must not.
+
+### Amendment 1 (2026-11-14) — from the review of ST-02 and ST-03
+
+**A "shall" proves the unit is normative. It does not prove which normative kind.** The first
+draft labelled every "shall" unit `requirement` and let that win over the model. But the
+labelling guide's own example — *"If the module is not initialized, Xyz_Transmit shall return
+E_NOT_OK"* — is `error_handling`. The rule would have overwritten the right answer.
+
+So:
+
+- The `shall` and `must` rows give no kind. They set `normative = true` on the unit.
+- The **normative kinds** are `requirement`, `error_handling`, `state_or_mode_rule` and
+  `configuration_constraint`. They are listed once, in `marking.json`, as `normative_kinds`
+  (the same four as `required_behaviour_required`).
+- For a normative unit the model chooses the kind. If it chooses a normative kind, that kind is
+  stored. If it chooses any other kind, the statement is stored as `requirement` and the
+  disagreement is counted. Nothing else changes in check 4.
+
+**Three corrections to the certain rules.** Each is a case where "certain" was not.
+
+| Rule | Correction | Must not match |
+|---|---|---|
+| `means` | does not match "by means of" | *Errors are reported by means of the DET.* |
+| `no-verb` | does not apply to a table row; a table row with no other label goes to the model | a row `Timeout \| 100 ms` |
+| `may-only` | does not match the month: "May" followed by a four-digit year | *Released in May 2024* |
+
+The verb list stays a heuristic. It decides only `other`, and only for short fragments, so a
+missing verb costs one model call at worst.
 
 ---
 
@@ -102,6 +130,7 @@ the units, numbered, and the kinds from the schema file.
 3. `required_behaviour` is required for `requirement`, `error_handling`, `state_or_mode_rule` and
    `configuration_constraint`.
 4. A rule-given kind from Stage 1 wins over the model's kind; the disagreement is counted.
+   A unit marked **normative** has no rule-given kind: see Amendment 1.
 5. Every unit sent must come back with at least one statement. A missing unit is retried once,
    then listed for review with reason `no-reply`.
 
@@ -182,9 +211,10 @@ Rules of Part A apply. Code goes in `mcp-server/grap_mcp/kee/statements/`.
 | **ST-04** Mentions | [S] | §6 first part: statements → rows in `mentions`. |
 | **ST-05** Edges | [M] | §6 table. Test: one fixture per row of the table, and the `subject_unlinked` count. |
 | **ST-06** Output for the scorer | [S] | Write `{"statements": [{source_id, item_id, kind, subject}]}` with `subject` as the quoted text. |
+| **ST-08** Amendment 1 | [S] | The normative flag and the three rule corrections of §4's Amendment 1. Test first: the guide's error-handling example is stored as `error_handling`; a normative unit the model calls `informative` is stored as `requirement` with one disagreement; each "must not match" example of the table. |
 | **ST-07** Live run | **[M] + owner** | Run on real items with the local model; paste §7's counts. Needs the corpus. |
 
-Order: ST-01 → ST-02 → ST-03 → ST-04 → ST-05 → ST-06. ST-05 needs E-14 and E-15 merged.
+Order: ST-01 → ST-02 → ST-03 → ST-08 → ST-04 → ST-05 → ST-06. ST-05 needs E-14 and E-15 merged.
 
 ---
 
