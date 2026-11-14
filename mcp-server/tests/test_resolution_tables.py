@@ -4,7 +4,13 @@ import sqlite3
 
 import pytest
 
-from grap_mcp.kee.graph_store import SCHEMA_VERSION, GraphState, GraphStore
+from grap_mcp.kee.graph_store import (
+    SCHEMA_VERSION,
+    GraphState,
+    GraphStore,
+    _MIGRATIONS,
+    _migrate_resolution_tables,
+)
 
 WIDGET = "Signal | demo | Widget"
 GADGET = "Signal | demo | Gadget"
@@ -146,8 +152,10 @@ def test_e10_store_migrates_to_resolution_tables_and_keeps_both_edges(tmp_path):
     state = GraphState(edges=[(1, 0, "uses"), (1, 0, "cites")])
     with GraphStore(path) as store:
         store.save(state)
-        # One step back: every migration before the resolution tables has run.
-        store.conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION - 1}")
+        # The version before the resolution migration, taken from the migration
+        # list. A later migration must not move this rollback to the tip.
+        before_resolution = _MIGRATIONS.index(_migrate_resolution_tables)
+        store.conn.execute(f"PRAGMA user_version = {before_resolution}")
         for table in ("mentions", "link_decisions", "constraints", "groupings"):
             store.conn.execute(f"DROP TABLE IF EXISTS {table}")
         store.conn.commit()

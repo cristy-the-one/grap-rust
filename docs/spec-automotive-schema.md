@@ -284,7 +284,49 @@ edge attributes in the store, so nothing is lost.
 | ○ sender-receiver-to-signal mapping | `InterfaceElement` —`realised_by`→ `Signal` |
 | ○ component-to-ECU mapping | `Component` —`runs_on`→ `Ecu` |
 
-An object that joins three or more things, or that other items refer to, stays an `Element`.
+An object that joins three or more things stays an `Element`.
+
+### Amendment 1 (2026-11-14) — from the first projection of a real file
+
+Projecting `system-4.2.arxml` gave 48 untyped items of 157 and 129 fallback links of 225, both
+over the 20% line of §7. The alarm was right; these rules were missing.
+
+**Packages are namespaces, not things.** An `AR-PACKAGE` is not projected: no `Item`, no
+`Element`. Its path is already part of every `native_id` beneath it. A containment link whose
+target is a package is not written. Both are counted, separately from the §7 counts, as
+`namespace_items` and `namespace_links`, and both are left out of the §7 totals.
+
+**A folded object can still be referred to.** A reference to an object that was folded into an
+edge is followed through to that edge's **first end**. So a reference to a `PDU-TRIGGERING`
+arrives at its `Pdu`. (The earlier rule kept any referred-to object as an `Element`; that is
+withdrawn.)
+
+**PDUs inside PDUs, and signals inside groups.** ✔ = seen in the fixture.
+
+| ARXML | Becomes |
+|---|---|
+| ✔ `I-PDU-REF` owned by a `MULTIPLEXED-I-PDU` (its static and dynamic parts) | part `Pdu` —`part_of`→ the multiplexed `Pdu` |
+| ✔ `CONTAINED-PDU-TRIGGERING-REF` owned by a `CONTAINER-I-PDU` | contained `Pdu` —`part_of`→ the container `Pdu` |
+| ✔ `PAYLOAD-REF` owned by a `SECURED-I-PDU` | payload `Pdu` —`part_of`→ the secured `Pdu` |
+| ✔ `I-SIGNAL-REF` owned by an `I-SIGNAL-GROUP` | member `Signal` —`part_of`→ the group `Signal` |
+| ○ `SYSTEM-SIGNAL-REF` owned by a `SYSTEM-SIGNAL-GROUP` | member `Signal` —`part_of`→ the group `Signal` |
+
+Note the direction: the reference points from the whole to the part, and the edge runs from the
+part to the whole.
+
+**Question 3 follows nesting.** From a signal, follow `part_of` through any number of `Pdu` and
+group steps until a `Frame` is reached. A signal that reaches no frame is reported as such, with
+the last node reached — never as an empty answer.
+
+**Expected after this amendment, on `system-4.2.arxml`:** no package among the nodes; the five
+`PDU-TRIGGERING` objects folded; every signal carried by a multiplexed, container or secured PDU
+reaches its frame in question 3; `untyped_items` and `fallback_links` each below 20% of their
+totals. The exact counts are to be measured and pasted into the PR, not predicted here.
+
+Still unmapped, and correctly left as `Element`: network-management configuration, communication
+controllers, transformation and secure-communication properties, PDU groups, the `SYSTEM` element.
+ECU-to-network attachment and who sends or receives a frame are **not** derivable from this
+fixture, which has no connectors; they wait for a real file.
 
 ### Other links
 
@@ -371,4 +413,7 @@ confirmed with the inventory tool on real files before the projection relies on 
 | **S-05** Edge encoding | [M] | Relation as property name (§6) **only for the 30 schema relations**; every other verb as `refers_to` with `role`. Migration for existing graphs. Test: 70 distinct free verbs are accepted and each is retrievable by its role. Needs S-01 for the names and E-10 for the edge key. Touches `working_graph.py`; **not** the Rust engine. |
 | **S-06** Statements from text into the schema | **[L]** | Needs the entity-resolution design (E-01) for subjects that have no identifier. |
 
+| **S-07** Projection amendment | [M] | Amendment 1 of §8: packages not projected; references followed through folded objects; nested PDUs and signal groups; question 3 follows nesting. Test first on `system-4.2.arxml`: no package node; `/ISignal/Hello` reaches a frame; both §7 shares below 20%. Paste the measured counts. |
+
 Order: S-01 → S-02 → S-03 → S-04; S-05 independently. S-03 depends on ARXML cards AR-02 to AR-04.
+S-07 follows S-04.

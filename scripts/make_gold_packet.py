@@ -3,7 +3,10 @@
 
 One row per kept passage. Label columns are left blank for the labeller.
 Law passages are whole articles, split on the ``_ARTICLE`` markers in
-``grap_mcp.kee.legal_rules``. No model is called.
+``grap_mcp.kee.legal_rules``. Automotive passages come from ``ingest._READERS``.
+Sheet 1 keeps ``requirement`` and ``text`` items of 80 to 1,500 characters.
+Sealing follows ``source_id``, so one source is not split across the sheets.
+No model is called.
 
     python scripts/make_gold_packet.py --corpus-root <dir> --corpus law-ro \\
         --seed 20261112 --items 150 --out gold/law-ro
@@ -41,14 +44,20 @@ _LAW_LABELS = (
     "sure",
     "note",
 )
-_COLUMNS = ("packet_id", "source_id", "item_id", "passage", *_LAW_LABELS)
-
-_MISSING_AUTOMOTIVE_READERS = (
-    "R-02 DBC reader (mcp-server/grap_mcp/readers/dbc.py)",
-    "R-03 specification PDF reader (readers/spec_pdf.py)",
-    "R-04 ReqIF reader (readers/reqif.py)",
-    "R-05 ARXML reader",
+_AUTOMOTIVE_LABELS = (
+    "kind",
+    "subject",
+    "trigger_condition",
+    "required_behaviour",
+    "values_and_timing",
+    "exception",
+    "refers_to",
+    "traces_up_to",
+    "configuration_dependency",
+    "sure",
+    "note",
 )
+_STATEMENT_KINDS = ("requirement", "text")
 
 
 @dataclass(frozen=True)
@@ -173,18 +182,29 @@ def read_law_files(corpus_root: Path) -> list[_FileItems]:
 
 
 def _select(files: list[_FileItems], seed: str, items: int):
+    """Hash order, at most 4 items per file. Every fourth source is sealed.
+
+    The seal follows ``source_id``, not the file. A source that spans files
+    stays in one sheet. A corpus whose files are already one source each
+    seals the same files as a per-file count.
+    """
     ordered = sorted((group for group in files if group.items), key=lambda group: _rank(seed, group.file))
     chosen = []
     remaining = items
-    for index, group in enumerate(ordered):
+    source_ordinal = {}
+    for group in ordered:
         if remaining <= 0:
             break
+        ordinal = source_ordinal.get(group.source_id)
+        if ordinal is None:
+            ordinal = len(source_ordinal)
+            source_ordinal[group.source_id] = ordinal
         ranked = tuple(sorted(
             group.items,
             key=lambda item: (_item_rank(seed, group.file, item.item_id), item.item_id),
         ))
         take = ranked[: min(_MAX_PER_FILE, remaining)]
-        chosen.append((group, take, (index + 1) % 4 == 0))
+        chosen.append((group, take, (ordinal + 1) % 4 == 0))
         remaining -= len(take)
     return chosen, len(ordered)
 
@@ -193,7 +213,59 @@ def _counts_line(source_files: int, rows: int, sealed_rows: int) -> str:
     return f"source_files={source_files} rows={rows} sealed_rows={sealed_rows}"
 
 
-def _rows(taken: tuple[SourceItem, ...]) -> list[dict[str, str]]:
+def _header(labels: tuple[str, ...]) -> tuple[str, ...]:
+    return ("packet_id", "source_id", "item_id", "passage", *labels)
+
+
+def _from_reader(item, relative: str, digest: str) -> SourceItem:
+    return SourceItem(
+        source_id=item.source_id,
+        release=item.release,
+        item_id=item.item_id,
+        kind_hint=item.kind_hint,
+        text=item.text,
+        heading_path=tuple(item.heading_path),
+        attributes=dict(item.attributes),
+        links=tuple(item.links),
+        file=relative,
+        sha256=digest,
+    )
+
+
+def read_automotive_files(corpus_root: Path) -> list[_FileItems]:
+    """One group per file the ingestion readers know. A bad file raises."""
+    from grap_mcp.ingest import _READERS
+
+    root = Path(corpus_root)
+    if not root.is_dir():
+        raise RuntimeError(f"corpus root is not a directory: {root}")
+    paths = sorted(
+        (
+            path for path in root.rglob("*")
+            if path.is_file() and path.suffix.lower() in _READERS
+        ),
+        key=lambda path: path.as_posix(),
+    )
+    groups = []
+    for path in paths:
+        relative = path.resolve().relative_to(root.resolve()).as_posix()
+        digest = hashlib.sha256(path.read_bytes()).hexdigest()
+        try:
+            read_items = list(_READERS[path.suffix.lower()](path, corpus_root=root))
+        except Exception as exc:
+            raise RuntimeError(f"cannot parse {relative}: {exc}") from exc
+        items = tuple(
+            _from_reader(item, relative, digest)
+            for item in read_items
+            if item.kind_hint in _STATEMENT_KINDS
+            and _MIN_CHARS <= len(item.text) <= _MAX_CHARS
+        )
+        source_id = items[0].source_id if items else path.stem
+        groups.append(_FileItems(relative, digest, source_id, items))
+    return groups
+
+
+def _rows(taken: tuple[SourceItem, ...], labels: tuple[str, ...]) -> list[dict[str, str]]:
     rows = []
     for item in taken:
         row = {
@@ -202,44 +274,45 @@ def _rows(taken: tuple[SourceItem, ...]) -> list[dict[str, str]]:
             "item_id": item.item_id,
             "passage": item.text,
         }
-        for column in _LAW_LABELS:
+        for column in labels:
             row[column] = ""
         rows.append(row)
     return rows
 
 
-def _write_csv(path: Path, rows: list[dict[str, str]]) -> None:
+def _write_csv(path: Path, rows: list[dict[str, str]], columns: tuple[str, ...]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8", newline="") as handle:
-        writer = csv.DictWriter(handle, fieldnames=_COLUMNS, lineterminator="\n")
+        writer = csv.DictWriter(handle, fieldnames=columns, lineterminator="\n")
         writer.writeheader()
         writer.writerows(rows)
 
 
 def build_packet(corpus_root: Path, corpus: str, seed: str, items: int, out: Path) -> None:
     if corpus == "automotive":
-        missing = "; ".join(_MISSING_AUTOMOTIVE_READERS)
-        raise RuntimeError(
-            "automotive corpus requires Part D SourceItem readers that are not implemented: "
-            + missing
-        )
-    if corpus != "law-ro":
+        labels = _AUTOMOTIVE_LABELS
+        read = read_automotive_files
+    elif corpus == "law-ro":
+        labels = _LAW_LABELS
+        read = read_law_files
+    else:
         raise RuntimeError(f"unknown corpus: {corpus}")
     if items < 0:
         raise RuntimeError("--items must be zero or greater")
-    chosen, source_files = _select(read_law_files(corpus_root), str(seed), items)
+    chosen, source_files = _select(read(corpus_root), str(seed), items)
     open_rows = []
     sealed_rows = []
     for group, taken, sealed in chosen:
         target = sealed_rows if sealed else open_rows
-        target.extend(_rows(taken))
+        target.extend(_rows(taken, labels))
     rows = len(open_rows) + len(sealed_rows)
     print(_counts_line(source_files, rows, len(sealed_rows)))
     if source_files < _MIN_SOURCE_FILES or rows < items or not sealed_rows:
         raise SystemExit(1)
+    columns = _header(labels)
     destination = Path(out)
-    _write_csv(destination / "open" / "statements.csv", open_rows)
-    _write_csv(destination / "sealed" / "statements.csv", sealed_rows)
+    _write_csv(destination / "open" / "statements.csv", open_rows, columns)
+    _write_csv(destination / "sealed" / "statements.csv", sealed_rows, columns)
     manifest = {
         "corpus": corpus,
         "file_hashes": [
