@@ -1,0 +1,142 @@
+{
+  "source": "spec-statements.md §4. File order is precedence: the first matching row wins. A marked block wins over every later row.",
+  "item_kinds": ["requirement", "text"],
+  "skip_model": ["other", "informative"],
+  "modals": ["shall", "must", "may", "should", "can", "could", "will", "would", "might"],
+  "verbs": [
+    "start", "stop", "return", "report", "set", "get", "send", "receive",
+    "check", "detect", "define", "mean", "apply", "include", "provide",
+    "require", "allow", "ignore", "initialize", "initialise", "reset",
+    "enable", "disable", "configure", "transmit", "indicate", "specify",
+    "describe", "contain", "use", "call", "invoke", "trigger", "activate",
+    "deactivate", "read", "write", "store", "load", "update", "delete",
+    "create", "wait", "remain", "stay", "exceed", "comply", "satisfy",
+    "meet", "follow", "occur", "happen", "fail", "pass", "record", "list",
+    "avoid", "retry", "log", "see"
+  ],
+  "irregulars": [
+    "is", "are", "was", "were", "be", "been", "being", "am",
+    "has", "have", "had", "do", "does", "did", "done"
+  ],
+  "rules": [
+    {
+      "id": "note-block",
+      "kind": "informative",
+      "when": "block",
+      "marker": "note",
+      "pattern": "inside a block marked note",
+      "regex": "(?i)^notes?\\s*:|(?-i:^NOTES?\\b)",
+      "heading_regex": "(?i)^notes?\\b",
+      "match": "NOTE: The module shall ignore unknown ids.",
+      "non_match": "The module shall ignore unknown ids."
+    },
+    {
+      "id": "rationale-block",
+      "kind": "informative",
+      "when": "block",
+      "marker": "rationale",
+      "pattern": "inside a block marked rationale",
+      "regex": "(?i)^rationales?\\s*:|(?-i:^RATIONALES?\\b)",
+      "heading_regex": "(?i)^rationales?\\b",
+      "match": "Rationale: A short timeout avoids a deadlock.",
+      "non_match": "A short timeout avoids a deadlock."
+    },
+    {
+      "id": "example-block",
+      "kind": "informative",
+      "when": "block",
+      "marker": "example",
+      "pattern": "inside a block marked example",
+      "regex": "(?i)^examples?\\s*:|(?-i:^EXAMPLES?\\b)",
+      "heading_regex": "(?i)^examples?\\b",
+      "match": "Example: The module shall start.",
+      "non_match": "The module shall start."
+    },
+    {
+      "id": "shall",
+      "kind": "requirement",
+      "when": "modal-outside-block",
+      "pattern": "shall, outside a note or rationale",
+      "regex": "(?i)\\bshall\\b",
+      "match": "The module shall start.",
+      "non_match": "NOTE: The module shall start."
+    },
+    {
+      "id": "must",
+      "kind": "requirement",
+      "when": "modal-outside-block",
+      "pattern": "must, outside a note or rationale",
+      "regex": "(?i)\\bmust\\b",
+      "match": "The module must start.",
+      "non_match": "Rationale: The module must start."
+    },
+    {
+      "id": "defined-as",
+      "kind": "definition",
+      "when": "regex",
+      "pattern": "X is defined as …",
+      "regex": "(?i)\\bis defined as\\b",
+      "match": "ECU is defined as an electronic control unit.",
+      "non_match": "The module shall start."
+    },
+    {
+      "id": "means",
+      "kind": "definition",
+      "when": "regex",
+      "pattern": "X means …",
+      "regex": "(?i)\\bmeans\\b",
+      "match": "ECU means electronic control unit.",
+      "non_match": "The module shall start."
+    },
+    {
+      "id": "glossary-row",
+      "kind": "definition",
+      "when": "glossary",
+      "pattern": "a glossary row",
+      "match": "ECU — electronic control unit",
+      "non_match": "The module shall start."
+    },
+    {
+      "id": "may-only",
+      "kind": "informative",
+      "when": "may-only",
+      "pattern": "may as the only modal",
+      "match": "The caller may retry.",
+      "non_match": "The caller may retry and shall log the error."
+    },
+    {
+      "id": "caption",
+      "kind": "other",
+      "when": "regex",
+      "pattern": "only a caption",
+      "regex": "(?i)^(?:table|figure|fig\\.|caption)\\s+\\d+\\b",
+      "match": "Table 1: Signal names",
+      "non_match": "The table shall list every signal."
+    },
+    {
+      "id": "change-history",
+      "kind": "other",
+      "when": "regex",
+      "pattern": "only a change-history line",
+      "regex": "(?i)\\b\\d{4}-\\d{2}-\\d{2}\\b.*\\b\\d+\\.\\d+\\b|\\b\\d+\\.\\d+\\b.*\\b\\d{4}-\\d{2}-\\d{2}\\b|^(?:change history|revision history)\\b",
+      "match": "2024-01-15 1.0 Initial release",
+      "non_match": "The module shall record each change."
+    },
+    {
+      "id": "heading",
+      "kind": "other",
+      "when": "heading",
+      "pattern": "only a heading",
+      "match": "3.2 Initialization",
+      "non_match": "The module shall initialize."
+    },
+    {
+      "id": "no-verb",
+      "kind": "other",
+      "when": "no-verb",
+      "pattern": "no verb",
+      "match": "speed, torque",
+      "non_match": "The module starts."
+    }
+  ]
+}
