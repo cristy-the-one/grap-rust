@@ -3,7 +3,8 @@
 The table lives in the extraction store. Saving the graph does not insert,
 update, or delete these rows.
 
-A statement stores spans, not the item's text. ``subject`` is a span.
+A statement stores spans, not the item's text. ``subject`` is a span, or
+empty for the kinds the marking data file allows to omit one.
 ``condition``, ``required_behaviour`` and ``exception`` are a span or empty.
 ``values_and_timing`` is a list of spans. ``statement_id`` is
 ``{source_id}|{item_id}|{n}`` with ``n`` counting from 0 in text order of the
@@ -22,7 +23,7 @@ from dataclasses import dataclass
 
 from grap_mcp.kee.graph_store import GraphStore
 
-from .schema import statement_kinds
+from .schema import marking_rules, statement_kinds
 
 _ORIGINS = ("rule", "model")
 
@@ -33,7 +34,7 @@ class Statement:
     item_id: str
     unit: tuple[int, int]
     kind: str
-    subject: tuple[int, int]
+    subject: tuple[int, int] | None
     condition: tuple[int, int] | None
     required_behaviour: tuple[int, int] | None
     values_and_timing: tuple[tuple[int, int], ...]
@@ -98,6 +99,13 @@ def _encode_spans(spans: Sequence[tuple[int, int]]) -> str:
     return json.dumps([[start, end] for start, end in spans], separators=(",", ":"))
 
 
+def _read_subject(start: object, end: object) -> tuple[int, int] | None:
+    span = _stored_span(start, end)
+    if span is None:
+        return None
+    return _span(span, "subject")
+
+
 def _stored_span(start: object, end: object) -> tuple[int, int] | None:
     if start is None and end is None:
         return None
@@ -124,6 +132,7 @@ class StatementTables:
     def __init__(self, store: GraphStore):
         self.conn = store.conn
         self._kinds = statement_kinds()
+        self._subject_optional = frozenset(marking_rules()["subject_optional"])
         self._replacing = False
 
         def replace_ok() -> int:
@@ -192,12 +201,18 @@ class StatementTables:
                 "kind must be one of the kinds in the schema file: "
                 + ", ".join(self._kinds)
             )
+        if statement.subject is None:
+            if kind not in self._subject_optional:
+                raise ValueError("subject must be a non-empty span")
+            subject = None
+        else:
+            subject = _required_span(statement.subject, "subject")
         return Statement(
             source_id=source,
             item_id=item,
             unit=_required_span(statement.unit, "unit"),
             kind=kind,
-            subject=_required_span(statement.subject, "subject"),
+            subject=subject,
             condition=_optional_span(statement.condition, "condition"),
             required_behaviour=_optional_span(
                 statement.required_behaviour, "required_behaviour",
@@ -237,7 +252,7 @@ class StatementTables:
                     (
                         statement_id, source_id, item_id, n,
                         statement.unit[0], statement.unit[1], statement.kind,
-                        statement.subject[0], statement.subject[1],
+                        *_ends(statement.subject),
                         *_ends(statement.condition),
                         *_ends(statement.required_behaviour),
                         _encode_spans(statement.values_and_timing),
@@ -260,7 +275,7 @@ class StatementTables:
             item_id=row["item_id"],
             unit=_span((row["unit_start"], row["unit_end"]), "unit"),
             kind=row["kind"],
-            subject=_span((row["subject_start"], row["subject_end"]), "subject"),
+            subject=_read_subject(row["subject_start"], row["subject_end"]),
             condition=_stored_span(row["condition_start"], row["condition_end"]),
             required_behaviour=_stored_span(
                 row["required_behaviour_start"], row["required_behaviour_end"],

@@ -1,0 +1,10 @@
+{
+  "subject_optional": ["informative", "other"],
+  "required_behaviour_required": [
+    "requirement",
+    "error_handling",
+    "state_or_mode_rule",
+    "configuration_constraint"
+  ],
+  "no_statement_kind": "other"
+}
