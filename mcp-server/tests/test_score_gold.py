@@ -397,6 +397,30 @@ def test_unclear_and_broken_statements_excluded_and_counted(tmp_path):
     assert "statements_broken=1\n" in report
 
 
+def test_prediction_on_excluded_statement_is_dropped_and_counted(tmp_path):
+    """A prediction on an excluded unclear gold row is dropped before matching.
+
+    One unclear gold row and one prediction on that (source_id, item_id):
+    nothing remains to score, so precision is n/a, and the drop is counted.
+    """
+    folder = tmp_path / "packet"
+    _write_csv(folder / "open" / "statements.csv", _STATEMENT_COLUMNS, [
+        _statement("doc", "art-1", "unclear", "the ministry"),
+    ])
+    result = score_gold.score(folder, {"statements": [{
+        "source_id": "doc",
+        "item_id": "art-1",
+        "kind": "obligation",
+        "subject": "the ministry",
+    }]})
+    assert result["statements_n_pred"] == 0
+    assert result["statements_precision"] == "n/a"
+    assert result["statements_pred_on_excluded"] == 1
+    report = score_gold.format_report(result)
+    assert "statements_precision=n/a [n/a, n/a] n_gold=0 n_pred=0 n_docs=0" in report
+    assert "statements_pred_on_excluded=1\n" in report
+
+
 def test_question_hit_rate(tmp_path):
     """A hit cites every where entry. Unanswerable questions hit only on a decline.
 

@@ -6,6 +6,8 @@ only. The two are never combined. Sheets are UTF-8 with a header.
 Statement rows match on source_id, item_id, kind, and subject (B3). A gold
 statement whose kind is ``unclear`` or ``broken`` is excluded from the
 statement metrics and counted (``statements_unclear``, ``statements_broken``).
+A prediction whose ``source_id`` and ``item_id`` equal one of those rows is
+dropped before matching and counted (``statements_pred_on_excluded``).
 Pair labels collapse to same / not-same, and ``unclear`` rows are excluded
 from the pair metric. Question hits require every ``where`` entry, except
 unanswerable questions, which hit only when the system declines.
@@ -201,18 +203,22 @@ def _match_statements(gold: list[dict], predicted: list[dict]) -> tuple[int, int
 def _score_statements(rows: list[dict], predicted: list[dict]) -> dict:
     # ``unclear`` and ``broken`` are not misses. Drop them before matching,
     # and count them, the same way an unclear pair is left out of pair F1.
+    # A prediction on one of those rows is not a false positive. Drop it
+    # before matching too, and count it on its own.
     unclear = 0
     broken = 0
     kept = []
+    excluded = set()
     for row in rows:
         kind = _norm(row.get("kind") or "")
         if kind == "unclear":
             unclear += 1
-            continue
-        if kind == "broken":
+        elif kind == "broken":
             broken += 1
+        else:
+            kept.append(row)
             continue
-        kept.append(row)
+        excluded.add((str(row.get("source_id") or ""), str(row.get("item_id") or "")))
     gold = [{
         "source_id": row.get("source_id") or "",
         "item_id": str(row.get("item_id") or ""),
@@ -225,6 +231,14 @@ def _score_statements(rows: list[dict], predicted: list[dict]) -> dict:
         "kind": row.get("kind") or "",
         "subject": row.get("subject") or "",
     } for row in predicted]
+    pred_on_excluded = 0
+    judged = []
+    for row in preds:
+        if (row["source_id"], row["item_id"]) in excluded:
+            pred_on_excluded += 1
+            continue
+        judged.append(row)
+    preds = judged
     gold_by = defaultdict(list)
     pred_by = defaultdict(list)
     for row in gold:
@@ -268,6 +282,7 @@ def _score_statements(rows: list[dict], predicted: list[dict]) -> dict:
         "statements_n_docs": n_docs,
         "statements_unclear": unclear,
         "statements_broken": broken,
+        "statements_pred_on_excluded": pred_on_excluded,
     }
 
 
@@ -647,6 +662,7 @@ def format_report(result: dict) -> str:
     lines.append(f"pairs_unclear={result['pairs_unclear']}")
     lines.append(f"statements_unclear={result['statements_unclear']}")
     lines.append(f"statements_broken={result['statements_broken']}")
+    lines.append(f"statements_pred_on_excluded={result['statements_pred_on_excluded']}")
     needs_counts = (
         f"n_requirements={result['testpoints_n_requirements']} "
         f"n_needed={result['testpoints_n_needed']} "
