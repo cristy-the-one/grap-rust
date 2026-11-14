@@ -1,5 +1,6 @@
 """GS-01 split a filled reviewer packet into open and sealed CSVs.
 
+GS-02: a row whose only filled cell is packet_id is an unused prepared row.
 Synthetic workbooks only. Cell text is invented. Nothing is written under a
 held directory, and the real reviewer sheets are not read here.
 """
@@ -159,6 +160,15 @@ def _question(packet_id, source_id, where):
     ]
 
 
+def _question_cells(packet_id, source_id="", note=""):
+    """One question row. Empty cells stay empty. source_id defaults to blank."""
+    row = [""] * len(_QUESTION_HEADERS)
+    row[0] = packet_id
+    row[1] = source_id
+    row[-1] = note
+    return row
+
+
 def write_workbooks(directory, statements, pairs, questions):
     write_xlsx(directory / "statements.xlsx", [_STATEMENT_HEADERS, *statements])
     write_xlsx(directory / "pairs.xlsx", [_PAIR_COLUMNS, *pairs])
@@ -257,13 +267,17 @@ def test_routes_open_and_sealed_by_source_id(tmp_path, capsys):
 
     expected = "\n".join([
         "statements open_rows=2/3 n=2 documents=1 sealed_rows=1/3 n=1 documents=1 "
-        "rows=3 n=3 documents=2 refused=0/3 n=0 documents=0",
+        "rows=3 n=3 documents=2 refused=0/3 n=0 documents=0 "
+        "unused_rows=0/3 n=0 documents=0",
         "pairs open_rows=1/2 n=1 documents=1 sealed_rows=1/2 n=1 documents=1 "
-        "rows=2 n=2 documents=2 refused=0/2 n=0 documents=0",
+        "rows=2 n=2 documents=2 refused=0/2 n=0 documents=0 "
+        "unused_rows=0/2 n=0 documents=0",
         "questions open_rows=1/2 n=1 documents=1 sealed_rows=1/2 n=1 documents=1 "
-        "rows=2 n=2 documents=2 refused=0/2 n=0 documents=0",
+        "rows=2 n=2 documents=2 refused=0/2 n=0 documents=0 "
+        "unused_rows=0/2 n=0 documents=0",
         "total open_rows=4/7 n=4 documents=2 sealed_rows=3/7 n=3 documents=1 "
-        "rows=7 n=7 documents=3 refused=0/7 n=0 documents=0",
+        "rows=7 n=7 documents=3 refused=0/7 n=0 documents=0 "
+        "unused_rows=0/7 n=0 documents=0",
         "manifest sealed_ids=1/2 n=1 documents=2",
         "pair_manifest sealed_ids=1/3 n=1 documents=3",
         "routing sealed_ids=1/3 n=1 documents=3",
@@ -320,13 +334,14 @@ def test_source_id_in_neither_list_writes_nothing(tmp_path, capsys):
     assert not out.exists()
     expected = "\n".join([
         "statements open_rows=n/a sealed_rows=n/a rows=2 n=2 documents=2 "
-        "refused=1/2 n=1 documents=1",
+        "refused=1/2 n=1 documents=1 refused_sheet_rows=3 "
+        "unused_rows=0/2 n=0 documents=0",
         "pairs open_rows=n/a sealed_rows=n/a rows=1 n=1 documents=1 "
-        "refused=0/1 n=0 documents=0",
+        "refused=0/1 n=0 documents=0 unused_rows=0/1 n=0 documents=0",
         "questions open_rows=n/a sealed_rows=n/a rows=1 n=1 documents=1 "
-        "refused=0/1 n=0 documents=0",
+        "refused=0/1 n=0 documents=0 unused_rows=0/1 n=0 documents=0",
         "total open_rows=n/a sealed_rows=n/a rows=4 n=4 documents=3 "
-        "refused=1/4 n=1 documents=1",
+        "refused=1/4 n=1 documents=1 unused_rows=0/4 n=0 documents=0",
         "manifest sealed_ids=1/2 n=1 documents=2",
         "pair_manifest sealed_ids=1/3 n=1 documents=3",
         "routing sealed_ids=1/3 n=1 documents=3",
@@ -346,6 +361,136 @@ def test_source_id_in_neither_list_writes_nothing(tmp_path, capsys):
     assert UNKNOWN_SOURCE not in process_text
     assert "invented-answer" not in process_text
     assert "Traceback" not in process_text
+    assert not out.exists()
+
+
+def test_unused_question_rows_are_skipped(tmp_path, capsys):
+    """Three filled question rows and two unused ones. The split succeeds.
+
+    An unused row has packet_id and nothing else. It is not written.
+    unused_rows carries the rows seen on that sheet as its denominator.
+    """
+    unused_a = "pkt-unused-aa"
+    unused_b = "pkt-unused-bb"
+    packet = tmp_path / "packet"
+    packet.mkdir()
+    write_packet_manifests(packet)
+    write_workbooks(
+        packet,
+        [_statement("src-open", "item-1", "obligation")],
+        [_pair("pair-0000", "src-open", "src-open")],
+        [
+            _question("q-fill-1", "src-open", "src-open#item-1"),
+            _question_cells(unused_a),
+            _question("q-fill-2", "src-open", "src-open#item-2"),
+            _question_cells(unused_b),
+            _question("q-fill-3", "src-open", "src-open#item-3"),
+        ],
+    )
+    out = tmp_path / "split-out"
+    splitter.main(argv_for(packet, out))
+    stdout, stderr, combined = streams_of(capsys)
+    assert unused_a not in combined
+    assert unused_b not in combined
+    assert CANARY not in combined
+    assert "invented-answer" not in combined
+    assert stderr == ""
+    expected = "\n".join([
+        "statements open_rows=1/1 n=1 documents=1 sealed_rows=0/1 n=0 documents=0 "
+        "rows=1 n=1 documents=1 refused=0/1 n=0 documents=0 "
+        "unused_rows=0/1 n=0 documents=0",
+        "pairs open_rows=1/1 n=1 documents=1 sealed_rows=0/1 n=0 documents=0 "
+        "rows=1 n=1 documents=1 refused=0/1 n=0 documents=0 "
+        "unused_rows=0/1 n=0 documents=0",
+        "questions open_rows=3/3 n=3 documents=1 sealed_rows=0/3 n=0 documents=0 "
+        "rows=3 n=3 documents=1 refused=0/3 n=0 documents=0 "
+        "unused_rows=2/5 n=2 documents=0",
+        "total open_rows=5/5 n=5 documents=1 sealed_rows=0/5 n=0 documents=0 "
+        "rows=5 n=5 documents=1 refused=0/5 n=0 documents=0 "
+        "unused_rows=2/7 n=2 documents=0",
+        "manifest sealed_ids=1/2 n=1 documents=2",
+        "pair_manifest sealed_ids=1/3 n=1 documents=3",
+        "routing sealed_ids=1/3 n=1 documents=3",
+    ]) + "\n"
+    assert stdout == expected
+    _header, open_questions = read_csv(out / "open" / "questions.csv")
+    _header, sealed_questions = read_csv(out / "sealed" / "questions.csv")
+    assert [row["packet_id"] for row in open_questions] == [
+        "q-fill-1", "q-fill-2", "q-fill-3",
+    ]
+    assert sealed_questions == []
+    written = "\n".join(row["packet_id"] for row in open_questions)
+    assert unused_a not in written
+    assert unused_b not in written
+
+
+def test_other_cell_without_source_id_refuses_with_sheet_row(tmp_path, capsys):
+    """packet_id plus one other filled cell, and no source_id, still refuses.
+
+    The refusal prints that row's sheet row number and no cell text.
+    The unused neighbour is skipped, with the rows seen as the denominator.
+    """
+    bare_packet = "pkt-nosrc-qq"
+    bare_note = "NOTETEXT9q"
+    unused_packet = "pkt-unused-cc"
+    packet = tmp_path / "packet"
+    packet.mkdir()
+    write_packet_manifests(packet)
+    write_workbooks(
+        packet,
+        [_statement("src-open", "item-1", "obligation")],
+        [_pair("pair-0000", "src-open", "src-open")],
+        [
+            _question("q-ok-1", "src-open", "src-open#item-1"),
+            _question_cells(unused_packet),
+            _question("q-ok-2", "src-open", "src-open#item-2"),
+            _question_cells(bare_packet, note=bare_note),
+        ],
+    )
+    out = tmp_path / "split-out"
+    with pytest.raises(SystemExit) as caught:
+        splitter.main(argv_for(packet, out))
+    assert caught.value.code == 1
+    stdout, stderr, combined = streams_of(capsys)
+    assert bare_packet not in combined
+    assert bare_note not in combined
+    assert unused_packet not in combined
+    assert CANARY not in combined
+    assert "invented-answer" not in combined
+    assert "Traceback" not in combined
+    assert not out.exists()
+    expected = "\n".join([
+        "statements open_rows=n/a sealed_rows=n/a rows=1 n=1 documents=1 "
+        "refused=0/1 n=0 documents=0 unused_rows=0/1 n=0 documents=0",
+        "pairs open_rows=n/a sealed_rows=n/a rows=1 n=1 documents=1 "
+        "refused=0/1 n=0 documents=0 unused_rows=0/1 n=0 documents=0",
+        "questions open_rows=n/a sealed_rows=n/a rows=3 n=3 documents=2 "
+        "refused=1/3 n=1 documents=1 refused_sheet_rows=5 "
+        "unused_rows=1/4 n=1 documents=0",
+        "total open_rows=n/a sealed_rows=n/a rows=5 n=5 documents=2 "
+        "refused=1/5 n=1 documents=1 unused_rows=1/6 n=1 documents=0",
+        "manifest sealed_ids=1/2 n=1 documents=2",
+        "pair_manifest sealed_ids=1/3 n=1 documents=3",
+        "routing sealed_ids=1/3 n=1 documents=3",
+    ]) + "\n"
+    assert stdout == expected
+    assert stderr == ""
+
+    completed = subprocess.run(
+        [sys.executable, str(_SCRIPTS / "split_reviewer_packet.py"), *argv_for(packet, out)],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert completed.returncode == 1
+    process_text = completed.stdout + completed.stderr
+    assert bare_packet not in process_text
+    assert bare_note not in process_text
+    assert unused_packet not in process_text
+    assert CANARY not in process_text
+    assert "invented-answer" not in process_text
+    assert "Traceback" not in process_text
+    assert "refused_sheet_rows=5" in completed.stdout
     assert not out.exists()
 
 

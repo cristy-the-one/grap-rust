@@ -9,6 +9,12 @@ is not sealed is written under ``open/``. A question follows that same
 ``source_id`` rule. A ``source_id`` in neither list refuses the run: the
 counts are printed and no CSV is written.
 
+A row whose only non-empty cell is ``packet_id`` is an unused prepared row.
+It is skipped. Each sheet prints ``unused_rows`` with the rows seen on that
+sheet (every non-blank data row) as the denominator. A row with any other
+cell filled and no ``source_id`` refuses the run. On refusal the sheet row
+numbers of the refused rows are printed, numbers only.
+
 Every count is printed with ``n`` and the number of documents behind it.
 A figure with nothing to measure is printed as ``n/a``. Cell text is never
 printed or logged.
@@ -46,6 +52,12 @@ def _n_docs(rows: list[dict[str, str]]) -> int:
     return len({row["source_id"].strip() for row in rows})
 
 
+def _only_packet_id(row: dict[str, str]) -> bool:
+    """True when packet_id is the only non-empty cell."""
+    filled = [name for name, value in row.items() if value != ""]
+    return filled == ["packet_id"]
+
+
 def _load_ids(path: Path, label: str) -> tuple[set[str], set[str]]:
     """Return ``(sealed_ids, known_ids)`` for one manifest. Known includes sealed."""
     try:
@@ -74,7 +86,9 @@ def _load_ids(path: Path, label: str) -> tuple[set[str], set[str]]:
     return sealed, known
 
 
-def _read_workbook(path: Path, label: str) -> tuple[list[str], list[dict[str, str]]]:
+def _read_workbook(
+    path: Path, label: str,
+) -> tuple[list[str], list[dict[str, str]], list[int], int, int]:
     try:
         workbook = openpyxl.load_workbook(path, read_only=True, data_only=False)
     except Exception as exc:
@@ -84,10 +98,13 @@ def _read_workbook(path: Path, label: str) -> tuple[list[str], list[dict[str, st
             if not workbook.worksheets:
                 raise RuntimeError(f"{label}: workbook has no sheet")
             sheet = workbook.worksheets[0]
-            table = [
-                [_cell_text(value) for value in raw]
-                for raw in sheet.iter_rows(values_only=True)
-            ]
+            table = []
+            origin = []
+            for raw in sheet.iter_rows():
+                if not raw:
+                    continue
+                origin.append(raw[0].row)
+                table.append([_cell_text(cell.value) for cell in raw])
         except RuntimeError:
             raise
         except Exception as exc:
@@ -112,7 +129,10 @@ def _read_workbook(path: Path, label: str) -> tuple[list[str], list[dict[str, st
     if "source_id" not in columns:
         raise RuntimeError(f"{label}: no source_id column")
     rows = []
-    for raw in table[1:]:
+    kept_origin = []
+    unused = 0
+    seen = 0
+    for sheet_row, raw in zip(origin[1:], table[1:]):
         cells = list(raw)
         extra = cells[width:]
         if any(cell != "" for cell in extra):
@@ -122,8 +142,14 @@ def _read_workbook(path: Path, label: str) -> tuple[list[str], list[dict[str, st
             cells.extend("" for _ in range(width - len(cells)))
         if all(cell == "" for cell in cells):
             continue
-        rows.append(dict(zip(columns, cells)))
-    return columns, rows
+        seen += 1
+        record = dict(zip(columns, cells))
+        if _only_packet_id(record):
+            unused += 1
+            continue
+        rows.append(record)
+        kept_origin.append(sheet_row)
+    return columns, rows, kept_origin, unused, seen
 
 
 def _side(source_id: str, sealed_ids: set[str], known_ids: set[str]) -> str:
@@ -148,7 +174,17 @@ def _fraction(name: str, count: int, total: int, docs: int, measured: bool) -> s
     return f"{name}={count}/{total} n={count} documents={docs}"
 
 
-def _sheet_line(name: str, rows: list[dict[str, str]], grouped, wrote: bool) -> str:
+def _refused_sheet_rows(rows, numbers, sealed_ids, known_ids) -> list[int]:
+    """Sheet row numbers of rows whose source_id is in neither list."""
+    found = []
+    for row, number in zip(rows, numbers):
+        if _side(row["source_id"], sealed_ids, known_ids) == "neither":
+            found.append(number)
+    return found
+
+
+def _sheet_line(name: str, rows: list[dict[str, str]], grouped, wrote: bool,
+                unused: int, seen: int, refused_numbers: list[int]) -> str:
     total = len(rows)
     refused = grouped["neither"]
     # Open and sealed counts describe CSVs that were written. A refusal, or a
@@ -161,6 +197,11 @@ def _sheet_line(name: str, rows: list[dict[str, str]], grouped, wrote: bool) -> 
         f"rows={total} n={total} documents={_n_docs(rows)}",
         _fraction("refused", len(refused), total, _n_docs(refused), total > 0),
     ]
+    if refused_numbers:
+        parts.append("refused_sheet_rows=" + ",".join(str(number) for number in refused_numbers))
+    # An unused row has no source_id, so no document is behind the count.
+    # The denominator is the non-blank data rows seen on the sheet.
+    parts.append(_fraction("unused_rows", unused, seen, 0, seen > 0))
     return " ".join(parts)
 
 
@@ -174,12 +215,25 @@ def _id_line(label: str, sealed_ids: set[str], known_ids: set[str]) -> str:
 
 def _report(loaded, sealed_ids, known_ids, manifest_ids, pair_ids, wrote: bool) -> str:
     lines = [
-        _sheet_line(label, rows, grouped, wrote)
-        for label, _columns, rows, grouped in loaded
+        _sheet_line(
+            label, rows, grouped, wrote, unused, seen,
+            _refused_sheet_rows(rows, numbers, sealed_ids, known_ids),
+        )
+        for label, _columns, rows, grouped, unused, seen, numbers in loaded
     ]
-    all_rows = [row for _label, _columns, rows, _grouped in loaded for row in rows]
+    all_rows = [
+        row
+        for _label, _columns, rows, _grouped, _unused, _seen, _numbers in loaded
+        for row in rows
+    ]
     combined = _group(all_rows, sealed_ids, known_ids)
-    lines.append(_sheet_line("total", all_rows, combined, wrote))
+    # Sheet row numbers are per sheet. The total line does not repeat them.
+    lines.append(_sheet_line(
+        "total", all_rows, combined, wrote,
+        sum(unused for _l, _c, _r, _g, unused, _s, _n in loaded),
+        sum(seen for _l, _c, _r, _g, _u, seen, _n in loaded),
+        [],
+    ))
     lines.append(_id_line("manifest", manifest_ids[0], manifest_ids[1]))
     lines.append(_id_line("pair_manifest", pair_ids[0], pair_ids[1]))
     lines.append(_id_line("routing", sealed_ids, known_ids))
@@ -209,14 +263,20 @@ def split(statements: Path, pairs: Path, questions: Path, manifest: Path,
         ("pairs", pairs),
         ("questions", questions),
     ):
-        columns, rows = _read_workbook(path, label)
-        loaded.append((label, columns, rows, _group(rows, sealed_ids, known_ids)))
-    refused = any(grouped["neither"] for _label, _columns, _rows, grouped in loaded)
+        columns, rows, numbers, unused, seen = _read_workbook(path, label)
+        loaded.append((
+            label, columns, rows, _group(rows, sealed_ids, known_ids),
+            unused, seen, numbers,
+        ))
+    refused = any(
+        grouped["neither"]
+        for _label, _columns, _rows, grouped, _unused, _seen, _numbers in loaded
+    )
     if refused:
         sys.stdout.write(_report(loaded, sealed_ids, known_ids, manifest_ids, pair_ids, wrote=False))
         raise SystemExit(1)
     destination = Path(out)
-    for label, columns, _rows, grouped in loaded:
+    for label, columns, _rows, grouped, _unused, _seen, _numbers in loaded:
         _write_csv(destination / "open" / f"{label}.csv", columns, grouped["open"])
         _write_csv(destination / "sealed" / f"{label}.csv", columns, grouped["sealed"])
     sys.stdout.write(_report(loaded, sealed_ids, known_ids, manifest_ids, pair_ids, wrote=True))
