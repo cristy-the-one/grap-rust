@@ -612,3 +612,78 @@ def test_a_step_that_is_not_a_mapping_is_refused():
         """
     )
     assert [p.code for p in refused.problems] == ["invalid_step"]
+
+
+@pytest.mark.parametrize(
+    ("body", "ref"),
+    [
+        (
+            """
+            steps:
+              - id: check
+                operation: select_requirements
+                inputs:
+                  scope: all
+                guards:
+                  - {ref: ghost.outputs.requirements, op: eq, value: 1}
+            """,
+            "ghost.outputs.requirements",
+        ),
+        (
+            """
+            steps:
+              - id: check
+                operation: select_requirements
+                inputs:
+                  scope: all
+                guards:
+                  - {ref: later.outputs.requirements, op: not_empty, value: null}
+              - id: later
+                operation: select_requirements
+                inputs:
+                  scope: all
+            """,
+            "later.outputs.requirements",
+        ),
+    ],
+)
+def test_guard_ref_no_earlier_step_produces_is_refused(body, ref):
+    """P-10a: a guard ref naming an output no earlier step produces is refused.
+
+    A ref to an output of a later step is not produced yet, so it is refused too.
+    """
+    refused = _refuse(body)
+    assert [p.code for p in refused.problems] == ["guard_ref_not_produced"]
+    assert ref in refused.problems[0].message
+    assert refused.problems[0].step_id == "check"
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        """
+        steps:
+          - operation: select_requirements
+            inputs:
+              scope: all
+        """,
+        """
+        steps:
+          - id: ""
+            operation: select_requirements
+            inputs:
+              scope: all
+        """,
+    ],
+)
+def test_missing_or_empty_step_id_is_refused(body):
+    """P-10a: a step with a missing or empty id is refused."""
+    refused = _refuse(body)
+    assert [p.code for p in refused.problems] == ["missing_step_id"]
+
+
+def test_yaml_syntax_error_is_procedure_refused():
+    """P-10a: a YAML syntax error is ProcedureRefused, code invalid_yaml."""
+    with pytest.raises(ProcedureRefused) as caught:
+        load_procedure("steps: [\n")
+    assert [p.code for p in caught.value.problems] == ["invalid_yaml"]
