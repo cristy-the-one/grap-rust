@@ -1,5 +1,5 @@
 {
-  "source": "spec-statements.md §4. File order is precedence: the first matching row wins. A marked block wins over every later row.",
+  "source": "spec-statements.md §4, Amendment 1. File order is precedence: the first matching row wins. A marked block wins over every later row. The shall and must rows give no kind; they set normative.",
   "item_kinds": ["requirement", "text"],
   "skip_model": ["other", "informative"],
   "modals": ["shall", "must", "may", "should", "can", "could", "will", "would", "might"],
@@ -54,7 +54,8 @@
     },
     {
       "id": "shall",
-      "kind": "requirement",
+      "kind": null,
+      "normative": true,
       "when": "modal-outside-block",
       "pattern": "shall, outside a note or rationale",
       "regex": "(?i)\\bshall\\b",
@@ -63,7 +64,8 @@
     },
     {
       "id": "must",
-      "kind": "requirement",
+      "kind": null,
+      "normative": true,
       "when": "modal-outside-block",
       "pattern": "must, outside a note or rationale",
       "regex": "(?i)\\bmust\\b",
@@ -84,7 +86,7 @@
       "kind": "definition",
       "when": "regex",
       "pattern": "X means …",
-      "regex": "(?i)\\bmeans\\b",
+      "regex": "(?i)(?<!by )\\bmeans\\b",
       "match": "ECU means electronic control unit.",
       "non_match": "The module shall start."
     },
