@@ -457,7 +457,9 @@ def _extraction_events(corpus: str, model: Optional[str], sim: float,
     base_provider = llm.get_provider(model=model or None)
     provider = base_provider
     rule_contexts = {}
-    chunks = pipeline.read_chunks(corpus, max_files=max_files, rule_contexts=rule_contexts)
+    document_contexts = {}
+    chunks = pipeline.read_chunks(corpus, max_files=max_files, rule_contexts=rule_contexts,
+                                  document_contexts=document_contexts)
     yield {"type": "extract_begin", "chunks": len(chunks),
            "provider": provider.name, "model": getattr(provider, "model", None)}
 
@@ -471,17 +473,16 @@ def _extraction_events(corpus: str, model: Optional[str], sim: float,
         yield {"type": "chunk_start", "i": i + 1, "n": len(chunks), "source": src}
         parts: list[str] = []
         ntok = 0
+        user_prompt = extract.build_user_prompt(text, rule_context, document_contexts.get(src))
         try:
             if can_stream:
-                for delta in provider.stream(extract.system_prompt(rule_context, provider),
-                                             extract.build_user_prompt(text, rule_context)):
+                for delta in provider.stream(extract.system_prompt(rule_context, provider), user_prompt):
                     parts.append(delta)
                     ntok += 1
                     if ntok % 6 == 0:
                         yield {"type": "token", "i": i + 1, "n": len(chunks), "tokens": ntok}
             else:
-                parts.append(provider.complete(extract.system_prompt(rule_context, provider),
-                                               extract.build_user_prompt(text, rule_context)))
+                parts.append(provider.complete(extract.system_prompt(rule_context, provider), user_prompt))
         except Exception as exc:
             failures.append({"source": src, "reason": "provider"})
             yield {"type": "chunk_error", "i": i + 1, "message": str(exc)}

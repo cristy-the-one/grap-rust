@@ -27,7 +27,7 @@ logger = logging.getLogger("grap-mcp.kee")
 
 def _extract_windows(wg, chunks: List[Tuple[str, str]], provider, concurrency: int,
                      on_chunk: Optional[Callable[[int, str], None]] = None,
-                     rule_contexts=None,
+                     rule_contexts=None, document_contexts=None,
                      ) -> Iterator[Tuple[List[Tuple[str, str]],
                                          List[Tuple[Optional[dict], Optional[str]]]]]:
     """Yield (window, results) over `chunks` in windows of `concurrency`.
@@ -46,7 +46,8 @@ def _extract_windows(wg, chunks: List[Tuple[str, str]], provider, concurrency: i
             if on_chunk is not None:
                 on_chunk(i, source)
             ctx = wg.context_for(text)
-            result = extract.extract_chunk(provider, source, text, ctx, (rule_contexts or {}).get(source))
+            result = extract.extract_chunk(provider, source, text, ctx, (rule_contexts or {}).get(source),
+                                           (document_contexts or {}).get(source))
             wg.prefetch_extraction([result[0]], [t for _, t in chunks[i + 1:i + 2]])
             yield [(source, text)], [result]
         return
@@ -59,7 +60,8 @@ def _extract_windows(wg, chunks: List[Tuple[str, str]], provider, concurrency: i
             # The first window of a reopened graph may not have cached queries.
             wg.prefetch_extraction([], [text for _, text in window])
             ctxs = [wg.context_for(text) for (_source, text) in window]
-            futs = [pool.submit(extract.extract_chunk, provider, source, text, ctx, (rule_contexts or {}).get(source))
+            futs = [pool.submit(extract.extract_chunk, provider, source, text, ctx, (rule_contexts or {}).get(source),
+                                (document_contexts or {}).get(source))
                     for (source, text), ctx in zip(window, ctxs)]
             results = [f.result() for f in futs]
             wg.prefetch_extraction([frag for frag, _ in results],
@@ -71,7 +73,7 @@ def graph_extract_ontology(chunks: Sequence[Tuple[str, str]], provider, embedder
                            sim: float = 0.86, version: str = "kee-candidate",
                            relook_ratio: float = 0.2, context_cap: int = 8,
                            workdir: Optional[str] = None,
-                           concurrency: int = 1, rule_contexts=None) -> Dict[str, Any]:
+                           concurrency: int = 1, rule_contexts=None, document_contexts=None) -> Dict[str, Any]:
     budget = math.ceil(relook_ratio * len(chunks)) if chunks else 0
     relooks = 0
     quality = QualityMonitor(class_vocab=extract.CLASS_VOCAB)
@@ -79,7 +81,8 @@ def graph_extract_ontology(chunks: Sequence[Tuple[str, str]], provider, embedder
 
     with WorkingGraph(embedder, merge_threshold=sim, context_cap=context_cap,
                       workdir=workdir) as wg:
-        for window, results in _extract_windows(wg, list(chunks), provider, concurrency, rule_contexts=rule_contexts):
+        for window, results in _extract_windows(wg, list(chunks), provider, concurrency,
+                                                rule_contexts=rule_contexts, document_contexts=document_contexts):
             for (source, text), (frag, reason) in zip(window, results):
                 if frag is None:
                     quality.record_failure(reason)
@@ -90,7 +93,8 @@ def graph_extract_ontology(chunks: Sequence[Tuple[str, str]], provider, embedder
                 if sig.warrants_relook() and relooks < budget:
                     relooks += 1
                     fctx = wg.focused_context(sig)
-                    frag2, _ = extract.extract_chunk(provider, source, text, fctx, (rule_contexts or {}).get(source))
+                    frag2, _ = extract.extract_chunk(provider, source, text, fctx, (rule_contexts or {}).get(source),
+                                                    (document_contexts or {}).get(source))
                     if frag2 is not None:
                         wg.replace_fragment(frag2, source)
 
@@ -161,14 +165,23 @@ def extend_graph_ontology(workdir: str, docs_path: str, provider, embedder, *,
         _t = time.time()
         read_stats: Dict[str, Any] = {}
         rule_contexts = {}
+        document_contexts = {}
         chunks = read_chunks(docs_path, max_files=max_files, chunk_chars=chunk_chars,
-                             stats=read_stats, chunk_strategy=selected_strategy, rule_contexts=rule_contexts)
+                             stats=read_stats, chunk_strategy=selected_strategy, rule_contexts=rule_contexts,
+                             document_contexts=document_contexts)
         skipped_ids = set(read_stats.get("tabular_skipped_ids") or [])
         current = {src: text for (src, text) in chunks}
         # A rule can extend past its entity chunk. Its source revision is part of
         # invalidation, so an edited exception cannot leave an unchanged prefix current.
-        hashes = {src: incremental.chunk_hash(text + ("\0" + rule_contexts[src]["source_hash"]
-                  + "\0" + extract.PROMPT_VERSION if src in rule_contexts else "")) for src, text in current.items()}
+        hashes = {}
+        for src, text in current.items():
+            # Prompt version is part of the key for every chunk, so a version bump
+            # misses a stored extraction. Rule chunks also carry the source revision.
+            material = text
+            if src in rule_contexts:
+                material += "\0" + rule_contexts[src]["source_hash"]
+            material += "\0" + extract.PROMPT_VERSION
+            hashes[src] = incremental.chunk_hash(material)
         phase["read_chunks_s"] = round(time.time() - _t, 1)
         prev = dict(wg.manifest)
 
@@ -211,7 +224,8 @@ def extend_graph_ontology(workdir: str, docs_path: str, provider, embedder, *,
         for window, results in _extract_windows(
                 wg, to_extract, provider, concurrency,
                 on_chunk=lambda i, source: _emit(
-                    {"phase": "chunk", "i": i + 1, "n": n, "source": source}), rule_contexts=rule_contexts):
+                    {"phase": "chunk", "i": i + 1, "n": n, "source": source}),
+                rule_contexts=rule_contexts, document_contexts=document_contexts):
             for (source, text), (frag, reason) in zip(window, results):
                 if frag is None:
                     qm.record_failure(reason)
@@ -232,7 +246,8 @@ def extend_graph_ontology(workdir: str, docs_path: str, provider, embedder, *,
                 since_ckpt += 1
                 if sig.warrants_relook() and relooks < budget:
                     relooks += 1
-                    frag2, _ = extract.extract_chunk(provider, source, text, wg.focused_context(sig), rule_contexts.get(source))
+                    frag2, _ = extract.extract_chunk(provider, source, text, wg.focused_context(sig),
+                                                    rule_contexts.get(source), document_contexts.get(source))
                     if frag2 is not None:
                         wg.replace_fragment(frag2, source)
             # Durability checkpoint. Without this the whole run lives in memory

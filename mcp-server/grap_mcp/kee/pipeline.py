@@ -24,7 +24,8 @@ logger = logging.getLogger("grap-mcp.kee")
 
 def read_chunks(root: str, max_files: Optional[int] = None,
                 chunk_chars: int = 800,
-                stats: Optional[dict] = None, chunk_strategy: str = "legacy", rule_contexts=None) -> List[Tuple[str, str]]:
+                stats: Optional[dict] = None, chunk_strategy: str = "legacy", rule_contexts=None,
+                document_contexts=None) -> List[Tuple[str, str]]:
     """Walk .md/.txt/.json under `root` → [(source_label, chunk_text), ...].
 
     JSON files are read via the law-aware/generic extractor. `max_files` caps how
@@ -53,13 +54,18 @@ def read_chunks(root: str, max_files: Optional[int] = None,
             raw = f.read_text(encoding="utf-8")
         except OSError:
             continue
+        explicit_title = ""
         if f.suffix.lower() == ".json":
             try:
-                text, label = _text_and_label_from_json(json.loads(raw), f.stem)
+                obj = json.loads(raw)
+                text, label = _text_and_label_from_json(obj, f.stem)
             except ValueError:
                 continue
+            if isinstance(obj, dict):
+                explicit_title = str(obj.get("titlu") or "").strip()
         else:
             text, label = raw, f.stem
+        title = extract.source_title(text, label, explicit_title or None) if document_contexts is not None else ""
         if label in source_files:
             raise ValueError(f"Duplicate extraction source label {label!r}: "
                              f"{source_files[label]} and {f}; use unique file stems or JSON ids")
@@ -85,6 +91,11 @@ def read_chunks(root: str, max_files: Optional[int] = None,
                 skipped_ids.append(f"{label}#{i}")
                 continue
             chunks.append((f"{label}#{i}", c))
+            if document_contexts is not None:
+                document_contexts[f"{label}#{i}"] = {
+                    "title": title,
+                    "heading_path": extract.heading_path(text, start),
+                }
             if rule_plan is not None:
                 rule_contexts[f"{label}#{i}"] = qualified.slice_plan(rule_plan, start, cursor)
     if skipped_ids:
@@ -113,12 +124,15 @@ def extract_ontology(docs_path: str, provider, embedder, sim: float = 0.86,
     re-looks). `graph_augmented=False` runs the legacy stateless path
     (per-chunk extract -> embedding reconcile)."""
     rule_contexts = {}
-    chunks = read_chunks(docs_path, max_files=max_files, chunk_chars=chunk_chars, chunk_strategy=chunk_strategy, rule_contexts=rule_contexts)
+    document_contexts = {}
+    chunks = read_chunks(docs_path, max_files=max_files, chunk_chars=chunk_chars, chunk_strategy=chunk_strategy,
+                         rule_contexts=rule_contexts, document_contexts=document_contexts)
     if graph_augmented:
         from .graph_extract import graph_extract_ontology
         return graph_extract_ontology(chunks, provider, embedder,
-                                      sim=sim, version=version, rule_contexts=rule_contexts)
-    fragments = extract.extract_fragments(chunks, provider, rule_contexts)
+                                      sim=sim, version=version, rule_contexts=rule_contexts,
+                                      document_contexts=document_contexts)
+    fragments = extract.extract_fragments(chunks, provider, rule_contexts, document_contexts)
     ontology = reconcile.reconcile(fragments, embedder, sim=sim, version=version)
     return {
         "ontology": ontology,
