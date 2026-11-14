@@ -199,8 +199,19 @@ def test_eight_questions_follow_the_section_9_paths(tmp_path):
         "network": "NET",
         "identifier": None,
     }]
-    assert signal_travel(kg, direct, result) == []
-    assert signal_travel(kg, sig2, result) == []
+    assert signal_travel(kg, direct, result) == [{
+        "pdu": None,
+        "frame": "FR",
+        "network": "NET",
+        "identifier": None,
+    }]
+    assert signal_travel(kg, sig2, result) == [{
+        "pdu": None,
+        "frame": None,
+        "network": None,
+        "identifier": None,
+        "last": "SIG2",
+    }]
 
     needs = question_needs(kg, req_a)
     assert {
@@ -252,7 +263,9 @@ def test_eight_questions_follow_the_section_9_paths(tmp_path):
     assert "q7 unverified=3 (n=5 requirements, documents=1)" in text
     assert "SIG frames=1 (n=6 signals, documents=1)" in text
     assert "pdu=PDU frame=FR identifier=n/a network=NET" in text
-    assert "SIG-DIRECT frames=0 (n=6 signals, documents=1)" in text
+    assert "SIG-DIRECT frames=1 (n=6 signals, documents=1)" in text
+    assert "pdu=n/a frame=FR identifier=n/a network=NET" in text
+    assert "last=SIG2" in text
 
 
 def test_question_3_on_the_arxml_fixture(tmp_path):
@@ -262,19 +275,93 @@ def test_question_3_on_the_arxml_fixture(tmp_path):
     )
     kg, result = _project(tmp_path, items)
     signal = _id(result, "Signal", "/ISignal/signal1")
-    assert signal_travel(kg, signal, result) == [{
-        "pdu": "/ISignalIPdu/message1",
-        "frame": "/CanFrame/Message1",
+    assert signal_travel(kg, signal, result) == [
+        {
+            "pdu": "/ContainerIPdu/OneToContainThemAll",
+            "frame": "/CanFrame/OneToContainThemAll",
+            "network": "/Cluster/Cluster0/Pch0",
+            "identifier": "102",
+        },
+        {
+            "pdu": "/ISignalIPdu/message1",
+            "frame": "/CanFrame/Message1",
+            "network": "/Cluster/Cluster0/Pch0",
+            "identifier": "5",
+        },
+    ]
+    hello = _id(result, "Signal", "/ISignal/Hello")
+    assert {
+        "pdu": "/MultiplexedIPdu/multiplexed_message",
+        "frame": "/CanFrame/MultiplexedMessage",
         "network": "/Cluster/Cluster0/Pch0",
-        "identifier": "5",
-    }]
+        "identifier": "4",
+    } in signal_travel(kg, hello, result)
+    carried = (
+        "/ISignal/Hello",
+        "/ISignal/World1",
+        "/ISignal/World2",
+        "/ISignal/MultiplexedStatic",
+        "/ISignal/MultiplexedStatic2",
+        "/ISignal/multiplexed_message_selector",
+    )
+    missing = [
+        native for native in carried
+        if not any(
+            row["frame"]
+            for row in signal_travel(kg, _id(result, "Signal", native), result)
+        )
+    ]
+    assert missing == []
     text = run_checks(kg, result)
     assert (
         "pdu=/ISignalIPdu/message1 frame=/CanFrame/Message1 "
         "identifier=5 network=/Cluster/Cluster0/Pch0"
     ) in text
+    assert (
+        "pdu=/MultiplexedIPdu/multiplexed_message frame=/CanFrame/MultiplexedMessage "
+        "identifier=4 network=/Cluster/Cluster0/Pch0"
+    ) in text
     assert "q1 n/a (n=0 requirements, documents=1)" in text
     assert "q7 n/a (n=0 requirements, documents=1)" in text
+
+
+def test_question_3_follows_nesting(tmp_path):
+    """Amendment 1: part_of walks any number of Pdu and group steps to a frame.
+
+    A signal that reaches no frame reports the last node, not an empty answer.
+    """
+    items = [
+        _item("SIG", [_link("part_of", "INNER")], attributes=_tag("I-SIGNAL")),
+        _item("MEM", [_link("part_of", "GRP")], attributes=_tag("I-SIGNAL")),
+        _item("GRP", [_link("part_of", "INNER")], attributes=_tag("I-SIGNAL-GROUP")),
+        _item("INNER", [_link("part_of", "OUTER")], attributes=_tag("I-SIGNAL-I-PDU")),
+        _item("OUTER", [_link("part_of", "FR")], attributes=_tag("MULTIPLEXED-I-PDU")),
+        _item("FR", [_link("transmitted_on", "NET")], attributes=_tag("CAN-FRAME")),
+        _item("NET", attributes=_tag("CAN-CLUSTER")),
+        _item("LONE", attributes=_tag("I-SIGNAL")),
+    ]
+    kg, result = _project(tmp_path, items)
+    reached = {
+        "pdu": "OUTER",
+        "frame": "FR",
+        "network": "NET",
+        "identifier": None,
+    }
+    assert signal_travel(kg, _id(result, "Signal", "SIG"), result) == [reached]
+    assert signal_travel(kg, _id(result, "Signal", "MEM"), result) == [reached]
+    assert signal_travel(kg, _id(result, "Signal", "LONE"), result) == [{
+        "pdu": None,
+        "frame": None,
+        "network": None,
+        "identifier": None,
+        "last": "LONE",
+    }]
+    text = run_checks(kg, result)
+    n_sig = sum(1 for node in result["nodes"] if node["type"] == "Signal")
+    assert f"SIG frames=1 (n={n_sig} signals, documents=1)" in text
+    assert "pdu=OUTER frame=FR identifier=n/a network=NET" in text
+    assert f"LONE frames=0 (n={n_sig} signals, documents=1)" in text
+    assert "last=LONE" in text
 
 
 def test_empty_graph_prints_na(tmp_path, capsys):
