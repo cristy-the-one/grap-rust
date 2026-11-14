@@ -345,6 +345,58 @@ def test_unclear_pairs_excluded_and_counted(tmp_path):
     assert result["pairs_f1_high"] == high
 
 
+def test_unclear_and_broken_statements_excluded_and_counted(tmp_path):
+    """Kind ``unclear`` and kind ``broken`` are not statement misses.
+
+    They leave the statement denominators and are counted on their own,
+    the same way an unclear pair is left out of pair F1.
+    """
+    folder = tmp_path / "packet"
+    _write_csv(folder / "open" / "statements.csv", _STATEMENT_COLUMNS, [
+        _statement("doc", "art-1", "unclear", "the ministry"),
+        _statement("doc", "art-2", "broken", "the registry"),
+    ])
+    result = score_gold.score(folder, {})
+    observed = {
+        "statements_n_gold": result["statements_n_gold"],
+        "statements_n_pred": result["statements_n_pred"],
+        "statements_n_docs": result["statements_n_docs"],
+        "statements_precision": result["statements_precision"],
+        "statements_precision_low": result["statements_precision_low"],
+        "statements_precision_high": result["statements_precision_high"],
+        "statements_recall": result["statements_recall"],
+        "statements_recall_low": result["statements_recall_low"],
+        "statements_recall_high": result["statements_recall_high"],
+        "statements_f1": result["statements_f1"],
+        "statements_f1_low": result["statements_f1_low"],
+        "statements_f1_high": result["statements_f1_high"],
+        "statements_unclear": result.get("statements_unclear"),
+        "statements_broken": result.get("statements_broken"),
+    }
+    assert observed == {
+        "statements_n_gold": 0,
+        "statements_n_pred": 0,
+        "statements_n_docs": 0,
+        "statements_precision": "n/a",
+        "statements_precision_low": "n/a",
+        "statements_precision_high": "n/a",
+        "statements_recall": "n/a",
+        "statements_recall_low": "n/a",
+        "statements_recall_high": "n/a",
+        "statements_f1": "n/a",
+        "statements_f1_low": "n/a",
+        "statements_f1_high": "n/a",
+        "statements_unclear": 1,
+        "statements_broken": 1,
+    }
+    report = score_gold.format_report(result)
+    assert "statements_precision=n/a [n/a, n/a] n_gold=0 n_pred=0 n_docs=0" in report
+    assert "statements_recall=n/a [n/a, n/a] n_gold=0 n_pred=0 n_docs=0" in report
+    assert "statements_f1=n/a [n/a, n/a] n_gold=0 n_pred=0 n_docs=0" in report
+    assert "statements_unclear=1\n" in report
+    assert "statements_broken=1\n" in report
+
+
 def test_question_hit_rate(tmp_path):
     """A hit cites every where entry. Unanswerable questions hit only on a decline.
 
