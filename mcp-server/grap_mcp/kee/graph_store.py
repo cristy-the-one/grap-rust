@@ -95,6 +95,18 @@ def _migrate_resolution_tables(c) -> None:
     apply_resolution_schema(c)
 
 
+def _migrate_statements_empty_subject(c) -> None:
+    """Allow an empty subject for the kinds that have none.
+
+    A store created before that change has NOT NULL subject columns. Rebuilding
+    is idempotent, so a run that finished the table and stopped before
+    ``user_version`` was bumped can be repeated.
+    """
+    from .statements.schema import apply_statements_schema
+
+    apply_statements_schema(c)
+
+
 def _migrate_statements_table(c) -> None:
     """Add the statements table (spec-statements.md §3).
 
@@ -158,6 +170,7 @@ _MIGRATIONS = [
     _migrate_edge_sources_include_relation,
     _migrate_resolution_tables,
     _migrate_statements_table,
+    _migrate_statements_empty_subject,
 ]
 
 SCHEMA_VERSION = len(_MIGRATIONS)

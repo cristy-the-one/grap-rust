@@ -210,3 +210,187 @@ def test_existing_store_migrates_to_the_statements_table(tmp_path):
     assert "statements" in names
     assert "statements" in names_again
     assert sorted(loaded.edges) == [(1, 0, "cites"), (1, 0, "uses")]
+
+
+# The statements table as ST-01 created it: subject columns are NOT NULL.
+_OLD_STATEMENTS = """
+CREATE TABLE statements (
+    statement_id TEXT PRIMARY KEY,
+    source_id TEXT NOT NULL,
+    item_id TEXT NOT NULL,
+    n INTEGER NOT NULL,
+    unit_start INTEGER NOT NULL,
+    unit_end INTEGER NOT NULL,
+    kind TEXT NOT NULL,
+    subject_start INTEGER NOT NULL,
+    subject_end INTEGER NOT NULL,
+    condition_start INTEGER,
+    condition_end INTEGER,
+    required_behaviour_start INTEGER,
+    required_behaviour_end INTEGER,
+    values_and_timing TEXT NOT NULL,
+    exception_start INTEGER,
+    exception_end INTEGER,
+    origin TEXT NOT NULL,
+    extractor TEXT NOT NULL,
+    CHECK (n >= 0),
+    CHECK (statement_id = source_id || '|' || item_id || '|' || n),
+    CHECK (unit_start >= 0 AND unit_end > unit_start),
+    CHECK (subject_start >= 0 AND subject_end > subject_start),
+    CHECK (origin IN ('rule', 'model')),
+    CHECK (json_valid(values_and_timing) AND json_type(values_and_timing) = 'array'),
+    UNIQUE (source_id, item_id, n)
+);
+"""
+
+
+def test_other_and_informative_store_an_empty_subject(tmp_path):
+    """§5: subject is required for every kind except other and informative.
+
+    Those two kinds have no subject. This card is the first that stores them.
+    """
+    from grap_mcp.kee.statements import StatementTables
+
+    kinds = _kinds()
+    optional = ("informative", "other")
+    assert [kind for kind in kinds if kind in optional] == list(optional)
+
+    path = str(tmp_path / "graph_store.db")
+    with GraphStore(path) as graph:
+        tables = StatementTables(graph)
+        for kind in optional:
+            tables.replace_item_statements("spec", kind, [
+                _statement(kind, item_id=kind, subject=None, required_behaviour=None),
+            ])
+            row = tables.statements_for_item("spec", kind)[0]
+            assert row.kind == kind
+            assert row.subject is None
+            assert row.statement_id == f"spec|{kind}|0"
+
+        for kind in kinds:
+            if kind in optional:
+                continue
+            with pytest.raises(ValueError, match="subject"):
+                tables.replace_item_statements("spec", "kept", [
+                    _statement(kind, item_id="kept", subject=None),
+                ])
+        assert tables.statements_for_item("spec", "kept") == []
+
+        with pytest.raises(sqlite3.IntegrityError):
+            graph.conn.execute(
+                """
+                INSERT INTO statements (
+                    statement_id, source_id, item_id, n,
+                    unit_start, unit_end, kind,
+                    subject_start, subject_end,
+                    condition_start, condition_end,
+                    required_behaviour_start, required_behaviour_end,
+                    values_and_timing,
+                    exception_start, exception_end,
+                    origin, extractor
+                ) VALUES (
+                    'spec|raw-req|0', 'spec', 'raw-req', 0,
+                    0, 8, ?,
+                    NULL, NULL,
+                    NULL, NULL,
+                    NULL, NULL,
+                    '[]',
+                    NULL, NULL,
+                    'rule', 'ruleset 1'
+                )
+                """,
+                (kinds[0],),
+            )
+        graph.conn.rollback()
+
+        graph.conn.execute(
+            """
+            INSERT INTO statements (
+                statement_id, source_id, item_id, n,
+                unit_start, unit_end, kind,
+                subject_start, subject_end,
+                condition_start, condition_end,
+                required_behaviour_start, required_behaviour_end,
+                values_and_timing,
+                exception_start, exception_end,
+                origin, extractor
+            ) VALUES (
+                'spec|raw-other|0', 'spec', 'raw-other', 0,
+                0, 8, 'other',
+                NULL, NULL,
+                NULL, NULL,
+                NULL, NULL,
+                '[]',
+                NULL, NULL,
+                'rule', 'ruleset 1'
+            )
+            """
+        )
+        graph.conn.commit()
+        assert tables.statement("spec|raw-other|0").subject is None
+        assert tables.statement("spec|raw-other|0").kind == "other"
+
+
+def test_an_old_statements_table_gains_an_empty_subject(tmp_path):
+    """A store created before empty subjects still accepts one after it opens."""
+    from grap_mcp.kee.graph_store import _MIGRATIONS, _migrate_statements_empty_subject
+    from grap_mcp.kee.statements import StatementTables
+
+    path = str(tmp_path / "graph_store.db")
+    state = GraphState(edges=[(1, 0, "uses")])
+    with GraphStore(path) as store:
+        store.save(state)
+        store.conn.execute("DROP TABLE statements")
+        store.conn.executescript(_OLD_STATEMENTS)
+        store.conn.execute(
+            """
+            INSERT INTO statements (
+                statement_id, source_id, item_id, n,
+                unit_start, unit_end, kind,
+                subject_start, subject_end,
+                condition_start, condition_end,
+                required_behaviour_start, required_behaviour_end,
+                values_and_timing,
+                exception_start, exception_end,
+                origin, extractor
+            ) VALUES (
+                'spec|spec#0|0', 'spec', 'spec#0', 0,
+                0, 8, 'requirement',
+                0, 4,
+                NULL, NULL,
+                NULL, NULL,
+                '[]',
+                NULL, NULL,
+                'rule', 'ruleset 1'
+            )
+            """
+        )
+        store.conn.execute(
+            "PRAGMA user_version = "
+            + str(_MIGRATIONS.index(_migrate_statements_empty_subject))
+        )
+        store.conn.commit()
+
+    with GraphStore(path) as store:
+        tables = StatementTables(store)
+        kept = tables.statement("spec|spec#0|0")
+        nullable = {
+            row["name"]: row["notnull"]
+            for row in store.conn.execute("PRAGMA table_info(statements)")
+        }
+        tables.replace_item_statements("spec", "spec#1", [
+            _statement("informative", item_id="spec#1", subject=None, required_behaviour=None),
+        ])
+        empty = tables.statements_for_item("spec", "spec#1")[0]
+        with pytest.raises(sqlite3.IntegrityError, match="cannot be updated"):
+            store.conn.execute(
+                "UPDATE statements SET extractor = ? WHERE statement_id = ?",
+                ("edited", "spec|spec#0|0"),
+            )
+        store.conn.rollback()
+        loaded = store.load()
+
+    assert kept is not None and kept.subject == (0, 4) and kept.kind == "requirement"
+    assert nullable["subject_start"] == 0 and nullable["subject_end"] == 0
+    assert empty.kind == "informative" and empty.subject is None
+    assert sorted(loaded.edges) == [(1, 0, "uses")]
