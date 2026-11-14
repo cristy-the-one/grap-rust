@@ -19,6 +19,13 @@ many names were dropped out of how many distinct names. A pair is written to
 the sealed sheet when either document is sealed in the statement sample, so
 a sealed sentence never lands in the open sheet. Label columns are left blank.
 
+Automotive files are read through ``ingest._READERS``. Each sampled file
+contributes every item: the ``item_id``, the ``short_name`` attribute when it
+is set, and identifiers the R-09 rule finds in the item text (a phrase keeps
+a bracketed id or a strong token; a one-token item uses the whole-name rule).
+The walk is unchanged — hash order, at most 4 items counted per file, every
+fourth source sealed — so one source is never split across the sheets.
+
 Stops, without writing, when any band is short. The shortfall is printed and
 nothing is borrowed from another band. Every count is printed with its
 denominator. ``n/a`` is printed for sheet sizes when nothing was written.
@@ -64,6 +71,11 @@ _WORD = r"[A-ZĂÂÎȘŞȚŢ][A-Za-zĂÂÎȘŞȚŢăâîșşțţ0-9-]*"
 _NP = re.compile(rf"\b{_WORD}(?:\s+{_WORD})+\b")
 _CODE = re.compile(r"\b[A-Za-z][A-Za-z0-9]*_[A-Za-z0-9_]+\b")
 _ABBREV = re.compile(r"\b[A-ZĂÂÎȘŞȚŢ]{2,}\b")
+# Punctuation that rides on a token ("VehSpdFL.") is not part of the name.
+# Brackets stay: a bracketed id such as [SWS_Com_00123] is the name as written.
+_EDGE_PUNCT = ".,;:!?()\"'`<>"
+_BRACKETED_ID = re.compile(r"\[[^\]\s]+\]")
+_CAMEL_HUMP = re.compile(r"[a-z][A-Z]")
 
 _COLUMNS = (
     "packet_id",
@@ -420,6 +432,144 @@ def _row(number: int, left: Mention, right: Mention) -> dict[str, str]:
     }
 
 
+def _name_is_identifier(name: str) -> bool:
+    """R-09 whole name, the same predicate as ``working_graph._name_is_identifier``.
+
+    No whitespace, and an underscore, slash, dot, digit, or a capital after
+    the first character.
+    """
+    if not name or any(ch.isspace() for ch in name):
+        return False
+    if any(ch in "_/." or ch.isdigit() for ch in name):
+        return True
+    return any(ch.isupper() for ch in name[1:])
+
+
+def _token_is_strong_identifier(token: str) -> bool:
+    """Inside a phrase, the same predicate as ``working_graph._token_is_strong_identifier``.
+
+    Prose dots and digits ("nr. 5", "58/1998") are not identifiers. An
+    underscore, a leading slash, or a CamelCase hump is.
+    """
+    return "_" in token or token.startswith("/") or _CAMEL_HUMP.search(token) is not None
+
+
+def _identifier_spans(text: str) -> list[tuple[str, int, int]]:
+    """Identifiers in item text. A longer span wins when two start together.
+
+    Running text uses the phrase rule. A one-token item uses the whole-name rule.
+    """
+    phrase = any(ch.isspace() for ch in text)
+    spans = []
+    for match in re.finditer(r"\S+", text):
+        raw = match.group(0)
+        start = 0
+        end = len(raw)
+        while start < end and raw[start] in _EDGE_PUNCT:
+            start += 1
+        while end > start and raw[end - 1] in _EDGE_PUNCT:
+            end -= 1
+        core = raw[start:end]
+        if not core:
+            continue
+        if _BRACKETED_ID.fullmatch(core):
+            keep = True
+        elif phrase:
+            keep = _token_is_strong_identifier(core)
+        else:
+            keep = _name_is_identifier(core)
+        if not keep:
+            continue
+        abs_start = match.start() + start
+        spans.append((core, abs_start, abs_start + len(core)))
+    spans.sort(key=lambda span: (span[1], -(span[2] - span[1])))
+    chosen = []
+    cursor = -1
+    for name, start, end in spans:
+        if start < cursor:
+            continue
+        chosen.append((name, start, end))
+        cursor = end
+    return chosen
+
+
+def _mentions_for_item(item, sealed: bool) -> list[Mention]:
+    """item_id, short_name, and identifiers in the item text.
+
+    A name already located in the text is not repeated as a structural
+    mention. A structural name that is not in the text is anchored at -1,
+    and its passage is the whole item.
+    """
+    text = item.text or ""
+    mentions = []
+    seen = set()
+    for name, start, end in _identifier_spans(text):
+        sentence = _sentence(text, start, end)
+        if name not in sentence:
+            continue
+        mentions.append(Mention(
+            source_id=item.source_id,
+            item_id=item.item_id,
+            name=name,
+            sentence=sentence,
+            start=start,
+            sealed=sealed,
+        ))
+        seen.add(name)
+    for name in (item.item_id, item.attributes.get("short_name", "")):
+        if not isinstance(name, str) or not name.strip() or name in seen:
+            continue
+        seen.add(name)
+        mentions.append(Mention(
+            source_id=item.source_id,
+            item_id=item.item_id,
+            name=name,
+            sentence=text,
+            start=-1,
+            sealed=sealed,
+        ))
+    return mentions
+
+
+def _read_automotive_files(corpus_root: Path):
+    """Every item from ``ingest._READERS``. Sheet 1's kind and length filter is not applied."""
+    from grap_mcp.ingest import _READERS
+
+    root = Path(corpus_root)
+    if not root.is_dir():
+        raise RuntimeError(f"corpus root is not a directory: {root}")
+    paths = sorted(
+        (
+            path for path in root.rglob("*")
+            if path.is_file() and path.suffix.lower() in _READERS
+        ),
+        key=lambda path: path.as_posix(),
+    )
+    groups = []
+    for path in paths:
+        relative = path.resolve().relative_to(root.resolve()).as_posix()
+        digest = hashlib.sha256(path.read_bytes()).hexdigest()
+        try:
+            read_items = list(_READERS[path.suffix.lower()](path, corpus_root=root))
+        except Exception as exc:
+            raise RuntimeError(f"cannot parse {relative}: {exc}") from exc
+        items = tuple(
+            statements._from_reader(item, relative, digest) for item in read_items
+        )
+        source_id = items[0].source_id if items else path.stem
+        groups.append(statements._FileItems(relative, digest, source_id, items))
+    return groups
+
+
+def _automotive_mentions(chosen) -> list[Mention]:
+    """Every item of each sampled file. The 4-item cap only budgets the walk."""
+    mentions = []
+    for group, _taken, sealed in chosen:
+        for item in group.items:
+            mentions.extend(_mentions_for_item(item, sealed))
+    return mentions
+
+
 def _write_csv(path: Path, rows: list[dict[str, str]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8", newline="") as handle:
@@ -430,20 +580,16 @@ def _write_csv(path: Path, rows: list[dict[str, str]]) -> None:
 
 def build_packet(corpus_root: Path, corpus: str, seed: str, items: int, out: Path,
                  embedder=None) -> None:
-    if corpus == "automotive":
-        # Sheet 2 stays on the old refusal until TP-02. Sheet 1 no longer raises.
-        raise RuntimeError(
-            "automotive corpus requires Part D SourceItem readers that are not implemented: "
-            "R-02 DBC reader (mcp-server/grap_mcp/readers/dbc.py); "
-            "R-03 specification PDF reader (readers/spec_pdf.py); "
-            "R-04 ReqIF reader (readers/reqif.py); "
-            "R-05 ARXML reader"
-        )
-    if corpus != "law-ro":
-        raise RuntimeError(f"unknown corpus: {corpus}")
     root = Path(corpus_root)
-    chosen, n_files = statements._select(statements.read_law_files(root), str(seed), items)
-    mentions, names_dropped = _drop_common(_collect(chosen, root), len(chosen))
+    if corpus == "automotive":
+        chosen, n_files = statements._select(_read_automotive_files(root), str(seed), items)
+        collected = _automotive_mentions(chosen)
+    elif corpus == "law-ro":
+        chosen, n_files = statements._select(statements.read_law_files(root), str(seed), items)
+        collected = _collect(chosen, root)
+    else:
+        raise RuntimeError(f"unknown corpus: {corpus}")
+    mentions, names_dropped = _drop_common(collected, len(chosen))
     if embedder is None:
         embedder = get_embedder()
     names = sorted({mention.name for mention in mentions})

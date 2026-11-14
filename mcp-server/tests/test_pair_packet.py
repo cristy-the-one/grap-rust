@@ -10,6 +10,7 @@ import hashlib
 import itertools
 import json
 import math
+import re
 import sys
 from collections import Counter
 from pathlib import Path
@@ -608,22 +609,430 @@ def test_cosine_band_boundaries():
     assert pairs.band_for_cosine(0.699) == "random"
 
 
-def test_automotive_names_the_missing_readers(tmp_path):
-    root = tmp_path / "corpus"
+# Sheet 1 keeps nothing shorter than 80 characters. Sheet 2 must still see it.
+_PLAIN = "is named in this sentence nr. 5."
+_SPECIAL = "is named in this sentence. see [SWS_Com_00123] VehSpdFL. Decoy Phrase appears."
+_EDGE_PUNCT = ".,;:!?()\"'`<>"
+_EXTRA_NAMES = ("ITEM_H000", "[SWS_Com_00123]", "VehSpdFL")
+
+
+def _xml(text):
+    return (
+        text.replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace('"', "&quot;")
+    )
+
+
+_BRACKETED_ID = re.compile(r"\[[^\]\s]+\]")
+_CAMEL_HUMP = re.compile(r"[a-z][A-Z]")
+
+
+def _name_is_identifier(name):
+    """R-09 whole name: no whitespace, and an underscore, slash, dot, digit, or a later capital."""
+    if not name or any(ch.isspace() for ch in name):
+        return False
+    if any(ch in "_/." or ch.isdigit() for ch in name):
+        return True
+    return any(ch.isupper() for ch in name[1:])
+
+
+def _token_is_strong_identifier(token):
+    """Inside a phrase, prose dots and digits do not count. Underscore, leading slash, or CamelCase does."""
+    return "_" in token or token.startswith("/") or _CAMEL_HUMP.search(token) is not None
+
+
+def _identifier_spans(text):
+    """Identifiers in item text, as written, longer span first at the same start.
+
+    A phrase uses the strong token rule. A one-token item uses the whole-name rule.
+    """
+    phrase = any(ch.isspace() for ch in text)
+    spans = []
+    for match in re.finditer(r"\S+", text):
+        raw = match.group(0)
+        start = 0
+        end = len(raw)
+        while start < end and raw[start] in _EDGE_PUNCT:
+            start += 1
+        while end > start and raw[end - 1] in _EDGE_PUNCT:
+            end -= 1
+        core = raw[start:end]
+        if not core:
+            continue
+        if _BRACKETED_ID.fullmatch(core):
+            keep = True
+        elif phrase:
+            keep = _token_is_strong_identifier(core)
+        else:
+            keep = _name_is_identifier(core)
+        if keep:
+            abs_start = match.start() + start
+            spans.append((core, abs_start, abs_start + len(core)))
+    spans.sort(key=lambda span: (span[1], -(span[2] - span[1])))
+    chosen = []
+    cursor = -1
+    for name, start, end in spans:
+        if start < cursor:
+            continue
+        chosen.append((name, start, end))
+        cursor = end
+    return chosen
+
+
+def _mentions_of(item):
+    """item_id, short_name, and R-09 identifiers. One structural name per item."""
+    text = item.text or ""
+    found = []
+    seen = set()
+    for name, start, end in _identifier_spans(text):
+        sentence = pairs._sentence(text, start, end)
+        if name not in sentence:
+            continue
+        found.append({
+            "source_id": item.source_id,
+            "item_id": item.item_id,
+            "name": name,
+            "start": start,
+            "passage": sentence,
+        })
+        seen.add(name)
+    for name in (item.item_id, item.attributes.get("short_name", "")):
+        if not isinstance(name, str) or not name.strip() or name in seen:
+            continue
+        seen.add(name)
+        found.append({
+            "source_id": item.source_id,
+            "item_id": item.item_id,
+            "name": name,
+            "start": -1,
+            "passage": text,
+        })
+    return found
+
+
+def _write_reqif(path, items):
+    """items is (item_id, type long-name, short_name, text)."""
+    types = []
+    specs = []
+    seen = {}
+    for item_id, type_name, short_name, text in items:
+        type_id = seen.get(type_name)
+        if type_id is None:
+            type_id = f"_t{len(seen)}"
+            seen[type_name] = type_id
+            types.append(
+                f'<SPEC-OBJECT-TYPE IDENTIFIER="{type_id}" LONG-NAME="{_xml(type_name)}">'
+                "<SPEC-ATTRIBUTES>"
+                f'<ATTRIBUTE-DEFINITION-XHTML IDENTIFIER="{type_id}_text" LONG-NAME="ReqIF.Text">'
+                "<TYPE><DATATYPE-DEFINITION-XHTML-REF>_dt</DATATYPE-DEFINITION-XHTML-REF></TYPE>"
+                "</ATTRIBUTE-DEFINITION-XHTML>"
+                f'<ATTRIBUTE-DEFINITION-STRING IDENTIFIER="{type_id}_short" LONG-NAME="short_name">'
+                "<TYPE><DATATYPE-DEFINITION-STRING-REF>_ds</DATATYPE-DEFINITION-STRING-REF></TYPE>"
+                "</ATTRIBUTE-DEFINITION-STRING>"
+                "</SPEC-ATTRIBUTES>"
+                "</SPEC-OBJECT-TYPE>"
+            )
+        specs.append(
+            f'<SPEC-OBJECT IDENTIFIER="{_xml(item_id)}" LONG-NAME="{_xml(item_id)}">'
+            f"<TYPE><SPEC-OBJECT-TYPE-REF>{type_id}</SPEC-OBJECT-TYPE-REF></TYPE>"
+            "<VALUES>"
+            "<ATTRIBUTE-VALUE-XHTML>"
+            f"<DEFINITION><ATTRIBUTE-DEFINITION-XHTML-REF>{type_id}_text</ATTRIBUTE-DEFINITION-XHTML-REF></DEFINITION>"
+            f"<THE-VALUE><xhtml:div>{_xml(text)}</xhtml:div></THE-VALUE>"
+            "</ATTRIBUTE-VALUE-XHTML>"
+            f'<ATTRIBUTE-VALUE-STRING THE-VALUE="{_xml(short_name)}">'
+            f"<DEFINITION><ATTRIBUTE-DEFINITION-STRING-REF>{type_id}_short</ATTRIBUTE-DEFINITION-STRING-REF></DEFINITION>"
+            "</ATTRIBUTE-VALUE-STRING>"
+            "</VALUES>"
+            "</SPEC-OBJECT>"
+        )
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        '<REQ-IF xmlns="http://www.omg.org/spec/ReqIF/20110401/reqif.xsd" '
+        'xmlns:xhtml="http://www.w3.org/1999/xhtml">\n'
+        "<CORE-CONTENT><REQ-IF-CONTENT>\n"
+        "<DATATYPES>"
+        '<DATATYPE-DEFINITION-XHTML IDENTIFIER="_dt" LONG-NAME="XHTML"/>'
+        '<DATATYPE-DEFINITION-STRING IDENTIFIER="_ds" LONG-NAME="String"/>'
+        "</DATATYPES>\n"
+        f"<SPEC-TYPES>{''.join(types)}</SPEC-TYPES>\n"
+        f"<SPEC-OBJECTS>{''.join(specs)}</SPEC-OBJECTS>\n"
+        "</REQ-IF-CONTENT></CORE-CONTENT>\n"
+        "</REQ-IF>\n",
+        encoding="utf-8",
+    )
+
+
+def _add_orthogonal(vectors, names):
+    missing = [name for name in names if name not in vectors]
+    if not missing:
+        return
+    width = len(next(iter(vectors.values())))
+    for name in list(vectors):
+        vectors[name] = list(vectors[name]) + [0.0] * len(missing)
+    total = width + len(missing)
+    for index, name in enumerate(missing):
+        vector = [0.0] * total
+        vector[width + index] = 1.0
+        vectors[name] = vector
+
+
+def build_automotive_corpus(root):
+    """The law corpus's names, carried as ReqIF short_name attributes.
+
+    Item text is under 80 characters, so Sheet 1 would keep none of it.
+    H000 is a heading whose short_name is not its item_id and is not in the
+    text. Page Header is the furniture name. Two files share one source_id.
+    """
     root.mkdir()
-    with pytest.raises(RuntimeError) as caught:
-        pairs.main([
-            "--corpus-root", str(root),
-            "--corpus", "automotive",
-            "--seed", "1",
-            "--items", "4",
-            "--out", str(tmp_path / "out"),
-        ])
-    message = str(caught.value).lower()
-    assert "dbc" in message
-    assert "pdf" in message
-    assert "reqif" in message
-    assert "arxml" in message
+    high_groups = _quads("H", 14)
+    mid_groups = _quads("M", 10)
+    rand_groups = _quads("R", 5)
+    identical = [f"I{index:02d}" for index in range(50)]
+    high_dims = len(high_groups)
+    mid_dims = len(mid_groups) * 5
+    rand_dims = len(rand_groups) * 4
+    total = high_dims + mid_dims + rand_dims + len(identical) + 1
+    vectors = {}
+    for index, group in enumerate(high_groups):
+        vector = [0.0] * total
+        vector[index] = 1.0
+        for name in group:
+            vectors[name] = list(vector)
+    for index, group in enumerate(mid_groups):
+        offset = high_dims + index * 5
+        for member, name in enumerate(group):
+            vector = [0.0] * total
+            vector[offset] = math.sqrt(0.8)
+            vector[offset + 1 + member] = math.sqrt(0.2)
+            vectors[name] = vector
+    rand_at = high_dims + mid_dims
+    for index, group in enumerate(rand_groups):
+        for member, name in enumerate(group):
+            vector = [0.0] * total
+            vector[rand_at + index * 4 + member] = 1.0
+            vectors[name] = vector
+    ident_at = rand_at + rand_dims
+    for index, name in enumerate(identical):
+        vector = [0.0] * total
+        vector[ident_at + index] = 1.0
+        vectors[name] = vector
+    border = [0.0] * total
+    border[-1] = 1.0
+    vectors[_BORDER] = border
+    assert cosine(vectors[high_groups[0][0]], vectors[high_groups[0][1]]) >= 0.86
+    assert cosine(vectors[high_groups[0][0]], vectors[high_groups[1][0]]) < 0.70
+    mid = cosine(vectors[mid_groups[0][0]], vectors[mid_groups[0][1]])
+    assert 0.70 <= mid < 0.86
+    assert cosine(vectors[rand_groups[0][0]], vectors[rand_groups[0][1]]) < 0.70
+
+    by_doc = {doc: [] for doc in range(_DOCS)}
+    singles = [name for group in high_groups + mid_groups + rand_groups for name in group]
+    placements = [(index % _DOCS, name) for index, name in enumerate(singles)]
+    for index, name in enumerate(identical):
+        placements.append((index % _DOCS, name))
+        placements.append(((index + 1) % _DOCS, name))
+    placements.append((0, _BORDER))
+    placements.append((1, _BORDER))
+    for doc in (0, 1, 2):
+        placements.append((doc, _FURNITURE))
+    for doc, name in placements:
+        if name == "H000":
+            by_doc[doc].append(("ITEM_H000", "Heading", name, _SPECIAL))
+        else:
+            by_doc[doc].append((name, "Requirement", name, _PLAIN))
+    assert sum(item[0] == "ITEM_H000" for doc in by_doc for item in by_doc[doc]) == 1
+    for doc, items in by_doc.items():
+        assert len({item[0] for item in items}) == len(items)
+        _write_reqif(root / f"src-{doc:02d}.reqif", items)
+    for folder in ("left", "right"):
+        _write_reqif(
+            root / folder / "shared.reqif",
+            [(_FURNITURE, "Requirement", _FURNITURE, _PLAIN)],
+        )
+    (root / "notes.txt").write_text("UniqueDecoyName appears in this file.\n", encoding="utf-8")
+    _add_orthogonal(vectors, _EXTRA_NAMES)
+    assert cosine(vectors["H000"], vectors["H001"]) >= 0.86
+    return vectors
+
+
+def _read_groups(root):
+    from grap_mcp.ingest import _READERS
+
+    paths = sorted(
+        (path for path in root.rglob("*") if path.is_file() and path.suffix.lower() in _READERS),
+        key=lambda path: path.as_posix(),
+    )
+    groups = []
+    for path in paths:
+        relative = path.resolve().relative_to(root.resolve()).as_posix()
+        digest = hashlib.sha256(path.read_bytes()).hexdigest()
+        read_items = list(_READERS[path.suffix.lower()](path, corpus_root=root))
+        items = tuple(statements._from_reader(item, relative, digest) for item in read_items)
+        source_id = items[0].source_id if items else path.stem
+        groups.append(statements._FileItems(relative, digest, source_id, items))
+    return groups
+
+
+def _per_file_sealed(groups, seed):
+    ordered = sorted((group for group in groups if group.items), key=lambda group: statements._rank(seed, group.file))
+    return {
+        group.source_id
+        for index, group in enumerate(ordered)
+        if (index + 1) % 4 == 0
+    }
+
+
+def _pair_names(chosen):
+    names = set()
+    for band in BANDS:
+        for pair in chosen[band]:
+            names.add(pair[0]["name"])
+            names.add(pair[1]["name"])
+    return names
+
+
+def _pick_automotive_seed(mentions, vectors, groups):
+    for number in range(1, 120):
+        seed = str(number)
+        chosen, _dropped, _total, _kept_count = _select(mentions, vectors, seed, len(groups))
+        if not all(len(chosen[band]) == TARGETS[band] for band in BANDS):
+            continue
+        filed = _file_select(mentions, vectors, len(groups))
+        high = [(_identity(pair[0]), _identity(pair[1])) for pair in chosen["cosine_high"]]
+        filed_high = [(_identity(pair[0]), _identity(pair[1])) for pair in filed["cosine_high"]]
+        if high == filed_high:
+            continue
+        if "H000" not in _pair_names(chosen):
+            continue
+        sampled, _reached = statements._select(groups, seed, 150)
+        if _per_file_sealed(groups, seed) == {group.source_id for group, _taken, sealed in sampled if sealed}:
+            continue
+        return seed
+    raise AssertionError("no seed separated hash order, kept H000, and split a source per file")
+
+
+def test_automotive_short_name_mentions_and_exact_band_counts(tmp_path, monkeypatch, capsys):
+    """TP-02: a short_name is a mention even when it is not the item_id or in the text.
+
+    Band counts stay 80/60/30/30. The walk still seals by source_id, so the two
+    files of one source are not split. Item text is under 80 characters and one
+    item is a heading, which Sheet 1 would both refuse.
+    """
+    assert len(_PLAIN) < 80 and len(_SPECIAL) < 80
+    root = tmp_path / "corpus"
+    vectors = build_automotive_corpus(root)
+    groups = _read_groups(root)
+    assert len(groups) == 12
+    assert all(len(item.text) < 80 for group in groups for item in group.items)
+    assert any(item.kind_hint == "heading" for group in groups for item in group.items)
+    assert any(len(group.items) > 4 for group in groups)
+    mentions = [mention for group in groups for item in group.items for mention in _mentions_of(item)]
+    special = [mention for mention in mentions if mention["item_id"] == "ITEM_H000"]
+    assert {mention["name"] for mention in special} == {
+        "ITEM_H000", "H000", "[SWS_Com_00123]", "VehSpdFL",
+    }
+    by_name = {mention["name"]: mention for mention in special}
+    assert by_name["H000"]["start"] == -1
+    assert "H000" not in by_name["H000"]["passage"]
+    assert "[SWS_Com_00123]" in by_name["[SWS_Com_00123]"]["passage"]
+    assert "Decoy" not in {mention["name"] for mention in mentions}
+    assert "5" not in {mention["name"] for mention in mentions}
+    assert "nr" not in {mention["name"] for mention in mentions}
+    assert "UniqueDecoyName" not in {mention["name"] for mention in mentions}
+    seed = _pick_automotive_seed(mentions, vectors, groups)
+    expected, dropped, total_names, n_kept = _select(mentions, vectors, seed, len(groups))
+    assert _FURNITURE in dropped and _BORDER not in dropped
+    sampled, reached = statements._select(groups, seed, 150)
+    assert len(sampled) == len(groups) == reached == 12
+    oracle_sealed = {group.source_id for group, _taken, sealed in sampled if sealed}
+    assert _per_file_sealed(groups, seed) != oracle_sealed
+    shared_flags = [sealed for group, _taken, sealed in sampled if group.source_id == "shared"]
+    assert shared_flags == [shared_flags[0], shared_flags[0]]
+
+    from grap_mcp.ingest import _READERS
+
+    seen = []
+
+    def _watch(suffix, reader):
+        def wrapped(path, corpus_root=None):
+            seen.append((suffix, Path(path).name))
+            return reader(path, corpus_root=corpus_root)
+        return wrapped
+
+    monkeypatch.setitem(_READERS, ".dbc", _watch(".dbc", _READERS[".dbc"]))
+    monkeypatch.setitem(_READERS, ".reqif", _watch(".reqif", _READERS[".reqif"]))
+    monkeypatch.setattr(pairs, "get_embedder", lambda: MapEmbedder(vectors))
+    out = tmp_path / "out"
+    pairs.main([
+        "--corpus-root", str(root),
+        "--corpus", "automotive",
+        "--seed", seed,
+        "--items", "150",
+        "--out", str(out),
+    ])
+    assert (".reqif", "src-00.reqif") in seen
+    assert all(suffix == ".reqif" for suffix, _name in seen)
+    assert len(seen) == 12
+    printed = capsys.readouterr().out
+    rows = all_rows(out)
+    counts = Counter(band_of(row["name"], row["other_name"], vectors) for row in rows)
+    assert dict(counts) == TARGETS
+    assert "cosine_high=80/80" in printed
+    assert "cosine_mid=60/60" in printed
+    assert "random=30/30" in printed
+    assert "identical=30/30" in printed
+    assert f"names_dropped={len(dropped)}/{total_names}" in printed
+    assert f"n_mentions={n_kept}" in printed
+    assert f"n_docs={len(sampled)}" in printed
+    assert f"n_files_reached={reached}" in printed
+    assert "n_pairs=200/200" in printed
+    got = {band: [] for band in BANDS}
+    for row in sorted(rows, key=lambda item: item["packet_id"]):
+        got[band_of(row["name"], row["other_name"], vectors)].append(
+            (_endpoint(row, "left"), _endpoint(row, "right"))
+        )
+        assert row["label"] == "" and row["note"] == ""
+        left = _endpoint(row, "left")
+        right = _endpoint(row, "right")
+        assert left != right
+    for band in BANDS:
+        want = [(_identity(pair[0]), _identity(pair[1])) for pair in expected[band]]
+        assert got[band] == want
+    h_rows = [row for row in rows if row["name"] == "H000" or row["other_name"] == "H000"]
+    assert h_rows
+    for row in h_rows:
+        if row["name"] == "H000":
+            assert row["item_id"] == "ITEM_H000"
+            assert "H000" not in row["passage"]
+        if row["other_name"] == "H000":
+            assert row["other_item_id"] == "ITEM_H000"
+            assert "H000" not in row["other_passage"]
+    assert "Decoy Phrase" not in {row["name"] for row in rows}
+    assert "Decoy Phrase" not in {row["other_name"] for row in rows}
+    assert "UniqueDecoyName" not in {row["name"] for row in rows}
+    open_rows = read_rows(out / "open" / "pairs.csv")
+    sealed_rows = read_rows(out / "sealed" / "pairs.csv")
+    assert open_rows and sealed_rows
+    assert f"n_open={len(open_rows)}" in printed
+    assert f"n_sealed={len(sealed_rows)}" in printed
+    for row in open_rows:
+        assert row["source_id"] not in oracle_sealed
+        assert row["other_source_id"] not in oracle_sealed
+    for row in sealed_rows:
+        assert row["source_id"] in oracle_sealed or row["other_source_id"] in oracle_sealed
+    manifest = json.loads((out / "pair_manifest.json").read_text(encoding="utf-8"))
+    assert manifest["corpus"] == "automotive"
+    assert manifest["seed"] == seed
+    assert set(manifest["sealed_ids"]) == oracle_sealed
+    hashed = {entry["file"] for entry in manifest["file_hashes"]}
+    assert "left/shared.reqif" in hashed and "right/shared.reqif" in hashed
+    script = Path(__file__).resolve().parents[2] / "scripts" / "make_pair_packet.py"
+    assert "readers that are not implemented" not in script.read_text(encoding="utf-8")
+    assert "_READERS" in script.read_text(encoding="utf-8")
 
 
 def test_generator_does_not_call_source_units():
