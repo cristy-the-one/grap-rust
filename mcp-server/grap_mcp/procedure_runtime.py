@@ -23,6 +23,12 @@ Public API, for the interpreter that stacks on this branch:
 
 A step produces the outputs its operation gives. Output declarations in
 the file are descriptive and are not part of the signature.
+
+P-10a, still at load and still one list of problems: a guard whose
+``ref`` names an output no earlier step produces
+(``guard_ref_not_produced``); a step with a missing or empty id
+(``missing_step_id``); a YAML syntax error (``invalid_yaml``), raised as
+``ProcedureRefused`` rather than a raw parser exception.
 """
 
 from __future__ import annotations
@@ -131,8 +137,13 @@ class ProcedureRefused(Exception):
 
 
 def load_procedure(text: str, source_path: str | None = None) -> Procedure:
-    """Parse a procedure file and refuse it unless §3 is satisfied."""
-    data = yaml.safe_load(text)
+    """Parse a procedure file and refuse it unless the static check passes."""
+    try:
+        data = yaml.safe_load(text)
+    except yaml.YAMLError as exc:
+        raise ProcedureRefused([
+            Problem("invalid_yaml", f"procedure file is not valid YAML: {exc}"),
+        ]) from exc
     problems = _problems(data)
     if problems:
         raise ProcedureRefused(problems)
@@ -163,6 +174,12 @@ def _problems(data: Any) -> list[Problem]:
             problems.append(Problem("invalid_step", f"step {index} is not a mapping"))
             continue
         step_id = _text(raw.get("id"), "")
+        if step_id == "":
+            problems.append(Problem(
+                "missing_step_id",
+                f"step {index} has a missing or empty id",
+                None,
+            ))
         if step_id in seen:
             problems.append(Problem(
                 "duplicate_step_id",
@@ -214,7 +231,7 @@ def _problems(data: Any) -> list[Problem]:
                     f"and no earlier step produces that output",
                     step_id,
                 ))
-        problems.extend(_guard_problems(step_id, raw.get("guards")))
+        problems.extend(_guard_problems(step_id, raw.get("guards"), produced))
         if operation is not None:
             produced.setdefault(step_id, set()).update(operation.outputs)
     return problems
@@ -227,7 +244,11 @@ def _produced(ref: str, produced: Mapping[str, set[str]]) -> bool:
     return output in produced.get(source, ())
 
 
-def _guard_problems(step_id: str, guards: Any) -> list[Problem]:
+def _guard_problems(
+    step_id: str,
+    guards: Any,
+    produced: Mapping[str, set[str]],
+) -> list[Problem]:
     if guards is None:
         return []
     if not isinstance(guards, list):
@@ -244,6 +265,15 @@ def _guard_problems(step_id: str, guards: Any) -> list[Problem]:
                 "invalid_guard",
                 f"step {step_id!r} guard {index} is not {{ref, op, value}} "
                 f"with op one of {allowed} (got {guard!r})",
+                step_id,
+            ))
+            continue
+        ref = guard.get("ref")
+        if isinstance(ref, str) and ".outputs." in ref and not _produced(ref, produced):
+            problems.append(Problem(
+                "guard_ref_not_produced",
+                f"step {step_id!r} guard {index} refers to {ref!r} "
+                f"and no earlier step produces that output",
                 step_id,
             ))
     return problems
