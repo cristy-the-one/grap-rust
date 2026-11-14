@@ -5,6 +5,7 @@ from itertools import islice
 from .native_graph import add_node_batch
 from .readers.arxml import read_arxml
 from .readers.dbc import read_dbc
+from .readers.reqif import read_reqif
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -16,6 +17,7 @@ _EXTS = {".md", ".txt", ".markdown"}
 # Structured suffixes dispatch to a reader. Prose stays on read_document.
 _READERS = {
     ".dbc": read_dbc,
+    ".reqif": read_reqif,
 }
 _ALL_EXTS = _EXTS | {".json", ".arxml"} | set(_READERS)
 
