@@ -135,9 +135,10 @@ def test_prose_dots_digits_and_plain_tokens_are_not_identifiers(tmp_path):
 def test_values_and_timing_span_that_is_an_identifier(tmp_path):
     """A values span that is an identifier is a mention, as that span.
 
-    100 and BNR are identifiers as a whole name and are not strong tokens
-    inside the phrase, so only the values span puts them in. 100 ms is not
-    an identifier. E_NOT_OK is one row, though the phrase contains it too.
+    BNR is an identifier as a whole name and is not a strong token inside
+    the phrase, so only the values span puts it in. 100 has no letter, so
+    it is not a mention. 100 ms is not an identifier. E_NOT_OK is one row,
+    though the phrase contains it too.
     """
     text = "The module shall wait 100 ms and return E_NOT_OK or BNR."
     statement = _statement(
@@ -154,8 +155,32 @@ def test_values_and_timing_span_that_is_an_identifier(tmp_path):
     with _open(tmp_path) as graph:
         _write(graph, text, "spec", "spec#0", [statement])
         rows = _rows(graph, "spec", "spec#0")
-    assert [row.text for row in rows] == ["The module", "100", "E_NOT_OK", "BNR"]
+    assert [row.text for row in rows] == ["The module", "E_NOT_OK", "BNR"]
+    assert "100" not in [row.text for row in rows]
     assert "100 ms" not in [row.text for row in rows]
+
+
+def test_a_values_span_with_no_letter_is_not_a_mention(tmp_path):
+    """A token with no letter is never a mention.
+
+    A values span ``100`` has no letter, so it is not a mention. ``5.0``
+    is the same. ``0x01`` stays a mention because it has a letter.
+    ``E_NOT_OK`` is one mention.
+    """
+    text = "The module shall return 100 or 5.0 or 0x01 or E_NOT_OK."
+    statement = _statement(
+        text,
+        values_and_timing=(
+            _span(text, "100"),
+            _span(text, "5.0"),
+            _span(text, "0x01"),
+            _span(text, "E_NOT_OK"),
+        ),
+    )
+    with _open(tmp_path) as graph:
+        _write(graph, text, "spec", "spec#0", [statement])
+        rows = _rows(graph, "spec", "spec#0")
+    assert [row.text for row in rows] == ["0x01", "E_NOT_OK"]
 
 
 def test_the_same_character_span_is_one_row(tmp_path):

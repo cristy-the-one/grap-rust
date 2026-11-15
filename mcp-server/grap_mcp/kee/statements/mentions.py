@@ -8,6 +8,8 @@ For one item, each statement contributes:
   the exception);
 - each ``values_and_timing`` span that is itself an identifier.
 
+A token with no letter is never a mention.
+
 The same character span is one row. The spec writes "type hint in brackets"
 and then names none, so ``type_hint`` is absent. Linking is left to the
 entity-resolution stages. A second call with the same rows does not write.
@@ -21,15 +23,17 @@ from collections.abc import Sequence
 from grap_mcp.kee.resolution.backfill import _sentence
 from grap_mcp.kee.resolution.tables import Mention, ResolutionTables
 from grap_mcp.kee.statements.tables import Statement
+from grap_mcp.kee.working_graph import (
+    _BRACKETED_ID,
+    _name_is_identifier,
+    _token_is_strong_identifier,
+)
 
-# R-09, the same predicates as ``working_graph`` and the pair-packet finder.
-# A whole name with no whitespace is an identifier when it has an underscore,
-# a slash, a dot, a digit, or a capital after the first character. Inside a
-# phrase, only an underscore, a leading slash, a CamelCase hump, or a
-# bracketed id counts. Prose dots and digits do not.
+# R-09 predicates live in ``working_graph``. Inside a phrase, only an
+# underscore, a leading slash, a CamelCase hump, or a bracketed id counts.
+# A one-token span uses the whole-name rule. A token with no letter is
+# never a mention: ``0x01`` stays, ``100`` and ``5.0`` do not.
 _EDGE_PUNCT = ".,;:!?()\"'`<>"
-_BRACKETED_ID = re.compile(r"\[[^\]\s]+\]")
-_CAMEL_HUMP = re.compile(r"[a-z][A-Z]")
 
 _PARTS = ("unit", "subject", "condition", "required_behaviour", "exception")
 
@@ -143,22 +147,19 @@ def _check_span(span, field: str, text: str) -> tuple[int, int]:
 
 
 def _span_is_identifier(span_text: str) -> bool:
-    """The values span as a whole, under the R-09 whole-name rule."""
+    """The values span as a whole, under the R-09 whole-name rule.
+
+    A token with no letter is never a mention.
+    """
+    if not _token_has_a_letter(span_text):
+        return False
     if _BRACKETED_ID.fullmatch(span_text):
         return True
     return _name_is_identifier(span_text)
 
 
-def _name_is_identifier(name: str) -> bool:
-    if not name or any(ch.isspace() for ch in name):
-        return False
-    if any(ch in "_/." or ch.isdigit() for ch in name):
-        return True
-    return any(ch.isupper() for ch in name[1:])
-
-
-def _token_is_strong_identifier(token: str) -> bool:
-    return "_" in token or token.startswith("/") or _CAMEL_HUMP.search(token) is not None
+def _token_has_a_letter(token: str) -> bool:
+    return any(ch.isalpha() for ch in token)
 
 
 def _identifier_spans(span_text: str, base: int) -> list[tuple[int, int]]:
@@ -178,7 +179,7 @@ def _identifier_spans(span_text: str, base: int) -> list[tuple[int, int]]:
         while end > rel and raw[end - 1] in _EDGE_PUNCT:
             end -= 1
         core = raw[rel:end]
-        if not core:
+        if not core or not _token_has_a_letter(core):
             continue
         if _BRACKETED_ID.fullmatch(core):
             keep = True
