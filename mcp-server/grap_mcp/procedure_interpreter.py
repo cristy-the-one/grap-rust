@@ -3,7 +3,8 @@
 Data flow, guards, and the one bounded loop from §6 of
 docs/spec-procedure-runtime.md. Every operation here is a stub. This
 module does not call a model, read a graph, render a template, or write
-a tracked-run event.
+a tracked-run event. An optional ``observe`` callback is told about each
+step; writing the audit log is left to that callback.
 
 ``max_rounds`` (default 2, from the ``refine`` step, or 0 when that step
 is absent) is how many times ``refine`` may send issues back to the
@@ -107,8 +108,18 @@ class StubOperations:
         return dict(result)
 
 
-def interpret(procedure: Procedure, operations: Callable[..., Any] | None = None) -> Run:
-    """Run ``procedure``. ``operations`` defaults to :class:`StubOperations`."""
+def interpret(
+    procedure: Procedure,
+    operations: Callable[..., Any] | None = None,
+    *,
+    observe: Callable[..., Any] | None = None,
+) -> Run:
+    """Run ``procedure``. ``operations`` defaults to :class:`StubOperations`.
+
+    ``observe(event, inputs, outputs)`` is called after each step when it
+    is set. Both values are ``None`` when the step is skipped. This
+    function does not write an audit event.
+    """
     if operations is None:
         operations = StubOperations()
     shape = _shape(procedure.steps)
@@ -117,7 +128,7 @@ def interpret(procedure: Procedure, operations: Callable[..., Any] | None = None
     steps = procedure.steps
     while index < len(steps):
         step = steps[index]
-        ran = _execute(steps, index, operations, state, shape)
+        ran = _execute(steps, index, operations, state, shape, observe)
         if ran and step.operation == "validate_output" and state.passed is False:
             if state.rounds >= shape.limit or shape.refine_index is None:
                 state.status = "failed-validation"
@@ -125,13 +136,13 @@ def interpret(procedure: Procedure, operations: Callable[..., Any] | None = None
                 break
             index += 1
             while index < len(steps) and steps[index].operation != "refine":
-                _execute(steps, index, operations, state, shape)
+                _execute(steps, index, operations, state, shape, observe)
                 index += 1
             if index >= len(steps):
                 state.status = "failed-validation"
                 state.rejected = state.last_draft
                 break
-            if not _execute(steps, index, operations, state, shape):
+            if not _execute(steps, index, operations, state, shape, observe):
                 state.status = "failed-validation"
                 state.rejected = state.last_draft
                 break
@@ -248,11 +259,11 @@ def _round_limit(step: Step) -> int:
     return value
 
 
-def _execute(steps, index: int, operations, state: _State, shape: _Shape) -> bool:
+def _execute(steps, index: int, operations, state: _State, shape: _Shape, observe) -> bool:
     step = steps[index]
     failing = _failing_guard(step, state.outputs)
     if failing is not None:
-        _skip(step, state, failing)
+        _skip(step, state, failing, observe)
         if state.pending is not None and index == shape.compose_index:
             raise ProcedureRunError(
                 f"step {step.id!r} was skipped, so refine cannot send issues back to it",
@@ -266,12 +277,14 @@ def _execute(steps, index: int, operations, state: _State, shape: _Shape) -> boo
     result = operations(step.operation, copy.deepcopy(inputs))
     stored = _outputs(step, result)
     state.outputs[step.id] = stored
-    state.events.append(Event(
+    event = Event(
         kind="ran",
         step_id=step.id,
         operation=step.operation,
         iteration=state.iteration(),
-    ))
+    )
+    state.events.append(event)
+    _notify(observe, event, inputs, stored)
     if step.operation == "validate_output":
         state.last_draft = copy.deepcopy(inputs["draft"])
         state.passed = stored["passed"]
@@ -280,9 +293,9 @@ def _execute(steps, index: int, operations, state: _State, shape: _Shape) -> boo
     return True
 
 
-def _skip(step: Step, state: _State, guard: Guard) -> None:
+def _skip(step: Step, state: _State, guard: Guard, observe) -> None:
     state.outputs.pop(step.id, None)
-    state.events.append(Event(
+    event = Event(
         kind="skipped",
         step_id=step.id,
         operation=step.operation,
@@ -290,7 +303,17 @@ def _skip(step: Step, state: _State, guard: Guard) -> None:
         reason="guard",
         guard_ref=guard.ref,
         guard_op=guard.op,
-    ))
+    )
+    state.events.append(event)
+    _notify(observe, event, None, None)
+
+
+def _notify(observe, event: Event, inputs, outputs) -> None:
+    if observe is None:
+        return
+    seen_inputs = None if inputs is None else copy.deepcopy(inputs)
+    seen_outputs = None if outputs is None else copy.deepcopy(outputs)
+    observe(event, seen_inputs, seen_outputs)
 
 
 def _outputs(step: Step, result: Any) -> dict[str, Any]:
