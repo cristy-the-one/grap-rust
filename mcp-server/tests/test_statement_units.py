@@ -61,7 +61,12 @@ def test_each_rule_matches_its_example_and_not_its_counterexample(rule):
     unit = matched[0]
     assert unit.rule_id == rule["id"]
     assert unit.kind == rule["kind"]
-    assert unit.kind in statement_kinds()
+    if rule["kind"] is None:
+        assert rule["normative"] is True
+        assert unit.normative is True
+    else:
+        assert unit.kind in statement_kinds()
+        assert unit.normative is False
     assert unit.origin == "rule"
     assert unit.to_model is (rule["kind"] not in set(data["skip_model"]))
     assert _slice(rule["match"], unit) == rule["match"].strip()
@@ -73,7 +78,10 @@ def test_each_rule_matches_its_example_and_not_its_counterexample(rule):
 
 
 def test_rule_rows_cover_the_certain_labels_and_name_schema_kinds():
-    """Every certain label in §4 has a row. Kinds are the schema file's kinds."""
+    """Every certain label in §4 has a row. A named kind is a schema kind.
+
+    shall and must name no kind. Amendment 1 sets normative instead.
+    """
     data = _data()
     kinds = set(statement_kinds())
     assert [rule["id"] for rule in data["rules"]] == [
@@ -91,7 +99,12 @@ def test_rule_rows_cover_the_certain_labels_and_name_schema_kinds():
         "heading",
         "no-verb",
     ]
-    assert {rule["kind"] for rule in data["rules"]} <= kinds
+    named = {rule["kind"] for rule in data["rules"] if rule["kind"] is not None}
+    assert named <= kinds
+    assert [rule["id"] for rule in data["rules"] if rule["kind"] is None] == [
+        "shall",
+        "must",
+    ]
     assert set(data["skip_model"]) == {"other", "informative"}
     for rule in data["rules"]:
         assert rule["match"].strip() and rule["non_match"].strip()
@@ -110,7 +123,8 @@ def test_other_and_informative_do_not_go_to_the_model():
     assert fragment[0].kind == "other" and fragment[0].to_model is False
 
     demand = _label("The module shall start.")
-    assert demand[0].kind == "requirement" and demand[0].origin == "rule"
+    assert demand[0].kind is None and demand[0].normative is True
+    assert demand[0].origin == "rule"
     assert demand[0].to_model is True
 
     defined = _label("ECU is defined as an electronic control unit.")
@@ -262,7 +276,8 @@ def test_sentences_list_entries_and_table_rows_are_the_units():
         "| Term | Meaning |",
         "| The module shall start. | on reset |",
     ]
-    assert rows[0].rule_id == "no-verb"
+    assert rows[0].rule_id is None
+    assert rows[0].kind is None and rows[0].to_model is True
     assert rows[1].rule_id == "shall"
     assert "---" not in "".join(_slice(table, unit) for unit in rows)
 
@@ -270,7 +285,8 @@ def test_sentences_list_entries_and_table_rows_are_the_units():
 def test_a_glossary_table_row_under_a_glossary_heading_is_a_definition():
     text = "| Term | Meaning |\n| --- | --- |\n| ECU | electronic control unit |\n"
     plain = _label(text)
-    assert plain[-1].rule_id == "no-verb"
+    assert plain[-1].rule_id is None
+    assert plain[-1].kind is None and plain[-1].to_model is True
 
     defined = _label(text, heading_path=["Glossary"])
     assert _slice(text, defined[-1]) == "| ECU | electronic control unit |"

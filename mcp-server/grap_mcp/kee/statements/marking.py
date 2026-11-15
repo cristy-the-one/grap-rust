@@ -115,6 +115,8 @@ def mark_items(items, provider, tables, *, budget=None) -> MarkResult:
     schema = reply_schema()
     optional = set(rules["subject_optional"])
     behaviour_required = set(rules["required_behaviour_required"])
+    normative_kinds = set(rules["normative_kinds"])
+    normative_fallback = rules["normative_fallback_kind"]
     labelled = [(item, label_item(item)) for item in items]
     rule_extractor = _rule_extractor()
     model_extractor = _model_extractor(provider)
@@ -141,7 +143,8 @@ def mark_items(items, provider, tables, *, budget=None) -> MarkResult:
         raw = _ask(provider, pending, labelled)
         missing = _consume(
             pending, _parse(raw, schema), raw, labelled, schema,
-            optional, behaviour_required, model_extractor,
+            optional, behaviour_required, normative_kinds, normative_fallback,
+            model_extractor,
             accepted, review, disagreements,
         )
         if not missing:
@@ -150,7 +153,8 @@ def mark_items(items, provider, tables, *, budget=None) -> MarkResult:
         raw = _ask(provider, missing, labelled)
         still = _consume(
             missing, _parse(raw, schema), raw, labelled, schema,
-            optional, behaviour_required, model_extractor,
+            optional, behaviour_required, normative_kinds, normative_fallback,
+            model_extractor,
             accepted, review, disagreements,
         )
         for index, unit in still:
@@ -252,7 +256,7 @@ def _parse(raw: str, schema: dict) -> dict[int, list] | None:
 
 def _consume(
     pending, parsed, raw, labelled, schema,
-    optional, behaviour_required, extractor,
+    optional, behaviour_required, normative_kinds, normative_fallback, extractor,
     accepted, review, disagreements,
 ) -> list[tuple[int, object]]:
     if parsed is None:
@@ -283,7 +287,8 @@ def _consume(
             continue
         for row in valid:
             statement, reason, disagreed = _check(
-                item, unit, row, optional, behaviour_required, extractor,
+                item, unit, row, optional, behaviour_required, normative_kinds,
+                normative_fallback, extractor,
             )
             if reason:
                 review[index].append(ReviewEntry(
@@ -301,7 +306,8 @@ def _consume(
     return missing
 
 
-def _check(item, unit, row, optional, behaviour_required, extractor):
+def _check(item, unit, row, optional, behaviour_required, normative_kinds,
+           normative_fallback, extractor):
     unit_text = item.text[unit.start:unit.end]
     spans = {}
     for field in _QUOTED:
@@ -324,9 +330,14 @@ def _check(item, unit, row, optional, behaviour_required, extractor):
             return None, "not-verbatim", False
         value_spans.append((unit.start + at, unit.start + at + len(quote)))
     kind = row["kind"]
-    disagreed = unit.kind is not None and kind != unit.kind
-    if unit.kind is not None:
-        kind = unit.kind
+    if unit.normative:
+        disagreed = kind not in normative_kinds
+        if disagreed:
+            kind = normative_fallback
+    else:
+        disagreed = unit.kind is not None and kind != unit.kind
+        if unit.kind is not None:
+            kind = unit.kind
     if spans["subject"] is None and kind not in optional:
         return None, "subject-required", False
     if spans["required_behaviour"] is None and kind in behaviour_required:

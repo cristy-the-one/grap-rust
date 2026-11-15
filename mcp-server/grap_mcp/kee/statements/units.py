@@ -3,8 +3,9 @@
 The model is not called. A unit is a sentence, a list entry, or a table row.
 Sentence breaks come from the existing splitter, after a number, a bracketed
 identifier, or an abbreviation has been masked so the break cannot fall inside
-it. Certain labels are the rows of ``rules.json``, first match wins. A marked
-block wins over every later row, and a unit so labelled is not sent on.
+it. Certain labels are the rows of ``rules.json``, first match wins. A shall
+or must row sets ``normative`` and gives no kind. A marked block wins over
+every later row, and a unit so labelled is not sent on.
 """
 
 from __future__ import annotations
@@ -55,11 +56,12 @@ _LOADED: tuple[dict, tuple[_Rule, ...], frozenset[str], frozenset[str]] | None =
 @dataclass(frozen=True)
 class _Rule:
     id: str
-    kind: str
+    kind: str | None
     when: str
     marker: str | None
     regex: re.Pattern[str] | None
     heading_regex: re.Pattern[str] | None
+    normative: bool
 
 
 @dataclass(frozen=True)
@@ -73,9 +75,10 @@ class _Piece:
 class Unit:
     """One sentence, list entry, or table row, with a certain label if it has one.
 
-    ``kind`` is None when no row matched: the unit goes on with no kind.
-    ``origin`` is ``rule`` when a row matched. ``to_model`` is false when the
-    row's kind is one this stage does not send on.
+    ``kind`` is None when no row matched, and when a shall or must row matched:
+    that row sets ``normative`` and does not choose a kind. ``origin`` is
+    ``rule`` when a row matched. ``to_model`` is false when the row's kind is
+    one this stage does not send on.
     """
 
     start: int
@@ -84,6 +87,7 @@ class Unit:
     rule_id: str | None
     origin: str | None
     to_model: bool
+    normative: bool
 
 
 def label_item(item: SourceItem) -> list[Unit]:
@@ -123,7 +127,7 @@ def label_item(item: SourceItem) -> list[Unit]:
 
 def _unit(piece: _Piece, rule: _Rule | None, skip: set[str]) -> Unit:
     if rule is None:
-        return Unit(piece.start, piece.end, None, None, None, True)
+        return Unit(piece.start, piece.end, None, None, None, True, False)
     return Unit(
         piece.start,
         piece.end,
@@ -131,6 +135,7 @@ def _unit(piece: _Piece, rule: _Rule | None, skip: set[str]) -> Unit:
         rule.id,
         "rule",
         rule.kind not in skip,
+        rule.normative,
     )
 
 
@@ -152,7 +157,7 @@ def _match(text, block, piece, heading_path, rules, verbs, modals) -> _Rule | No
             return rule
         if rule.when == "heading" and _heading(text, verbs, modals):
             return rule
-        if rule.when == "no-verb" and _no_verb(text, verbs, modals):
+        if rule.when == "no-verb" and not piece.table and _no_verb(text, verbs, modals):
             return rule
     return None
 
@@ -162,7 +167,16 @@ def _hits(rule: _Rule, text: str) -> bool:
 
 
 def _modals(text: str, modals: frozenset[str]) -> set[str]:
-    return {word.lower() for word in re.findall(r"[A-Za-z]+", text)} & modals
+    """Modal words. ``May`` before a four-digit year is the month, not ``may``."""
+    found: set[str] = set()
+    for match in re.finditer(r"[A-Za-z]+", text):
+        word = match.group(0)
+        if word == "May" and re.match(r"\s+\d{4}\b", text[match.end():]):
+            continue
+        lower = word.lower()
+        if lower in modals:
+            found.add(lower)
+    return found
 
 
 def _heading(text: str, verbs: frozenset[str], modals: frozenset[str]) -> bool:
@@ -376,15 +390,20 @@ def _rule(row: dict, kinds: set[str]) -> _Rule:
     when = row["when"]
     if when not in _WHEN:
         raise ValueError(f"unknown rule {row['id']}")
-    if row["kind"] not in kinds:
+    normative = row.get("normative", False)
+    kind = row["kind"]
+    if type(normative) is not bool or (normative and kind is not None):
+        raise ValueError(f"unknown rule {row['id']}")
+    if not normative and kind not in kinds:
         raise ValueError("a rule kind is not in the schema file")
     return _Rule(
         id=row["id"],
-        kind=row["kind"],
+        kind=kind,
         when=when,
         marker=row.get("marker"),
         regex=_compiled(row.get("regex")),
         heading_regex=_compiled(row.get("heading_regex")),
+        normative=normative,
     )
 
 
