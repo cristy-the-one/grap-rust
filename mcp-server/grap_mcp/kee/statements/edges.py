@@ -30,14 +30,17 @@ live node is not written. That miss is ``structural_missing``, printed with
 
 A Statement node's text is two lines: the statement id, then ``edges:`` and
 the sha256 hex of its edge rows. The digest covers those rows sorted by
-``(relation, to_key, role or "")``, each encoded
-``relation|to_key|to_engine_id|role|origin`` and joined by a newline. Entity
-nodes may be replaced. A live Statement is left untouched only when every
-endpoint is live and the digest matches. Otherwise the old node, if any, is
-removed with ``remove_node``, a new node is written, and its projection
-entry is replaced. A live Statement of this item whose statement id is
-absent from the new list is removed the same way and dropped from
-``projection["nodes"]``.
+``(relation, from_key, to_key, role or "")``, each encoded
+``relation|from_key|from_engine_id|to_key|to_engine_id|role|origin`` and
+joined by a newline. A replaced Requirement, Item, or entity changes that
+digest, so the statement is rewritten and the edge lands on the new node.
+That counts as ``statements_rewritten``. ``structural_missing`` stays the
+count for an Item or Requirement key that is absent from the projection.
+A live Statement is left untouched only when the digest matches. Otherwise
+the old node, if any, is removed with ``remove_node``, a new node is
+written, and its projection entry is replaced. A live Statement of this
+item whose statement id is absent from the new list is removed the same
+way and dropped from ``projection["nodes"]``.
 
 ``remove_node`` hides that node's edges from traversal and does not lower
 ``edge_count()``. A deletion shows up through ``neighbors_by_relation``,
@@ -315,6 +318,7 @@ def _plan(kg, by_key, rows, *, from_type, from_scope, from_native, relation, rol
         return "missing", from_key
     if to_key != statement_key and _live_id(kg, by_key.get(to_key)) is None:
         return "missing", to_key
+    from_engine_id = None if from_key == statement_key else _live_id(kg, by_key.get(from_key))
     to_engine_id = None if to_key == statement_key else _live_id(kg, by_key.get(to_key))
     props = dict(_relation_properties(relation))
     props["origin"] = origin
@@ -329,6 +333,7 @@ def _plan(kg, by_key, rows, *, from_type, from_scope, from_native, relation, rol
         "origin": origin,
         "role": role,
         "statement_id": statement_id,
+        "from_engine_id": from_engine_id,
         "to_engine_id": to_engine_id,
         "properties": props,
     })
@@ -448,10 +453,7 @@ def _apply(kg, projection, by_key, scope, source_id, plans) -> tuple[int, int]:
         existing = _statement_engine(kg, by_key, key)
         if existing is not None:
             _bind_statement_engine(rows, key, existing)
-            if (
-                _endpoints_live(kg, by_key, rows, key)
-                and _stored_digest(kg, existing, statement_id) == _digest(rows)
-            ):
+            if _stored_digest(kg, existing, statement_id) == _digest(rows):
                 unchanged += 1
                 continue
             kg.remove_node(existing)
@@ -507,32 +509,20 @@ def _write_rows(kg, by_key, rows, statement_key, statement_engine) -> None:
 
 def _bind_statement_engine(rows, statement_key: str, engine_id: int) -> None:
     for row in rows:
+        if row["from_key"] == statement_key:
+            row["from_engine_id"] = engine_id
         if row["to_key"] == statement_key:
             row["to_engine_id"] = engine_id
 
 
-def _endpoints_live(kg, by_key, rows, statement_key: str) -> bool:
-    """True when every endpoint named by these rows is a live node."""
-    for row in rows:
-        if row["to_key"] == statement_key:
-            engine = row["to_engine_id"]
-            if isinstance(engine, bool) or not isinstance(engine, int) or kg.is_node_deleted(engine):
-                return False
-        else:
-            live = _live_id(kg, by_key.get(row["to_key"]))
-            if live is None or live != row["to_engine_id"]:
-                return False
-        if row["from_key"] != statement_key and _live_id(kg, by_key.get(row["from_key"])) is None:
-            return False
-    return True
-
-
 def _digest(rows) -> str:
     ordered = sorted(
-        rows, key=lambda row: (row["relation"], row["to_key"], row["role"] or ""),
+        rows,
+        key=lambda row: (row["relation"], row["from_key"], row["to_key"], row["role"] or ""),
     )
     payload = "\n".join(
-        f"{row['relation']}|{row['to_key']}|{row['to_engine_id']}|{row['role'] or ''}|{row['origin']}"
+        f"{row['relation']}|{row['from_key']}|{row['from_engine_id']}"
+        f"|{row['to_key']}|{row['to_engine_id']}|{row['role'] or ''}|{row['origin']}"
         for row in ordered
     )
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()

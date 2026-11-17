@@ -9,6 +9,7 @@ with no ``about`` edge, and counted as ``subject_unlinked``.
 
 import hashlib
 import io
+import logging
 from contextlib import redirect_stdout
 
 import pygrap
@@ -152,12 +153,14 @@ def _seed(kg, projection, entities, kind_hint):
 
 
 def _statement_text(statement_id, rows):
-    """The two-line node text. Each digest line names that edge's target engine id."""
+    """The two-line node text. Each digest line names both endpoints' engine ids."""
     ordered = sorted(
-        rows, key=lambda row: (row["relation"], row["to_key"], row["role"] or ""),
+        rows,
+        key=lambda row: (row["relation"], row["from_key"], row["to_key"], row["role"] or ""),
     )
     payload = "\n".join(
-        f"{row['relation']}|{row['to_key']}|{row['to_engine_id']}|{row['role'] or ''}|{row['origin']}"
+        f"{row['relation']}|{row['from_key']}|{row['from_engine_id']}"
+        f"|{row['to_key']}|{row['to_engine_id']}|{row['role'] or ''}|{row['origin']}"
         for row in ordered
     )
     digest = hashlib.sha256(payload.encode("utf-8")).hexdigest()
@@ -994,7 +997,7 @@ def test_replaced_entity_node_rewrites_the_statement(tmp_path):
     assert kg.get_node_text(new_statement) == _statement_text(statement_id, rows)
 
 
-def test_absent_item_counts_structural_missing(tmp_path):
+def test_absent_item_counts_structural_missing(tmp_path, caplog):
     """An Item that is not a live node writes no stated_in edge.
 
     structural_missing is 1, printed with n_statements. The Item key is in
@@ -1010,6 +1013,7 @@ def test_absent_item_counts_structural_missing(tmp_path):
         required_behaviour=_span(text, "shall start."),
     )
     item_key = _key("Item", ITEM)
+    caplog.set_level(logging.DEBUG)
     kg = pygrap.IndexedKnowledgeGraph(str(tmp_path / "kg"))
     projection = _projection()
     _project_node(kg, projection, "Requirement", ITEM, SOURCE, SOURCE)
@@ -1035,12 +1039,13 @@ def test_absent_item_counts_structural_missing(tmp_path):
     assert "structural_missing=1" in printed
     assert "n_statements=1" in printed
     assert item_key not in printed
+    assert item_key not in caplog.text
     assert _rows(report, "stated_in", item_key) == []
     statement_node = _entry(projection, "Statement", f"{SOURCE}|{ITEM}|0")["engine_id"]
     assert kg.neighbors_by_relation(statement_node, "stated_in", True) == []
 
 
-def test_absent_entity_key_is_returned_and_not_printed(tmp_path, capsys):
+def test_absent_entity_key_is_returned_and_not_printed(tmp_path, capsys, caplog):
     """An absent entity key is returned and is not written to stdout."""
     from grap_mcp.kee.statements.edges import write_statement_edges
 
@@ -1051,6 +1056,7 @@ def test_absent_entity_key_is_returned_and_not_printed(tmp_path, capsys):
         required_behaviour=_span(text, "shall be fresh."),
     )
     signal_key = _key("Signal", "VehSpdFL")
+    caplog.set_level(logging.DEBUG)
     kg = pygrap.IndexedKnowledgeGraph(str(tmp_path / "kg"))
     projection = _projection()
     _project_node(kg, projection, "Item", ITEM, SOURCE, SOURCE)
@@ -1075,4 +1081,206 @@ def test_absent_entity_key_is_returned_and_not_printed(tmp_path, capsys):
     assert signal_key not in printed
     assert signal_key not in captured.out
     assert signal_key not in captured.err
+    assert signal_key not in caplog.text
     assert _rows(report, "about", signal_key) == []
+
+
+def test_replaced_requirement_rewrites_has_statement(tmp_path):
+    """A replaced Requirement is a new source, so the statement is rewritten.
+
+    remove_node the Requirement and give its key a new node. The second call
+    reports statements_rewritten=1 and structural_missing=0. has_statement
+    reaches the new Requirement. This is a rewrite, not a structural miss.
+    """
+    from grap_mcp.kee.statements.edges import write_statement_edges
+
+    text = "The module shall start."
+    statement = _statement(
+        text,
+        subject=_span(text, "The module"),
+        required_behaviour=_span(text, "shall start."),
+    )
+    entity = _entity("Component", "The module")
+    requirement_key = _key("Requirement", ITEM)
+    statement_id = f"{SOURCE}|{ITEM}|0"
+    kg = pygrap.IndexedKnowledgeGraph(str(tmp_path / "kg"))
+    projection = _projection()
+    _seed(kg, projection, [entity], "requirement")
+    with GraphStore(str(tmp_path / "graph_store.db")) as graph:
+        tables = ResolutionTables(graph)
+        write_statement_mentions(tables, text, SOURCE, ITEM, [statement])
+        mentions = tables.mentions_for_item(SOURCE, ITEM)
+        with redirect_stdout(io.StringIO()):
+            link_identifiers(tables, mentions, [entity], decided_at=DECIDED_AT)
+            write_statement_edges(
+                tables, kg, projection, SOURCE, ITEM, [statement], kind_hint="requirement",
+            )
+        old_requirement = _entry(projection, "Requirement", ITEM)["engine_id"]
+        kg.remove_node(old_requirement)
+        new_requirement = kg.add_node(text=ITEM, label="Requirement")
+        for node in projection["nodes"]:
+            if node["key"] == requirement_key:
+                node["engine_id"] = new_requirement
+        buffer = io.StringIO()
+        with redirect_stdout(buffer):
+            report = write_statement_edges(
+                tables, kg, projection, SOURCE, ITEM, [statement], kind_hint="requirement",
+            )
+    assert report["statements_rewritten"] == 1
+    assert report["structural_missing"] == 0
+    new_statement = _entry(projection, "Statement", statement_id)["engine_id"]
+    assert kg.predecessors_by_relation(new_statement, "has_statement", True) == [
+        (new_requirement, 1.0),
+    ]
+
+
+def test_replaced_item_rewrites_stated_in(tmp_path):
+    """A replaced Item is a new target, so the statement is rewritten.
+
+    The second call reports statements_rewritten=1 and structural_missing=0.
+    stated_in reaches the new Item.
+    """
+    from grap_mcp.kee.statements.edges import write_statement_edges
+
+    text = "The module shall start."
+    statement = _statement(
+        text,
+        subject=_span(text, "The module"),
+        required_behaviour=_span(text, "shall start."),
+    )
+    entity = _entity("Component", "The module")
+    item_key = _key("Item", ITEM)
+    statement_id = f"{SOURCE}|{ITEM}|0"
+    kg = pygrap.IndexedKnowledgeGraph(str(tmp_path / "kg"))
+    projection = _projection()
+    _seed(kg, projection, [entity], "requirement")
+    with GraphStore(str(tmp_path / "graph_store.db")) as graph:
+        tables = ResolutionTables(graph)
+        write_statement_mentions(tables, text, SOURCE, ITEM, [statement])
+        mentions = tables.mentions_for_item(SOURCE, ITEM)
+        with redirect_stdout(io.StringIO()):
+            link_identifiers(tables, mentions, [entity], decided_at=DECIDED_AT)
+            write_statement_edges(
+                tables, kg, projection, SOURCE, ITEM, [statement], kind_hint="requirement",
+            )
+        old_item = _entry(projection, "Item", ITEM)["engine_id"]
+        kg.remove_node(old_item)
+        new_item = kg.add_node(text=ITEM, label="Item")
+        for node in projection["nodes"]:
+            if node["key"] == item_key:
+                node["engine_id"] = new_item
+        with redirect_stdout(io.StringIO()):
+            report = write_statement_edges(
+                tables, kg, projection, SOURCE, ITEM, [statement], kind_hint="requirement",
+            )
+    assert report["statements_rewritten"] == 1
+    assert report["structural_missing"] == 0
+    new_statement = _entry(projection, "Statement", statement_id)["engine_id"]
+    assert kg.neighbors_by_relation(new_statement, "stated_in", True) == [(new_item, 1.0)]
+
+
+def test_two_statements_missing_one_item_keep_a_single_structural_key(tmp_path):
+    """Two statements that miss the same Item record that key once."""
+    from grap_mcp.kee.statements.edges import write_statement_edges
+
+    text = "The module shall start. Com_SendSignal shall stop."
+    first = _statement(
+        text,
+        unit=_span(text, "The module shall start."),
+        subject=_span(text, "The module"),
+        required_behaviour=_span(text, "shall start"),
+    )
+    second = _statement(
+        text,
+        unit=_span(text, "Com_SendSignal shall stop."),
+        subject=_span(text, "Com_SendSignal"),
+        required_behaviour=_span(text, "shall stop."),
+    )
+    item_key = _key("Item", ITEM)
+    kg = pygrap.IndexedKnowledgeGraph(str(tmp_path / "kg"))
+    projection = _projection()
+    _project_node(kg, projection, "Requirement", ITEM, SOURCE, SOURCE)
+    with GraphStore(str(tmp_path / "graph_store.db")) as graph:
+        tables = ResolutionTables(graph)
+        write_statement_mentions(tables, text, SOURCE, ITEM, [first, second])
+        with redirect_stdout(io.StringIO()):
+            report = write_statement_edges(
+                tables, kg, projection, SOURCE, ITEM, [first, second],
+                kind_hint="requirement",
+            )
+    assert report["n_statements"] == 2
+    assert report["structural_missing_keys"] == (item_key,)
+
+
+def test_two_missing_entities_return_sorted_keys(tmp_path):
+    """Two absent entities come back sorted, ZedModule ahead of AaaModule in the text."""
+    from grap_mcp.kee.statements.edges import write_statement_edges
+
+    text = "ZedModule and AaaModule shall start."
+    statement = _statement(
+        text,
+        subject=_span(text, "ZedModule and AaaModule"),
+        required_behaviour=_span(text, "shall start."),
+    )
+    later = _entity("Component", "ZedModule")
+    earlier = _entity("Component", "AaaModule")
+    kg = pygrap.IndexedKnowledgeGraph(str(tmp_path / "kg"))
+    projection = _projection()
+    _project_node(kg, projection, "Item", ITEM, SOURCE, SOURCE)
+    _project_node(kg, projection, "Requirement", ITEM, SOURCE, SOURCE)
+    with GraphStore(str(tmp_path / "graph_store.db")) as graph:
+        tables = ResolutionTables(graph)
+        write_statement_mentions(tables, text, SOURCE, ITEM, [statement])
+        mentions = tables.mentions_for_item(SOURCE, ITEM)
+        with redirect_stdout(io.StringIO()):
+            link_identifiers(tables, mentions, [later, earlier], decided_at=DECIDED_AT)
+            report = write_statement_edges(
+                tables, kg, projection, SOURCE, ITEM, [statement], kind_hint="requirement",
+            )
+    assert report["entity_missing_keys"] == (
+        _key("Component", "AaaModule"),
+        _key("Component", "ZedModule"),
+    )
+
+
+def test_absent_requirement_counts_structural_missing(tmp_path, caplog):
+    """An absent Requirement writes no has_statement edge.
+
+    structural_missing is 1. The Requirement key is returned and is not printed.
+    """
+    from grap_mcp.kee.statements.edges import write_statement_edges
+
+    text = "The module shall start."
+    statement = _statement(
+        text,
+        subject=_span(text, "The module"),
+        required_behaviour=_span(text, "shall start."),
+    )
+    requirement_key = _key("Requirement", ITEM)
+    caplog.set_level(logging.DEBUG)
+    kg = pygrap.IndexedKnowledgeGraph(str(tmp_path / "kg"))
+    projection = _projection()
+    _project_node(kg, projection, "Item", ITEM, SOURCE, SOURCE)
+    _project_node(kg, projection, "Component", "The module", SOURCE, SOURCE)
+    with GraphStore(str(tmp_path / "graph_store.db")) as graph:
+        tables = ResolutionTables(graph)
+        write_statement_mentions(tables, text, SOURCE, ITEM, [statement])
+        mentions = tables.mentions_for_item(SOURCE, ITEM)
+        with redirect_stdout(io.StringIO()):
+            link_identifiers(
+                tables, mentions, [_entity("Component", "The module")], decided_at=DECIDED_AT,
+            )
+        buffer = io.StringIO()
+        with redirect_stdout(buffer):
+            report = write_statement_edges(
+                tables, kg, projection, SOURCE, ITEM, [statement], kind_hint="requirement",
+            )
+        printed = buffer.getvalue()
+    assert report["structural_missing"] == 1
+    assert report["n_statements"] == 1
+    assert report["structural_missing_keys"] == (requirement_key,)
+    assert "structural_missing=1" in printed
+    assert "n_statements=1" in printed
+    assert requirement_key not in printed
+    assert requirement_key not in caplog.text
+    assert [row for row in report["edge_rows"] if row["relation"] == "has_statement"] == []
