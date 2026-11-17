@@ -9,7 +9,10 @@ load, every projection node's engine id must be a live graph node with
 the same label.
 
 ``--provider stub`` is the default. The stub marks nothing. No step reads
-gold/. Item text is not printed.
+gold/. Item text is not printed. Two inputs that share a source id (the
+file stem) stop at step 1 and name both paths. An ARXML file keeps the
+release recorded from its AUTOSAR schema. A mention that already has a
+decision in force is not sent to stage 1 again.
 """
 
 from __future__ import annotations
@@ -35,6 +38,7 @@ from grap_mcp.kee.resolution.exact import (  # noqa: E402
     SourceScope,
     link_identifiers,
 )
+from grap_mcp.kee.resolution.review import decision_in_force  # noqa: E402
 from grap_mcp.kee.resolution.tables import ResolutionTables  # noqa: E402
 from grap_mcp.kee.statements.edges import write_statement_edges  # noqa: E402
 from grap_mcp.kee.statements.marking import mark_items  # noqa: E402
@@ -107,7 +111,7 @@ def main(argv: list[str] | None = None) -> int:
     try:
         _execute(args)
     except ProjectionMismatch as exc:
-        print(str(exc))
+        print(f"step 3 (save) failed: {exc}")
         return 1
     except StepFailure as exc:
         print(f"step {exc.number} ({exc.name}) failed: {exc.message}")
@@ -120,9 +124,24 @@ def _parser() -> argparse.ArgumentParser:
         description="Build the automotive graph from DBC, ARXML, and ReqIF files.",
     )
     parser.add_argument("--dbc", action="append", default=[], help="DBC file (repeatable)")
-    parser.add_argument("--arxml", action="append", default=[], help="ARXML file (repeatable)")
+    parser.add_argument(
+        "--arxml",
+        action="append",
+        default=[],
+        help=(
+            "ARXML file (repeatable). Its release comes from the AUTOSAR "
+            "schema, not from --release"
+        ),
+    )
     parser.add_argument("--reqif", action="append", default=[], help="ReqIF file (repeatable)")
-    parser.add_argument("--release", required=True, help="Release for items that state none")
+    parser.add_argument(
+        "--release",
+        required=True,
+        help=(
+            "Release for items that state none. ARXML keeps the release "
+            "from the AUTOSAR schema"
+        ),
+    )
     parser.add_argument("--out", required=True, type=Path, help="Output directory")
     parser.add_argument(
         "--provider",
@@ -140,32 +159,35 @@ def _execute(args) -> None:
     _guard(3, "save", lambda: _load_if_present(out, graph_dir))
 
     items = _guard(1, "read", lambda: _read(args))
-    # The previous pair matched. Replace its graph with this run's nodes
-    # once the sources have been read.
-    if graph_dir.exists():
-        shutil.rmtree(graph_dir)
-    print("step 2 (project)")
-    kg, projection = _guard(2, "project", lambda: _project(graph_dir, items))
-    _guard(3, "save", lambda: _save_step(graph_dir, projection, kg))
+    # The previous pair matched. Drop graph/ and projection.json together
+    # so a failed step cannot leave one of them behind.
+    _clear_saved_pair(out, graph_dir)
+    try:
+        print("step 2 (project)")
+        kg, projection = _guard(2, "project", lambda: _project(graph_dir, items))
+        _guard(3, "save", lambda: _save_step(graph_dir, projection, kg))
 
-    provider = _provider(args.provider)
-    with GraphStore(str(out / "graph_store.db")) as store:
-        statement_tables = StatementTables(store)
-        resolution = ResolutionTables(store)
-        eligible = [item for item in items if item.kind_hint in _statement_item_kinds()]
-        _guard(4, "statements", lambda: _statements(eligible, provider, statement_tables))
-        mentions = _guard(
-            5, "mentions", lambda: _mentions(eligible, statement_tables, resolution),
-        )
-        _guard(
-            6, "resolve",
-            lambda: _resolve(mentions, items, projection, resolution),
-        )
-        _guard(
-            7, "edges",
-            lambda: _edges(eligible, statement_tables, resolution, kg, projection, graph_dir),
-        )
-    _guard(8, "questions", lambda: _questions(kg, projection))
+        provider = _provider(args.provider)
+        with GraphStore(str(out / "graph_store.db")) as store:
+            statement_tables = StatementTables(store)
+            resolution = ResolutionTables(store)
+            eligible = [item for item in items if item.kind_hint in _statement_item_kinds()]
+            _guard(4, "statements", lambda: _statements(eligible, provider, statement_tables))
+            mentions = _guard(
+                5, "mentions", lambda: _mentions(eligible, statement_tables, resolution),
+            )
+            _guard(
+                6, "resolve",
+                lambda: _resolve(mentions, items, projection, resolution),
+            )
+            _guard(
+                7, "edges",
+                lambda: _edges(eligible, statement_tables, resolution, kg, projection, graph_dir),
+            )
+        _guard(8, "questions", lambda: _questions(kg, projection))
+    except Exception:
+        _clear_saved_pair(out, graph_dir)
+        raise
 
 
 def _guard(number: int, name: str, fn):
@@ -174,7 +196,7 @@ def _guard(number: int, name: str, fn):
     except (StepFailure, ProjectionMismatch):
         raise
     except Exception as exc:
-        raise StepFailure(number, name, f"{type(exc).__name__}: {exc}") from exc
+        raise StepFailure(number, name, type(exc).__name__) from exc
 
 
 def _load_if_present(out: Path, graph_dir: Path) -> None:
@@ -186,9 +208,20 @@ def _load_if_present(out: Path, graph_dir: Path) -> None:
     load_graph_and_projection(graph_dir)
 
 
+def _clear_saved_pair(out: Path, graph_dir: Path) -> None:
+    if graph_dir.exists():
+        shutil.rmtree(graph_dir)
+    projection_path = out / "projection.json"
+    if projection_path.exists():
+        projection_path.unlink()
+
+
 def _read(args) -> list:
     if not args.dbc and not args.arxml and not args.reqif:
         raise StepFailure(1, "read", "no source files")
+    duplicate = _duplicate_source_ids(args)
+    if duplicate:
+        raise StepFailure(1, "read", duplicate)
     items = []
     if args.dbc:
         found = _read_files(read_dbc, args.dbc, args.release)
@@ -205,18 +238,73 @@ def _read(args) -> list:
     return items
 
 
+def _duplicate_source_ids(args) -> str | None:
+    """One source id is the file stem. Two inputs must not share one."""
+    owners: dict[str, list[str]] = {}
+
+    def add(source_id: str, path: str) -> None:
+        owners.setdefault(source_id, []).append(path)
+
+    for path in args.dbc:
+        add(Path(path).stem, str(path))
+    for path in args.reqif:
+        add(Path(path).stem, str(path))
+    if args.arxml:
+        first = min(args.arxml, key=lambda path: Path(path).as_posix())
+        add(Path(first).stem, str(first))
+    collisions = [
+        (source_id, paths)
+        for source_id, paths in owners.items()
+        if len(paths) > 1
+    ]
+    if not collisions:
+        return None
+    parts = []
+    for source_id, paths in sorted(collisions):
+        parts.append(
+            f"duplicate source id {source_id!r} for {' and '.join(paths)}"
+        )
+    return "; ".join(parts)
+
+
 def _read_files(reader, paths, release: str) -> list:
     items = []
     for path in paths:
-        items.extend(reader(path, corpus_root=Path(path).parent))
+        try:
+            items.extend(reader(path, corpus_root=Path(path).parent))
+        except StepFailure:
+            raise
+        except Exception as exc:
+            raise StepFailure(1, "read", f"{type(exc).__name__}: {path}") from exc
     return _with_release(items, release)
 
 
 def _read_arxml(paths, release: str) -> list:
     ordered = sorted((Path(path) for path in paths), key=lambda path: path.as_posix())
     source_id = ordered[0].stem
-    items, _report = read_arxml(ordered, source_id=source_id)
-    return _with_release(list(items), release)
+    try:
+        items, _report = read_arxml(ordered, source_id=source_id)
+    except StepFailure:
+        raise
+    except Exception as exc:
+        shown = ", ".join(str(path) for path in ordered)
+        raise StepFailure(1, "read", f"{type(exc).__name__}: {shown}") from exc
+    stamped = _with_release(list(items), release)
+    _print_arxml_releases(ordered, stamped)
+    return stamped
+
+
+def _print_arxml_releases(paths, items) -> None:
+    by_file: dict[str, set] = {}
+    for item in items:
+        if item.kind_hint == "unresolved" or not item.file:
+            continue
+        by_file.setdefault(item.file, set()).add(item.release)
+    for path in paths:
+        releases = by_file.get(path.as_posix(), set())
+        release = next(iter(releases)) if len(releases) == 1 else None
+        shown = release if isinstance(release, str) and release != "" else "n/a"
+        print(f"arxml {path.name} release={shown} (from the AUTOSAR schema)")
 
 
 def _with_release(items, release: str) -> list:
@@ -247,7 +335,6 @@ def _project(graph_dir: Path, items):
 
 
 def _save_step(graph_dir: Path, projection, kg) -> None:
-    print("step 3 (save)")
     save_graph_and_projection(graph_dir, projection, kg)
     nodes = len(projection["nodes"])
     documents = projection["counts"]["documents"]
@@ -311,12 +398,31 @@ def _mentions(eligible, statement_tables, resolution) -> list:
 
 def _resolve(mentions, items, projection, resolution) -> None:
     print("step 6 (resolve)")
+    pending = [
+        mention for mention in mentions
+        if not _already_decided(resolution, mention)
+    ]
     link_identifiers(
         resolution,
-        mentions,
+        pending,
         _entities(projection),
         sources=_sources(items),
         decided_at=datetime.now(timezone.utc).isoformat(timespec="seconds"),
+    )
+
+
+def _already_decided(tables, mention) -> bool:
+    """True when the mention already has a decision in force."""
+    mention_id = getattr(mention, "mention_id", None)
+    if isinstance(mention_id, bool) or not isinstance(mention_id, int):
+        return False
+    rows = tables.conn.execute(
+        "SELECT DISTINCT entity_key FROM link_decisions WHERE mention_id = ?",
+        (mention_id,),
+    ).fetchall()
+    return any(
+        decision_in_force(tables, mention_id, row["entity_key"]) is not None
+        for row in rows
     )
 
 
