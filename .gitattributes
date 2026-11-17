@@ -3,3 +3,5 @@ mcp-server/tests/fixtures/arxml/*.arxml -text
 mcp-server/tests/fixtures/arxml/SHA256SUMS -text
 # Stored byte-for-byte: SHA256SUMS is checked against these exact bytes.
 mcp-server/tests/fixtures/loom_judge/* -text
+# Stored byte-for-byte: SHA256SUMS is checked against these exact bytes.
+mcp-server/tests/fixtures/loom_dbc_dump/* -text
