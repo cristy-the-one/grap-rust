@@ -17,13 +17,15 @@ Judgements this card had to make, and the tests lock in:
   error. A native id on more than one node is an error until the caller
   names a node key.
 - ``{{name}}`` is checked at load. Outside ``{{#cases}}`` the fields are
-  ``title`` and ``level``. Inside, the §5 case fields plus ``level``.
-  The block is the exact text between the markers. One block, no nesting.
+  ``title`` and ``level``. Inside, the §5a case fields plus ``level``.
+  ``checks`` is stored and is not a placeholder. The block is the exact
+  text between the markers. One block, no nesting.
 - ``level`` on the specification and on every case is the template
   header. A level on the draft is replaced. Fields outside §5 are not
-  stored. A line whose only placeholder is ``{{variant}}`` is omitted
-  when the case has no variant or the variant is ``""``. An empty
-  variant is not stored.
+  stored. ``checks`` (§5b) is stored as given, including ``[]``. It is
+  not a template placeholder. A line whose only placeholder is
+  ``{{variant}}`` is omitted when the case has no variant or the variant
+  is ``""``. An empty variant is not stored.
 - An item's own text is the engine text after the ``native_id`` line.
   The line is how the projection stores the id, not part of the text.
 - ``passed`` must be ``True``. Otherwise nothing is written.
@@ -46,8 +48,11 @@ FIXED_TEXT = (
     "Do not invent an identifier. The template sets level; do not set it.\n"
     "The JSON object has title and cases. Each case has id, verifies, "
     "preconditions, stimulus, expected_observable_result, pass_criterion, "
-    "kind (positive or negative), uses, and variant. "
+    "kind (positive or negative), uses, variant, and checks. "
     "An empty variant means no variant. "
+    "checks is required and may be empty. "
+    "Leave checks empty when the requirement is observable only inside the ECU, "
+    "or when the signal is not a DBC Signal in the case's uses. "
     "verifies and uses are lists.\n"
 )
 
@@ -293,6 +298,8 @@ def _specification(draft: Any, template: Mapping[str, Any]) -> dict:
             if field == "variant" and case[field] == "":
                 continue
             stored[field] = case[field]
+        if "checks" in case:
+            stored["checks"] = case["checks"]
         stored["level"] = template["level"]
         cases.append(stored)
     return {"title": title, "level": template["level"], "cases": cases}
