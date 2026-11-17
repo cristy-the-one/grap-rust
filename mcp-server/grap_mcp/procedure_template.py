@@ -21,7 +21,9 @@ Judgements this card had to make, and the tests lock in:
   The block is the exact text between the markers. One block, no nesting.
 - ``level`` on the specification and on every case is the template
   header. A level on the draft is replaced. Fields outside §5 are not
-  stored.
+  stored. A line whose only placeholder is ``{{variant}}`` is omitted
+  when the case has no variant or the variant is ``""``. An empty
+  variant is not stored.
 - An item's own text is the engine text after the ``native_id`` line.
   The line is how the projection stores the id, not part of the text.
 - ``passed`` must be ``True``. Otherwise nothing is written.
@@ -44,7 +46,8 @@ FIXED_TEXT = (
     "Do not invent an identifier. The template sets level; do not set it.\n"
     "The JSON object has title and cases. Each case has id, verifies, "
     "preconditions, stimulus, expected_observable_result, pass_criterion, "
-    "kind (positive or negative), uses, and optional variant. "
+    "kind (positive or negative), uses, and variant. "
+    "An empty variant means no variant. "
     "verifies and uses are lists.\n"
 )
 
@@ -285,8 +288,11 @@ def _specification(draft: Any, template: Mapping[str, Any]) -> dict:
             raise TemplateError("case is not a mapping")
         stored: dict[str, Any] = {}
         for field in _CASE_FIELDS:
-            if field in case and case[field] is not None:
-                stored[field] = case[field]
+            if field not in case or case[field] is None:
+                continue
+            if field == "variant" and case[field] == "":
+                continue
+            stored[field] = case[field]
         stored["level"] = template["level"]
         cases.append(stored)
     return {"title": title, "level": template["level"], "cases": cases}
@@ -561,6 +567,9 @@ def _check_fields(text: str, allowed: frozenset, where: str) -> None:
 
 
 def _fill(text: str, record: Mapping[str, Any], allowed: frozenset) -> str:
+    if _variant_absent(record):
+        text = _without_variant_lines(text)
+
     def replace(match: re.Match) -> str:
         name = match.group(1)
         if name not in allowed:
@@ -569,6 +578,23 @@ def _fill(text: str, record: Mapping[str, Any], allowed: frozenset) -> str:
         return _render_value(name, value)
 
     return _FIELD.sub(replace, text)
+
+
+def _variant_absent(record: Mapping[str, Any]) -> bool:
+    """``""`` is no variant. A missing variant is the same."""
+    if not isinstance(record, Mapping) or "variant" not in record:
+        return True
+    return record.get("variant") == "" or record.get("variant") is None
+
+
+def _without_variant_lines(text: str) -> str:
+    """Drop a line whose only placeholder is ``{{variant}}``."""
+    kept = []
+    for line in text.split("\n"):
+        if "{{variant}}" in line and "{{" not in line.replace("{{variant}}", ""):
+            continue
+        kept.append(line)
+    return "\n".join(kept)
 
 
 def _render_value(name: str, value: Any) -> str:

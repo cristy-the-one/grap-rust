@@ -1,0 +1,50 @@
+# P-16. spec-procedure-runtime.md §5 and §11.
+# scope source "corpus" is a placeholder. A run passes the scope it has.
+# §6: refine may send issues back at most max_rounds times. The default is 2.
+name: generate-test-spec
+description: Generate a test specification from a set of requirements.
+version: "0.1"
+steps:
+  - id: select
+    operation: select_requirements
+    inputs:
+      scope:
+        source: corpus
+  - id: context
+    operation: fetch_context
+    inputs:
+      requirements: select.outputs.requirements
+  - id: template
+    operation: choose_template
+    inputs:
+      requirements: select.outputs.requirements
+      template_id: default
+  - id: compose
+    operation: compose_instructions
+    inputs:
+      requirements: select.outputs.requirements
+      context: context.outputs.context
+      template: template.outputs.template
+  - id: model
+    operation: invoke_model
+    inputs:
+      instructions: compose.outputs.instructions
+  - id: check
+    operation: validate_output
+    inputs:
+      draft: model.outputs.draft
+      requirements: select.outputs.requirements
+      context: context.outputs.context
+  - id: revise
+    operation: refine
+    inputs:
+      issues: check.outputs.issues
+    max_rounds: 2
+    guards:
+      - {ref: check.outputs.passed, op: eq, value: false}
+  - id: publish
+    operation: emit
+    inputs:
+      draft: model.outputs.draft
+      template: template.outputs.template
+      passed: check.outputs.passed
