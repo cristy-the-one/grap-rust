@@ -12,6 +12,7 @@ No automotive corpus is chosen (P-17). These tests build one requirement
 in the test itself. They do not read gold/ or real-data-law-ro/.
 """
 
+import copy
 import hashlib
 import json
 from pathlib import Path
@@ -440,6 +441,16 @@ _LEAVE_CHECKS_EMPTY = (
 )
 
 
+def _with_absent_sentinels(check):
+    """Every schema key present. [] and null are the absent sentinels."""
+    item = copy.deepcopy(check)
+    item.setdefault("given", [])
+    for condition in (item["when"], item["expect"], *item["given"]):
+        condition.setdefault("tolerance", None)
+        condition["signal"].setdefault("channel", None)
+    return item
+
+
 def _section_3_check():
     """The check object in signal-loom's plan §3, including its given."""
     return {
@@ -479,9 +490,9 @@ def test_draft_schema_checks_follow_section_3_and_a_missing_key_is_rejected():
     condition = DRAFT_SCHEMA["$defs"]["condition"]
     signal = DRAFT_SCHEMA["$defs"]["signal"]
     assert check["additionalProperties"] is False
-    assert check["required"] == ["id", "when", "expect", "mode", "within_ms"]
+    assert check["required"] == ["id", "given", "when", "expect", "mode", "within_ms"]
     assert "given" in check["properties"]
-    assert "given" not in check["required"]
+    assert "given" in check["required"]
     assert check["properties"]["given"] == {
         "type": "array",
         "items": {"$ref": "#/$defs/condition"},
@@ -502,9 +513,9 @@ def test_draft_schema_checks_follow_section_3_and_a_missing_key_is_rejected():
         "items": {"type": "integer", "minimum": 0, "maximum": 3600000},
     }
     assert condition["additionalProperties"] is False
-    assert condition["required"] == ["signal", "op", "value"]
+    assert condition["required"] == ["signal", "op", "value", "tolerance"]
     assert "tolerance" in condition["properties"]
-    assert "tolerance" not in condition["required"]
+    assert "tolerance" in condition["required"]
     assert condition["properties"]["signal"] == {"$ref": "#/$defs/signal"}
     assert condition["properties"]["op"] == {
         "enum": ["==", "!=", ">", ">=", "<", "<="],
@@ -513,12 +524,17 @@ def test_draft_schema_checks_follow_section_3_and_a_missing_key_is_rejected():
     assert condition["properties"]["value"] == {
         "anyOf": [{"type": "number"}, {"type": "string"}],
     }
-    assert condition["properties"]["tolerance"] == {"type": "number", "minimum": 0}
+    assert condition["properties"]["tolerance"] == {
+        "anyOf": [{"type": "number", "minimum": 0}, {"type": "null"}],
+    }
     assert signal["additionalProperties"] is False
-    assert signal["required"] == ["message", "signal"]
+    assert signal["required"] == ["message", "signal", "channel"]
     assert signal["properties"] == {
         "message": {"type": "string"},
         "signal": {"type": "string"},
+        "channel": {
+            "anyOf": [{"type": "integer", "minimum": 0}, {"type": "null"}],
+        },
     }
     reply = _reply()
     del reply["cases"][0]["checks"]
@@ -540,9 +556,9 @@ def test_empty_checks_are_accepted():
 
 
 def test_one_valid_section_3_check_is_accepted():
-    """§3.2. The plan's check is kept. given and tolerance may be absent."""
+    """§3.2. The plan's check is kept. null and [] are stored as absent."""
     check = _section_3_check()
-    provider = _SchemaProvider(_reply(checks=[check]))
+    provider = _SchemaProvider(_reply(checks=[_with_absent_sentinels(check)]))
     draft = invoke_model("write the lamp test", provider, _TEMPLATE)
     assert draft["cases"][0]["checks"] == [check]
 
@@ -562,7 +578,7 @@ def test_one_valid_section_3_check_is_accepted():
         "mode": "never",
         "within_ms": [0, 0],
     }
-    kept = _SchemaProvider(_reply(checks=[minimal]))
+    kept = _SchemaProvider(_reply(checks=[_with_absent_sentinels(minimal)]))
     assert invoke_model("again", kept, _TEMPLATE)["cases"][0]["checks"] == [minimal]
 
 
@@ -571,14 +587,14 @@ def test_a_malformed_check_is_rejected():
     bad_op = _section_3_check()
     bad_op["when"] = dict(bad_op["when"])
     bad_op["when"]["op"] = "eq"
-    provider = StubProvider(responses=[json.dumps(_reply(checks=[bad_op]))])
+    provider = StubProvider(responses=[json.dumps(_reply(checks=[_with_absent_sentinels(bad_op)]))])
     with pytest.raises(ModelError, match="when op"):
         invoke_model("write a test", provider, _TEMPLATE)
     assert len(provider.calls) == 1
 
     reversed_window = _section_3_check()
     reversed_window["within_ms"] = [100, 0]
-    window = StubProvider(responses=[json.dumps(_reply(checks=[reversed_window]))])
+    window = StubProvider(responses=[json.dumps(_reply(checks=[_with_absent_sentinels(reversed_window)]))])
     with pytest.raises(ModelError, match="within_ms"):
         invoke_model("write a test", window, _TEMPLATE)
 
@@ -586,14 +602,72 @@ def test_a_malformed_check_is_rejected():
     tolerated["expect"] = dict(tolerated["expect"])
     tolerated["expect"]["op"] = ">"
     tolerated["expect"]["tolerance"] = 0
-    wrong_op = StubProvider(responses=[json.dumps(_reply(checks=[tolerated]))])
+    wrong_op = StubProvider(responses=[json.dumps(_reply(checks=[_with_absent_sentinels(tolerated)]))])
     with pytest.raises(ModelError, match="tolerance"):
         invoke_model("write a test", wrong_op, _TEMPLATE)
 
     shared = _section_3_check()
-    duplicate = StubProvider(responses=[json.dumps(_reply(checks=[shared, shared]))])
+    duplicate = StubProvider(responses=[json.dumps(_reply(checks=[
+        _with_absent_sentinels(shared), _with_absent_sentinels(shared),
+    ]))])
     with pytest.raises(ModelError, match="share an id"):
         invoke_model("write a test", duplicate, _TEMPLATE)
+
+
+def test_given_empty_and_tolerance_null_are_accepted_and_required():
+    """Strict schema, as for variant. given [], tolerance null, and channel
+    null are present and mean absent. tolerance null on a non-equality op
+    is accepted. A negative channel is refused.
+    """
+    check = DRAFT_SCHEMA["$defs"]["check"]
+    condition = DRAFT_SCHEMA["$defs"]["condition"]
+    signal = DRAFT_SCHEMA["$defs"]["signal"]
+    assert "given" in check["required"]
+    assert "tolerance" in condition["required"]
+    assert "channel" in signal["required"]
+
+    payload = {
+        "id": "c-absent",
+        "given": [],
+        "when": {
+            "signal": {"message": "BrakeCmd", "signal": "BrakePedal", "channel": None},
+            "op": ">",
+            "value": 1,
+            "tolerance": None,
+        },
+        "expect": {
+            "signal": {"message": "Lamps", "signal": "BrakeLamp", "channel": 0},
+            "op": "==",
+            "value": 1,
+            "tolerance": None,
+        },
+        "mode": "eventually",
+        "within_ms": [0, 100],
+    }
+    provider = _SchemaProvider(_reply(checks=[payload]))
+    draft = invoke_model("write the lamp test", provider, _TEMPLATE)
+    assert draft["cases"][0]["checks"] == [{
+        "id": "c-absent",
+        "when": {
+            "signal": {"message": "BrakeCmd", "signal": "BrakePedal"},
+            "op": ">",
+            "value": 1,
+        },
+        "expect": {
+            "signal": {"message": "Lamps", "signal": "BrakeLamp", "channel": 0},
+            "op": "==",
+            "value": 1,
+        },
+        "mode": "eventually",
+        "within_ms": [0, 100],
+    }]
+
+    negative = _with_absent_sentinels(_section_3_check())
+    negative["when"]["signal"]["channel"] = -1
+    refused = StubProvider(responses=[json.dumps(_reply(checks=[negative]))])
+    with pytest.raises(ModelError, match="channel"):
+        invoke_model("write a test", refused, _TEMPLATE)
+    assert len(refused.calls) == 1
 
 
 def test_the_prompt_says_when_to_leave_checks_empty():

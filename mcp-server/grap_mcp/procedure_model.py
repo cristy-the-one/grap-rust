@@ -16,8 +16,11 @@ Judgements this card had to make, and the tests lock in:
 - The reply is one object with ``title`` and ``cases``. Each case has the
   §5 fields. ``variant`` is required and may be ``""``. ``checks`` is
   required and may be ``[]``. A check follows signal-loom's plan §3.1 and
-  §3.2: ``given`` and ``tolerance`` may be absent, and two checks in one
-  case may not share an ``id``. ``level`` on the object or on a case is
+  §3.2. ``given``, ``tolerance`` and ``channel`` are required keys;
+  ``[]`` and ``null`` mean absent and are not stored. A numeric
+  ``tolerance`` on an operator other than ``==`` or ``!=`` is refused;
+  ``null`` there is absent. Two checks in one case may not share an
+  ``id``. ``level`` on the object or on a case is
   dropped and never copied onto the draft. Each case that carried a
   ``level`` adds one to ``level_ignored``. Any other extra field is an
   error after the one call. There is no retry inside the call.
@@ -103,10 +106,11 @@ _EQUALITY_OPS = ("==", "!=")
 _MODES = ("eventually", "always", "never")
 # §3.2 writes this upper bound as 3 600 000.
 _WINDOW_MAX_MS = 3600000
-_CHECK_REQUIRED = ("id", "when", "expect", "mode", "within_ms")
-_CHECK_OPTIONAL = frozenset({"given"})
-_CONDITION_REQUIRED = ("signal", "op", "value")
-_CONDITION_OPTIONAL = frozenset({"tolerance"})
+_CHECK_REQUIRED = ("id", "given", "when", "expect", "mode", "within_ms")
+_CHECK_OPTIONAL = frozenset()
+_CONDITION_REQUIRED = ("signal", "op", "value", "tolerance")
+_CONDITION_OPTIONAL = frozenset()
+_SIGNAL_REQUIRED = ("message", "signal", "channel")
 
 DRAFT_SCHEMA = {
     "type": "object",
@@ -175,16 +179,27 @@ DRAFT_SCHEMA = {
                 "signal": {"$ref": "#/$defs/signal"},
                 "op": {"enum": list(_OPS), "type": "string"},
                 "value": {"anyOf": [{"type": "number"}, {"type": "string"}]},
-                "tolerance": {"type": "number", "minimum": 0},
+                "tolerance": {
+                    "anyOf": [
+                        {"type": "number", "minimum": 0},
+                        {"type": "null"},
+                    ],
+                },
             },
         },
         "signal": {
             "type": "object",
             "additionalProperties": False,
-            "required": ["message", "signal"],
+            "required": list(_SIGNAL_REQUIRED),
             "properties": {
                 "message": {"type": "string"},
                 "signal": {"type": "string"},
+                "channel": {
+                    "anyOf": [
+                        {"type": "integer", "minimum": 0},
+                        {"type": "null"},
+                    ],
+                },
             },
         },
     },
@@ -415,10 +430,10 @@ def _parse_check(index: int, check_index: int, check: Any) -> dict:
     if not isinstance(check["id"], str):
         raise ModelError(f"{where} id must be a string")
     stored: dict[str, Any] = {"id": check["id"]}
-    if "given" in check:
-        stored["given"] = _parse_condition_list(
-            index, check_index, "given", check["given"],
-        )
+    # [] means absent, the same as leaving given out.
+    given = _parse_condition_list(index, check_index, "given", check["given"])
+    if given:
+        stored["given"] = given
     stored["when"] = _parse_condition(index, check_index, "when", check["when"])
     stored["expect"] = _parse_condition(index, check_index, "expect", check["expect"])
     if check["mode"] not in _MODES:
@@ -450,8 +465,9 @@ def _parse_condition(index: int, check_index: int, name: str, value: Any) -> dic
         "op": op,
         "value": _parse_condition_value(where, value["value"]),
     }
-    if "tolerance" in value:
-        tolerance = value["tolerance"]
+    # null means absent, including on an operator other than == and !=.
+    tolerance = value["tolerance"]
+    if tolerance is not None:
         if op not in _EQUALITY_OPS:
             raise ModelError(f"{where} tolerance applies to == and != only")
         if not _is_number(tolerance) or tolerance < 0:
@@ -463,12 +479,21 @@ def _parse_condition(index: int, check_index: int, name: str, value: Any) -> dic
 def _parse_signal(where: str, value: Any) -> dict:
     if not isinstance(value, dict):
         raise ModelError(f"{where} signal is not an object")
-    _expect_fields(where + " signal", value, ("message", "signal"), frozenset())
+    _expect_fields(where + " signal", value, _SIGNAL_REQUIRED, frozenset())
     message = value["message"]
     signal = value["signal"]
     if not isinstance(message, str) or not isinstance(signal, str):
         raise ModelError(f"{where} signal message and signal must be strings")
-    return {"message": message, "signal": signal}
+    stored = {"message": message, "signal": signal}
+    # null means absent. 0 is a channel.
+    channel = value["channel"]
+    if channel is not None:
+        if not _is_int(channel) or channel < 0:
+            raise ModelError(
+                f"{where} signal channel must be an integer >= 0 or null"
+            )
+        stored["channel"] = channel
+    return stored
 
 
 def _parse_condition_value(where: str, value: Any) -> Any:
