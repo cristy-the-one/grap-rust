@@ -87,6 +87,24 @@ def _extra_body_from_env() -> dict:
     return obj if isinstance(obj, dict) else {}
 
 
+def _completion_usage(body: object) -> Optional[dict]:
+    """Map an OpenAI ``usage`` object to ``{"prompt", "completion"}``.
+
+    ``None`` when the server sends no integer prompt and completion counts.
+    """
+    if not isinstance(body, dict):
+        return None
+    usage = body.get("usage")
+    if not isinstance(usage, dict):
+        return None
+    prompt = usage.get("prompt_tokens")
+    completion = usage.get("completion_tokens")
+    if (isinstance(prompt, bool) or isinstance(completion, bool)
+            or not isinstance(prompt, int) or not isinstance(completion, int)):
+        return None
+    return {"prompt": prompt, "completion": completion}
+
+
 def _check_finish_reason(choice: dict) -> None:
     # Some compatible servers omit this field. Honor explicit failure signals:
     # valid-looking partial JSON must never replace previously extracted claims.
@@ -180,6 +198,8 @@ class OpenAICompatProvider:
         return {key: copy.deepcopy(payload[key]) for key in keys if key in payload}
 
     def complete(self, system: str, user: str) -> str:
+        # Drop the previous call before this one can fail or omit usage.
+        self.last_usage = None
         url = f"{self.base_url}/chat/completions"
         data = json.dumps(self._payload(system, user, stream=False)).encode("utf-8")
         headers = {"Content-Type": "application/json"}
@@ -197,6 +217,7 @@ class OpenAICompatProvider:
                 content = choice["message"]["content"]
                 if not isinstance(content, str):
                     raise TypeError("completion content must be text")
+                self.last_usage = _completion_usage(body)
                 return content
             except urllib.error.HTTPError as exc:
                 last_exc = exc

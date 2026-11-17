@@ -24,10 +24,13 @@ Judgements this card had to make, and the tests lock in:
   operation signature stays ``instructions`` to ``draft``.
 - ``duration_ms`` is ``int((time.perf_counter() after the call) -
   (time.perf_counter() before it))`` in milliseconds, for every provider,
-  including the stub. ``kee/llm.py`` ``complete`` returns text and does
-  not keep the provider's usage object, and this module does not change
-  that file. ``token_counts`` stays ``n/a`` unless the provider object
-  already exposes ``usage`` or ``token_counts`` as a mapping of integers.
+  including the stub. ``kee/llm.py`` ``complete`` returns the same text
+  and keeps ``last_usage`` on the provider that served the call
+  (``{"prompt": int, "completion": int}``, or ``None`` when the server
+  sends none). ``token_counts`` reads that ``last_usage``. It stays
+  ``n/a`` unless the value is a mapping of integers. A stub leaves it
+  unset, so a stub stays ``n/a``. ``with_json_schema`` copies the
+  provider, so the read is the copy ``complete`` ran on.
 - Documents are not on the draft, so the model line prints ``n_docs=n/a``.
   ``n_cases`` is the number of cases in the reply.
 - The file's scope source ``corpus`` is a placeholder. A run passes the
@@ -239,7 +242,7 @@ def _call(instructions: Any, provider, template: Mapping[str, Any]) -> tuple[dic
         "model": _model_name(provider),
         "instructions": instructions,
         "prompt_hash": hashlib.sha256(instructions.encode("utf-8")).hexdigest(),
-        "token_counts": _token_counts(provider),
+        "token_counts": _token_counts(target),
         "duration_ms": duration_ms,
         "n_cases": len(draft["cases"]),
         "level_ignored": level_ignored,
@@ -329,15 +332,12 @@ def _string_list(index: int, name: str, value: Any) -> list:
 
 
 def _token_counts(provider) -> Any:
-    """Copy integer usage when the provider already exposes it.
+    """Copy integer counts from ``last_usage``.
 
-    ``complete`` returns text. ``kee/llm.py`` does not keep the response
-    usage, and this module does not change that file, so a stub stays
-    ``n/a``.
+    ``complete`` returns text and records ``last_usage`` on the provider
+    that served the call. ``None`` or a missing value stays ``n/a``.
     """
-    raw = getattr(provider, "usage", None)
-    if raw is None:
-        raw = getattr(provider, "token_counts", None)
+    raw = getattr(provider, "last_usage", None)
     if not isinstance(raw, Mapping) or not raw:
         return "n/a"
     clean = {}
