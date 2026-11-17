@@ -292,19 +292,8 @@ class _Log:
     def _keep(self, payload: dict) -> None:
         if payload["event_type"] != "procedure_run":
             self.events.append(payload)
-        text = json.dumps(payload, sort_keys=True, ensure_ascii=False)
-        version = self.workspace.record_explanation(
-            text,
-            metadata={"event_type": payload["event_type"], "run_id": self.run_id},
-        )
-        self.hashes.append(version.hash)
-        _append_audit(
-            self.workspace_root,
-            payload["event_type"],
-            self.run_id,
-            _details(payload),
-            list(payload.get("links") or []),
-            version.hash,
+        self.hashes.append(
+            keep_event(self.workspace, self.workspace_root, self.run_id, payload)
         )
 
     def _complete(self, status: str, procedure_status: str, replayable: bool) -> None:
@@ -707,7 +696,32 @@ def _details(payload: Mapping[str, Any]) -> dict[str, str]:
         details["status"] = str(payload.get("status", ""))
         details["replayable"] = "true" if payload.get("replayable") else "false"
         details["replay_note"] = str(payload.get("replay_note", ""))
+    if payload.get("event_type") == "judge_verdict":
+        details["case"] = payload["case_id"]
+        details["verdict"] = payload["verdict"]
     return details
+
+
+def keep_event(workspace, workspace_root, run_id: str, payload: Mapping[str, Any]) -> str:
+    """Store one event and return its explanation hash.
+
+    An explanation record, then one audit line for ``run_id``. This is the
+    body of ``_Log._keep``. It does not complete the run.
+    """
+    text = json.dumps(payload, sort_keys=True, ensure_ascii=False)
+    version = workspace.record_explanation(
+        text,
+        metadata={"event_type": payload["event_type"], "run_id": run_id},
+    )
+    _append_audit(
+        workspace_root,
+        payload["event_type"],
+        run_id,
+        _details(payload),
+        list(payload.get("links") or []),
+        version.hash,
+    )
+    return version.hash
 
 
 def _append_audit(workspace_root, event_type: str, run_id: str, details: dict, node_links, explanation_hash: str) -> None:
