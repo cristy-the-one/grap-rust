@@ -12,6 +12,7 @@ No automotive corpus is chosen (P-17). These tests build one requirement
 in the test itself. They do not read gold/ or real-data-law-ro/.
 """
 
+import copy
 import hashlib
 import json
 from pathlib import Path
@@ -23,12 +24,13 @@ from grap_mcp.kee.llm import StubProvider
 from grap_mcp.procedure_model import (
     DRAFT_SCHEMA,
     PROCEDURE_PATH,
+    SYSTEM,
     ModelError,
     invoke_model,
     run_generate_test_spec,
 )
 from grap_mcp.procedure_runtime import load_procedure_file
-from grap_mcp.procedure_template import render
+from grap_mcp.procedure_template import FIXED_TEXT, emit, render
 from grap_mcp.procedure_validate import validate_output
 from grap_mcp.readers import SourceItem
 from grap_mcp.schema.project import project_items
@@ -43,6 +45,7 @@ _CASE_REQUIRED = (
     "variant",
     "kind",
     "uses",
+    "checks",
 )
 _TEMPLATE = {
     "id": "default",
@@ -62,6 +65,7 @@ def _case(**overrides):
         "kind": "positive",
         "uses": [],
         "variant": "",
+        "checks": [],
     }
     case.update(overrides)
     return case
@@ -428,3 +432,270 @@ def test_empty_variant_is_required_renders_no_variant_line_and_passes():
         context,
     )
     assert result == {"issues": [], "passed": True}
+
+
+# §5b / signal-loom plan §3. The sentence the model is told, in both prompts.
+_LEAVE_CHECKS_EMPTY = (
+    "Leave checks empty when the requirement is observable only inside the ECU, "
+    "or when the signal is not a DBC Signal in the case's uses."
+)
+
+
+def _with_absent_sentinels(check):
+    """Every schema key present. [] and null are the absent sentinels."""
+    item = copy.deepcopy(check)
+    item.setdefault("given", [])
+    for condition in (item["when"], item["expect"], *item["given"]):
+        condition.setdefault("tolerance", None)
+        condition["signal"].setdefault("channel", None)
+    return item
+
+
+def _section_3_check():
+    """The check object in signal-loom's plan §3, including its given."""
+    return {
+        "id": "c1",
+        "given": [
+            {
+                "signal": {"message": "Ignition", "signal": "IgnState"},
+                "op": "==",
+                "value": "ON",
+            }
+        ],
+        "when": {
+            "signal": {"message": "BrakeCmd", "signal": "BrakePedal"},
+            "op": "==",
+            "value": 1,
+        },
+        "expect": {
+            "signal": {"message": "Lamps", "signal": "BrakeLamp"},
+            "op": "==",
+            "value": 1,
+        },
+        "mode": "eventually",
+        "within_ms": [0, 100],
+    }
+
+
+def test_draft_schema_checks_follow_section_3_and_a_missing_key_is_rejected():
+    """§5b. checks is required. A stub reply with no checks key is refused."""
+    case = DRAFT_SCHEMA["$defs"]["case"]
+    assert case["additionalProperties"] is False
+    assert "checks" in case["required"]
+    assert case["properties"]["checks"] == {
+        "type": "array",
+        "items": {"$ref": "#/$defs/check"},
+    }
+    check = DRAFT_SCHEMA["$defs"]["check"]
+    condition = DRAFT_SCHEMA["$defs"]["condition"]
+    signal = DRAFT_SCHEMA["$defs"]["signal"]
+    assert check["additionalProperties"] is False
+    assert check["required"] == ["id", "given", "when", "expect", "mode", "within_ms"]
+    assert "given" in check["properties"]
+    assert "given" in check["required"]
+    assert check["properties"]["given"] == {
+        "type": "array",
+        "items": {"$ref": "#/$defs/condition"},
+    }
+    assert check["properties"]["when"] == {"$ref": "#/$defs/condition"}
+    assert check["properties"]["expect"] == {"$ref": "#/$defs/condition"}
+    assert check["properties"]["id"] == {"type": "string"}
+    assert check["properties"]["mode"] == {
+        "enum": ["eventually", "always", "never"],
+        "type": "string",
+    }
+    # §3.2: [min, max], integers, 0 ≤ min ≤ max ≤ 3 600 000.
+    # min ≤ max is two array items; the schema bounds each item.
+    assert check["properties"]["within_ms"] == {
+        "type": "array",
+        "minItems": 2,
+        "maxItems": 2,
+        "items": {"type": "integer", "minimum": 0, "maximum": 3600000},
+    }
+    assert condition["additionalProperties"] is False
+    assert condition["required"] == ["signal", "op", "value", "tolerance"]
+    assert "tolerance" in condition["properties"]
+    assert "tolerance" in condition["required"]
+    assert condition["properties"]["signal"] == {"$ref": "#/$defs/signal"}
+    assert condition["properties"]["op"] == {
+        "enum": ["==", "!=", ">", ">=", "<", "<="],
+        "type": "string",
+    }
+    assert condition["properties"]["value"] == {
+        "anyOf": [{"type": "number"}, {"type": "string"}],
+    }
+    assert condition["properties"]["tolerance"] == {
+        "anyOf": [{"type": "number", "minimum": 0}, {"type": "null"}],
+    }
+    assert signal["additionalProperties"] is False
+    assert signal["required"] == ["message", "signal", "channel"]
+    assert signal["properties"] == {
+        "message": {"type": "string"},
+        "signal": {"type": "string"},
+        "channel": {
+            "anyOf": [{"type": "integer", "minimum": 0}, {"type": "null"}],
+        },
+    }
+    reply = _reply()
+    del reply["cases"][0]["checks"]
+    provider = StubProvider(responses=[json.dumps(reply)])
+    with pytest.raises(ModelError, match=r"missing \['checks'\]"):
+        invoke_model("write the lamp test", provider, _TEMPLATE)
+    assert len(provider.calls) == 1
+
+
+def test_empty_checks_are_accepted():
+    """§5b. checks may be []."""
+    provider = _SchemaProvider(_reply(checks=[]))
+    draft = invoke_model("write the lamp test", provider, _TEMPLATE)
+    assert provider.schemas == [DRAFT_SCHEMA]
+    assert len(provider.calls) == 1
+    assert draft["cases"][0]["checks"] == []
+    assert draft["level"] == "software"
+    assert draft["cases"][0]["level"] == "software"
+
+
+def test_one_valid_section_3_check_is_accepted():
+    """§3.2. The plan's check is kept. null and [] are stored as absent."""
+    check = _section_3_check()
+    provider = _SchemaProvider(_reply(checks=[_with_absent_sentinels(check)]))
+    draft = invoke_model("write the lamp test", provider, _TEMPLATE)
+    assert draft["cases"][0]["checks"] == [check]
+
+    minimal = {
+        "id": "c0",
+        "when": {
+            "signal": {"message": "BrakeCmd", "signal": "BrakePedal"},
+            "op": "==",
+            "value": 1,
+        },
+        "expect": {
+            "signal": {"message": "Lamps", "signal": "BrakeLamp"},
+            "op": "!=",
+            "value": 0,
+            "tolerance": 0.5,
+        },
+        "mode": "never",
+        "within_ms": [0, 0],
+    }
+    kept = _SchemaProvider(_reply(checks=[_with_absent_sentinels(minimal)]))
+    assert invoke_model("again", kept, _TEMPLATE)["cases"][0]["checks"] == [minimal]
+
+
+def test_a_malformed_check_is_rejected():
+    """§3.1 and §3.2. A check that breaks the grammar is refused. One call."""
+    bad_op = _section_3_check()
+    bad_op["when"] = dict(bad_op["when"])
+    bad_op["when"]["op"] = "eq"
+    provider = StubProvider(responses=[json.dumps(_reply(checks=[_with_absent_sentinels(bad_op)]))])
+    with pytest.raises(ModelError, match="when op"):
+        invoke_model("write a test", provider, _TEMPLATE)
+    assert len(provider.calls) == 1
+
+    reversed_window = _section_3_check()
+    reversed_window["within_ms"] = [100, 0]
+    window = StubProvider(responses=[json.dumps(_reply(checks=[_with_absent_sentinels(reversed_window)]))])
+    with pytest.raises(ModelError, match="within_ms"):
+        invoke_model("write a test", window, _TEMPLATE)
+
+    tolerated = _section_3_check()
+    tolerated["expect"] = dict(tolerated["expect"])
+    tolerated["expect"]["op"] = ">"
+    tolerated["expect"]["tolerance"] = 0
+    wrong_op = StubProvider(responses=[json.dumps(_reply(checks=[_with_absent_sentinels(tolerated)]))])
+    with pytest.raises(ModelError, match="tolerance"):
+        invoke_model("write a test", wrong_op, _TEMPLATE)
+
+    shared = _section_3_check()
+    duplicate = StubProvider(responses=[json.dumps(_reply(checks=[
+        _with_absent_sentinels(shared), _with_absent_sentinels(shared),
+    ]))])
+    with pytest.raises(ModelError, match="share an id"):
+        invoke_model("write a test", duplicate, _TEMPLATE)
+
+
+def test_given_empty_and_tolerance_null_are_accepted_and_required():
+    """Strict schema, as for variant. given [], tolerance null, and channel
+    null are present and mean absent. tolerance null on a non-equality op
+    is accepted. A negative channel is refused.
+    """
+    check = DRAFT_SCHEMA["$defs"]["check"]
+    condition = DRAFT_SCHEMA["$defs"]["condition"]
+    signal = DRAFT_SCHEMA["$defs"]["signal"]
+    assert "given" in check["required"]
+    assert "tolerance" in condition["required"]
+    assert "channel" in signal["required"]
+
+    payload = {
+        "id": "c-absent",
+        "given": [],
+        "when": {
+            "signal": {"message": "BrakeCmd", "signal": "BrakePedal", "channel": None},
+            "op": ">",
+            "value": 1,
+            "tolerance": None,
+        },
+        "expect": {
+            "signal": {"message": "Lamps", "signal": "BrakeLamp", "channel": 0},
+            "op": "==",
+            "value": 1,
+            "tolerance": None,
+        },
+        "mode": "eventually",
+        "within_ms": [0, 100],
+    }
+    provider = _SchemaProvider(_reply(checks=[payload]))
+    draft = invoke_model("write the lamp test", provider, _TEMPLATE)
+    assert draft["cases"][0]["checks"] == [{
+        "id": "c-absent",
+        "when": {
+            "signal": {"message": "BrakeCmd", "signal": "BrakePedal"},
+            "op": ">",
+            "value": 1,
+        },
+        "expect": {
+            "signal": {"message": "Lamps", "signal": "BrakeLamp", "channel": 0},
+            "op": "==",
+            "value": 1,
+        },
+        "mode": "eventually",
+        "within_ms": [0, 100],
+    }]
+
+    negative = _with_absent_sentinels(_section_3_check())
+    negative["when"]["signal"]["channel"] = -1
+    refused = StubProvider(responses=[json.dumps(_reply(checks=[negative]))])
+    with pytest.raises(ModelError, match="channel"):
+        invoke_model("write a test", refused, _TEMPLATE)
+    assert len(refused.calls) == 1
+
+
+def test_the_prompt_says_when_to_leave_checks_empty():
+    """§5b. Both prompts say when checks stays empty. No network."""
+    assert _LEAVE_CHECKS_EMPTY in SYSTEM
+    assert _LEAVE_CHECKS_EMPTY in FIXED_TEXT
+
+
+def test_emit_keeps_checks_on_the_stored_case(tmp_path):
+    """§5. The stored structure keeps checks. An empty list is not dropped."""
+    template = {
+        "id": "default",
+        "name": "Default test specification",
+        "level": "software",
+        "body": "# {{title}}\n{{#cases}}\n## {{id}}\n{{/cases}}\n",
+    }
+    check = _section_3_check()
+    artifact = emit(
+        {"title": "Lamp", "cases": [_case(checks=[check])]},
+        template,
+        True,
+        store=tmp_path,
+    )
+    assert artifact["specification"]["cases"][0]["checks"] == [check]
+    empty = emit(
+        {"title": "Lamp", "cases": [_case(checks=[])]},
+        template,
+        True,
+        store=tmp_path / "empty",
+    )
+    assert empty["specification"]["cases"][0]["checks"] == []

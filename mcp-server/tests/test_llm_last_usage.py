@@ -43,6 +43,7 @@ _DRAFT = {
         "variant": "",
         "kind": "positive",
         "uses": [],
+        "checks": [],
     }],
 }
 
