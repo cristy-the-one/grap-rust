@@ -121,7 +121,8 @@ def test_a_complete_draft_passes():
         no_invented_names=0 (n=1 cases, documents=1)
         traceability=0 (n=1 cases, documents=1)
         completeness=0 (n=1 cases, documents=1)
-        negative_cases=0 (n=1 requirements, n_statements=0, documents=1)"""
+        negative_cases=0 (n=1 requirements, n_statements=0, documents=1)
+        checks=0 (n=1 cases, documents=1)"""
     )
 
 
@@ -394,7 +395,8 @@ def test_nothing_to_measure_prints_na_and_a_bad_draft_is_refused():
         no_invented_names=n/a (n=0 cases, documents=0)
         traceability=n/a (n=0 cases, documents=0)
         completeness=n/a (n=0 cases, documents=0)
-        negative_cases=n/a (n=0 requirements, n_statements=0, documents=0)"""
+        negative_cases=n/a (n=0 requirements, n_statements=0, documents=0)
+        checks=n/a (n=0 cases, documents=0)"""
     )
     with pytest.raises(ValidationError, match="draft"):
         validate_output("not a specification", [], {"requirements": []})
@@ -768,4 +770,29 @@ def test_three_bad_checks_list_all_three_issues():
             _issue("op", "c-op"),
             _issue("mode", "c-mode"),
         ],
+    }
+
+
+def test_a_check_rule_failure_is_counted_on_the_checks_line():
+    """The summary's seventh line is the number of §5b issues over n_cases."""
+    bad = _judge_check(mode="soon")
+    result, summary = _run_judge([bad])
+    assert result == {
+        "passed": False,
+        "issues": [_issue("mode", "c1")],
+    }
+    assert summary.startswith(
+        "passed=false n_issues=1 n_cases=1 n_requirements=1 n_docs=1 n_statements=0"
+    )
+    assert "checks=1 (n=1 cases, documents=1)" in summary
+    assert "coverage=0 (n=1 requirements, documents=1)" in summary
+    assert "grounding=0 (n=1 cases, documents=1)" in summary
+
+
+def test_a_check_that_is_not_an_object_is_an_issue():
+    """A check that is not an object is one issue. The value is its index."""
+    result, _summary = _run_judge([_judge_check("c1"), "not-an-object"])
+    assert result == {
+        "passed": False,
+        "issues": [_issue("check shape", "#1")],
     }

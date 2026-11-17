@@ -41,8 +41,10 @@ Judgements this card had to make, and the tests lock in:
   number must be ``>= 0`` and only on ``==`` or ``!=``. ``channel``
   null is absent; otherwise it is an integer from 0 to 255. Check
   ids are unique within the case. ``value`` is a number or a string,
-  and is not compared with a DBC label. One failure is one issue:
-  ``check`` is the rule, ``value`` is the check id.
+  and is not compared with a DBC label. A check that is not an object
+  is the rule ``check shape`` and the value ``#<index>``. One failure
+  is one issue: ``check`` is the rule, ``value`` is the check id.
+  The summary's ``checks`` line counts these issues over ``n_cases``.
 """
 
 from __future__ import annotations
@@ -84,6 +86,17 @@ _CHECK_MODES = ("eventually", "always", "never")
 # §3.2 writes this upper bound as 3 600 000. Channel is 0 to 255.
 _CHECK_WINDOW_MAX_MS = 3600000
 _CHECK_CHANNEL_MAX = 255
+_CHECK_RULES = frozenset({
+    "check signal not in uses",
+    "op",
+    "mode",
+    "within_ms",
+    "tolerance",
+    "channel",
+    "check id",
+    "value",
+    "check shape",
+})
 
 
 class ValidationError(Exception):
@@ -170,10 +183,13 @@ def format_summary(
     n_docs = len({req["source_id"] for req in reqs})
     n_statements = len(_statement_rows(reqs, projection, statements))
     counts = {name: 0 for name in _CHECKS}
+    n_check_issues = 0
     for issue in result["issues"]:
         check = issue.get("check")
         if check in counts:
             counts[check] += 1
+        if check in _CHECK_RULES:
+            n_check_issues += 1
     passed = "true" if result.get("passed") is True else "false"
     lines = [
         f"passed={passed} n_issues={len(result['issues'])} n_cases={n_cases} "
@@ -186,6 +202,7 @@ def format_summary(
         _check_line("traceability", counts["traceability"], n_cases, "cases", n_docs),
         _check_line("completeness", counts["completeness"], n_cases, "cases", n_docs),
         _negative_line(counts["negative_cases"], n_requirements, n_statements, n_docs),
+        _check_line("checks", n_check_issues, n_cases, "cases", n_docs),
     ]
     return "\n".join(lines)
 
@@ -487,6 +504,7 @@ def _one_case_checks(case, case_id: str, nodes: dict) -> list[dict]:
     seen: list[str] = []
     for index, check in enumerate(raw):
         if not isinstance(check, Mapping):
+            issues.append(_issue(case_id, "check shape", f"#{index}"))
             continue
         check_id = _check_id(check, index)
         conditions = _check_conditions(check)
