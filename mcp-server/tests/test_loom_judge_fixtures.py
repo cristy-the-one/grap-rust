@@ -1,0 +1,31 @@
+"""GJ-03 step 0: the signal-loom judge fixture is copied byte for byte.
+
+signal-loom owns fixtures/judge/ at 177cc41e77ed70e942c04c38c13f1db6c73a2dd5.
+This tree keeps that copy under tests/fixtures/loom_judge/ with the same
+SHA256SUMS. Every recorded line is checked here. A one-byte edit fails.
+"""
+
+import hashlib
+from pathlib import Path
+
+FIXTURES = Path(__file__).resolve().parent / "fixtures" / "loom_judge"
+_SUMS = "SHA256SUMS"
+
+
+def _recorded():
+    rows = {}
+    for line in (FIXTURES / _SUMS).read_text(encoding="utf-8").splitlines():
+        if line == "":
+            continue
+        digest, name = line.split(maxsplit=1)
+        rows[name.lstrip("*")] = digest
+    return rows
+
+
+def test_every_sha256sums_line_matches_the_copied_file():
+    recorded = _recorded()
+    copied = sorted(path.name for path in FIXTURES.iterdir() if path.name != _SUMS)
+    assert sorted(recorded) == copied
+    for name, digest in recorded.items():
+        actual = hashlib.sha256((FIXTURES / name).read_bytes()).hexdigest()
+        assert actual == digest, f"{name} is not the copied fixture"
