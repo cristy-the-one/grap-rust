@@ -312,8 +312,11 @@ def test_first_draft_fails_validation_and_the_second_passes_in_one_round(tmp_pat
     assert len(result.drafts) == 2
     assert len(result.calls) == 2
     assert len(provider.calls) == 2
-    assert result.calls[0]["instructions"] != result.calls[1]["instructions"]
+    first = result.calls[0]["instructions"]
     second = result.calls[1]["instructions"]
+    assert first != second
+    assert '"check": "completeness"' not in first
+    assert '"value": "stimulus"' not in first
     assert '"check": "completeness"' in second
     assert '"value": "stimulus"' in second
     assert result.drafts[0]["cases"][0]["stimulus"] == ""
@@ -380,6 +383,13 @@ def test_a_case_level_is_dropped_and_counted_on_the_event(tmp_path, capsys):
     assert stored["level"] == "software"
     assert stored["cases"][0]["level"] == "software"
     assert "hardware" not in json.dumps(stored)
+    assert result.calls[0]["level_ignored"] == 1
+    printed = capsys.readouterr().out
+    assert (
+        "invoke_model model=stub n_cases=1 n_docs=n/a "
+        f"duration_ms={result.calls[0]['duration_ms']} token_counts=n/a "
+        "level_ignored=1 (n=1 cases)"
+    ) in printed
     model = next(
         event for event in result.recorded.events
         if event["operation"] == "invoke_model" and event["event_type"] == "procedure_step"

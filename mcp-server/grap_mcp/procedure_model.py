@@ -22,8 +22,8 @@ Judgements this card had to make, and the tests lock in:
 - The template's ``level`` is required. The runner keeps the template
   ``choose_template`` returned and passes it into this operation. The
   operation signature stays ``instructions`` to ``draft``.
-- ``duration_ms`` is ``int((time.monotonic() after the call) -
-  (time.monotonic() before it))`` in milliseconds, for every provider,
+- ``duration_ms`` is ``int((time.perf_counter() after the call) -
+  (time.perf_counter() before it))`` in milliseconds, for every provider,
   including the stub. ``kee/llm.py`` ``complete`` returns text and does
   not keep the provider's usage object, and this module does not change
   that file. ``token_counts`` stays ``n/a`` unless the provider object
@@ -229,9 +229,9 @@ def _call(instructions: Any, provider, template: Mapping[str, Any]) -> tuple[dic
     level = _template_level(template)
     configure = getattr(provider, "with_json_schema", None)
     target = configure(copy.deepcopy(DRAFT_SCHEMA)) if callable(configure) else provider
-    started = time.monotonic()
+    started = time.perf_counter()
     raw = target.complete(SYSTEM, instructions)
-    duration_ms = int((time.monotonic() - started) * 1000)
+    duration_ms = int((time.perf_counter() - started) * 1000)
     if not isinstance(raw, str):
         raise ModelError("model reply is not text")
     draft, level_ignored = _parse_draft(raw, level)
