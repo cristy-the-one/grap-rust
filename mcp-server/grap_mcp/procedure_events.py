@@ -8,7 +8,9 @@ Every step writes one explanation record and one audit event. The record
 carries the step id, the operation, the procedure version, and the hashes
 of that step's inputs and outputs. A skipped step, a failed check, and
 each refine round are events. ``invoke_model`` also carries the model, the
-prompt hash, the token counts, and the duration.
+prompt hash, the token counts, and the duration. When the operations
+object sets ``model_step`` during that call, the event takes
+``duration_ms``, ``token_counts`` and ``level_ignored`` from it.
 
 ``fetch_context`` stores the node keys it returned and each node's content
 hash, copied at that moment. A later edit to the graph does not rewrite
@@ -208,6 +210,7 @@ def run_procedure(
         kg=kg,
         projection=projection,
         receipt=receipt,
+        operations=operations,
     )
     try:
         result = interpret(procedure, operations, observe=log.observe)
@@ -218,7 +221,10 @@ def run_procedure(
 
 
 class _Log:
-    def __init__(self, procedure, workspace, workspace_root, run_id, kg, projection, receipt):
+    def __init__(
+        self, procedure, workspace, workspace_root, run_id, kg, projection, receipt,
+        operations=None,
+    ):
         self.procedure = procedure
         self.workspace = workspace
         self.workspace_root = workspace_root
@@ -226,6 +232,7 @@ class _Log:
         self.kg = kg
         self.projection = projection
         self.receipt = receipt
+        self.operations = operations
         self.events: list[dict] = []
         self.hashes: list[str] = []
         self.evidence: dict | None = None
@@ -236,6 +243,8 @@ class _Log:
             event, inputs, outputs, self.procedure.version, self.run_id,
             self.projection, self.receipt,
         )
+        if event.kind == "ran" and event.operation == "invoke_model":
+            _overlay_model_step(payload, self.operations)
         self._keep(payload)
         if event.kind == "ran" and event.operation == "fetch_context":
             snapshot = _snapshot(self.kg, self.projection, outputs.get("context") if outputs else None)
@@ -507,6 +516,20 @@ def _receipt(receipt: Mapping[str, Any] | None) -> dict:
         "token_counts": tokens,
         "duration_ms": duration,
     }
+
+
+def _overlay_model_step(payload: dict, operations) -> None:
+    """Copy the call's measured fields when the operation recorded them.
+
+    A caller that does not set ``model_step`` keeps the receipt copied at
+    the start of the run.
+    """
+    step = getattr(operations, "model_step", None)
+    if not isinstance(step, Mapping):
+        return
+    for key in ("duration_ms", "token_counts", "level_ignored"):
+        if key in step:
+            payload[key] = step[key]
 
 
 def _model_fields(inputs, receipt: Mapping[str, Any]) -> dict:

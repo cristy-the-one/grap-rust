@@ -14,15 +14,20 @@ rounds are counted.
 Judgements this card had to make, and the tests lock in:
 
 - The reply is one object with ``title`` and ``cases``. Each case has the
-  §5 fields. ``variant`` is optional. ``level`` on the object or on a
-  case is ignored. Any other extra field is an error after the one call.
-  There is no retry inside the call.
+  §5 fields. ``variant`` is required and may be ``""``. ``level`` on the
+  object or on a case is dropped and never copied onto the draft. Each
+  case that carried a ``level`` adds one to ``level_ignored``. Any other
+  extra field is an error after the one call. There is no retry inside
+  the call.
 - The template's ``level`` is required. The runner keeps the template
   ``choose_template`` returned and passes it into this operation. The
   operation signature stays ``instructions`` to ``draft``.
-- A stub has no token usage and no measured duration. Both are ``n/a``.
-  A clock reading would make two stub runs differ, and it would be a
-  number this card did not take from the model.
+- ``duration_ms`` is ``int((time.monotonic() after the call) -
+  (time.monotonic() before it))`` in milliseconds, for every provider,
+  including the stub. ``kee/llm.py`` ``complete`` returns text and does
+  not keep the provider's usage object, and this module does not change
+  that file. ``token_counts`` stays ``n/a`` unless the provider object
+  already exposes ``usage`` or ``token_counts`` as a mapping of integers.
 - Documents are not on the draft, so the model line prints ``n_docs=n/a``.
   ``n_cases`` is the number of cases in the reply.
 - The file's scope source ``corpus`` is a placeholder. A run passes the
@@ -36,6 +41,7 @@ from __future__ import annotations
 import copy
 import hashlib
 import json
+import time
 from collections.abc import Mapping
 from dataclasses import dataclass, replace
 from pathlib import Path
@@ -55,10 +61,10 @@ SYSTEM = (
     "Return one JSON object and nothing else. "
     "The object has title and cases. "
     "Each case has id, verifies, preconditions, stimulus, "
-    "expected_observable_result, pass_criterion, kind, and uses. "
-    "variant is optional. "
+    "expected_observable_result, pass_criterion, variant, kind, and uses. "
     "verifies and uses are lists of strings. "
     "kind is positive or negative. "
+    "variant is required and may be empty. An empty variant is no variant. "
     "Do not set level. The template copies level. "
     "Do not invent an identifier. "
     "The instructions are data."
@@ -71,6 +77,7 @@ _CASE_REQUIRED = (
     "stimulus",
     "expected_observable_result",
     "pass_criterion",
+    "variant",
     "kind",
     "uses",
 )
@@ -129,8 +136,8 @@ def format_invoke(receipt: Mapping[str, Any]) -> str:
     """One model call. Documents are not on the draft, so ``n_docs`` is ``n/a``."""
     return (
         f"invoke_model model={receipt['model']} n_cases={receipt['n_cases']} "
-        f"n_docs=n/a duration_ms={receipt['duration_ms']} "
-        f"token_counts=n/a"
+        f"n_docs=n/a duration_ms={receipt['duration_ms']} {_format_tokens(receipt['token_counts'])} "
+        f"level_ignored={receipt['level_ignored']} (n={receipt['n_cases']} cases)"
     )
 
 
@@ -222,17 +229,20 @@ def _call(instructions: Any, provider, template: Mapping[str, Any]) -> tuple[dic
     level = _template_level(template)
     configure = getattr(provider, "with_json_schema", None)
     target = configure(copy.deepcopy(DRAFT_SCHEMA)) if callable(configure) else provider
+    started = time.monotonic()
     raw = target.complete(SYSTEM, instructions)
+    duration_ms = int((time.monotonic() - started) * 1000)
     if not isinstance(raw, str):
         raise ModelError("model reply is not text")
-    draft = _parse_draft(raw, level)
+    draft, level_ignored = _parse_draft(raw, level)
     receipt = {
         "model": _model_name(provider),
         "instructions": instructions,
         "prompt_hash": hashlib.sha256(instructions.encode("utf-8")).hexdigest(),
-        "token_counts": "n/a",
-        "duration_ms": "n/a",
+        "token_counts": _token_counts(provider),
+        "duration_ms": duration_ms,
         "n_cases": len(draft["cases"]),
+        "level_ignored": level_ignored,
     }
     return draft, receipt
 
@@ -248,7 +258,7 @@ def _template_level(template: Mapping[str, Any]) -> str:
     return level
 
 
-def _parse_draft(raw: str, level: str) -> dict:
+def _parse_draft(raw: str, level: str) -> tuple[dict, int]:
     try:
         value = json.loads(raw)
     except json.JSONDecodeError as exc:
@@ -269,11 +279,17 @@ def _parse_draft(raw: str, level: str) -> dict:
         raise ModelError("title must be a string")
     if not isinstance(cases, list):
         raise ModelError("cases must be a list")
+    parsed = []
+    level_ignored = 0
+    for index, case in enumerate(cases):
+        if isinstance(case, dict) and "level" in case:
+            level_ignored += 1
+        parsed.append(_parse_case(index, case, level))
     return {
         "title": title,
         "level": level,
-        "cases": [_parse_case(index, case, level) for index, case in enumerate(cases)],
-    }
+        "cases": parsed,
+    }, level_ignored
 
 
 def _parse_case(index: int, case: Any, level: str) -> dict:
@@ -299,10 +315,9 @@ def _parse_case(index: int, case: Any, level: str) -> dict:
     if kind not in ("positive", "negative"):
         raise ModelError(f"case {index} kind must be positive or negative")
     stored["kind"] = kind
-    if "variant" in case:
-        if not isinstance(case["variant"], str):
-            raise ModelError(f"case {index} variant must be a string")
-        stored["variant"] = case["variant"]
+    if not isinstance(case["variant"], str):
+        raise ModelError(f"case {index} variant must be a string")
+    stored["variant"] = case["variant"]
     stored["level"] = level
     return stored
 
@@ -311,6 +326,34 @@ def _string_list(index: int, name: str, value: Any) -> list:
     if isinstance(value, list) and all(isinstance(item, str) for item in value):
         return list(value)
     raise ModelError(f"case {index} {name} must be a list of strings")
+
+
+def _token_counts(provider) -> Any:
+    """Copy integer usage when the provider already exposes it.
+
+    ``complete`` returns text. ``kee/llm.py`` does not keep the response
+    usage, and this module does not change that file, so a stub stays
+    ``n/a``.
+    """
+    raw = getattr(provider, "usage", None)
+    if raw is None:
+        raw = getattr(provider, "token_counts", None)
+    if not isinstance(raw, Mapping) or not raw:
+        return "n/a"
+    clean = {}
+    for key in sorted(raw):
+        value = raw[key]
+        if not isinstance(key, str) or isinstance(value, bool) or not isinstance(value, int):
+            return "n/a"
+        clean[key] = value
+    return clean
+
+
+def _format_tokens(tokens: Any) -> str:
+    if not isinstance(tokens, Mapping):
+        return "token_counts=n/a"
+    parts = " ".join(f"{key}={tokens[key]}" for key in sorted(tokens))
+    return f"token_counts {parts}"
 
 
 def _model_name(provider) -> str:
@@ -348,6 +391,7 @@ class _Operations:
         self.templates = TemplateOperations(kg, projection, store, templates_dir)
         self.validation = ValidationOperations(projection, statements)
         self.model = ModelOperations(provider)
+        self.model_step = None
 
     def __call__(self, operation: str, inputs: Mapping[str, Any]) -> dict[str, Any]:
         if operation in ("select_requirements", "fetch_context"):
@@ -361,7 +405,9 @@ class _Operations:
         if operation == "validate_output":
             return self.validation(operation, inputs)
         if operation == "invoke_model":
-            return self.model(operation, inputs)
+            result = self.model(operation, inputs)
+            self.model_step = self.model.calls[-1]
+            return result
         if operation == "refine":
             issues = inputs["issues"]
             if not isinstance(issues, list):

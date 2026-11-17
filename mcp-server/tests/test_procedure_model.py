@@ -28,6 +28,8 @@ from grap_mcp.procedure_model import (
     run_generate_test_spec,
 )
 from grap_mcp.procedure_runtime import load_procedure_file
+from grap_mcp.procedure_template import render
+from grap_mcp.procedure_validate import validate_output
 from grap_mcp.readers import SourceItem
 from grap_mcp.schema.project import project_items
 
@@ -38,6 +40,7 @@ _CASE_REQUIRED = (
     "stimulus",
     "expected_observable_result",
     "pass_criterion",
+    "variant",
     "kind",
     "uses",
 )
@@ -58,6 +61,7 @@ def _case(**overrides):
         "pass_criterion": "lamp is off",
         "kind": "positive",
         "uses": [],
+        "variant": "",
     }
     case.update(overrides)
     return case
@@ -136,7 +140,7 @@ def test_draft_schema_is_the_section_5_object_and_level_is_not_a_model_field():
     assert tuple(case["required"]) == _CASE_REQUIRED
     assert "level" not in case["properties"]
     assert "variant" in case["properties"]
-    assert "variant" not in case["required"]
+    assert "variant" in case["required"]
     assert case["properties"]["kind"]["enum"] == ["positive", "negative"]
     for name in ("verifies", "uses"):
         assert case["properties"][name] == {
@@ -245,7 +249,10 @@ def test_stub_run_selects_fetches_composes_validates_and_emits(tmp_path, capsys)
     assert result.drafts[0]["level"] == "software"
     assert result.drafts[0]["cases"][0]["level"] == "software"
     assert result.calls[0]["model"] == "stub"
-    assert result.calls[0]["duration_ms"] == "n/a"
+    assert isinstance(result.calls[0]["duration_ms"], int)
+    assert not isinstance(result.calls[0]["duration_ms"], bool)
+    assert result.calls[0]["duration_ms"] >= 0
+    assert result.calls[0]["duration_ms"] != "n/a"
     assert result.calls[0]["token_counts"] == "n/a"
     assert result.calls[0]["n_cases"] == 1
     model = next(
@@ -253,7 +260,8 @@ def test_stub_run_selects_fetches_composes_validates_and_emits(tmp_path, capsys)
         if event["operation"] == "invoke_model"
     )
     assert model["model"] == "stub"
-    assert model["duration_ms"] == "n/a"
+    assert model["duration_ms"] == result.calls[0]["duration_ms"]
+    assert model["duration_ms"] != "n/a"
     assert model["token_counts"] == "n/a"
     assert model["prompt_hash"] == result.calls[0]["prompt_hash"]
     assert model["prompt_hash"] == hashlib.sha256(
@@ -268,14 +276,18 @@ def test_stub_run_selects_fetches_composes_validates_and_emits(tmp_path, capsys)
     assert "## TC-1 (positive)" in rendered
     assert "Verifies: REQ-1" in rendered
     printed = capsys.readouterr().out
+    duration = result.calls[0]["duration_ms"]
     assert "template id=default level=software n_requirements=1 n_docs=1" in printed
     assert "instructions n_requirements=1 n_context=0 n_docs=1" in printed
     assert (
         "invoke_model model=stub n_cases=1 n_docs=n/a "
-        "duration_ms=n/a token_counts=n/a"
+        f"duration_ms={duration} token_counts=n/a "
+        "level_ignored=1 (n=1 cases)"
     ) in printed
     assert "passed=true n_issues=0 n_cases=1 n_requirements=1 n_docs=1" in printed
-    assert "invoke_model n_calls=1 model=stub duration_ms=n/a token_counts=n/a" in printed
+    assert (
+        f"invoke_model n_calls=1 model=stub duration_ms={duration} token_counts=n/a"
+    ) in printed
 
 
 def test_first_draft_fails_validation_and_the_second_passes_in_one_round(tmp_path, capsys):
@@ -288,16 +300,22 @@ def test_first_draft_fails_validation_and_the_second_passes_in_one_round(tmp_pat
     store = tmp_path / "store"
     failing = _reply(stimulus="")
     passing = _reply()
+    provider = _provider(failing, passing)
     result = run_generate_test_spec(
         kg, projection, workspace, root, store,
         run_id="run-retry",
         scope={"ids": ["REQ-1"]},
-        provider=_provider(failing, passing),
+        provider=provider,
     )
     assert result.recorded.status == "ok"
     assert result.recorded.rounds == 1
     assert len(result.drafts) == 2
     assert len(result.calls) == 2
+    assert len(provider.calls) == 2
+    assert result.calls[0]["instructions"] != result.calls[1]["instructions"]
+    second = result.calls[1]["instructions"]
+    assert '"check": "completeness"' in second
+    assert '"value": "stimulus"' in second
     assert result.drafts[0]["cases"][0]["stimulus"] == ""
     assert result.drafts[1]["cases"][0]["stimulus"] == "press"
     assert result.drafts[0]["level"] == "software"
@@ -330,9 +348,73 @@ def test_first_draft_fails_validation_and_the_second_passes_in_one_round(tmp_pat
     assert stored["level"] == "software"
     assert stored["cases"][0]["level"] == "software"
     printed = capsys.readouterr().out
-    assert printed.count(
-        "invoke_model model=stub n_cases=1 n_docs=n/a duration_ms=n/a token_counts=n/a"
-    ) == 2
-    assert "invoke_model n_calls=2 model=stub duration_ms=n/a token_counts=n/a" in printed
+    assert printed.count("invoke_model model=stub n_cases=1 n_docs=n/a ") == 2
+    for call in result.calls:
+        assert (
+            "invoke_model model=stub n_cases=1 n_docs=n/a "
+            f"duration_ms={call['duration_ms']} token_counts=n/a "
+            "level_ignored=1 (n=1 cases)"
+        ) in printed
+    assert (
+        "invoke_model n_calls=2 model=stub "
+        f"duration_ms={result.calls[-1]['duration_ms']} token_counts=n/a"
+    ) in printed
     assert "passed=false" in printed
     assert "passed=true" in printed
+
+
+def test_a_case_level_is_dropped_and_counted_on_the_event(tmp_path, capsys):
+    """A level on one case is not used. The event counts it. The template level wins."""
+    kg, projection = _graph(tmp_path, capsys)
+    workspace, root = _ws(tmp_path, "ws")
+    store = tmp_path / "store"
+    case = _case(level="hardware", variant="")
+    result = run_generate_test_spec(
+        kg, projection, workspace, root, store,
+        run_id="run-level",
+        scope={"ids": ["REQ-1"]},
+        provider=_provider({"title": "Lamp", "cases": [case]}),
+    )
+    assert result.recorded.status == "ok"
+    stored = json.loads(next(path.read_text() for path in store.glob("*.json")))
+    assert stored["level"] == "software"
+    assert stored["cases"][0]["level"] == "software"
+    assert "hardware" not in json.dumps(stored)
+    model = next(
+        event for event in result.recorded.events
+        if event["operation"] == "invoke_model" and event["event_type"] == "procedure_step"
+    )
+    assert model["level_ignored"] == 1
+
+
+def test_empty_variant_is_required_renders_no_variant_line_and_passes():
+    """variant is required and may be empty. Empty is no variant: no Variant line, and validation passes."""
+    case_schema = DRAFT_SCHEMA["$defs"]["case"]
+    assert "variant" in case_schema["required"]
+    template = {
+        "level": "software",
+        "body": (
+            "# Spec {{title}}\n"
+            "{{#cases}}\n"
+            "## {{id}}\n"
+            "Variant: {{variant}}\n"
+            "{{/cases}}\n"
+        ),
+    }
+    case = _case(variant="")
+    rendered = render(template, {"title": "Lamp", "level": "software", "cases": [case]})
+    assert "Variant" not in rendered
+    assert "## TC-1" in rendered
+    req = {"key": "Requirement | fix | REQ-1", "source_id": "fix", "item_id": "REQ-1"}
+    context = {"requirements": [{
+        "key": req["key"],
+        "source_id": "fix",
+        "item_id": "REQ-1",
+        "nodes": [],
+    }]}
+    result = validate_output(
+        {"title": "Lamp", "cases": [case]},
+        [req],
+        context,
+    )
+    assert result == {"issues": [], "passed": True}

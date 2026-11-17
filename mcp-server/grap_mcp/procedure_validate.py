@@ -20,6 +20,7 @@ Judgements this card had to make, and the tests lock in:
   node's native id.
 - The scanned text is ``preconditions``, ``stimulus``,
   ``expected_observable_result``, ``pass_criterion`` and ``variant``.
+  An empty ``variant`` is no variant and is not scanned.
 - A negative case counts for a requirement only when that case verifies
   it. ``error_handling`` is the statement kind. An exception is a
   non-empty ``exception``. An explicit ``statements`` list is the whole
@@ -502,6 +503,8 @@ def _texts(case: Mapping[str, Any]) -> list[str]:
     found = []
     for field in _TEXT_FIELDS:
         value = case.get(field)
+        if field == "variant" and (value is None or value == ""):
+            continue
         if isinstance(value, str):
             found.append(value)
         elif isinstance(value, list):
