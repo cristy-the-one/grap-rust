@@ -190,3 +190,27 @@ def test_judge_verdict_events_and_audit_lines_omit_evidence(tmp_path):
     for text in texts + judge_lines:
         for word in _FORBIDDEN:
             assert word not in text
+
+
+def test_judge_verdict_audit_lines_carry_case_and_verdict(tmp_path):
+    """The audit line names the case and the verdict. Nothing else from the case."""
+    _workspace, root = _closed_run(tmp_path)
+    proc = _import(root, FIXTURES / "expected-verdict.json", FIXTURES / "request.json")
+    assert proc.returncode == 0, proc.stderr
+    verdict = json.loads((FIXTURES / "expected-verdict.json").read_text(encoding="utf-8"))
+    rows = []
+    for line in (root / "audit" / "events.jsonl").read_text(encoding="utf-8").splitlines():
+        event = json.loads(line)
+        if event.get("event_type") != "judge_verdict":
+            continue
+        details = event["details"]
+        assert "counts" not in details
+        assert "value" not in details
+        rows.append((details["case"], details["verdict"]))
+    assert [case["case_id"] for case in verdict["cases"]] == [
+        "TC-1", "TC-2", "TC-3", "TC-4",
+    ]
+    assert [case["verdict"] for case in verdict["cases"]] == [
+        "fail", "fail", "not_exercised", "not_judgeable",
+    ]
+    assert rows == [(case["case_id"], case["verdict"]) for case in verdict["cases"]]

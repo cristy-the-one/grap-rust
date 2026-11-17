@@ -696,6 +696,9 @@ def _details(payload: Mapping[str, Any]) -> dict[str, str]:
         details["status"] = str(payload.get("status", ""))
         details["replayable"] = "true" if payload.get("replayable") else "false"
         details["replay_note"] = str(payload.get("replay_note", ""))
+    if payload.get("event_type") == "judge_verdict":
+        details["case"] = payload["case_id"]
+        details["verdict"] = payload["verdict"]
     return details
 
 
