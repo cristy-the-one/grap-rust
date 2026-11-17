@@ -117,6 +117,27 @@ Pass criterion: {{pass_criterion}}
 - One template, `default.md`, ships with the runtime so the procedure can run before the owner
   supplies real ones.
 
+### 5b. Amendment 2 (2026-11-17) — checks a recording can judge
+
+Each test case gains **`checks`**: required, may be `[]`. A check is machine-readable and is
+judged against a bus recording by signal-loom. The grammar, the evaluation rules and the two
+file formats (`loom-judge/1` out, `loom-verdict/1` back) are fixed in signal-loom's
+`docs/plan-judging-2026-11.md`, §3 to §5. This spec does not restate them; it adds only what
+grap-rust must do.
+
+- **Signals are named as in the DBC:** `{"message": <BO_ name>, "signal": <SG_ name>}`. In
+  this graph that is the DBC `Signal` node whose `native_id` is `<message>.<signal>`. An ARXML
+  signal is not usable in a check until it is linked to its DBC signal; that is a gap to count,
+  not to guess around.
+- **The model writes checks; validation decides whether they stand.** A check whose signal is
+  not a DBC `Signal` in that case's `uses` is an issue for the refine loop, like any invented
+  identifier (§10 decision 3).
+- **A case with no checks is allowed.** Many requirements are observable only inside the ECU.
+  Such a case is exported anyway and comes back counted as `not_judgeable`.
+- **Verdicts are events, not edits.** An imported verdict is recorded on the run as an event
+  (§8). It never changes the stored specification.
+- **Recordings never enter this repository**, and evidence values never enter a log line.
+
 ---
 
 ## 6. Guards and the one loop
@@ -207,6 +228,12 @@ revisited after the first real run (card P-17), when there is evidence instead o
 | **P-14** Events and evidence snapshot | [M] | §8. |
 | **P-15** `choose_template`, `compose_instructions`, `emit` | [M] | Template rendering. |
 | **P-16** `invoke_model` and the procedure file | [S] | The JSON schema of §5; `procedures/generate-test-spec.pg.yaml`; end-to-end with the stub. |
+| **GJ-01** `checks` in the model's output | [S] | §5b: add `checks` to the §5 JSON schema (required, may be `[]`), in the grammar of signal-loom's plan §3; the model's prompt says when to leave it empty. |
+| **GJ-02** Validate checks | [S] | §5b: every signal reference is a DBC `Signal` key in the case's `uses`; `op`, `mode`, `within_ms` and `tolerance` follow signal-loom's §3. Each failure is one issue. Tests: one per rule. |
+| **GJ-03** Export a judge request | [S] | `scripts/export_judge_request.py`: emitted specification → `loom-judge/1`. Cases without checks kept. Test: the contract fixture's `request.json` is reproduced from a specification built to match it. |
+| **GJ-04** Import verdicts | [S] | `scripts/import_verdicts.py`: `loom-verdict/1` → one event per case on the run (verdict, log sha256, counts). Refuse a file whose `request_sha256` does not match the exported request. Test with signal-loom's `expected-verdict.json`, copied with its `SHA256SUMS`. |
+| **GJ-05** DBC parity | [S] | Dump a DBC through `readers/dbc.py` in signal-loom's SL-17 format and compare with signal-loom's expected file for `hypercar_lap.dbc`. Any difference fails, and is a finding about one of the two readers, not a test to loosen. |
+| **GJ-06** First real judgement | **[L] + owner** | After P-17: a real recording and a generated specification, on the owner's machine. |
 | **P-17** First real run | **[L] + owner** | On the real corpus with a local model; Sheet 4 scores; the side-by-side review. |
 
 P-12 can be built and scored before any model is involved, and should be: it is the part the gold
