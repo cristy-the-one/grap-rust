@@ -121,7 +121,8 @@ def test_a_complete_draft_passes():
         no_invented_names=0 (n=1 cases, documents=1)
         traceability=0 (n=1 cases, documents=1)
         completeness=0 (n=1 cases, documents=1)
-        negative_cases=0 (n=1 requirements, n_statements=0, documents=1)"""
+        negative_cases=0 (n=1 requirements, n_statements=0, documents=1)
+        checks=0 (n=1 cases, documents=1)"""
     )
 
 
@@ -394,7 +395,8 @@ def test_nothing_to_measure_prints_na_and_a_bad_draft_is_refused():
         no_invented_names=n/a (n=0 cases, documents=0)
         traceability=n/a (n=0 cases, documents=0)
         completeness=n/a (n=0 cases, documents=0)
-        negative_cases=n/a (n=0 requirements, n_statements=0, documents=0)"""
+        negative_cases=n/a (n=0 requirements, n_statements=0, documents=0)
+        checks=n/a (n=0 cases, documents=0)"""
     )
     with pytest.raises(ValidationError, match="draft"):
         validate_output("not a specification", [], {"requirements": []})
@@ -448,3 +450,349 @@ def test_the_interpreter_keeps_a_failed_validation_and_emits_nothing():
 def test_validation_does_not_run_another_operation():
     with pytest.raises(ValidationError, match="invoke_model"):
         ValidationOperations()("invoke_model", {"instructions": "write a test"})
+
+
+# §5b. checks on a case. One test fails one rule. The issue names the case,
+# the check id and the rule, in the same shape as the six checks above.
+
+
+def _signal_key(message, signal):
+    native = f"{message}.{signal}"
+    key = f"Signal | fix | {native}"
+    return key, _node(key, "Signal", native, kind="i_signal")
+
+
+_IGN_KEY, _IGN_NODE = _signal_key("Ignition", "IgnState")
+_BRAKE_KEY, _BRAKE_NODE = _signal_key("BrakeCmd", "BrakePedal")
+_LAMP_KEY, _LAMP_NODE = _signal_key("Lamps", "BrakeLamp")
+_CHECK_NODES = [_IGN_NODE, _BRAKE_NODE, _LAMP_NODE]
+_CHECK_USES = [SIG_KEY, _IGN_KEY, _BRAKE_KEY, _LAMP_KEY]
+
+
+def _condition(message, signal, op="==", value=1, **extra):
+    ref = {"message": message, "signal": signal}
+    if "channel" in extra:
+        ref["channel"] = extra.pop("channel")
+    cond = {"signal": ref, "op": op, "value": value}
+    if "tolerance" in extra:
+        cond["tolerance"] = extra.pop("tolerance")
+    if extra:
+        raise AssertionError(sorted(extra))
+    return cond
+
+
+def _judge_check(check_id="c1", **overrides):
+    check = {
+        "id": check_id,
+        "given": [_condition("Ignition", "IgnState", value="ON")],
+        "when": _condition("BrakeCmd", "BrakePedal", value=1),
+        "expect": _condition("Lamps", "BrakeLamp", value=1),
+        "mode": "eventually",
+        "within_ms": [0, 100],
+    }
+    check.update(overrides)
+    return check
+
+
+def _run_judge(checks, *, uses=None, nodes=None):
+    req = _req()
+    if uses is None:
+        uses = list(_CHECK_USES)
+    if nodes is None:
+        nodes = list(_CHECK_NODES)
+    case = _case(checks=list(checks), uses=list(uses))
+    projection = _projection([req], extra_nodes=nodes)
+    return _run(
+        _draft(case),
+        [req],
+        projection=projection,
+        context_nodes=list(uses),
+    )
+
+
+def test_check_signal_not_in_uses_is_an_issue():
+    """§5b. Every condition in given, when and expect needs a Signal in uses.
+
+    The native_id is exactly message.signal. Another type with that id,
+    or a Signal with a different id, is the same issue. checks: [] is valid.
+    """
+    empty, _summary = _run_judge([])
+    assert empty == {"issues": [], "passed": True}
+
+    valid, _summary = _run_judge([_judge_check()])
+    assert valid == {"issues": [], "passed": True}
+
+    missing, _summary = _run_judge([_judge_check()], uses=[SIG_KEY])
+    assert missing == {
+        "passed": False,
+        "issues": [_issue("check signal not in uses", "c1")],
+    }
+
+    given_only, _summary = _run_judge(
+        [_judge_check()], uses=[SIG_KEY, _BRAKE_KEY, _LAMP_KEY],
+    )
+    assert given_only == missing
+
+    when_only, _summary = _run_judge(
+        [_judge_check()], uses=[SIG_KEY, _IGN_KEY, _LAMP_KEY],
+    )
+    assert when_only == missing
+
+    expect_only, _summary = _run_judge(
+        [_judge_check()], uses=[SIG_KEY, _IGN_KEY, _BRAKE_KEY],
+    )
+    assert expect_only == missing
+
+    wrong_key = "ISignal | fix | BrakeCmd.BrakePedal"
+    wrong_type, _summary = _run_judge(
+        [_judge_check()],
+        uses=[SIG_KEY, _IGN_KEY, wrong_key, _LAMP_KEY],
+        nodes=[
+            _IGN_NODE,
+            _node(wrong_key, "ISignal", "BrakeCmd.BrakePedal", kind="i_signal"),
+            _LAMP_NODE,
+        ],
+    )
+    assert wrong_type == missing
+
+    other_native, _summary = _run_judge(
+        [_judge_check()],
+        nodes=[
+            _IGN_NODE,
+            _node(_BRAKE_KEY, "Signal", "BrakeCmd.Other", kind="i_signal"),
+            _LAMP_NODE,
+        ],
+    )
+    assert other_native == missing
+
+
+def test_check_op_must_be_one_of_the_six_comparisons():
+    """op is == != > >= < <=. A bad op on given, when or expect is one issue."""
+    expected = {
+        "passed": False,
+        "issues": [_issue("op", "c1")],
+    }
+    when_bad = _judge_check()
+    when_bad["when"] = _condition("BrakeCmd", "BrakePedal", op="eq", value=1)
+    result, _summary = _run_judge([when_bad])
+    assert result == expected
+
+    given_bad = _judge_check()
+    given_bad["given"] = [_condition("Ignition", "IgnState", op="eq", value="ON")]
+    given, _summary = _run_judge([given_bad])
+    assert given == expected
+
+    expect_bad = _judge_check()
+    expect_bad["expect"] = _condition("Lamps", "BrakeLamp", op="eq", value=1)
+    expect, _summary = _run_judge([expect_bad])
+    assert expect == expected
+
+    for op in ("==", "!=", ">", ">=", "<", "<="):
+        ok = _judge_check()
+        ok["when"] = _condition("BrakeCmd", "BrakePedal", op=op, value=1)
+        passed, _summary = _run_judge([ok])
+        assert passed == {"issues": [], "passed": True}, op
+
+
+def test_check_mode_must_be_eventually_always_or_never():
+    result, _summary = _run_judge([_judge_check(mode="soon")])
+    assert result == {
+        "passed": False,
+        "issues": [_issue("mode", "c1")],
+    }
+    for mode in ("eventually", "always", "never"):
+        passed, _summary = _run_judge([_judge_check(mode=mode)])
+        assert passed == {"issues": [], "passed": True}, mode
+
+
+def test_check_within_ms_must_be_two_integers_in_range():
+    """0 <= min <= max <= 3600000. Both ends are integers."""
+    expected = {
+        "passed": False,
+        "issues": [_issue("within_ms", "c1")],
+    }
+    reversed_window, _summary = _run_judge([_judge_check(within_ms=[100, 0])])
+    assert reversed_window == expected
+    over, _summary = _run_judge([_judge_check(within_ms=[0, 3600001])])
+    assert over == expected
+    fractional, _summary = _run_judge([_judge_check(within_ms=[0, 1.5])])
+    assert fractional == expected
+    boolean, _summary = _run_judge([_judge_check(within_ms=[False, 100])])
+    assert boolean == expected
+    edge, _summary = _run_judge([_judge_check(within_ms=[0, 3600000])])
+    assert edge == {"issues": [], "passed": True}
+    same, _summary = _run_judge([_judge_check(within_ms=[0, 0])])
+    assert same == {"issues": [], "passed": True}
+
+
+def test_check_tolerance_is_null_or_a_non_negative_number_on_equality():
+    """null is absent. A number >= 0 is kept only on == and !=."""
+    expected = {
+        "passed": False,
+        "issues": [_issue("tolerance", "c1")],
+    }
+    wrong_op = _judge_check()
+    wrong_op["when"] = _condition(
+        "BrakeCmd", "BrakePedal", op=">", value=1, tolerance=0,
+    )
+    result, _summary = _run_judge([wrong_op])
+    assert result == expected
+
+    negative = _judge_check()
+    negative["expect"] = _condition(
+        "Lamps", "BrakeLamp", op="==", value=1, tolerance=-1,
+    )
+    neg, _summary = _run_judge([negative])
+    assert neg == expected
+
+    text = _judge_check()
+    text["given"] = [_condition(
+        "Ignition", "IgnState", op="==", value="ON", tolerance="0",
+    )]
+    text_result, _summary = _run_judge([text])
+    assert text_result == expected
+
+    absent = _judge_check()
+    absent["when"] = _condition(
+        "BrakeCmd", "BrakePedal", op=">", value=1, tolerance=None,
+    )
+    ok_null, _summary = _run_judge([absent])
+    assert ok_null == {"issues": [], "passed": True}
+
+    kept = _judge_check()
+    kept["expect"] = _condition(
+        "Lamps", "BrakeLamp", op="!=", value=1, tolerance=0.5,
+    )
+    ok_num, _summary = _run_judge([kept])
+    assert ok_num == {"issues": [], "passed": True}
+
+
+def test_check_channel_is_null_or_an_integer_from_0_to_255():
+    """null is absent. Otherwise the channel is an integer from 0 to 255."""
+    expected = {
+        "passed": False,
+        "issues": [_issue("channel", "c1")],
+    }
+    high = _judge_check()
+    high["when"] = _condition("BrakeCmd", "BrakePedal", value=1, channel=256)
+    result, _summary = _run_judge([high])
+    assert result == expected
+
+    low = _judge_check()
+    low["expect"] = _condition("Lamps", "BrakeLamp", value=1, channel=-1)
+    neg, _summary = _run_judge([low])
+    assert neg == expected
+
+    fractional = _judge_check()
+    fractional["given"] = [_condition(
+        "Ignition", "IgnState", value="ON", channel=1.0,
+    )]
+    frac, _summary = _run_judge([fractional])
+    assert frac == expected
+
+    flag = _judge_check()
+    flag["when"] = _condition("BrakeCmd", "BrakePedal", value=1, channel=True)
+    boolean, _summary = _run_judge([flag])
+    assert boolean == expected
+
+    top = _judge_check()
+    top["when"] = _condition("BrakeCmd", "BrakePedal", value=1, channel=255)
+    ok, _summary = _run_judge([top])
+    assert ok == {"issues": [], "passed": True}
+
+    zero = _judge_check()
+    zero["expect"] = _condition("Lamps", "BrakeLamp", value=1, channel=0)
+    at_zero, _summary = _run_judge([zero])
+    assert at_zero == {"issues": [], "passed": True}
+
+    absent = _judge_check()
+    absent["when"] = _condition(
+        "BrakeCmd", "BrakePedal", value=1, channel=None,
+    )
+    ok_null, _summary = _run_judge([absent])
+    assert ok_null == {"issues": [], "passed": True}
+
+
+def test_check_ids_are_unique_within_a_case():
+    result, _summary = _run_judge([_judge_check("c1"), _judge_check("c1")])
+    assert result == {
+        "passed": False,
+        "issues": [_issue("check id", "c1")],
+    }
+    distinct, _summary = _run_judge([_judge_check("c1"), _judge_check("c2")])
+    assert distinct == {"issues": [], "passed": True}
+
+
+def test_check_value_is_a_number_or_a_string():
+    """A string is accepted as written. Labels are not checked against a DBC."""
+    expected = {
+        "passed": False,
+        "issues": [_issue("value", "c1")],
+    }
+    flag = _judge_check()
+    flag["when"] = _condition("BrakeCmd", "BrakePedal", value=True)
+    result, _summary = _run_judge([flag])
+    assert result == expected
+
+    empty = _judge_check()
+    empty["expect"] = _condition("Lamps", "BrakeLamp", value=None)
+    missing, _summary = _run_judge([empty])
+    assert missing == expected
+
+    given_bad = _judge_check()
+    given_bad["given"] = [_condition("Ignition", "IgnState", value={"raw": 1})]
+    given, _summary = _run_judge([given_bad])
+    assert given == expected
+
+    label = _judge_check()
+    label["given"] = [_condition("Ignition", "IgnState", value="NOT_A_LABEL")]
+    ok, _summary = _run_judge([label])
+    assert ok == {"issues": [], "passed": True}
+
+    number = _judge_check()
+    number["when"] = _condition("BrakeCmd", "BrakePedal", value=1.5)
+    num, _summary = _run_judge([number])
+    assert num == {"issues": [], "passed": True}
+
+
+def test_three_bad_checks_list_all_three_issues():
+    """One case, three bad checks, three issues, in check order."""
+    missing = _judge_check("c-signal")
+    missing["when"] = _condition("Missing", "Nope", value=1)
+    bad_op = _judge_check("c-op")
+    bad_op["when"] = _condition("BrakeCmd", "BrakePedal", op="eq", value=1)
+    bad_mode = _judge_check("c-mode", mode="soon")
+    result, _summary = _run_judge([missing, bad_op, bad_mode])
+    assert result == {
+        "passed": False,
+        "issues": [
+            _issue("check signal not in uses", "c-signal"),
+            _issue("op", "c-op"),
+            _issue("mode", "c-mode"),
+        ],
+    }
+
+
+def test_a_check_rule_failure_is_counted_on_the_checks_line():
+    """The summary's seventh line is the number of §5b issues over n_cases."""
+    bad = _judge_check(mode="soon")
+    result, summary = _run_judge([bad])
+    assert result == {
+        "passed": False,
+        "issues": [_issue("mode", "c1")],
+    }
+    assert summary.startswith(
+        "passed=false n_issues=1 n_cases=1 n_requirements=1 n_docs=1 n_statements=0"
+    )
+    assert "checks=1 (n=1 cases, documents=1)" in summary
+    assert "coverage=0 (n=1 requirements, documents=1)" in summary
+    assert "grounding=0 (n=1 cases, documents=1)" in summary
+
+
+def test_a_check_that_is_not_an_object_is_an_issue():
+    """A check that is not an object is one issue. The value is its index."""
+    result, _summary = _run_judge([_judge_check("c1"), "not-an-object"])
+    assert result == {
+        "passed": False,
+        "issues": [_issue("check shape", "#1")],
+    }

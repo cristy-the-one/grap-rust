@@ -31,6 +31,20 @@ Judgements this card had to make, and the tests lock in:
   traceability still verifies the selection and names one id outside it.
 - Completeness is a missing or blank ``stimulus``,
   ``expected_observable_result`` or ``pass_criterion``.
+- A case's ``checks`` may be missing or ``[]``. Each check is judged
+  on its own. For every condition in ``given``, ``when`` and
+  ``expect``, some key in that case's ``uses`` must be a projection
+  node of type ``Signal`` whose ``native_id`` is exactly
+  ``message.signal``. ``op`` is ``== != > >= < <=``. ``mode`` is
+  ``eventually always never``. ``within_ms`` is two integers,
+  ``0 <= min <= max <= 3600000``. ``tolerance`` null is absent; a
+  number must be ``>= 0`` and only on ``==`` or ``!=``. ``channel``
+  null is absent; otherwise it is an integer from 0 to 255. Check
+  ids are unique within the case. ``value`` is a number or a string,
+  and is not compared with a DBC label. A check that is not an object
+  is the rule ``check shape`` and the value ``#<index>``. One failure
+  is one issue: ``check`` is the rule, ``value`` is the check id.
+  The summary's ``checks`` line counts these issues over ``n_cases``.
 """
 
 from __future__ import annotations
@@ -66,6 +80,23 @@ _REQUIRED_TEXT = (
     "pass_criterion",
 )
 _EDGE_PUNCT = ".,;:!?()\"'`<>"
+_CHECK_OPS = ("==", "!=", ">", ">=", "<", "<=")
+_CHECK_EQUALITY = ("==", "!=")
+_CHECK_MODES = ("eventually", "always", "never")
+# §3.2 writes this upper bound as 3 600 000. Channel is 0 to 255.
+_CHECK_WINDOW_MAX_MS = 3600000
+_CHECK_CHANNEL_MAX = 255
+_CHECK_RULES = frozenset({
+    "check signal not in uses",
+    "op",
+    "mode",
+    "within_ms",
+    "tolerance",
+    "channel",
+    "check id",
+    "value",
+    "check shape",
+})
 
 
 class ValidationError(Exception):
@@ -113,7 +144,10 @@ def validate_output(
     projection=None,
     statements=None,
 ) -> dict[str, Any]:
-    """Run the six checks. ``passed`` is true only when ``issues`` is empty."""
+    """Run the §7 checks and the §5b check rules.
+
+    ``passed`` is true only when ``issues`` is empty.
+    """
     cases = _cases(draft)
     reqs = _requirements(requirements)
     groups = _context_groups(context)
@@ -127,6 +161,7 @@ def validate_output(
     issues.extend(_traceability(reqs, cases, attached))
     issues.extend(_completeness(cases))
     issues.extend(_negative(reqs, cases, attached))
+    issues.extend(_case_checks(cases, projection))
     return {"issues": issues, "passed": not issues}
 
 
@@ -148,10 +183,13 @@ def format_summary(
     n_docs = len({req["source_id"] for req in reqs})
     n_statements = len(_statement_rows(reqs, projection, statements))
     counts = {name: 0 for name in _CHECKS}
+    n_check_issues = 0
     for issue in result["issues"]:
         check = issue.get("check")
         if check in counts:
             counts[check] += 1
+        if check in _CHECK_RULES:
+            n_check_issues += 1
     passed = "true" if result.get("passed") is True else "false"
     lines = [
         f"passed={passed} n_issues={len(result['issues'])} n_cases={n_cases} "
@@ -164,6 +202,7 @@ def format_summary(
         _check_line("traceability", counts["traceability"], n_cases, "cases", n_docs),
         _check_line("completeness", counts["completeness"], n_cases, "cases", n_docs),
         _negative_line(counts["negative_cases"], n_requirements, n_statements, n_docs),
+        _check_line("checks", n_check_issues, n_cases, "cases", n_docs),
     ]
     return "\n".join(lines)
 
@@ -436,6 +475,156 @@ def _completeness(cases) -> list[dict]:
             if _blank(case.get(field)):
                 issues.append(_issue(case_id, "completeness", field))
     return issues
+
+
+def _case_checks(cases, projection) -> list[dict]:
+    """The §5b rules. A missing ``checks`` and ``[]`` add nothing."""
+    nodes = _projection_nodes(projection)
+    issues = []
+    for index, case in enumerate(cases):
+        issues.extend(_one_case_checks(case, _case_id(case, index), nodes))
+    return issues
+
+
+def _projection_nodes(projection) -> dict:
+    if not isinstance(projection, Mapping):
+        return {}
+    nodes = {}
+    for node in projection.get("nodes", ()):
+        if isinstance(node, Mapping) and isinstance(node.get("key"), str):
+            nodes[node["key"]] = node
+    return nodes
+
+
+def _one_case_checks(case, case_id: str, nodes: dict) -> list[dict]:
+    raw = case.get("checks")
+    if not isinstance(raw, list) or len(raw) == 0:
+        return []
+    issues = []
+    seen: list[str] = []
+    for index, check in enumerate(raw):
+        if not isinstance(check, Mapping):
+            issues.append(_issue(case_id, "check shape", f"#{index}"))
+            continue
+        check_id = _check_id(check, index)
+        conditions = _check_conditions(check)
+        if any(not _signal_in_uses(case, nodes, item) for item in conditions):
+            issues.append(_issue(case_id, "check signal not in uses", check_id))
+        if any(not _op_ok(item) for item in conditions):
+            issues.append(_issue(case_id, "op", check_id))
+        if check.get("mode") not in _CHECK_MODES:
+            issues.append(_issue(case_id, "mode", check_id))
+        if not _window_ok(check.get("within_ms")):
+            issues.append(_issue(case_id, "within_ms", check_id))
+        if any(not _tolerance_ok(item) for item in conditions):
+            issues.append(_issue(case_id, "tolerance", check_id))
+        if any(not _channel_ok(item) for item in conditions):
+            issues.append(_issue(case_id, "channel", check_id))
+        ident = check.get("id")
+        if isinstance(ident, str):
+            if ident in seen:
+                issues.append(_issue(case_id, "check id", check_id))
+            else:
+                seen.append(ident)
+        if any(not _value_ok(item) for item in conditions):
+            issues.append(_issue(case_id, "value", check_id))
+    return issues
+
+
+def _check_id(check: Mapping[str, Any], index: int) -> str:
+    ident = check.get("id")
+    if isinstance(ident, str) and ident.strip() != "":
+        return ident
+    return f"#{index}"
+
+
+def _check_conditions(check: Mapping[str, Any]) -> list:
+    found = []
+    given = check.get("given")
+    if isinstance(given, list):
+        found.extend(given)
+    for name in ("when", "expect"):
+        item = check.get(name)
+        if item is not None:
+            found.append(item)
+    return found
+
+
+def _signal_in_uses(case, nodes: dict, condition) -> bool:
+    if not isinstance(condition, Mapping):
+        return False
+    signal = condition.get("signal")
+    if not isinstance(signal, Mapping):
+        return False
+    message = signal.get("message")
+    name = signal.get("signal")
+    if not isinstance(message, str) or not isinstance(name, str):
+        return False
+    native = f"{message}.{name}"
+    for key in _uses(case):
+        if not isinstance(key, str):
+            continue
+        node = nodes.get(key)
+        if not isinstance(node, Mapping):
+            continue
+        if node.get("type") == "Signal" and node.get("native_id") == native:
+            return True
+    return False
+
+
+def _op_ok(condition) -> bool:
+    if not isinstance(condition, Mapping):
+        return False
+    return condition.get("op") in _CHECK_OPS
+
+
+def _window_ok(value) -> bool:
+    if (
+        not isinstance(value, list)
+        or len(value) != 2
+        or any(isinstance(item, bool) or not isinstance(item, int) for item in value)
+    ):
+        return False
+    start, end = value
+    return 0 <= start <= end <= _CHECK_WINDOW_MAX_MS
+
+
+def _tolerance_ok(condition) -> bool:
+    if not isinstance(condition, Mapping) or "tolerance" not in condition:
+        return True
+    tolerance = condition.get("tolerance")
+    if tolerance is None:
+        return True
+    if isinstance(tolerance, bool) or not isinstance(tolerance, (int, float)):
+        return False
+    if tolerance < 0:
+        return False
+    return condition.get("op") in _CHECK_EQUALITY
+
+
+def _channel_ok(condition) -> bool:
+    if not isinstance(condition, Mapping):
+        return True
+    signal = condition.get("signal")
+    if not isinstance(signal, Mapping) or "channel" not in signal:
+        return True
+    channel = signal.get("channel")
+    if channel is None:
+        return True
+    if isinstance(channel, bool) or not isinstance(channel, int):
+        return False
+    return 0 <= channel <= _CHECK_CHANNEL_MAX
+
+
+def _value_ok(condition) -> bool:
+    if not isinstance(condition, Mapping):
+        return False
+    value = condition.get("value")
+    if isinstance(value, str):
+        return True
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return False
+    return True
 
 
 def _negative(requirements, cases, attached) -> list[dict]:
