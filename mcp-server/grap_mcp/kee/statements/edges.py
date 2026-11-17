@@ -18,19 +18,29 @@ as ``subject_unlinked``.
 
 Endpoints are resolved by the full key ``type | scope | native_id`` through
 ``projection["nodes"]`` to ``engine_id``. The graph is not scanned. A linked
-entity key that is not in the projection writes no edge and is counted as
-``entity_missing``. Only Statement nodes are created here. Item, Requirement,
-and entity nodes must already be in the projection.
+entity key that is not a live node writes no edge and is counted as
+``entity_missing``. Its key is returned in ``entity_missing_keys``. Only
+Statement nodes are created here. Item, Requirement, and entity nodes must
+already be in the projection.
+
+A ``stated_in`` or ``has_statement`` edge whose Item or Requirement is not a
+live node is not written. That miss is ``structural_missing``, printed with
+``n_statements``. It does not raise. The missing keys are returned in
+``structural_missing_keys``. Neither key list is printed.
 
 A Statement node's text is two lines: the statement id, then ``edges:`` and
 the sha256 hex of its edge rows. The digest covers those rows sorted by
-``(relation, to_key, role or "")``, each encoded
-``relation|to_key|role|origin`` and joined by a newline. A live Statement
-node with that key and the same digest is left untouched. Otherwise the old
-node, if any, is removed with ``remove_node``, a new node is written, and
-its projection entry is replaced. A live Statement of this item whose
-statement id is absent from the new list is removed the same way and dropped
-from ``projection["nodes"]``.
+``(relation, from_key, to_key, role or "")``, each encoded
+``relation|from_key|from_engine_id|to_key|to_engine_id|role|origin`` and
+joined by a newline. A replaced Requirement, Item, or entity changes that
+digest, so the statement is rewritten and the edge lands on the new node.
+That counts as ``statements_rewritten``. ``structural_missing`` stays the
+count for an Item or Requirement key that is absent from the projection.
+A live Statement is left untouched only when the digest matches. Otherwise
+the old node, if any, is removed with ``remove_node``, a new node is
+written, and its projection entry is replaced. A live Statement of this
+item whose statement id is absent from the new list is removed the same
+way and dropped from ``projection["nodes"]``.
 
 ``remove_node`` hides that node's edges from traversal and does not lower
 ``edge_count()``. A deletion shows up through ``neighbors_by_relation``,
@@ -128,19 +138,25 @@ def write_statement_edges(
     unlinked_ids: list[str] = []
     rejected = 0
     entity_missing = 0
+    entity_keys: list[str] = []
+    structural_missing = 0
+    structural_keys: list[str] = []
     for index, statement in enumerate(ordered):
         statement_id = f"{source_id}|{item_id}|{index}"
         if statement.statement_id is not None and statement.statement_id != statement_id:
             raise ValueError(
                 f"statement_id {statement.statement_id} does not match {statement_id}"
             )
-        rows, missed, refused, missing = _edges_for(
+        rows, missed, refused, missing, missed_keys, struct_missing, struct_keys = _edges_for(
             kg, by_key, statement, statement_id, scope, item_id, kind_hint, mentions, links,
         )
         plans.append((statement_id, rows))
         edge_rows.extend(rows)
         rejected += refused
         entity_missing += missing
+        entity_keys.extend(missed_keys)
+        structural_missing += struct_missing
+        structural_keys.extend(struct_keys)
         if missed:
             unlinked_ids.append(statement_id)
 
@@ -154,6 +170,9 @@ def write_statement_edges(
         rejected=rejected,
         unlinked_ids=tuple(unlinked_ids),
         entity_missing=entity_missing,
+        entity_missing_keys=entity_keys,
+        structural_missing=structural_missing,
+        structural_missing_keys=structural_keys,
         unchanged=unchanged,
         rewritten=rewritten,
         removed=removed,
@@ -179,6 +198,7 @@ def format_report(report: dict) -> str:
         f"n_documents={report['n_documents']} "
         f"{cells} "
         f"entity_missing={_cell(report['entity_missing'])} "
+        f"structural_missing={_cell(report['structural_missing'])} "
         f"statements_unchanged={_cell(report['statements_unchanged'])} "
         f"statements_rewritten={_cell(report['statements_rewritten'])} "
         f"statements_removed={_cell(report['statements_removed'])}"
@@ -202,9 +222,11 @@ def _edges_for(kg, by_key, statement, statement_id, scope, item_id, kind_hint, m
     rows: list[dict] = []
     rejected = 0
     missing = 0
-    rejected += _structural(
+    entity_keys: list[str] = []
+    struct_rejected, struct_missing, struct_keys = _structural(
         kg, by_key, rows, statement_id, scope, item_id, kind_hint, origin,
     )
+    rejected += struct_rejected
     statement_key = _node_key("Statement", scope, statement_id)
     for mention, field, key in placed:
         if key is None:
@@ -213,7 +235,7 @@ def _edges_for(kg, by_key, statement, statement_id, scope, item_id, kind_hint, m
         relation, role = _choose(
             statement.kind, field, entity_type, mention.mention_id == first_subject,
         )
-        status = _plan(
+        status, missing_key = _plan(
             kg, by_key, rows,
             from_type="Statement", from_scope=scope, from_native=statement_id,
             relation=relation, role=role, origin=origin,
@@ -224,12 +246,21 @@ def _edges_for(kg, by_key, statement, statement_id, scope, item_id, kind_hint, m
             rejected += 1
         elif status == "missing":
             missing += 1
-    return rows, first_subject is None, rejected, missing
+            entity_keys.append(missing_key)
+    return (
+        rows, first_subject is None, rejected, missing,
+        entity_keys, struct_missing, struct_keys,
+    )
 
 
-def _structural(kg, by_key, rows, statement_id, scope, item_id, kind_hint, origin) -> int:
-    """Schema refusals only. A missing Item or Requirement is not an entity miss."""
+def _structural(kg, by_key, rows, statement_id, scope, item_id, kind_hint, origin):
+    """Schema refusals, and Item or Requirement misses.
+
+    A missing Item or Requirement writes no edge and is not an entity miss.
+    """
     rejected = 0
+    missing = 0
+    keys: list[str] = []
     statement_key = _node_key("Statement", scope, statement_id)
     for spec in (
         ("Statement", scope, statement_id, "stated_in", "Item", scope, item_id),
@@ -238,7 +269,7 @@ def _structural(kg, by_key, rows, statement_id, scope, item_id, kind_hint, origi
         from_type, from_scope, from_native, relation, to_type, to_scope, to_native = spec
         if relation == "has_statement" and not _is_requirement_item(kind_hint):
             continue
-        status = _plan(
+        status, missing_key = _plan(
             kg, by_key, rows,
             from_type=from_type, from_scope=from_scope, from_native=from_native,
             relation=relation, role=None, origin=origin,
@@ -247,7 +278,10 @@ def _structural(kg, by_key, rows, statement_id, scope, item_id, kind_hint, origi
         )
         if status == "rejected":
             rejected += 1
-    return rejected
+        elif status == "missing":
+            missing += 1
+            keys.append(missing_key)
+    return rejected, missing, keys
 
 
 def _choose(kind: str, field: str, entity_type: str, first_subject: bool):
@@ -266,7 +300,7 @@ def _choose(kind: str, field: str, entity_type: str, first_subject: bool):
 
 
 def _plan(kg, by_key, rows, *, from_type, from_scope, from_native, relation, role, origin,
-          to_type, to_scope, to_native, statement_id, statement_key) -> str:
+          to_type, to_scope, to_native, statement_id, statement_key) -> tuple[str, str | None]:
     """Record one edge, or say why it was not recorded.
 
     ``missing`` means an endpoint other than this statement is not a live
@@ -275,15 +309,17 @@ def _plan(kg, by_key, rows, *, from_type, from_scope, from_native, relation, rol
     try:
         allowed = relation_allowed(from_type, relation, to_type)
     except ValueError:
-        return "rejected"
+        return "rejected", None
     if not allowed:
-        return "rejected"
+        return "rejected", None
     from_key = _node_key(from_type, from_scope, from_native)
     to_key = _node_key(to_type, to_scope, to_native)
     if from_key != statement_key and _live_id(kg, by_key.get(from_key)) is None:
-        return "missing"
+        return "missing", from_key
     if to_key != statement_key and _live_id(kg, by_key.get(to_key)) is None:
-        return "missing"
+        return "missing", to_key
+    from_engine_id = None if from_key == statement_key else _live_id(kg, by_key.get(from_key))
+    to_engine_id = None if to_key == statement_key else _live_id(kg, by_key.get(to_key))
     props = dict(_relation_properties(relation))
     props["origin"] = origin
     if relation == "refers_to":
@@ -297,9 +333,11 @@ def _plan(kg, by_key, rows, *, from_type, from_scope, from_native, relation, rol
         "origin": origin,
         "role": role,
         "statement_id": statement_id,
+        "from_engine_id": from_engine_id,
+        "to_engine_id": to_engine_id,
         "properties": props,
     })
-    return "ok"
+    return "ok", None
 
 
 def _present(kg, source, target, relation, origin, role) -> bool:
@@ -366,7 +404,8 @@ def _split_key(key: str) -> tuple[str, str, str]:
 
 def _report(
     *, mentions, linked, statements, edge_rows, rejected, unlinked_ids,
-    entity_missing, unchanged, rewritten, removed,
+    entity_missing, entity_missing_keys, structural_missing, structural_missing_keys,
+    unchanged, rewritten, removed,
 ) -> dict:
     by_relation = {name: 0 for name in _RELATIONS}
     for row in edge_rows:
@@ -391,6 +430,11 @@ def _report(
         "subject_unlinked_ids": () if nothing else unlinked_ids,
         "edge_rows": tuple(edge_rows),
         "entity_missing": None if no_mentions else entity_missing,
+        "entity_missing_keys": tuple(sorted(set(entity_missing_keys))),
+        "structural_missing": None if nothing else structural_missing,
+        "structural_missing_keys": (
+            () if nothing else tuple(sorted(set(structural_missing_keys)))
+        ),
         "statements_unchanged": None if _quiet(statements, removed) else unchanged,
         "statements_rewritten": None if _quiet(statements, removed) else rewritten,
         "statements_removed": None if _quiet(statements, removed) else removed,
@@ -406,17 +450,17 @@ def _apply(kg, projection, by_key, scope, source_id, plans) -> tuple[int, int]:
     rewritten = 0
     for statement_id, rows in plans:
         key = _node_key("Statement", scope, statement_id)
-        digest = _digest(rows)
         existing = _statement_engine(kg, by_key, key)
-        if existing is not None and _stored_digest(kg, existing, statement_id) == digest:
-            unchanged += 1
-            continue
         if existing is not None:
+            _bind_statement_engine(rows, key, existing)
+            if _stored_digest(kg, existing, statement_id) == _digest(rows):
+                unchanged += 1
+                continue
             kg.remove_node(existing)
-        engine_id = kg.add_node(
-            text=f"{statement_id}\nedges:{digest}",
-            label="Statement",
-        )
+        engine_id = kg.add_node(text=statement_id, label="Statement")
+        _bind_statement_engine(rows, key, engine_id)
+        digest = _digest(rows)
+        kg.update_node(engine_id, f"{statement_id}\nedges:{digest}")
         _put_node(projection, by_key, {
             "key": key,
             "type": "Statement",
@@ -463,12 +507,22 @@ def _write_rows(kg, by_key, rows, statement_key, statement_engine) -> None:
             kg.add_edge(source, target, 1.0, row["properties"])
 
 
+def _bind_statement_engine(rows, statement_key: str, engine_id: int) -> None:
+    for row in rows:
+        if row["from_key"] == statement_key:
+            row["from_engine_id"] = engine_id
+        if row["to_key"] == statement_key:
+            row["to_engine_id"] = engine_id
+
+
 def _digest(rows) -> str:
     ordered = sorted(
-        rows, key=lambda row: (row["relation"], row["to_key"], row["role"] or ""),
+        rows,
+        key=lambda row: (row["relation"], row["from_key"], row["to_key"], row["role"] or ""),
     )
     payload = "\n".join(
-        f"{row['relation']}|{row['to_key']}|{row['role'] or ''}|{row['origin']}"
+        f"{row['relation']}|{row['from_key']}|{row['from_engine_id']}"
+        f"|{row['to_key']}|{row['to_engine_id']}|{row['role'] or ''}|{row['origin']}"
         for row in ordered
     )
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
