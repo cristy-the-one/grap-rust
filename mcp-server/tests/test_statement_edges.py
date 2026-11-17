@@ -152,12 +152,12 @@ def _seed(kg, projection, entities, kind_hint):
 
 
 def _statement_text(statement_id, rows):
-    """The two-line node text. The digest is the card's row encoding."""
+    """The two-line node text. Each digest line names that edge's target engine id."""
     ordered = sorted(
         rows, key=lambda row: (row["relation"], row["to_key"], row["role"] or ""),
     )
     payload = "\n".join(
-        f"{row['relation']}|{row['to_key']}|{row['role'] or ''}|{row['origin']}"
+        f"{row['relation']}|{row['to_key']}|{row['to_engine_id']}|{row['role'] or ''}|{row['origin']}"
         for row in ordered
     )
     digest = hashlib.sha256(payload.encode("utf-8")).hexdigest()
@@ -933,3 +933,146 @@ def test_later_process_sees_saved_statement_entries(tmp_path):
     assert not reopened.is_node_deleted(kept)
     assert _entry(loaded, "Statement", f"{SOURCE}|{ITEM}|0")["engine_id"] == kept
     assert all(node.get("engine_id") != removed for node in loaded["nodes"])
+
+
+def test_replaced_entity_node_rewrites_the_statement(tmp_path):
+    """A replaced entity is a new endpoint, so the statement is rewritten.
+
+    Write the edges, remove_node the target entity, and give its key a new
+    node in the projection. The second call reports statements_rewritten=1
+    and the about edge reaches the new node.
+    """
+    from grap_mcp.kee.statements.edges import write_statement_edges
+
+    text = "VehSpdFL shall be fresh."
+    statement = _statement(
+        text,
+        subject=_span(text, "VehSpdFL"),
+        required_behaviour=_span(text, "shall be fresh."),
+    )
+    entity = _entity("Signal", "VehSpdFL")
+    signal_key = _key("Signal", "VehSpdFL")
+    statement_id = f"{SOURCE}|{ITEM}|0"
+    kg = pygrap.IndexedKnowledgeGraph(str(tmp_path / "kg"))
+    projection = _projection()
+    _seed(kg, projection, [entity], "requirement")
+    with GraphStore(str(tmp_path / "graph_store.db")) as graph:
+        tables = ResolutionTables(graph)
+        write_statement_mentions(tables, text, SOURCE, ITEM, [statement])
+        mentions = tables.mentions_for_item(SOURCE, ITEM)
+        with redirect_stdout(io.StringIO()):
+            link_identifiers(tables, mentions, [entity], decided_at=DECIDED_AT)
+            write_statement_edges(
+                tables, kg, projection, SOURCE, ITEM, [statement], kind_hint="requirement",
+            )
+        old_entity = _entry(projection, "Signal", "VehSpdFL")["engine_id"]
+        old_statement = _entry(projection, "Statement", statement_id)["engine_id"]
+        kg.remove_node(old_entity)
+        new_entity = kg.add_node(text="VehSpdFL", label="Signal")
+        for node in projection["nodes"]:
+            if node["key"] == signal_key:
+                node["engine_id"] = new_entity
+        buffer = io.StringIO()
+        with redirect_stdout(buffer):
+            report = write_statement_edges(
+                tables, kg, projection, SOURCE, ITEM, [statement], kind_hint="requirement",
+            )
+        printed = buffer.getvalue()
+    assert report["statements_rewritten"] == 1
+    assert report["n_statements"] == 1
+    assert "statements_rewritten=1" in printed
+    assert "n_statements=1" in printed
+    new_statement = _entry(projection, "Statement", statement_id)["engine_id"]
+    assert new_statement != old_statement
+    assert kg.is_node_deleted(old_statement)
+    about = _rows(report, "about", signal_key)
+    assert len(about) == 1
+    assert about[0]["to_engine_id"] == new_entity
+    assert kg.neighbors_by_relation(new_statement, "about", True) == [(new_entity, 1.0)]
+    assert old_entity not in _ids(kg.neighbors_by_relation(new_statement, "about", True))
+    rows = [row for row in report["edge_rows"] if row["statement_id"] == statement_id]
+    assert kg.get_node_text(new_statement) == _statement_text(statement_id, rows)
+
+
+def test_absent_item_counts_structural_missing(tmp_path):
+    """An Item that is not a live node writes no stated_in edge.
+
+    structural_missing is 1, printed with n_statements. The Item key is in
+    structural_missing_keys and is not in the printed line. The call does
+    not raise.
+    """
+    from grap_mcp.kee.statements.edges import write_statement_edges
+
+    text = "The module shall start."
+    statement = _statement(
+        text,
+        subject=_span(text, "The module"),
+        required_behaviour=_span(text, "shall start."),
+    )
+    item_key = _key("Item", ITEM)
+    kg = pygrap.IndexedKnowledgeGraph(str(tmp_path / "kg"))
+    projection = _projection()
+    _project_node(kg, projection, "Requirement", ITEM, SOURCE, SOURCE)
+    _project_node(kg, projection, "Component", "The module", SOURCE, SOURCE)
+    with GraphStore(str(tmp_path / "graph_store.db")) as graph:
+        tables = ResolutionTables(graph)
+        write_statement_mentions(tables, text, SOURCE, ITEM, [statement])
+        mentions = tables.mentions_for_item(SOURCE, ITEM)
+        with redirect_stdout(io.StringIO()):
+            link_identifiers(
+                tables, mentions, [_entity("Component", "The module")], decided_at=DECIDED_AT,
+            )
+        buffer = io.StringIO()
+        with redirect_stdout(buffer):
+            report = write_statement_edges(
+                tables, kg, projection, SOURCE, ITEM, [statement], kind_hint="requirement",
+            )
+        printed = buffer.getvalue()
+    assert report["structural_missing"] == 1
+    assert report["n_statements"] == 1
+    assert report["structural_missing_keys"] == (item_key,)
+    assert item_key not in report["entity_missing_keys"]
+    assert "structural_missing=1" in printed
+    assert "n_statements=1" in printed
+    assert item_key not in printed
+    assert _rows(report, "stated_in", item_key) == []
+    statement_node = _entry(projection, "Statement", f"{SOURCE}|{ITEM}|0")["engine_id"]
+    assert kg.neighbors_by_relation(statement_node, "stated_in", True) == []
+
+
+def test_absent_entity_key_is_returned_and_not_printed(tmp_path, capsys):
+    """An absent entity key is returned and is not written to stdout."""
+    from grap_mcp.kee.statements.edges import write_statement_edges
+
+    text = "VehSpdFL shall be fresh."
+    statement = _statement(
+        text,
+        subject=_span(text, "VehSpdFL"),
+        required_behaviour=_span(text, "shall be fresh."),
+    )
+    signal_key = _key("Signal", "VehSpdFL")
+    kg = pygrap.IndexedKnowledgeGraph(str(tmp_path / "kg"))
+    projection = _projection()
+    _project_node(kg, projection, "Item", ITEM, SOURCE, SOURCE)
+    _project_node(kg, projection, "Requirement", ITEM, SOURCE, SOURCE)
+    with GraphStore(str(tmp_path / "graph_store.db")) as graph:
+        tables = ResolutionTables(graph)
+        write_statement_mentions(tables, text, SOURCE, ITEM, [statement])
+        mentions = tables.mentions_for_item(SOURCE, ITEM)
+        with redirect_stdout(io.StringIO()):
+            link_identifiers(
+                tables, mentions, [_entity("Signal", "VehSpdFL")], decided_at=DECIDED_AT,
+            )
+        buffer = io.StringIO()
+        with redirect_stdout(buffer):
+            report = write_statement_edges(
+                tables, kg, projection, SOURCE, ITEM, [statement], kind_hint="requirement",
+            )
+        printed = buffer.getvalue()
+    captured = capsys.readouterr()
+    assert report["entity_missing"] == 1
+    assert report["entity_missing_keys"] == (signal_key,)
+    assert signal_key not in printed
+    assert signal_key not in captured.out
+    assert signal_key not in captured.err
+    assert _rows(report, "about", signal_key) == []
