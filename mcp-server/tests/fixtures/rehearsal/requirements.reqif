@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<REQ-IF xmlns="http://www.omg.org/spec/ReqIF/20110401/reqif.xsd" xmlns:xhtml="http://www.w3.org/1999/xhtml">
+  <THE-HEADER>
+    <REQ-IF-HEADER IDENTIFIER="_header">
+      <CREATION-TIME>2026-11-13T08:00:00Z</CREATION-TIME>
+      <REQ-IF-TOOL-ID>grap-test</REQ-IF-TOOL-ID>
+      <REQ-IF-VERSION>1.0</REQ-IF-VERSION>
+      <SOURCE-TOOL-ID>grap-test</SOURCE-TOOL-ID>
+      <TITLE>Brake lamp spec</TITLE>
+    </REQ-IF-HEADER>
+  </THE-HEADER>
+  <CORE-CONTENT>
+    <REQ-IF-CONTENT>
+      <DATATYPES>
+        <DATATYPE-DEFINITION-STRING IDENTIFIER="_dt_string" LONG-NAME="String" MAX-LENGTH="1000"/>
+        <DATATYPE-DEFINITION-XHTML IDENTIFIER="_dt_xhtml" LONG-NAME="XHTML"/>
+      </DATATYPES>
+      <SPEC-TYPES>
+        <SPEC-OBJECT-TYPE IDENTIFIER="_sot_req" LONG-NAME="Requirement">
+          <SPEC-ATTRIBUTES>
+            <ATTRIBUTE-DEFINITION-XHTML IDENTIFIER="_ad_text" LONG-NAME="ReqIF.Text">
+              <TYPE><DATATYPE-DEFINITION-XHTML-REF>_dt_xhtml</DATATYPE-DEFINITION-XHTML-REF></TYPE>
+            </ATTRIBUTE-DEFINITION-XHTML>
+            <ATTRIBUTE-DEFINITION-STRING IDENTIFIER="_ad_foreign" LONG-NAME="ReqIF.ForeignID">
+              <TYPE><DATATYPE-DEFINITION-STRING-REF>_dt_string</DATATYPE-DEFINITION-STRING-REF></TYPE>
+            </ATTRIBUTE-DEFINITION-STRING>
+          </SPEC-ATTRIBUTES>
+        </SPEC-OBJECT-TYPE>
+      </SPEC-TYPES>
+      <SPEC-OBJECTS>
+        <SPEC-OBJECT IDENTIFIER="REQ-BRK-001" LONG-NAME="Brake lamp">
+          <TYPE><SPEC-OBJECT-TYPE-REF>_sot_req</SPEC-OBJECT-TYPE-REF></TYPE>
+          <VALUES>
+            <ATTRIBUTE-VALUE-XHTML>
+              <DEFINITION><ATTRIBUTE-DEFINITION-XHTML-REF>_ad_text</ATTRIBUTE-DEFINITION-XHTML-REF></DEFINITION>
+              <THE-VALUE><xhtml:div>When BrakeCmd.BrakePedal becomes 1, Lamps.BrakeLamp shall become 1 within 100 ms.</xhtml:div></THE-VALUE>
+            </ATTRIBUTE-VALUE-XHTML>
+            <ATTRIBUTE-VALUE-STRING THE-VALUE="REQ-BRK-001">
+              <DEFINITION><ATTRIBUTE-DEFINITION-STRING-REF>_ad_foreign</ATTRIBUTE-DEFINITION-STRING-REF></DEFINITION>
+            </ATTRIBUTE-VALUE-STRING>
+          </VALUES>
+        </SPEC-OBJECT>
+      </SPEC-OBJECTS>
+    </REQ-IF-CONTENT>
+  </CORE-CONTENT>
+</REQ-IF>

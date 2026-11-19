@@ -54,7 +54,7 @@ def read_dbc(path: str | Path, corpus_root: str | Path | None = None) -> list[So
         raise ParseError(f"DBC reader cannot parse {file_path}")
 
     source_id = file_path.stem
-    release = loaded.version
+    release = loaded.version or None
     relative = _relative_file(file_path, corpus_root)
     digest = hashlib.sha256(data).hexdigest()
     items: list[SourceItem] = []

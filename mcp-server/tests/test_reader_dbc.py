@@ -232,6 +232,26 @@ def test_extended_mux_signed_and_float_attributes(tmp_path: Path):
     assert items[5].links == [_part_of("MuxMsg")]
 
 
+def test_blank_version_records_no_release(tmp_path: Path):
+    """VERSION "" states no release. The reader records None, not ""."""
+    path = tmp_path / "blank.dbc"
+    path.write_text(
+        'VERSION ""\n'
+        "\n"
+        "NS_ :\n"
+        "BS_:\n"
+        "\n"
+        "BU_: Node\n"
+        "\n"
+        "BO_ 256 Cmd: 8 Node\n"
+        ' SG_ Pedal : 0|8@1+ (1,0) [0|1] "" Node\n',
+        encoding="utf-8",
+    )
+    items = read_dbc(path, corpus_root=tmp_path)
+    assert len(items) == 2
+    assert [item.release for item in items] == [None, None]
+
+
 def test_corrupt_dbc_raises(tmp_path: Path):
     path = tmp_path / "broken.dbc"
     path.write_bytes(b"this is not a dbc\n")
