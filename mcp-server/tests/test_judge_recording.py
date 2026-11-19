@@ -18,6 +18,7 @@ REPO = Path(__file__).resolve().parents[2]
 SCRIPT = REPO / "scripts" / "judge_recording.py"
 FIXTURES = Path(__file__).resolve().parent / "fixtures" / "loom_judge"
 _RUN_ID = "run-judge"
+_UNKNOWN_RUN_ID = "run-missing"
 _MODE = "LOOM_JUDGE_MODE"
 _REFUSE_LINES = (
     "request refused: unknown key",
@@ -201,6 +202,72 @@ def test_refuse_exits_2_prints_both_lines_and_writes_no_events(tmp_path):
     assert proc.stdout == ""
     assert _snapshot(root) == before
     assert _payloads(workspace) == []
+
+
+def _write_recording_fake(path: Path, marker: Path) -> None:
+    """A loom-judge stand-in that records that it was started."""
+    path.write_text(
+        "\n".join(
+            [
+                f"#!{sys.executable}",
+                "from pathlib import Path",
+                f"Path({str(marker)!r}).write_text('ran\\n', encoding='utf-8')",
+                "raise SystemExit(0)",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    path.chmod(path.stat().st_mode | stat.S_IEXEC)
+
+
+def test_unknown_run_exits_1_without_starting_loom_judge(tmp_path):
+    """An unknown run id exits 1 with one line. The binary is not started."""
+    root = tmp_path / "ws"
+    root.mkdir()
+    pygrap.Workspace.open(str(root))
+    before = _snapshot(root)
+    marker = tmp_path / "loom-judge-ran"
+    fake = tmp_path / "fake_loom_judge.py"
+    _write_recording_fake(fake, marker)
+    spec_path = tmp_path / "specification.json"
+    spec_path.write_text(
+        json.dumps(_specification(), indent=2, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
+    out = tmp_path / "out"
+    out.mkdir()
+    proc = subprocess.run(
+        [
+            sys.executable,
+            str(SCRIPT),
+            "--spec",
+            str(spec_path),
+            "--spec-id",
+            _SPEC_ID,
+            "--log",
+            str(FIXTURES / "brake.asc"),
+            "--dbc",
+            str(FIXTURES / "brake.dbc"),
+            "--loom-judge",
+            str(fake),
+            "--run-id",
+            _UNKNOWN_RUN_ID,
+            "--workspace",
+            str(root),
+            "--out",
+            str(out),
+        ],
+        capture_output=True,
+        text=True,
+    )
+    assert proc.returncode == 1, proc.stderr
+    assert proc.stdout == ""
+    assert proc.stderr.splitlines() == [
+        f"run {_UNKNOWN_RUN_ID!r} is not in the workspace"
+    ]
+    assert marker.is_file() is False
+    assert _snapshot(root) == before
 
 
 def test_crash_exits_1_and_writes_no_events(tmp_path):

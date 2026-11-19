@@ -13,8 +13,10 @@ by ``export_request``. The binary is then:
 
 Exit 0 imports the verdict and prints its counts line. Exit 2 reprints the
 binary's stderr and imports nothing. Any other exit prints
-``loom-judge failed (exit N)`` and imports nothing. The verdict file is left
-in ``<out>``.
+``loom-judge failed (exit N)`` and imports nothing. A run id that is not in
+the workspace is refused before the binary starts, with that one line. A
+``Refusal`` from import is printed as one line and exits 1. The verdict file
+is left in ``<out>``.
 """
 
 from __future__ import annotations
@@ -25,8 +27,10 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pygrap
+
 from export_judge_request import export_request
-from import_verdicts import import_verdicts
+from import_verdicts import Refusal, import_verdicts
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -53,6 +57,11 @@ def main(argv: list[str] | None = None) -> None:
         encoding="utf-8",
     )
 
+    workspace = pygrap.Workspace.open(str(args.workspace))
+    if workspace.get_run(args.run_id) is None:
+        print(f"run {args.run_id!r} is not in the workspace", file=sys.stderr)
+        raise SystemExit(1)
+
     command = [str(args.loom_judge), "--log", str(args.log)]
     for dbc in args.dbc:
         command.extend(["--dbc", dbc])
@@ -61,9 +70,13 @@ def main(argv: list[str] | None = None) -> None:
     )
     proc = subprocess.run(command, capture_output=True)
     if proc.returncode == 0:
-        line = import_verdicts(
-            verdict_path, request_path, args.run_id, args.workspace
-        )
+        try:
+            line = import_verdicts(
+                verdict_path, request_path, args.run_id, args.workspace
+            )
+        except Refusal as exc:
+            print(str(exc), file=sys.stderr)
+            raise SystemExit(1) from exc
         print(line)
         return
     if proc.returncode == 2:
