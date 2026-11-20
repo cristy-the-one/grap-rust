@@ -8,6 +8,18 @@ with a local one. Nothing else changes.
 
 Commands are PowerShell, run from the root of the grap-rust checkout with its venv active.
 
+**Or run it in one go:** `scripts\first-real-run.ps1` does §1 to §5 and writes the §7 report
+to `<run>\report.md`. Before anything runs, it refuses a run folder inside a git repository, a
+model server that isn't on this machine, a model the server doesn't list, and a run id that
+has already been used. Each step's full output goes to `<run>\logs\`. The report keeps only
+the count and status lines, with their exit codes and durations. `-From generate` (or
+`judge`) resumes an existing run, for example after the model server is fixed.
+
+```powershell
+.\scripts\first-real-run.ps1 -RunId p17-1 -ReqIf D:\corpus\spec.reqif -Dbc D:\corpus\bus.dbc `
+    -Release R1 -ScopeIds REQ-A,REQ-B -Model <model id> -Recording D:\logs\drive.asc
+```
+
 ---
 
 ## 0. Rules for this run
