@@ -10,7 +10,11 @@ Judgements this card had to make, and the tests lock in:
   requirement's key, its item id, or a statement id of one of its
   statements. One item id covers every selected requirement that carries
   it. A key covers that node only.
-- ``uses`` holds context node keys. A native id in ``uses`` is not grounded.
+- ``uses`` holds context node keys of the requirements the case verifies.
+  A verifies entry matches a context group when it equals that group's
+  requirement key or its item id. A use outside that union is not grounded.
+  A case whose verifies matches no group has an empty union. A native id
+  in ``uses`` is not grounded.
 - Identifiers are the R-09 rule, read from ``working_graph``. Inside a
   sentence only a bracketed id, an underscore, a leading slash or a
   CamelCase hump counts. A field with no whitespace uses the whole-name
@@ -45,6 +49,9 @@ Judgements this card had to make, and the tests lock in:
   is the rule ``check shape`` and the value ``#<index>``. One failure
   is one issue: ``check`` is the rule, ``value`` is the check id.
   The summary's ``checks`` line counts these issues over ``n_cases``.
+  A check whose ``within_ms`` is exactly ``[0, 1000]`` while the case's
+  ``pass_criterion`` does not contain ``assumed 1 s window`` is the rule
+  ``assumed_window``.
 """
 
 from __future__ import annotations
@@ -96,6 +103,7 @@ _CHECK_RULES = frozenset({
     "check id",
     "value",
     "check shape",
+    "assumed_window",
 })
 
 
@@ -156,7 +164,7 @@ def validate_output(
     names = _known_names(groups, projection)
     issues: list[dict] = []
     issues.extend(_coverage(reqs, cases, attached))
-    issues.extend(_grounding(cases, groups))
+    issues.extend(_grounding(cases, context))
     issues.extend(_invented(cases, names))
     issues.extend(_traceability(reqs, cases, attached))
     issues.extend(_completeness(cases))
@@ -422,17 +430,41 @@ def _coverage(requirements, cases, attached) -> list[dict]:
     return issues
 
 
-def _grounding(cases, groups) -> list[dict]:
-    present = {node for group in groups for node in group if isinstance(node, str)}
+def _grounding(cases, context) -> list[dict]:
+    groups = context["requirements"] if isinstance(context, Mapping) else []
     issues = []
     for index, case in enumerate(cases):
+        allowed = _allowed_nodes(case, groups)
         seen: list = []
         for used in _uses(case):
-            if used in present or used in seen:
+            if used in allowed or used in seen:
                 continue
             seen.append(used)
             issues.append(_issue(_case_id(case, index), "grounding", used))
     return issues
+
+
+def _allowed_nodes(case, groups) -> set:
+    """Context nodes of the groups this case verifies, by key or item id."""
+    allowed: set = set()
+    for entry in _entries(case.get("verifies")):
+        for group in groups:
+            if not _verifies_group(entry, group):
+                continue
+            for node in group.get("nodes", ()):
+                if isinstance(node, str):
+                    allowed.add(node)
+    return allowed
+
+
+def _verifies_group(entry, group) -> bool:
+    if not isinstance(entry, str) or not isinstance(group, Mapping):
+        return False
+    key = group.get("key")
+    item_id = group.get("item_id")
+    if isinstance(key, str) and entry == key:
+        return True
+    return isinstance(item_id, str) and entry == item_id
 
 
 def _invented(cases, names: set[str]) -> list[dict]:
@@ -516,6 +548,8 @@ def _one_case_checks(case, case_id: str, nodes: dict) -> list[dict]:
             issues.append(_issue(case_id, "mode", check_id))
         if not _window_ok(check.get("within_ms")):
             issues.append(_issue(case_id, "within_ms", check_id))
+        if _assumed_window(check, case):
+            issues.append(_issue(case_id, "assumed_window", check_id))
         if any(not _tolerance_ok(item) for item in conditions):
             issues.append(_issue(case_id, "tolerance", check_id))
         if any(not _channel_ok(item) for item in conditions):
@@ -576,6 +610,21 @@ def _op_ok(condition) -> bool:
     if not isinstance(condition, Mapping):
         return False
     return condition.get("op") in _CHECK_OPS
+
+
+def _assumed_window(check, case) -> bool:
+    """``[0, 1000]`` with no ``assumed 1 s window`` note in ``pass_criterion``."""
+    window = check.get("within_ms")
+    if (
+        not isinstance(window, list)
+        or len(window) != 2
+        or any(isinstance(item, bool) or not isinstance(item, int) for item in window)
+        or window[0] != 0
+        or window[1] != 1000
+    ):
+        return False
+    criterion = case.get("pass_criterion")
+    return not (isinstance(criterion, str) and "assumed 1 s window" in criterion)
 
 
 def _window_ok(value) -> bool:
