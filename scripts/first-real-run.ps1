@@ -58,6 +58,13 @@ function Stop-Run([string]$why) {
     exit 1
 }
 
+function Add-ModelHint([string]$log) {
+    # grap's own error text, never requirement text: safe to match and report.
+    if ((Test-Path $log) -and (Select-String -Path $log -SimpleMatch "finish_reason='length'" -Quiet)) {
+        Add-Report "The model hit its output cap (finish_reason=length), so grap refused the cut-off reply. For a reasoning model, set GRAP_LLM_EXTRA_BODY='{`"chat_template_kwargs`": {`"enable_thinking`": false}}'. Otherwise raise GRAP_LLM_MAX_TOKENS (now $(if ($env:GRAP_LLM_MAX_TOKENS) { $env:GRAP_LLM_MAX_TOKENS } else { '2048, the default' }))."
+    }
+}
+
 function Add-Report([string]$text) {
     if (Test-Path $Run) { Add-Content -Path (Join-Path $Run "report.md") -Value $text -Encoding utf8 }
 }
@@ -145,7 +152,11 @@ if ($Provider -eq "local" -and $Start -le 2) {
     try { $listed = @((Invoke-RestMethod "$base/models" -TimeoutSec 10).data | ForEach-Object { $_.id }) }
     catch { Stop-Run "no model server answers at $base/models. Start it (scripts\serve-bonsai.ps1) and retry." }
     if ($modelId -notin $listed) { Stop-Run "model '$modelId' is not served at $base. It lists: $($listed -join ', '). Pass -Model." }
-    $modelLine = "$modelId at $base"
+    $maxTokens = $env:GRAP_LLM_MAX_TOKENS
+    if (-not $maxTokens) { $maxTokens = "2048 (default)" }
+    $extra = $env:GRAP_LLM_EXTRA_BODY
+    if (-not $extra) { $extra = "none" }
+    $modelLine = "$modelId at $base, max_tokens $maxTokens, extra body $extra"
 }
 
 if ($Start -le 3 -and ($Recording -or $Start -eq 3)) {
@@ -215,7 +226,7 @@ if ($Start -le 1) {
     }
     $r = Invoke-Step "build" (Build-Args "graph-out" $Provider)
     Report-Build $r $Provider
-    if ($r.Code -ne 0) { Stop-Run "the $Provider build failed. See logs\build.log." }
+    if ($r.Code -ne 0) { Add-ModelHint $r.Log; Stop-Run "the $Provider build failed. See logs\build.log." }
 }
 
 # ---------------------------------------------------------------- 4. generate
@@ -240,6 +251,7 @@ if ($Start -le 2) {
     Add-Report '```'
     if ($r.Code -ne 0) {
         if (-not $status) { Add-Report "The script crashed. The last line of logs\generate.log names the error: read it before sharing it." }
+        Add-ModelHint $r.Log
         Stop-Run "generation did not produce a specification."
     }
 }
