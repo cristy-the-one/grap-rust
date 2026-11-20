@@ -21,7 +21,13 @@ Judgements this card had to make, and the tests lock in:
   rule, so a bare number is an identifier. Edge punctuation is not part
   of the identifier. The text is matched exactly, brackets included,
   against a context node's key or, when a projection is supplied, that
-  node's native id.
+  node's native id. A token that is not one of those names is still
+  accepted when it equals the part after the last ``.`` of exactly one
+  ``Signal`` native id among the context nodes of the requirements that
+  case verifies, matched the same way as grounding. The segment rule
+  mirrors ``kee/resolution/exact.py``: empty segments are dropped, and a
+  segment that is the whole native id is not a separate match. Two such
+  signals, or none, stay rejected. The comparison is case-sensitive.
 - The scanned text is ``preconditions``, ``stimulus``,
   ``expected_observable_result``, ``pass_criterion`` and ``variant``.
   An empty ``variant`` is no variant and is not scanned.
@@ -165,7 +171,7 @@ def validate_output(
     issues: list[dict] = []
     issues.extend(_coverage(reqs, cases, attached))
     issues.extend(_grounding(cases, context))
-    issues.extend(_invented(cases, names))
+    issues.extend(_invented(cases, names, context, projection))
     issues.extend(_traceability(reqs, cases, attached))
     issues.extend(_completeness(cases))
     issues.extend(_negative(reqs, cases, attached))
@@ -467,19 +473,59 @@ def _verifies_group(entry, group) -> bool:
     return isinstance(item_id, str) and entry == item_id
 
 
-def _invented(cases, names: set[str]) -> list[dict]:
+def _invented(cases, names: set[str], context, projection) -> list[dict]:
+    groups = context["requirements"] if isinstance(context, Mapping) else []
+    nodes = _projection_nodes(projection)
     issues = []
     for index, case in enumerate(cases):
+        bare = _bare_signal_names(case, groups, nodes)
         seen: list[str] = []
         for text in _texts(case):
             for identifier in _identifiers(text):
-                if identifier in names or identifier in seen:
+                if identifier in names or identifier in bare or identifier in seen:
                     continue
                 seen.append(identifier)
                 issues.append(_issue(
                     _case_id(case, index), "no_invented_names", identifier,
                 ))
     return issues
+
+
+def _bare_signal_names(case, groups, nodes: dict) -> set[str]:
+    """Last ``.`` segments of exactly one Signal in this case's context.
+
+    The signals are the context nodes of the requirements the case verifies,
+    matched the same way as grounding. The segment rule mirrors
+    ``_last_segment`` in ``kee/resolution/exact.py``, with ``.`` in place of
+    ``/``. A segment that is the whole native id is not a bare name, and the
+    comparison is case-sensitive.
+    """
+    counts: dict[str, int] = {}
+    for key in _allowed_nodes(case, groups):
+        node = nodes.get(key)
+        if not isinstance(node, Mapping) or node.get("type") != "Signal":
+            continue
+        native = node.get("native_id")
+        if not isinstance(native, str) or native == "":
+            continue
+        segment = _last_dot_segment(native)
+        if segment == native:
+            continue
+        counts[segment] = counts.get(segment, 0) + 1
+    return {segment for segment, count in counts.items() if count == 1}
+
+
+def _last_dot_segment(native_id: str) -> str:
+    """Part after the last ``.``, or the whole id when there is no such part.
+
+    Same shape as ``_last_segment`` in ``kee/resolution/exact.py``.
+    """
+    if "." not in native_id:
+        return native_id
+    parts = [part for part in native_id.split(".") if part]
+    if not parts:
+        return native_id
+    return parts[-1]
 
 
 def _traceability(requirements, cases, attached) -> list[dict]:
