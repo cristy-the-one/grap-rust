@@ -75,16 +75,21 @@ def _execute(args) -> int:
     workspace_dir.mkdir(parents=True, exist_ok=True)
     workspace = pygrap.Workspace.open(str(workspace_dir))
     out = Path(args.out)
-    result = run_generate_test_spec(
-        kg,
-        projection,
-        workspace,
-        workspace_dir,
-        out / "emitted",
-        run_id=args.run_id,
-        scope=_scope(args.scope_ids),
-        provider=_provider(args),
-    )
+    try:
+        result = run_generate_test_spec(
+            kg,
+            projection,
+            workspace,
+            workspace_dir,
+            out / "emitted",
+            run_id=args.run_id,
+            scope=_scope(args.scope_ids),
+            provider=_provider(args),
+        )
+    except RuntimeError as exc:
+        # The provider's own text can quote the reply. Print only the class.
+        print(f"model_error finish_reason={_model_finish_reason(exc)}")
+        return 1
     recorded = result.recorded
     if recorded.status == "ok":
         out.mkdir(parents=True, exist_ok=True)
@@ -97,6 +102,12 @@ def _execute(args) -> int:
         return 0
     print(f"{recorded.status} n_issues={_issue_count(recorded)}")
     return 1
+
+
+def _model_finish_reason(exc: BaseException) -> str:
+    if "finish_reason='length'" in str(exc):
+        return "length"
+    return "other"
 
 
 def _provider(args):
