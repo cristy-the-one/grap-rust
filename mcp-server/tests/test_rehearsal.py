@@ -265,7 +265,10 @@ def test_rehearsal_exports_the_judge_request_and_imports_four_verdicts(tmp_path,
     assert pedal_key in linked, (linked, mention_lines)
     assert lamp_key in linked, (linked, mention_lines)
 
-    reply = _reply(pedal_key, lamp_key)
+    # The model names context nodes and the requirement by the ids the prompt
+    # shows (native id), not by node key. Resolution must turn those into keys
+    # before grounding, and the judge request must stay the fixture.
+    reply = _reply(_PEDAL, _LAMP)
     reply_path = tmp_path / "reply.json"
     reply_text = json.dumps(reply)
     reply_path.write_text(reply_text, encoding="utf-8")
@@ -305,6 +308,10 @@ def test_rehearsal_exports_the_judge_request_and_imports_four_verdicts(tmp_path,
     assert generated.index(success) < generated.index(summary)
 
     spec = json.loads((spec_out / "specification.json").read_text(encoding="utf-8"))
+    assert [case["uses"] for case in spec["cases"]] == [[pedal_key, lamp_key]] * 4
+    assert [case["verifies"] for case in spec["cases"]] == [[_REQUIREMENT_ID]] * 4
+    resolved = [line for line in generated.splitlines() if line.startswith("resolved_ids ")]
+    assert resolved == ["resolved_ids uses=8 verifies=0"]
     exported = export_request(spec, _SPEC_ID)
     expected = json.loads(_REQUEST.read_text(encoding="utf-8"))
     assert exported == expected
