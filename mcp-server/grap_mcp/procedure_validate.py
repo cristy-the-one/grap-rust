@@ -58,6 +58,18 @@ Judgements this card had to make, and the tests lock in:
   A check whose ``within_ms`` is exactly ``[0, 1000]`` while the case's
   ``pass_criterion`` does not contain ``assumed 1 s window`` is the rule
   ``assumed_window``.
+- A requirement needs a check when its context group (the
+  ``context["requirements"]`` entry whose ``key`` equals the requirement
+  key) has a projection node of type ``Signal``. ``projection`` None adds
+  nothing. A requirement that no case verifies adds no checkable issue;
+  coverage already reports it. It passes when a case that verifies it
+  has a non-empty ``checks`` list, or a ``no_check_reason`` of
+  ``inside_ecu``, ``signal_compare`` or ``not_on_bus``. Otherwise one
+  issue: ``check="checkable"``, case None, value the requirement key.
+- ``no_check_reason`` absent or null is no reason. Any other value, and a
+  reason on a case whose ``checks`` is non-empty, is one issue
+  ``check="no_check_reason"``, value the case id. The summary counts a
+  reason when the value is one of the three and ``checks`` is empty.
 """
 
 from __future__ import annotations
@@ -79,7 +91,9 @@ _CHECKS = (
     "traceability",
     "completeness",
     "negative_cases",
+    "checkable",
 )
+_NO_CHECK_REASONS = ("inside_ecu", "signal_compare", "not_on_bus")
 _TEXT_FIELDS = (
     "preconditions",
     "stimulus",
@@ -110,6 +124,7 @@ _CHECK_RULES = frozenset({
     "value",
     "check shape",
     "assumed_window",
+    "no_check_reason",
 })
 
 
@@ -176,6 +191,8 @@ def validate_output(
     issues.extend(_completeness(cases))
     issues.extend(_negative(reqs, cases, attached))
     issues.extend(_case_checks(cases, projection))
+    issues.extend(_no_check_reason_issues(cases))
+    issues.extend(_checkable(reqs, cases, attached, context, projection))
     return {"issues": issues, "passed": not issues}
 
 
@@ -205,6 +222,7 @@ def format_summary(
         if check in _CHECK_RULES:
             n_check_issues += 1
     passed = "true" if result.get("passed") is True else "false"
+    signal_reqs = _signal_requirements(reqs, context, projection)
     lines = [
         f"passed={passed} n_issues={len(result['issues'])} n_cases={n_cases} "
         f"n_requirements={n_requirements} n_docs={n_docs} n_statements={n_statements}",
@@ -217,6 +235,14 @@ def format_summary(
         _check_line("completeness", counts["completeness"], n_cases, "cases", n_docs),
         _negative_line(counts["negative_cases"], n_requirements, n_statements, n_docs),
         _check_line("checks", n_check_issues, n_cases, "cases", n_docs),
+        _check_line(
+            "checkable",
+            counts["checkable"],
+            len(signal_reqs),
+            "requirements with signals",
+            len({req["source_id"] for req in signal_reqs}),
+        ),
+        _reason_line(cases),
     ]
     return "\n".join(lines)
 
@@ -243,6 +269,21 @@ def report_validation(
 def _check_line(name: str, count: int, total: int, unit: str, documents: int) -> str:
     shown = "n/a" if total == 0 else str(count)
     return f"{name}={shown} (n={total} {unit}, documents={documents})"
+
+
+def _reason_line(cases) -> str:
+    """Valid reasons: one of the three, and ``checks`` is not a non-empty list."""
+    counts = {name: 0 for name in _NO_CHECK_REASONS}
+    for case in cases:
+        reason = _accepted_reason(case)
+        if reason is not None:
+            counts[reason] += 1
+    return (
+        "no_check_reason "
+        f"inside_ecu={counts['inside_ecu']} "
+        f"signal_compare={counts['signal_compare']} "
+        f"not_on_bus={counts['not_on_bus']}"
+    )
 
 
 def _negative_line(count: int, requirements: int, statements: int, documents: int) -> str:
@@ -720,6 +761,83 @@ def _value_ok(condition) -> bool:
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         return False
     return True
+
+
+def _checks_nonempty(case) -> bool:
+    raw = case.get("checks") if isinstance(case, Mapping) else None
+    return isinstance(raw, list) and len(raw) > 0
+
+
+def _accepted_reason(case):
+    """A reason that satisfies checkable: one of the three, checks empty."""
+    if not isinstance(case, Mapping) or _checks_nonempty(case):
+        return None
+    reason = case.get("no_check_reason")
+    if reason in _NO_CHECK_REASONS:
+        return reason
+    return None
+
+
+def _no_check_reason_issues(cases) -> list[dict]:
+    """Absent or null is no reason. Each broken reason is one issue."""
+    issues = []
+    for index, case in enumerate(cases):
+        if not isinstance(case, Mapping) or "no_check_reason" not in case:
+            continue
+        reason = case.get("no_check_reason")
+        if reason is None:
+            continue
+        case_id = _case_id(case, index)
+        if reason not in _NO_CHECK_REASONS:
+            issues.append(_issue(case_id, "no_check_reason", case_id))
+        if _checks_nonempty(case):
+            issues.append(_issue(case_id, "no_check_reason", case_id))
+    return issues
+
+
+def _signal_requirements(requirements, context, projection) -> list:
+    """Requirements whose context group names a projection Signal.
+
+    ``projection`` None adds nothing: the list is empty, so checkable is n/a.
+    """
+    if not isinstance(projection, Mapping):
+        return []
+    nodes = _projection_nodes(projection)
+    groups = context["requirements"] if isinstance(context, Mapping) else []
+    return [
+        req for req in requirements
+        if _group_has_signal(req["key"], groups, nodes)
+    ]
+
+
+def _group_has_signal(req_key, groups, nodes) -> bool:
+    for group in groups:
+        if not isinstance(group, Mapping) or group.get("key") != req_key:
+            continue
+        for key in group.get("nodes") or []:
+            node = nodes.get(key)
+            if isinstance(node, Mapping) and node.get("type") == "Signal":
+                return True
+    return False
+
+
+def _checkable(requirements, cases, attached, context, projection) -> list[dict]:
+    """One issue per signal requirement whose verifying cases cannot be judged.
+
+    A requirement that no case verifies is left to coverage.
+    """
+    issues = []
+    for req in _signal_requirements(requirements, context, projection):
+        verifying = [case for case in cases if _verifies(case, req, attached)]
+        if not verifying:
+            continue
+        if any(
+            _checks_nonempty(case) or _accepted_reason(case) is not None
+            for case in verifying
+        ):
+            continue
+        issues.append(_issue(None, "checkable", req["key"]))
+    return issues
 
 
 def _negative(requirements, cases, attached) -> list[dict]:

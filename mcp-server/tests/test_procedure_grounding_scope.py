@@ -7,8 +7,8 @@ customer. A names signal S. B names no signal.
 from grap_mcp.procedure_model import _resolve_case_ids
 from grap_mcp.procedure_validate import format_summary, validate_output
 
-S_KEY = "Signal | synth | S"
 S_NATIVE = "S.native"
+S_KEY = f"Signal | synth | {S_NATIVE}"
 _A = {"key": "Requirement | synth | A", "source_id": "synth", "item_id": "A"}
 _B = {"key": "Requirement | synth | B", "source_id": "synth", "item_id": "B"}
 _CONTEXT = {
@@ -45,6 +45,32 @@ def _case(verifies, uses, **overrides):
         "uses": list(uses),
     }
     case.update(overrides)
+    checks = case.get("checks")
+    if (
+        (isinstance(checks, list) and len(checks) > 0)
+        or "no_check_reason" in case
+    ):
+        return case
+    # S.native is a DBC Signal. A use that is not that node is not a Signal.
+    if S_KEY in case["uses"]:
+        condition = {
+            "signal": {"message": "S", "signal": "native"},
+            "op": "==",
+            "value": 1,
+        }
+        case["checks"] = [{
+            "id": "c1",
+            "when": condition,
+            "expect": {
+                "signal": {"message": "S", "signal": "native"},
+                "op": "==",
+                "value": 1,
+            },
+            "mode": "eventually",
+            "within_ms": [0, 100],
+        }]
+    else:
+        case["no_check_reason"] = "not_on_bus"
     return case
 
 

@@ -138,6 +138,10 @@ grap-rust must do.
   (§8). It never changes the stored specification.
 - **Recordings never enter this repository**, and evidence values never enter a log line.
 
+### 5b. Amendment 3 (2026-11-20): checkable rule and no_check_reason
+
+A requirement whose context group (the `context["requirements"]` entry whose key equals the requirement key) contains a projection node of type `Signal` needs a check, unless no case verifies it: coverage already reports that requirement, and checkable adds nothing. It passes when at least one case that verifies it has a non-empty `checks` list, or a `no_check_reason` of exactly `inside_ecu`, `signal_compare`, or `not_on_bus`. Otherwise validation adds one issue, `check` `checkable`, case null, value the requirement key. When the projection is absent the rule adds nothing. `no_check_reason` is optional on a case: absent or null means no reason; a value outside those three, or a reason on a case whose `checks` is non-empty, is one issue `check` `no_check_reason` with the case id as the value. The summary reports checkable issues over the requirements that name a signal, and counts each valid reason over all cases.
+
 ---
 
 ## 6. Guards and the one loop
