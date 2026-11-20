@@ -63,6 +63,16 @@ _GOLD_COLUMNS = (
 _STIMULUS = "the pedal is pressed"
 
 
+def _requirement_key(projection, native_id: str) -> str:
+    found = [
+        node["key"]
+        for node in projection["nodes"]
+        if node.get("type") == "Requirement" and node.get("native_id") == native_id
+    ]
+    assert len(found) == 1, (native_id, len(found))
+    return found[0]
+
+
 def _signal_key(projection, native_id: str) -> str:
     found = [
         node["key"]
@@ -425,6 +435,23 @@ def test_score_gold_prints_needs_recall_for_the_written_testpoints(tmp_path, cap
     assert _SENTENCE not in completed.stderr
     assert _STIMULUS not in completed.stdout
     assert _STIMULUS not in completed.stderr
+
+
+def test_verifies_node_key_still_fills_stimulus(tmp_path, capsys):
+    """A verifies entry that is the requirement node key still fills stimulus."""
+    graph_out, pedal_key, lamp_key = _build(tmp_path, capsys)
+    projection = json.loads((graph_out / "projection.json").read_text(encoding="utf-8"))
+    requirement_key = _requirement_key(projection, _REQUIREMENT_ID)
+    reply = _reply(pedal_key, lamp_key)
+    for case in reply["cases"]:
+        case["verifies"] = [requirement_key]
+    code, generated, spec_out = _generate(tmp_path, capsys, graph_out, reply)
+    assert code == 0, generated
+    document = json.loads((spec_out / "testpoints.json").read_text(encoding="utf-8"))
+    row = next(item for item in document["testpoints"] if item["item_id"] == _REQUIREMENT_ID)
+    assert row["stimulus"] == _STIMULUS
+    assert _STIMULUS not in generated
+    assert _SENTENCE not in generated
 
 
 def test_a_run_that_is_not_ok_does_not_write_testpoints(tmp_path, capsys):

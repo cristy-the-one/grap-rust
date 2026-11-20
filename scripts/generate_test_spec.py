@@ -122,14 +122,17 @@ def _execute(args) -> int:
 
 def _testpoints(kg, projection, recorded, draft) -> dict:
     """needs from the run's fetched requirements, plus the last draft's text."""
-    requirements = [
-        {"key": group["key"]}
-        for group in (recorded.evidence or {}).get("requirements") or []
-    ]
+    groups = list((recorded.evidence or {}).get("requirements") or [])
+    requirements = [{"key": group["key"]} for group in groups]
     document = as_testpoints(projection, fetch_context(kg, projection, requirements))
     cases = draft["cases"]
-    for row in document["testpoints"]:
-        matched = [case for case in cases if row["item_id"] in case["verifies"]]
+    for group, row in zip(groups, document["testpoints"]):
+        # A verifies entry is the native id or the requirement node key.
+        key = group["key"]
+        matched = [
+            case for case in cases
+            if row["item_id"] in case["verifies"] or key in case["verifies"]
+        ]
         positive = [case for case in matched if case["kind"] == "positive"]
         for field in _POSITIVE_FIELDS:
             row[field] = _distinct(positive, field)
