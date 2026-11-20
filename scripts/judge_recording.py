@@ -13,10 +13,12 @@ by ``export_request``. The binary is then:
 
 Exit 0 imports the verdict and prints its counts line. Exit 2 reprints the
 binary's stderr and imports nothing. Any other exit prints
-``loom-judge failed (exit N)`` and imports nothing. A run id that is not in
-the workspace is refused before the binary starts, with that one line. A
-``Refusal`` from import is printed as one line and exits 1. The verdict file
-is left in ``<out>``.
+``loom-judge failed (exit N)`` and imports nothing. An OSError while
+starting the binary prints ``loom-judge could not start: <path>`` and
+exits 1. Nothing is imported. A run id that is not in the workspace is
+refused before the binary starts, with that one line. A ``Refusal`` from
+import is printed as one line and exits 1. The verdict file is left in
+``<out>``.
 """
 
 from __future__ import annotations
@@ -33,7 +35,7 @@ from export_judge_request import export_request
 from import_verdicts import Refusal, import_verdicts
 
 
-def main(argv: list[str] | None = None) -> None:
+def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="Export a judge request, run loom-judge, and import the verdict.",
     )
@@ -68,7 +70,11 @@ def main(argv: list[str] | None = None) -> None:
     command.extend(
         ["--request", str(request_path), "--out", str(verdict_path)]
     )
-    proc = subprocess.run(command, capture_output=True)
+    try:
+        proc = subprocess.run(command, capture_output=True)
+    except OSError:
+        print(f"loom-judge could not start: {args.loom_judge}", file=sys.stderr)
+        raise SystemExit(1)
     if proc.returncode == 0:
         try:
             line = import_verdicts(
@@ -78,7 +84,7 @@ def main(argv: list[str] | None = None) -> None:
             print(str(exc), file=sys.stderr)
             raise SystemExit(1) from exc
         print(line)
-        return
+        return 0
     if proc.returncode == 2:
         sys.stderr.buffer.write(proc.stderr)
         raise SystemExit(2)
