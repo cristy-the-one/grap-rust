@@ -128,7 +128,8 @@ def test_a_complete_draft_passes():
 
 def test_coverage_fails_only_for_requirements_no_case_verifies():
     """The middle requirement is verified. The other two are the only issues,
-    in selection order. A statement id covers its requirement."""
+    in selection order. A statement id covers its requirement. It does not
+    select that requirement's context group, so a use is still ungrounded."""
     first, middle, last = _req("REQ-1"), _req("REQ-2"), _req("REQ-3")
     result, summary = _run(_draft(verifies=["REQ-2"]), [first, middle, last])
     assert result == {
@@ -155,7 +156,10 @@ def test_coverage_fails_only_for_requirements_no_case_verifies():
     by_statement, _summary = _run(
         _draft(verifies=[statement_id]), [covered], statements=statements,
     )
-    assert by_statement == {"issues": [], "passed": True}
+    assert by_statement == {
+        "passed": False,
+        "issues": [_issue("grounding", SIG_KEY)],
+    }
 
 
 def test_the_same_item_id_covers_every_selected_node_and_a_key_covers_one():
@@ -246,7 +250,8 @@ def test_traceability_fails_only_when_verifies_names_something_outside():
     """The selected requirement is still verified, so coverage stays quiet.
 
     An empty verifies is also traceability, and then coverage fails too:
-    that case is not the single-check fixture.
+    that case is not the single-check fixture. It matches no context group,
+    so each use is a grounding issue.
     """
     req = _req()
     outside, _summary = _run(_draft(verifies=["REQ-1", "REQ-OTHER"]), [req])
@@ -258,6 +263,7 @@ def test_traceability_fails_only_when_verifies_names_something_outside():
     empty, _summary = _run(_draft(verifies=[]), [req])
     assert empty["issues"] == [
         _issue("coverage", req["key"], case=None),
+        _issue("grounding", SIG_KEY),
         _issue("traceability", []),
     ]
 

@@ -44,9 +44,11 @@ Judgements this card had to make, and the tests lock in:
   that list back and counts the round.
 - After the draft is parsed and before ``validate_output``, a ``uses``
   entry that is not a context node key is replaced by that key when it
-  equals the ``native_id`` of exactly one context node of this run (every
-  group). If several context nodes share the id, only ``Signal`` nodes
-  are kept, and the entry is replaced when that leaves one. Anything
+  equals the ``native_id`` of exactly one context node of the requirements
+  that case verifies. A verifies entry matches a context group when it
+  equals the group's requirement key or item id. The nodes are the union
+  of those groups. If several of those nodes share the id, only ``Signal``
+  nodes are kept, and the entry is replaced when that leaves one. Anything
   else is left as written. ``verifies`` is left as the model wrote it.
   One line follows the model line:
   ``resolved_ids uses=<n> verifies=<n>``.
@@ -67,7 +69,7 @@ from grap_mcp.procedure_context import GraphOperations
 from grap_mcp.procedure_events import RecordedRun, run_procedure
 from grap_mcp.procedure_runtime import load_procedure_file
 from grap_mcp.procedure_template import TemplateOperations
-from grap_mcp.procedure_validate import ValidationOperations
+from grap_mcp.procedure_validate import ValidationOperations, _entries, _verifies_group
 
 PROCEDURE_PATH = (
     Path(__file__).resolve().parents[2] / "procedures" / "generate-test-spec.pg.yaml"
@@ -596,22 +598,40 @@ def _model_name(provider) -> str:
 
 
 def _resolve_case_ids(draft, context, projection) -> tuple[int, int]:
-    """Replace native ids in ``uses`` with keys. An id that does not resolve stays put."""
+    """Replace native ids in ``uses`` with keys of the requirements this case verifies.
+
+    A verifies entry matches a context group on its requirement key or item id,
+    the same rule as grounding. An id that does not resolve stays put.
+    """
     if not isinstance(draft, dict) or not isinstance(draft.get("cases"), list):
         return 0, 0
-    nodes = _context_nodes(context, projection)
-    keys = {node["key"] for node in nodes if isinstance(node.get("key"), str)}
-    by_native: dict[str, list] = {}
-    for node in nodes:
-        native = node.get("native_id")
-        if isinstance(native, str) and native != "":
-            by_native.setdefault(native, []).append(node)
+
+    def scoped(case):
+        raw = context.get("requirements") if isinstance(context, Mapping) else None
+        if not isinstance(raw, list):
+            return {"requirements": []}
+        named = _entries(case.get("verifies"))
+        return {
+            "requirements": [
+                group for group in raw if any(_verifies_group(entry, group) for entry in named)
+            ],
+        }
+
     uses_n = 0
     for case in draft["cases"]:
         if not isinstance(case, dict):
             continue
+        nodes = _context_nodes(scoped(case), projection)
+        keys = {node["key"] for node in nodes if isinstance(node.get("key"), str)}
+        by_native: dict[str, list] = {}
+        for node in nodes:
+            native = node.get("native_id")
+            if isinstance(native, str) and native != "":
+                by_native.setdefault(native, []).append(node)
         uses_n += _replace_entries(
-            case, "uses", lambda entry: _uses_key(entry, keys, by_native),
+            case,
+            "uses",
+            lambda entry, keys=keys, by_native=by_native: _uses_key(entry, keys, by_native),
         )
     return uses_n, 0
 
