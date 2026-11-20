@@ -4,9 +4,11 @@ Nothing in this file is from a customer. The DBC is the committed
 loom_judge copy. The requirement sentence names both signals by DBC id.
 """
 
+import csv
 import json
 import os
 import stat
+import subprocess
 import sys
 from pathlib import Path
 
@@ -22,6 +24,7 @@ import judge_recording  # noqa: E402
 from export_judge_request import export_request  # noqa: E402
 
 from grap_mcp.kee.working_graph import _relation_filter  # noqa: E402
+from grap_mcp.procedure_context import format_summary  # noqa: E402
 
 from tests._fake_judge import make_runnable  # noqa: E402
 
@@ -42,6 +45,32 @@ _PEDAL = "BrakeCmd.BrakePedal"
 _LAMP = "Lamps.BrakeLamp"
 _MODE = "LOOM_JUDGE_MODE"
 _STATEMENT_LINKS = ("about", "refers_to")
+_GOLD_COLUMNS = (
+    "packet_id",
+    "source_id",
+    "item_id",
+    "passage",
+    "testable_as_written",
+    "preconditions",
+    "stimulus",
+    "expected_observable_result",
+    "pass_criterion",
+    "variants",
+    "negative_cases",
+    "needs_from_elsewhere",
+    "note",
+)
+_STIMULUS = "the pedal is pressed"
+
+
+def _requirement_key(projection, native_id: str) -> str:
+    found = [
+        node["key"]
+        for node in projection["nodes"]
+        if node.get("type") == "Requirement" and node.get("native_id") == native_id
+    ]
+    assert len(found) == 1, (native_id, len(found))
+    return found[0]
 
 
 def _signal_key(projection, native_id: str) -> str:
@@ -114,7 +143,7 @@ def _case(case_id: str, kind: str, checks: list, uses: list) -> dict:
         "id": case_id,
         "verifies": [_REQUIREMENT_ID],
         "preconditions": "power is on",
-        "stimulus": "the pedal is pressed",
+        "stimulus": _STIMULUS,
         "expected_observable_result": "the lamp is lit",
         "pass_criterion": "the lamp is lit in the window",
         "variant": "",
@@ -268,6 +297,25 @@ def test_rehearsal_exports_the_judge_request_and_imports_four_verdicts(tmp_path,
     generated = _captured(capsys)
     _assert_silent(generated, reply_text)
     assert code == 0, (generated, _issues(workspace))
+    assert _STIMULUS not in generated
+
+    points_path = spec_out / "testpoints.json"
+    assert points_path.is_file()
+    points_raw = points_path.read_text(encoding="utf-8")
+    points = json.loads(points_raw)
+    assert points_raw == json.dumps(points, indent=2, ensure_ascii=False) + "\n"
+    rows = [row for row in points["testpoints"] if row.get("item_id") == _REQUIREMENT_ID]
+    assert len(rows) == 1
+    row = rows[0]
+    assert _PEDAL in row["needs"]
+    assert _LAMP in row["needs"]
+    assert row["stimulus"] == _STIMULUS
+    assert "testable" not in row
+    summary = format_summary(points)
+    success = f"{_RUN_ID} {spec_out / 'specification.json'}"
+    assert success in generated
+    assert summary in generated
+    assert generated.index(success) < generated.index(summary)
 
     spec = json.loads((spec_out / "specification.json").read_text(encoding="utf-8"))
     assert [case["uses"] for case in spec["cases"]] == [[pedal_key, lamp_key]] * 4
@@ -306,3 +354,112 @@ def test_rehearsal_exports_the_judge_request_and_imports_four_verdicts(tmp_path,
     verdicts = _verdicts(workspace)
     assert len(verdicts) == 4
     assert verdicts == ["fail", "fail", "not_exercised", "not_judgeable"]
+
+
+def _build(tmp_path, capsys):
+    graph_out = tmp_path / "graph-out"
+    code = build_automotive_graph.main([
+        "--reqif", str(_REQIF),
+        "--dbc", str(_DBC),
+        "--release", _RELEASE,
+        "--out", str(graph_out),
+    ])
+    built = _captured(capsys)
+    _assert_silent(built)
+    assert code == 0, built
+    projection = json.loads((graph_out / "projection.json").read_text(encoding="utf-8"))
+    return graph_out, _signal_key(projection, _PEDAL), _signal_key(projection, _LAMP)
+
+
+def _generate(tmp_path, capsys, graph_out, reply):
+    reply_path = tmp_path / "reply.json"
+    reply_text = json.dumps(reply)
+    reply_path.write_text(reply_text, encoding="utf-8")
+    workspace = tmp_path / "ws"
+    spec_out = tmp_path / "spec-out"
+    code = generate_test_spec.main([
+        "--graph", str(graph_out),
+        "--workspace", str(workspace),
+        "--run-id", _RUN_ID,
+        "--scope-ids", _REQUIREMENT_ID,
+        "--provider", "stub",
+        "--stub-reply", str(reply_path),
+        "--out", str(spec_out),
+    ])
+    generated = _captured(capsys)
+    _assert_silent(generated, reply_text)
+    return code, generated, spec_out
+
+
+def _one_row_sheet(path: Path, source_id: str, item_id: str, needs: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    row = {column: "" for column in _GOLD_COLUMNS}
+    row["packet_id"] = "synthetic"
+    row["source_id"] = source_id
+    row["item_id"] = item_id
+    row["passage"] = "synthetic"
+    row["needs_from_elsewhere"] = needs
+    with path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=_GOLD_COLUMNS, lineterminator="\n")
+        writer.writeheader()
+        writer.writerow(row)
+
+
+def test_score_gold_prints_needs_recall_for_the_written_testpoints(tmp_path, capsys):
+    """The written testpoints.json is the system file a one-row sheet can score."""
+    graph_out, pedal_key, lamp_key = _build(tmp_path, capsys)
+    code, generated, spec_out = _generate(
+        tmp_path, capsys, graph_out, _reply(pedal_key, lamp_key),
+    )
+    assert code == 0, generated
+    points_path = spec_out / "testpoints.json"
+    document = json.loads(points_path.read_text(encoding="utf-8"))
+    row = next(item for item in document["testpoints"] if item["item_id"] == _REQUIREMENT_ID)
+    gold = tmp_path / "gold" / "testpoints.csv"
+    _one_row_sheet(gold, row["source_id"], row["item_id"], _PEDAL)
+    completed = subprocess.run(
+        [
+            sys.executable,
+            str(_SCRIPTS / "score_gold.py"),
+            "--gold",
+            str(gold.parent),
+            "--system",
+            str(points_path),
+        ],
+        capture_output=True,
+        text=True,
+    )
+    assert completed.returncode == 0
+    assert "testpoints_needs_recall" in completed.stdout
+    assert _SENTENCE not in completed.stdout
+    assert _SENTENCE not in completed.stderr
+    assert _STIMULUS not in completed.stdout
+    assert _STIMULUS not in completed.stderr
+
+
+def test_verifies_node_key_still_fills_stimulus(tmp_path, capsys):
+    """A verifies entry that is the requirement node key still fills stimulus."""
+    graph_out, pedal_key, lamp_key = _build(tmp_path, capsys)
+    projection = json.loads((graph_out / "projection.json").read_text(encoding="utf-8"))
+    requirement_key = _requirement_key(projection, _REQUIREMENT_ID)
+    reply = _reply(pedal_key, lamp_key)
+    for case in reply["cases"]:
+        case["verifies"] = [requirement_key]
+    code, generated, spec_out = _generate(tmp_path, capsys, graph_out, reply)
+    assert code == 0, generated
+    document = json.loads((spec_out / "testpoints.json").read_text(encoding="utf-8"))
+    row = next(item for item in document["testpoints"] if item["item_id"] == _REQUIREMENT_ID)
+    assert row["stimulus"] == _STIMULUS
+    assert _STIMULUS not in generated
+    assert _SENTENCE not in generated
+
+
+def test_a_run_that_is_not_ok_does_not_write_testpoints(tmp_path, capsys):
+    """A failed validation writes no testpoints.json."""
+    graph_out, pedal_key, lamp_key = _build(tmp_path, capsys)
+    reply = _reply(pedal_key, lamp_key)
+    reply["cases"][0]["stimulus"] = ""
+    code, generated, spec_out = _generate(tmp_path, capsys, graph_out, reply)
+    assert code != 0, generated
+    assert not (spec_out / "testpoints.json").exists()
+    assert _STIMULUS not in generated
