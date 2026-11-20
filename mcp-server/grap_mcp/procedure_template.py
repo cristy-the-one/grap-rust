@@ -54,6 +54,28 @@ FIXED_TEXT = (
     "Leave checks empty when the requirement is observable only inside the ECU, "
     "or when the signal is not a DBC Signal in the case's uses. "
     "verifies and uses are lists.\n"
+    "A check makes a case judgeable on a CAN recording. Write one when the "
+    "expected result is a signal value that follows a cause, and both signals "
+    "are DBC Signals in the case's uses. A check has exactly these keys: id "
+    "(unique within the case, e.g. c1); given (conditions that must already "
+    "hold, usually []); when (the condition whose change from false to true "
+    "starts the window); expect (the condition judged in the window); mode "
+    "(eventually: true at least once in the window; always: true throughout; "
+    "never: true at no point); within_ms ([min, max] in milliseconds after "
+    "when becomes true). A condition has exactly these keys: signal {message, "
+    "signal, channel}, op (one of == != > >= < <=), value (a number: the "
+    "signal's physical value, never a value-table label), tolerance (null, or "
+    "a number >= 0 with == or != only). message and signal are the two halves "
+    "of the DBC id Message.Signal. channel is null unless the requirement "
+    "names a CAN channel. Write every key; use [] or null when empty. When "
+    "the requirement states no time limit, use within_ms [0, 1000] and write "
+    "'assumed 1 s window, not stated in the requirement' in pass_criterion.\n"
+    "Example, with names that are not from this specification:\n"
+    '{"id": "c1", "given": [], "when": {"signal": {"message": "Pedal", '
+    '"signal": "Pressed", "channel": null}, "op": "==", "value": 1, '
+    '"tolerance": null}, "expect": {"signal": {"message": "Lamp", "signal": '
+    '"On", "channel": null}, "op": "==", "value": 1, "tolerance": null}, '
+    '"mode": "eventually", "within_ms": [0, 100]}\n'
 )
 
 _SHIPPED_DIR = Path(__file__).resolve().parents[2] / "templates" / "test-spec"
