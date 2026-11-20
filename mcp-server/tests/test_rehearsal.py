@@ -23,6 +23,8 @@ from export_judge_request import export_request  # noqa: E402
 
 from grap_mcp.kee.working_graph import _relation_filter  # noqa: E402
 
+from tests._fake_judge import make_runnable  # noqa: E402
+
 _FIXTURES = Path(__file__).resolve().parent / "fixtures"
 _REQIF = _FIXTURES / "rehearsal" / "requirements.reqif"
 _DBC = _FIXTURES / "loom_judge" / "brake.dbc"
@@ -271,16 +273,17 @@ def test_rehearsal_exports_the_judge_request_and_imports_four_verdicts(tmp_path,
 
     fake = tmp_path / "fake_loom_judge.py"
     _write_fake(fake)
+    launch = make_runnable(fake)
     judge_out = tmp_path / "judge-out"
     previous = os.environ.get(_MODE)
     os.environ[_MODE] = "ok"
     try:
-        judge_recording.main([
+        code = judge_recording.main([
             "--spec", str(spec_out / "specification.json"),
             "--spec-id", _SPEC_ID,
             "--log", str(_LOG),
             "--dbc", str(_DBC),
-            "--loom-judge", str(fake),
+            "--loom-judge", str(launch),
             "--run-id", _RUN_ID,
             "--workspace", str(workspace),
             "--out", str(judge_out),
@@ -292,6 +295,7 @@ def test_rehearsal_exports_the_judge_request_and_imports_four_verdicts(tmp_path,
             os.environ[_MODE] = previous
     judged = _captured(capsys)
     _assert_silent(judged, reply_text)
+    assert code == 0, judged
     verdicts = _verdicts(workspace)
     assert len(verdicts) == 4
     assert verdicts == ["fail", "fail", "not_exercised", "not_judgeable"]

@@ -14,6 +14,8 @@ from pathlib import Path
 
 import pygrap
 
+from tests._fake_judge import make_runnable
+
 REPO = Path(__file__).resolve().parents[2]
 SCRIPT = REPO / "scripts" / "judge_recording.py"
 FIXTURES = Path(__file__).resolve().parent / "fixtures" / "loom_judge"
@@ -136,6 +138,7 @@ def _run(tmp_path, root, mode):
     )
     fake = tmp_path / "fake_loom_judge.py"
     _write_fake(fake)
+    launch = make_runnable(fake)
     out = tmp_path / "out"
     out.mkdir()
     env = dict(os.environ)
@@ -155,7 +158,7 @@ def _run(tmp_path, root, mode):
             "--dbc",
             str(FIXTURES / "brake.dbc") + "@1",
             "--loom-judge",
-            str(fake),
+            str(launch),
             "--run-id",
             _RUN_ID,
             "--workspace",
@@ -230,6 +233,7 @@ def test_unknown_run_exits_1_without_starting_loom_judge(tmp_path):
     marker = tmp_path / "loom-judge-ran"
     fake = tmp_path / "fake_loom_judge.py"
     _write_recording_fake(fake, marker)
+    launch = make_runnable(fake)
     spec_path = tmp_path / "specification.json"
     spec_path.write_text(
         json.dumps(_specification(), indent=2, ensure_ascii=False) + "\n",
@@ -250,7 +254,7 @@ def test_unknown_run_exits_1_without_starting_loom_judge(tmp_path):
             "--dbc",
             str(FIXTURES / "brake.dbc"),
             "--loom-judge",
-            str(fake),
+            str(launch),
             "--run-id",
             _UNKNOWN_RUN_ID,
             "--workspace",
@@ -268,6 +272,60 @@ def test_unknown_run_exits_1_without_starting_loom_judge(tmp_path):
     ]
     assert marker.is_file() is False
     assert _snapshot(root) == before
+
+
+def test_missing_loom_judge_exits_1_and_imports_nothing(tmp_path):
+    """A loom-judge path that is not on disk exits 1 and imports nothing."""
+    workspace, root = _closed_run(tmp_path)
+    before = _snapshot(root)
+    spec_path = tmp_path / "specification.json"
+    spec_path.write_text(
+        json.dumps(_specification(), indent=2, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
+    missing = tmp_path / "missing-loom-judge"
+    out = tmp_path / "out"
+    out.mkdir()
+    proc = subprocess.run(
+        [
+            sys.executable,
+            str(SCRIPT),
+            "--spec",
+            str(spec_path),
+            "--spec-id",
+            _SPEC_ID,
+            "--log",
+            str(FIXTURES / "brake.asc"),
+            "--dbc",
+            str(FIXTURES / "brake.dbc"),
+            "--loom-judge",
+            str(missing),
+            "--run-id",
+            _RUN_ID,
+            "--workspace",
+            str(root),
+            "--out",
+            str(out),
+        ],
+        capture_output=True,
+        text=True,
+    )
+    assert proc.returncode == 1, proc.stderr
+    assert proc.stdout == ""
+    assert proc.stderr.splitlines() == [f"loom-judge could not start: {missing}"]
+    assert _snapshot(root) == before
+    assert _payloads(workspace) == []
+
+
+def test_make_runnable_on_nt_writes_the_cmd_wrapper(tmp_path, monkeypatch):
+    """Windows cannot exec a shebang script. The wrapper is one cmd line."""
+    monkeypatch.setattr(os, "name", "nt")
+    script = tmp_path / "fake_loom_judge.py"
+    script.write_text("raise SystemExit(0)\n", encoding="utf-8")
+    launched = make_runnable(script)
+    text = launched.read_text(encoding="utf-8")
+    assert launched == script.with_suffix(".cmd")
+    assert text == f'@"{sys.executable}" "{script}" %*\n'
 
 
 def test_crash_exits_1_and_writes_no_events(tmp_path):
