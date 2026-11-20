@@ -2,16 +2,28 @@
 """Download a public rehearsal corpus and write it outside the repository.
 
     python scripts/fetch_public_corpus.py --out /tmp/grap-corpus/public-1
+    python scripts/fetch_public_corpus.py --set public-2 --out /tmp/grap-corpus/public-2
 
-Writes ``bus.dbc``, ``drive.asc``, ``spec.reqif`` and ``SOURCES.md`` under
+``--set`` is ``public-1`` (the default) or ``public-2``. Both write
+``bus.dbc``, ``drive.asc``, ``spec.reqif`` and ``SOURCES.md`` under
 ``--out``. Refuses an ``--out`` that sits inside a git repository. Downloads
 nothing into the repository. Uses only the standard library.
 
-The DBC is commaai/opendbc (MIT) at one pinned commit, assembled the way
-that repository's generator assembles ``toyota_new_mc_pt_generated`` for the
-non-hybrid Toyota RAV4. The recording is one comma2k19 example segment
-(MIT) at one pinned commit. ``spec.reqif`` is written from the sentences
-below: there is no public ReqIF for this car.
+public-1: the DBC is commaai/opendbc (MIT) at one pinned commit, assembled
+the way that repository's generator assembles ``toyota_new_mc_pt_generated``
+for the non-hybrid Toyota RAV4. The recording is one comma2k19 example
+segment (MIT) at one pinned GitHub commit. ``spec.reqif`` is written from
+the sentences below: there is no public ReqIF for this car.
+
+public-2: ``bus.dbc`` is that same opendbc file. The recording is a different
+comma2k19 minute, segment ``b0c9d2329ad1606b|2018-07-29--12-02-42/30``, from
+the Chunk_1 zip on Hugging Face at one pinned revision. The zip is not
+downloaded whole. A HEAD resolves the redirect, then HTTP Range reads the
+central directory and the four raw CAN members. Each member's sha256 is
+checked, and the bytes fetched from the zip must stay under 64 MB. The
+comma2k19 licence check is the same pinned GitHub commit as public-1.
+``spec.reqif`` is spec-v2: the public-1 requirements with REQ-PUB-001 and
+REQ-PUB-002 replaced.
 
 REQ-PUB-007 and REQ-PUB-008 are plain words only. They are the control:
 they name no DBC id and are expected to fail grounding.
@@ -28,6 +40,7 @@ import sys
 import urllib.error
 import urllib.parse
 import urllib.request
+import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -36,6 +49,20 @@ _OPENDC_COMMIT = "79ddcc7bb72d557fc5b20d038c0fad9c9d423446"
 _COMMA2K19_REPO = "commaai/comma2k19"
 _COMMA2K19_COMMIT = "4c7f1a6e1957745beadc1def0e7225f559b09a2a"
 _SEGMENT = "b0c9d2329ad1606b|2018-08-02--08-34-47/40"
+_PUBLIC2_REVISION = "4bff77c7254c654c28d4c2726186b4e825adccee"
+_PUBLIC2_ZIP_URL = (
+    "https://huggingface.co/datasets/commaai/comma2k19/resolve/"
+    f"{_PUBLIC2_REVISION}/raw_data/Chunk_1.zip"
+)
+_PUBLIC2_SEGMENT = "b0c9d2329ad1606b|2018-07-29--12-02-42/30"
+# Stay strictly under this many bytes fetched from the zip, central directory included.
+_PUBLIC2_BYTE_BUDGET = 64 * 1024 * 1024
+_PUBLIC2_MEMBER_SHA256 = {
+    "t": "861affb87fb9db76bcec78cb13fe7c8426fc8fe7004d926297df2cc53dce6e86",
+    "address": "835fc971d5f0314ef07a0b6ee69075643034d5a2f4757e64832682f98ff94009",
+    "data": "1e2a02361be7147dff6bdb224057f8e7e869070322ebaaeeebe59b76faa8412f",
+    "src": "26a42bd07b169ae174c4d2efb12b776f008dd07dafd98f8a768ba110f5da585f",
+}
 _POWERTRAIN_SRC = 0
 # Frame 548 is BRAKE_MODULE in toyota_new_mc_pt (non-hybrid). Frame 550 is
 # the hybrid BRAKE_MODULE. The example dongle is the RAV4, so 548 must be
@@ -128,6 +155,30 @@ _REQUIREMENTS = (
     ),
 )
 
+# spec-v2 replaces only these two. REQ-PUB-003 to 008 stay the _REQUIREMENTS entries.
+_PUBLIC2_REQUIREMENTS = {
+    "REQ-PUB-001": (
+        "ACC brake lamps",
+        "While adaptive cruise commands a deceleration (PCM_CRUISE.ACC_BRAKING is 1), "
+        "ESP_CONTROL.BRAKE_LIGHTS_ACC shall become 1 within 0.5 s.",
+    ),
+    "REQ-PUB-002": (
+        "Cruise cancel on brake",
+        "When the driver presses the brake pedal (PCM_CRUISE_2.BRAKE_PRESSED becomes 1) "
+        "while adaptive cruise is active (PCM_CRUISE.CRUISE_ACTIVE is 1), "
+        "PCM_CRUISE.CRUISE_ACTIVE shall become 0 within 0.5 s.",
+    ),
+}
+_PUBLIC2_CHANGES = (
+    '- REQ-PUB-001: named ESP_CONTROL.BRAKE_LIGHTS_ACC as the pedal stop lamps; '
+    'the DBC comments it "brake lights when ACC commands decel". Found by run pub2-1.',
+    "- REQ-PUB-002: mixed ACC deceleration with the driver's brake; "
+    "braking cancels ACC. Found by run pub2-1.",
+    "- Corrections follow the DBC's documentation or standard ACC behaviour, "
+    "never how a recording behaves.",
+    "- REQ-PUB-003 to 008 are unchanged.",
+)
+
 
 class CorpusError(Exception):
     """A source could not be verified or read. Nothing is substituted."""
@@ -206,6 +257,12 @@ def write_asc(frames, segment: str, when: datetime) -> str:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--out", required=True, type=Path, help="Directory outside any git repo")
+    parser.add_argument(
+        "--set",
+        choices=("public-1", "public-2"),
+        default="public-1",
+        help="Corpus to build (default: public-1)",
+    )
     args = parser.parse_args(argv)
     out = args.out
     repo = _git_repo(out)
@@ -213,14 +270,31 @@ def main(argv: list[str] | None = None) -> int:
         print(f"refusing --out {out}: it is inside the git repository {repo}", file=sys.stderr)
         return 2
     try:
-        _fetch(out)
+        _fetch(out, args.set)
     except CorpusError as exc:
         print(str(exc), file=sys.stderr)
         return 1
     return 0
 
 
-def _fetch(out: Path) -> None:
+def _fetch(
+    out: Path,
+    corpus_set: str = "public-1",
+    *,
+    opener=None,
+    zip_budget: int = _PUBLIC2_BYTE_BUDGET,
+    expected_sha256: dict | None = None,
+) -> None:
+    if corpus_set == "public-2":
+        _fetch_public2(
+            out,
+            opener=opener,
+            zip_budget=zip_budget,
+            expected_sha256=expected_sha256,
+        )
+        return
+    if corpus_set != "public-1":
+        raise CorpusError(f"unknown corpus set {corpus_set}")
     out.mkdir(parents=True, exist_ok=True)
     downloads = []
     downloads.append(_licence(_OPENDC_REPO, _OPENDC_COMMIT))
@@ -407,10 +481,24 @@ def _drop_frame(text: str, frame_id: str) -> str:
     return "".join(kept)
 
 
-def _reqif() -> str:
+def _requirements_for(corpus_set: str) -> tuple:
+    if corpus_set == "public-1":
+        return _REQUIREMENTS
+    if corpus_set != "public-2":
+        raise CorpusError(f"unknown corpus set {corpus_set}")
+    updated = []
+    for ident, title, sentence in _REQUIREMENTS:
+        replacement = _PUBLIC2_REQUIREMENTS.get(ident)
+        if replacement is not None:
+            title, sentence = replacement
+        updated.append((ident, title, sentence))
+    return tuple(updated)
+
+
+def _reqif(requirements: tuple = _REQUIREMENTS) -> str:
     created = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     objects = []
-    for ident, title, sentence in _REQUIREMENTS:
+    for ident, title, sentence in requirements:
         text = _xml(sentence)
         name = _xml(title)
         objects.append(
@@ -549,6 +637,234 @@ def _sources(downloads: list[dict], counts: dict, span: float, kept: int) -> str
         "DBC names. There is no public ReqIF for this car.",
         "",
     ]
+    for item in downloads:
+        lines.extend([
+            f"- url: {item['url']}",
+            f"  repo path: {item['path']}",
+            f"  commit: {item['commit']}",
+            f"  licence: {item['licence']}"
+            + (f" ({item['copyright']})" if item.get("copyright") else ""),
+            f"  sha256: {item['sha256']}",
+            "",
+        ])
+    return "\n".join(lines)
+
+
+def _fetch_public2(out: Path, *, opener, zip_budget: int, expected_sha256: dict | None) -> None:
+    members, fetched = read_public2_can(opener, budget=zip_budget)
+    expected = _PUBLIC2_MEMBER_SHA256 if expected_sha256 is None else expected_sha256
+    for name in _CAN_NAMES:
+        digest = hashlib.sha256(members[name]).hexdigest()
+        wanted = expected[name]
+        if digest != wanted:
+            raise CorpusError(f"sha256 mismatch for member {name}: {digest} != {wanted}")
+    arrays = {name: read_npy(members[name]) for name in _CAN_NAMES}
+    frames, counts = _powertrain_frames(arrays)
+    downloads = []
+    downloads.append(_licence(_OPENDC_REPO, _OPENDC_COMMIT))
+    downloads.append(_licence(_COMMA2K19_REPO, _COMMA2K19_COMMIT))
+    dbc_files = {}
+    for name in _DBC_FILES:
+        item = _get(
+            _OPENDC_REPO,
+            _OPENDC_COMMIT,
+            f"{_DBC_DIR}/{name}",
+            "MIT",
+        )
+        downloads.append(item)
+        dbc_files[name] = item["data"].decode("utf-8")
+    bus = _assemble_dbc(dbc_files)
+    asc = write_asc(frames, _PUBLIC2_SEGMENT, _segment_when(_PUBLIC2_SEGMENT))
+    reqif = _reqif(_requirements_for("public-2"))
+    span = frames[-1][0] - frames[0][0]
+    sources = _sources_public2(downloads, counts, span, len(frames), fetched)
+    out.mkdir(parents=True, exist_ok=True)
+    (out / "bus.dbc").write_text(bus, encoding="utf-8")
+    (out / "drive.asc").write_text(asc, encoding="utf-8")
+    (out / "spec.reqif").write_text(reqif, encoding="utf-8")
+    (out / "SOURCES.md").write_text(sources, encoding="utf-8")
+    total = len(arrays["t"])
+    print(
+        f"frames={len(frames)}/{total} src={_POWERTRAIN_SRC} span_s={span!r} "
+        f"id548={counts.get(_RAV4_FRAME, 0)} id550={counts.get(_HYBRID_BRAKE_FRAME, 0)} "
+        f"zip_bytes={fetched}"
+    )
+    print(f"wrote {out / 'bus.dbc'}")
+    print(f"wrote {out / 'drive.asc'}")
+    print(f"wrote {out / 'spec.reqif'}")
+    print(f"wrote {out / 'SOURCES.md'}")
+
+
+def read_public2_can(opener=None, *, url: str = _PUBLIC2_ZIP_URL, budget: int = _PUBLIC2_BYTE_BUDGET):
+    """Read the four raw_can members from the Chunk_1 zip.
+
+    Returns ``({t, address, data, src: decompressed bytes}, bytes_fetched)``.
+    ``opener`` is ``urllib.request.urlopen`` unless a test injects one.
+    Nothing else in the zip is read.
+    """
+    if opener is None:
+        opener = urllib.request.urlopen
+    handle = _HttpRangeFile(opener, url, budget)
+    members = {}
+    with zipfile.ZipFile(handle) as archive:
+        for name in _CAN_NAMES:
+            path = f"Chunk_1/{_PUBLIC2_SEGMENT}/processed_log/CAN/raw_can/{name}"
+            try:
+                members[name] = archive.read(path)
+            except KeyError as exc:
+                raise CorpusError(f"zip member missing: {name}") from exc
+    return members, handle.fetched
+
+
+class _HttpRangeFile:
+    """A seekable file over HTTP Range requests. The redirect is resolved once."""
+
+    def __init__(self, opener, url: str, budget: int):
+        self._opener = opener
+        self._budget = budget
+        self.fetched = 0
+        self._pos = 0
+        request = urllib.request.Request(
+            url,
+            method="HEAD",
+            headers={
+                "User-Agent": "grap-fetch-public-corpus",
+                "Range": "bytes=0-0",
+            },
+        )
+        try:
+            with opener(request, timeout=120) as response:
+                if response.status not in (200, 206):
+                    raise CorpusError(f"zip HEAD failed: HTTP {response.status}")
+                self._final_url = response.geturl()
+                # A ranged HEAD is 206 with Content-Length 1. The object size
+                # is the Content-Range total.
+                self._size = _zip_size(response.headers)
+                body = response.read()
+        except CorpusError:
+            raise
+        except urllib.error.HTTPError as exc:
+            raise CorpusError(f"zip HEAD failed: HTTP {exc.code}") from exc
+        except urllib.error.URLError as exc:
+            raise CorpusError(f"zip HEAD failed: {exc.reason}") from exc
+        self._charge(len(body))
+
+    def _charge(self, count: int) -> None:
+        if count < 0:
+            raise CorpusError(f"negative zip read ({count})")
+        if self.fetched + count >= self._budget:
+            raise CorpusError(
+                "zip fetch budget exceeded: "
+                f"{self.fetched + count} bytes would not stay under {self._budget}"
+            )
+        self.fetched += count
+
+    def seek(self, offset: int, whence: int = 0) -> int:
+        if whence == 0:
+            pos = offset
+        elif whence == 1:
+            pos = self._pos + offset
+        elif whence == 2:
+            pos = self._size + offset
+        else:
+            raise OSError(f"invalid whence {whence}")
+        if pos < 0:
+            raise OSError("negative seek")
+        self._pos = pos
+        return self._pos
+
+    def tell(self) -> int:
+        return self._pos
+
+    def seekable(self) -> bool:
+        return True
+
+    def readable(self) -> bool:
+        return True
+
+    def read(self, n: int = -1) -> bytes:
+        if n is None or n < 0:
+            n = self._size - self._pos
+        if n <= 0 or self._pos >= self._size:
+            return b""
+        n = min(n, self._size - self._pos)
+        self._charge(n)
+        start = self._pos
+        end = start + n - 1
+        request = urllib.request.Request(
+            self._final_url,
+            headers={
+                "User-Agent": "grap-fetch-public-corpus",
+                "Range": f"bytes={start}-{end}",
+            },
+        )
+        try:
+            with self._opener(request, timeout=120) as response:
+                if response.status != 206:
+                    raise CorpusError(
+                        f"zip range failed: HTTP {response.status} bytes={start}-{end}"
+                    )
+                data = response.read()
+        except CorpusError:
+            raise
+        except urllib.error.HTTPError as exc:
+            raise CorpusError(
+                f"zip range failed: HTTP {exc.code} bytes={start}-{end}"
+            ) from exc
+        except urllib.error.URLError as exc:
+            raise CorpusError(f"zip range failed: {exc.reason}") from exc
+        if len(data) != n:
+            if len(data) > n:
+                self._charge(len(data) - n)
+            raise CorpusError(f"short zip range at {start}: got {len(data)} of {n}")
+        self._pos += len(data)
+        return data
+
+
+def _zip_size(headers) -> int:
+    content_range = headers.get("Content-Range")
+    if content_range:
+        total = str(content_range).rsplit("/", 1)[-1].strip()
+        if total.isdigit():
+            return int(total)
+    length = headers.get("Content-Length")
+    if length is not None and str(length).isdigit() and int(length) > 0:
+        return int(length)
+    raise CorpusError("zip size missing from HEAD response")
+
+
+def _sources_public2(downloads: list, counts: dict, span: float, kept: int, bytes_fetched: int) -> str:
+    lines = [
+        "# Public corpus sources",
+        "",
+        "Downloaded by `scripts/fetch_public_corpus.py --set public-2`. Nothing here is committed.",
+        "The CAN minute is four members of the Chunk_1 zip, read by HTTP range.",
+        "GitHub files below are the opendbc assembly and the licence checks.",
+        "",
+        f"Segment `{_PUBLIC2_SEGMENT}`. The route date in the segment name is 2018-07-29.",
+        f"Hugging Face URL: {_PUBLIC2_ZIP_URL}",
+        f"Revision: {_PUBLIC2_REVISION}",
+        f"Bytes fetched from the zip: {bytes_fetched}",
+        "",
+        "sha256 of each member's decompressed bytes:",
+        "",
+    ]
+    for name in _CAN_NAMES:
+        lines.append(f"- {name}: {_PUBLIC2_MEMBER_SHA256[name]}")
+    lines.extend([
+        "",
+        "`bus.dbc` is the same generated file as public-1. Message "
+        f"{_DROP_FRAME} (PCS_HUD) is omitted. `drive.asc` keeps src {_POWERTRAIN_SRC} only.",
+        f"That bus carries frame {_RAV4_FRAME} ({counts.get(_RAV4_FRAME, 0)} frames) "
+        f"and frame {_HYBRID_BRAKE_FRAME} ({counts.get(_HYBRID_BRAKE_FRAME, 0)} frames).",
+        f"Frames written: {kept}. Span from the first kept frame to the last: {span!r} seconds.",
+        "`spec.reqif` is spec-v2, written by this script.",
+        "",
+        "## Changes from public-1",
+        "",
+    ])
+    lines.extend(_PUBLIC2_CHANGES)
+    lines.append("")
     for item in downloads:
         lines.extend([
             f"- url: {item['url']}",
