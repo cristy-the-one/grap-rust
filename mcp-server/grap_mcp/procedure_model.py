@@ -42,6 +42,14 @@ Judgements this card had to make, and the tests lock in:
   scope it actually has. The file names the shipped ``default`` template.
 - ``refine`` returns the issue list it was given. The interpreter sends
   that list back and counts the round.
+- After the draft is parsed and before ``validate_output``, a ``uses``
+  entry that is not a context node key is replaced by that key when it
+  equals the ``native_id`` of exactly one context node of this run (every
+  group). If several context nodes share the id, only ``Signal`` nodes
+  are kept, and the entry is replaced when that leaves one. Anything
+  else is left as written. ``verifies`` is left as the model wrote it.
+  One line follows the model line:
+  ``resolved_ids uses=<n> verifies=<n>``.
 """
 
 from __future__ import annotations
@@ -587,6 +595,80 @@ def _model_name(provider) -> str:
     return "n/a"
 
 
+def _resolve_case_ids(draft, context, projection) -> tuple[int, int]:
+    """Replace native ids in ``uses`` with keys. An id that does not resolve stays put."""
+    if not isinstance(draft, dict) or not isinstance(draft.get("cases"), list):
+        return 0, 0
+    nodes = _context_nodes(context, projection)
+    keys = {node["key"] for node in nodes if isinstance(node.get("key"), str)}
+    by_native: dict[str, list] = {}
+    for node in nodes:
+        native = node.get("native_id")
+        if isinstance(native, str) and native != "":
+            by_native.setdefault(native, []).append(node)
+    uses_n = 0
+    for case in draft["cases"]:
+        if not isinstance(case, dict):
+            continue
+        uses_n += _replace_entries(
+            case, "uses", lambda entry: _uses_key(entry, keys, by_native),
+        )
+    return uses_n, 0
+
+
+def _context_nodes(context, projection) -> list:
+    if not isinstance(context, Mapping) or not isinstance(projection, Mapping):
+        return []
+    by_key = {
+        node["key"]: node
+        for node in projection.get("nodes", ())
+        if isinstance(node, Mapping) and isinstance(node.get("key"), str)
+    }
+    groups = context.get("requirements")
+    if not isinstance(groups, list):
+        return []
+    found = []
+    seen: set[str] = set()
+    for group in groups:
+        if not isinstance(group, Mapping) or not isinstance(group.get("nodes"), list):
+            continue
+        for key in group["nodes"]:
+            if not isinstance(key, str) or key in seen or key not in by_key:
+                continue
+            seen.add(key)
+            found.append(by_key[key])
+    return found
+
+
+def _replace_entries(case: dict, field: str, resolve) -> int:
+    values = case.get(field)
+    if not isinstance(values, list):
+        return 0
+    count = 0
+    replaced = []
+    for entry in values:
+        resolved = resolve(entry)
+        if resolved != entry:
+            count += 1
+        replaced.append(resolved)
+    case[field] = replaced
+    return count
+
+
+def _uses_key(entry, keys: set[str], by_native: dict[str, list]):
+    if not isinstance(entry, str) or entry in keys:
+        return entry
+    matches = by_native.get(entry, [])
+    if len(matches) > 1:
+        signals = [node for node in matches if node.get("type") == "Signal"]
+        if len(signals) != 1:
+            return entry
+        matches = signals
+    if len(matches) == 1 and isinstance(matches[0].get("key"), str):
+        return matches[0]["key"]
+    return entry
+
+
 def _with_scope(procedure, scope):
     steps = []
     found = False
@@ -611,10 +693,15 @@ class _Operations:
         self.validation = ValidationOperations(projection, statements)
         self.model = ModelOperations(provider)
         self.model_step = None
+        self.context = None
 
     def __call__(self, operation: str, inputs: Mapping[str, Any]) -> dict[str, Any]:
-        if operation in ("select_requirements", "fetch_context"):
+        if operation == "select_requirements":
             return self.graph(operation, inputs)
+        if operation == "fetch_context":
+            result = self.graph(operation, inputs)
+            self.context = result["context"]
+            return result
         if operation == "choose_template":
             result = self.templates(operation, inputs)
             self.model.template = result["template"]
@@ -625,6 +712,10 @@ class _Operations:
             return self.validation(operation, inputs)
         if operation == "invoke_model":
             result = self.model(operation, inputs)
+            uses_n, verifies_n = _resolve_case_ids(
+                result["draft"], self.context, self.graph.projection,
+            )
+            print(f"resolved_ids uses={uses_n} verifies={verifies_n}")
             self.model_step = self.model.calls[-1]
             return result
         if operation == "refine":
