@@ -47,6 +47,29 @@ def _case(verifies, uses, stimulus, case_id="TC-1"):
         "pass_criterion": "the lamp stays on",
         "kind": "positive",
         "uses": list(uses),
+        "checks": [_grounded_check(uses)],
+    }
+
+
+def _grounded_check(uses):
+    """One check on the first DBC Signal in uses. Native id is Message.Signal."""
+    native = uses[0].rsplit(" | ", 1)[-1]
+    message, signal = native.split(".", 1)
+    condition = {
+        "signal": {"message": message, "signal": signal},
+        "op": "==",
+        "value": 1,
+    }
+    return {
+        "id": "c1",
+        "when": condition,
+        "expect": {
+            "signal": {"message": message, "signal": signal},
+            "op": "==",
+            "value": 1,
+        },
+        "mode": "eventually",
+        "within_ms": [0, 100],
     }
 
 

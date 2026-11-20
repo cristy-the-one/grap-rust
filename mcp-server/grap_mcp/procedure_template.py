@@ -23,7 +23,8 @@ Judgements this card had to make, and the tests lock in:
 - ``level`` on the specification and on every case is the template
   header. A level on the draft is replaced. Fields outside §5 are not
   stored. ``checks`` (§5b) is stored as given, including ``[]``. It is
-  not a template placeholder. A line whose only placeholder is
+  not a template placeholder. ``no_check_reason`` is stored when the case
+  carries a string. Null is absent. A line whose only placeholder is
   ``{{variant}}`` is omitted when the case has no variant or the variant
   is ``""``. An empty variant is not stored.
 - An item's own text is the engine text after the ``native_id`` line.
@@ -51,8 +52,10 @@ FIXED_TEXT = (
     "kind (positive or negative), uses, variant, and checks. "
     "An empty variant means no variant. "
     "checks is required and may be empty. "
-    "Leave checks empty when the requirement is observable only inside the ECU, "
-    "or when the signal is not a DBC Signal in the case's uses. "
+    "When a requirement names DBC Signals, at least one case verifying it must have a check. "
+    "If no check can be written, leave checks empty and set no_check_reason to inside_ecu, "
+    "signal_compare or not_on_bus. "
+    "Never write a check you cannot ground in the case's uses. "
     "verifies and uses are lists.\n"
     "A check makes a case judgeable on a CAN recording. Write one when the "
     "expected result is a signal value that follows a cause, and both signals "
@@ -322,6 +325,9 @@ def _specification(draft: Any, template: Mapping[str, Any]) -> dict:
             stored[field] = case[field]
         if "checks" in case:
             stored["checks"] = case["checks"]
+        reason = case.get("no_check_reason")
+        if isinstance(reason, str):
+            stored["no_check_reason"] = reason
         stored["level"] = template["level"]
         cases.append(stored)
     return {"title": title, "level": template["level"], "cases": cases}

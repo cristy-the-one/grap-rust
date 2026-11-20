@@ -434,10 +434,16 @@ def test_empty_variant_is_required_renders_no_variant_line_and_passes():
     assert result == {"issues": [], "passed": True}
 
 
-# §5b / signal-loom plan §3. The sentence the model is told, in both prompts.
-_LEAVE_CHECKS_EMPTY = (
+# §5b Amendment 3. The sentence the model is told, in both prompts.
+_OLD_LEAVE_CHECKS_EMPTY = (
     "Leave checks empty when the requirement is observable only inside the ECU, "
     "or when the signal is not a DBC Signal in the case's uses."
+)
+_NEW_LEAVE_CHECKS_EMPTY = (
+    "When a requirement names DBC Signals, at least one case verifying it must have a check. "
+    "If no check can be written, leave checks empty and set no_check_reason to inside_ecu, "
+    "signal_compare or not_on_bus. "
+    "Never write a check you cannot ground in the case's uses."
 )
 
 
@@ -671,9 +677,17 @@ def test_given_empty_and_tolerance_null_are_accepted_and_required():
 
 
 def test_the_prompt_says_when_to_leave_checks_empty():
-    """§5b. Both prompts say when checks stays empty. No network."""
-    assert _LEAVE_CHECKS_EMPTY in SYSTEM
-    assert _LEAVE_CHECKS_EMPTY in FIXED_TEXT
+    """§5b Amendment 3. Both prompts name no_check_reason and the three values.
+
+    The old sentence is in neither. No network. This is RUN-09 test h.
+    """
+    for prompt in (SYSTEM, FIXED_TEXT):
+        assert "no_check_reason" in prompt
+        assert "inside_ecu" in prompt
+        assert "signal_compare" in prompt
+        assert "not_on_bus" in prompt
+        assert _NEW_LEAVE_CHECKS_EMPTY in prompt
+        assert _OLD_LEAVE_CHECKS_EMPTY not in prompt
 
 
 def test_emit_keeps_checks_on_the_stored_case(tmp_path):

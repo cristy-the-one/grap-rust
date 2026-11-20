@@ -21,7 +21,10 @@ from grap_mcp.procedure_validate import (
     validate_output,
 )
 
-SIG_KEY = "Signal | fix | VehSpdFL"
+# Native id is Message.Signal so a stub check can name it. VehSpdFL in
+# case text is the bare last segment of this one signal.
+SIG_NATIVE = "Speed.VehSpdFL"
+SIG_KEY = f"Signal | fix | {SIG_NATIVE}"
 
 
 def _req(item_id="REQ-1", source_id="fix", key=None):
@@ -57,7 +60,7 @@ def _node(key, type_name, native_id, source_id="fix", kind=""):
 def _projection(requirements, extra_nodes=(), edges=()):
     nodes = [_node(req["key"], "Requirement", req["item_id"], req["source_id"], "requirement")
              for req in requirements]
-    nodes.append(_node(SIG_KEY, "Signal", "VehSpdFL", kind="i_signal"))
+    nodes.append(_node(SIG_KEY, "Signal", SIG_NATIVE, kind="i_signal"))
     nodes.extend(extra_nodes)
     return {"nodes": nodes, "edges": list(edges)}
 
@@ -67,14 +70,57 @@ def _case(**overrides):
         "id": "TC-1",
         "verifies": ["REQ-1"],
         "preconditions": "ignition on",
-        "stimulus": "set VehSpdFL to 1",
-        "expected_observable_result": "VehSpdFL reads 1",
+        "stimulus": "set the speed to 1",
+        "expected_observable_result": "the speed reads 1",
         "pass_criterion": "the value equals 1",
         "kind": "positive",
         "uses": [SIG_KEY],
     }
     case.update(overrides)
+    checks = case.get("checks")
+    if (
+        (isinstance(checks, list) and len(checks) > 0)
+        or "no_check_reason" in case
+    ):
+        return case
+    # A DBC Signal in uses gets a check grounded on that signal. A use that
+    # is not a Signal node is not_on_bus: the case cannot name a DBC signal.
+    grounded = _grounded_check(case.get("uses") or [])
+    if grounded is None:
+        case["no_check_reason"] = "not_on_bus"
+    else:
+        case["checks"] = [grounded]
     return case
+
+
+def _grounded_check(uses):
+    """A check for the first Message.Signal native id carried in a use key."""
+    for key in uses:
+        if not isinstance(key, str):
+            continue
+        native = key.rsplit(" | ", 1)[-1]
+        if "." not in native:
+            continue
+        message, signal = native.split(".", 1)
+        if message == "" or signal == "":
+            continue
+        condition = {
+            "signal": {"message": message, "signal": signal},
+            "op": "==",
+            "value": 1,
+        }
+        return {
+            "id": "c1",
+            "when": condition,
+            "expect": {
+                "signal": {"message": message, "signal": signal},
+                "op": "==",
+                "value": 1,
+            },
+            "mode": "eventually",
+            "within_ms": [0, 100],
+        }
+    return None
 
 
 def _draft(*cases, **overrides):
@@ -122,7 +168,9 @@ def test_a_complete_draft_passes():
         traceability=0 (n=1 cases, documents=1)
         completeness=0 (n=1 cases, documents=1)
         negative_cases=0 (n=1 requirements, n_statements=0, documents=1)
-        checks=0 (n=1 cases, documents=1)"""
+        checks=0 (n=1 cases, documents=1)
+        checkable=0 (n=1 requirements with signals, documents=1)
+        no_check_reason inside_ecu=0 signal_compare=0 not_on_bus=0"""
     )
 
 
@@ -229,11 +277,11 @@ def test_invented_name_fails_only_when_the_identifier_is_not_in_the_context():
         _draft(
             stimulus="see [SWS_Com_00123]",
             expected_observable_result="the signal reads 1",
-            uses=[bracket_key],
+            uses=[bracket_key, SIG_KEY],
         ),
         [req],
         projection=projection,
-        context_nodes=[bracket_key],
+        context_nodes=[bracket_key, SIG_KEY],
     )
     assert exact == {"issues": [], "passed": True}
 
@@ -402,7 +450,9 @@ def test_nothing_to_measure_prints_na_and_a_bad_draft_is_refused():
         traceability=n/a (n=0 cases, documents=0)
         completeness=n/a (n=0 cases, documents=0)
         negative_cases=n/a (n=0 requirements, n_statements=0, documents=0)
-        checks=n/a (n=0 cases, documents=0)"""
+        checks=n/a (n=0 cases, documents=0)
+        checkable=n/a (n=0 requirements with signals, documents=0)
+        no_check_reason inside_ecu=0 signal_compare=0 not_on_bus=0"""
     )
     with pytest.raises(ValidationError, match="draft"):
         validate_output("not a specification", [], {"requirements": []})
