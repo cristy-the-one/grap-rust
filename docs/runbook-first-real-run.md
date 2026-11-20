@@ -153,14 +153,6 @@ open the recording in signal-loom: it shows the same evidence the verdict was ju
 
 ## 6. Score the context and review the cases (P-17's remaining part)
 
-> **Not runnable yet.** P-17 also asks for the Sheet 4 scores (`testpoints_needs_recall`, with
-> its interval) and the side-by-side review sheet. Both read a system JSON with a `testpoints`
-> list. The library writes it (`procedure_context.write_testpoints`), but no command produces
-> it from a real run. Card **RUN-03** adds that command. Until it merges, §6 is skipped and the
-> run is §3 to §5.
-
-Once RUN-03 has merged:
-
 ```powershell
 python scripts/score_gold.py --gold C:\dev\grap-gold\<automotive folder> --system "$RUN\spec-out\testpoints.json"
 python scripts/export_testpoint_review.py --gold C:\dev\grap-gold\<automotive folder> `
