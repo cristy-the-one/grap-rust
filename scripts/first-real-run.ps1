@@ -54,8 +54,45 @@ function Stop-Run([string]$why) {
         Remove-Item -Recurse -Force $Run
     }
     Add-Report "**Stopped:** $why"
+    if ($script:Phase -eq "run") { Add-Scorecard }
     Write-Host "STOPPED: $why" -ForegroundColor Red
     exit 1
+}
+
+# What the run is for: generated tests that reach a pass or fail on a recording.
+# A passed validation only lets a case in; it is not a result.
+$Validation = "not-run"
+$Judged = $false
+
+function Add-Scorecard {
+    $spec = Join-Path $Run "spec-out\specification.json"
+    $verdictFile = Join-Path $Run "judge-out\verdict.json"
+    $nCases = 0; $nChecked = 0
+    if ($script:Validation -ne "failed" -and (Test-Path $spec)) {
+        $cases = @((Get-Content $spec -Raw | ConvertFrom-Json).cases)
+        $nCases = $cases.Count
+        $nChecked = @($cases | Where-Object { @($_.checks).Count -gt 0 }).Count
+    }
+    $lines = @()
+    if ($script:Judged -and (Test-Path $verdictFile)) {
+        $c = (Get-Content $verdictFile -Raw | ConvertFrom-Json).counts
+        $lines += "verdicts=$($c.pass + $c.fail) of $($c.cases) cases (pass=$($c.pass) fail=$($c.fail))"
+        $lines += "cases_with_checks=$nChecked of $nCases"
+        $lines += "not_exercised=$($c.not_exercised) not_judgeable=$($c.not_judgeable) inconclusive=$($c.inconclusive)"
+    } elseif ($nCases -gt 0) {
+        $lines += "verdicts=0 of $nCases cases (not judged)"
+        $lines += "cases_with_checks=$nChecked of $nCases"
+    } else {
+        $lines += "verdicts=0 (no specification; scope $(@($settings.scope).Count) requirements)"
+    }
+    $lines += "validation=$($script:Validation)"
+    Add-Report ""
+    Add-Report "### scorecard"
+    Add-Report '```'
+    $lines | ForEach-Object { Add-Report $_ }
+    Add-Report '```'
+    Write-Host ""
+    $lines | ForEach-Object { Write-Host $_ -ForegroundColor Yellow }
 }
 
 function Add-ModelHint([string]$log) {
@@ -249,6 +286,7 @@ if ($Start -le 2) {
     Add-Report '```'
     $status | ForEach-Object { Add-Report $_ }
     Add-Report '```'
+    $Validation = $(if ($r.Code -eq 0) { "passed" } else { "failed" })
     if ($r.Code -ne 0) {
         if (-not $status) { Add-Report "The script crashed. The last line of logs\generate.log names the error: read it before sharing it." }
         Add-ModelHint $r.Log
@@ -275,10 +313,13 @@ if ($Start -le 3) {
         $shown = $r.Lines | Where-Object { $_ -notmatch '^\s*(Traceback|File ")' }
         $shown | ForEach-Object { Add-Report ($_ -replace [regex]::Escape($Run), '<run>') }
         Add-Report '```'
+        $Judged = ($r.Code -eq 0)
         if ($r.Code -ne 0) { Stop-Run "judging exited $($r.Code). Exit 2 is loom-judge refusing; 1 is a start, crash or import failure." }
     }
 }
 
+if ($Start -gt 2) { $Validation = "passed-earlier" }
+Add-Scorecard
 Add-Report ""
 Add-Report "Done."
 Write-Host ""
