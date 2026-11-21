@@ -13,6 +13,7 @@ Packages are namespaces (Amendment 1): ``namespace_items`` and
 
 from __future__ import annotations
 
+import json
 import re
 from dataclasses import dataclass, field
 
@@ -53,6 +54,7 @@ class _Node:
     kind: str
     source_id: str
     engine_id: int
+    values: dict[str, str] | None = None
 
 
 @dataclass
@@ -317,11 +319,14 @@ def _create_nodes(items, classes, folds, built: _Built, kg) -> None:
             type_name="Item", scope=scope, native_id=item.item_id,
             kind=item.kind_hint, source_id=item.source_id, text=text,
         )
-        built.typed[key] = _add(
+        typed = _add(
             built, kg,
             type_name=info.type_name, scope=scope, native_id=item.item_id,
             kind=info.kind, source_id=item.source_id, text=text,
         )
+        if info.type_name == "Signal" and "value_table" in item.attributes:
+            typed.values = json.loads(item.attributes["value_table"])
+        built.typed[key] = typed
     for item in items:
         key = _id(item)
         if not classes[key].placeholder:
@@ -740,20 +745,23 @@ def _finish(items, classes, folds, built: _Built) -> dict:
         "fallback_links": _exceeds(built.fallback_n, built.link_n),
     }
     _print_counts(counts, alarms, untyped, built)
+    nodes = []
+    for node in built.nodes:
+        record = {
+            "key": node.key,
+            "type": node.type_name,
+            "scope": node.scope,
+            "native_id": node.native_id,
+            "kind": node.kind,
+            "label": node.label,
+            "engine_id": node.engine_id,
+            "source_id": node.source_id,
+        }
+        if isinstance(node.values, dict) and node.values:
+            record["values"] = node.values
+        nodes.append(record)
     return {
-        "nodes": [
-            {
-                "key": node.key,
-                "type": node.type_name,
-                "scope": node.scope,
-                "native_id": node.native_id,
-                "kind": node.kind,
-                "label": node.label,
-                "engine_id": node.engine_id,
-                "source_id": node.source_id,
-            }
-            for node in built.nodes
-        ],
+        "nodes": nodes,
         "edges": built.edges,
         "rejected": built.rejected,
         "counts": counts,

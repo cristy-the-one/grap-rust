@@ -24,10 +24,21 @@ _REASON_MEANINGS = (
     "Every condition the requirement says must already hold "
     "(while ..., only when ..., when ... is ...) goes into given as a condition on its signal."
 )
+_VALUES_ROW = (
+    "A values row maps a Signal's raw numbers to names. A check compares the raw number: "
+    "if values says 0 = off, 1 = on, then switched on is == 1, and if it says 3 = none, any side selected is != 3. "
+)
 
 
 def test_a_both_prompts_say_what_each_no_check_reason_means():
     """Both prompts carry the RUN-10 paragraph word for word, after the RUN-09 sentence."""
     placed = _RUN09 + " " + _REASON_MEANINGS
+    for prompt in (SYSTEM, FIXED_TEXT):
+        assert placed in prompt
+
+
+def test_f_both_prompts_follow_the_run10_paragraph_with_values_sentences():
+    """Both prompts carry the RUN-12 sentences word for word, after the RUN-10 paragraph."""
+    placed = _REASON_MEANINGS + " " + _VALUES_ROW
     for prompt in (SYSTEM, FIXED_TEXT):
         assert placed in prompt
