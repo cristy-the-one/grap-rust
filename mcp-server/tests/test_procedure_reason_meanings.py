@@ -24,10 +24,22 @@ _REASON_MEANINGS = (
     "Every condition the requirement says must already hold "
     "(while ..., only when ..., when ... is ...) goes into given as a condition on its signal."
 )
+_IMPOSSIBLE_INSIDE_ECU = (
+    "inside_ecu is wrong when every signal the case uses is a DBC Signal. "
+    "Example: the requirement says when M.A becomes 1, M.B shall become 1 within 0.2 s. "
+    "The check is when M.A == 1, expect M.B == 1, mode eventually, within_ms [0, 200]. "
+)
 
 
 def test_a_both_prompts_say_what_each_no_check_reason_means():
     """Both prompts carry the RUN-10 paragraph word for word, after the RUN-09 sentence."""
     placed = _RUN09 + " " + _REASON_MEANINGS
+    for prompt in (SYSTEM, FIXED_TEXT):
+        assert placed in prompt
+
+
+def test_f_both_prompts_follow_the_run10_paragraph_with_the_inside_ecu_example():
+    """Both prompts carry the RUN-11 sentences word for word, after the RUN-10 paragraph."""
+    placed = _REASON_MEANINGS + " " + _IMPOSSIBLE_INSIDE_ECU
     for prompt in (SYSTEM, FIXED_TEXT):
         assert placed in prompt

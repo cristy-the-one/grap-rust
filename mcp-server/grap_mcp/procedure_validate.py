@@ -70,6 +70,10 @@ Judgements this card had to make, and the tests lock in:
   reason on a case whose ``checks`` is non-empty, is one issue
   ``check="no_check_reason"``, value the case id. The summary counts a
   reason when the value is one of the three and ``checks`` is empty.
+  ``inside_ecu`` with empty ``checks`` and two or more ``uses`` that are
+  all projection ``Signal`` keys is that same issue; ``projection`` None,
+  a use that is not a projection ``Signal``, ``not_on_bus`` and
+  ``signal_compare`` add nothing.
 """
 
 from __future__ import annotations
@@ -191,7 +195,7 @@ def validate_output(
     issues.extend(_completeness(cases))
     issues.extend(_negative(reqs, cases, attached))
     issues.extend(_case_checks(cases, projection))
-    issues.extend(_no_check_reason_issues(cases))
+    issues.extend(_no_check_reason_issues(cases, projection))
     issues.extend(_checkable(reqs, cases, attached, context, projection))
     return {"issues": issues, "passed": not issues}
 
@@ -778,9 +782,10 @@ def _accepted_reason(case):
     return None
 
 
-def _no_check_reason_issues(cases) -> list[dict]:
+def _no_check_reason_issues(cases, projection) -> list[dict]:
     """Absent or null is no reason. Each broken reason is one issue."""
     issues = []
+    nodes = _projection_nodes(projection)
     for index, case in enumerate(cases):
         if not isinstance(case, Mapping) or "no_check_reason" not in case:
             continue
@@ -790,9 +795,29 @@ def _no_check_reason_issues(cases) -> list[dict]:
         case_id = _case_id(case, index)
         if reason not in _NO_CHECK_REASONS:
             issues.append(_issue(case_id, "no_check_reason", case_id))
-        if _checks_nonempty(case):
+        if _checks_nonempty(case) or _impossible_inside_ecu(
+            case, reason, projection, nodes,
+        ):
             issues.append(_issue(case_id, "no_check_reason", case_id))
     return issues
+
+
+def _impossible_inside_ecu(case, reason, projection, nodes) -> bool:
+    """inside_ecu cannot stand when every use is a projection Signal.
+
+    ``projection`` None adds nothing. One use, a missing key, or a
+    non-Signal node does not fire. Other reasons do not fire.
+    """
+    if reason != "inside_ecu" or not isinstance(projection, Mapping):
+        return False
+    uses = _uses(case)
+    if len(uses) < 2:
+        return False
+    for used in uses:
+        node = nodes.get(used)
+        if not isinstance(node, Mapping) or node.get("type") != "Signal":
+            return False
+    return True
 
 
 def _signal_requirements(requirements, context, projection) -> list:
