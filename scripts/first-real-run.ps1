@@ -77,7 +77,13 @@ function Add-Scorecard {
     if ($script:Judged -and (Test-Path $verdictFile)) {
         $verdict = Get-Content $verdictFile -Raw | ConvertFrom-Json
         $c = $verdict.counts
-        $lines += "verdicts=$($c.pass + $c.fail) of $($c.cases) cases (pass=$($c.pass) fail=$($c.fail))"
+        # A case counts only when every one of its checks is approved for its sha256.
+        # review_checks.py owns that hash. A missing approvals file reviews nothing.
+        $reviewScript = Join-Path $Repo "scripts\review_checks.py"
+        $reviewed = @(& $Py $reviewScript --run $Run --scorecard | Where-Object { $_ -ne "" })
+        if ($LASTEXITCODE -ne 0) { throw "review_checks.py --scorecard failed for $Run" }
+        $lines += $reviewed[0]
+        $lines += $reviewed[1]
         # SL-22: an eventually pass whose expect already held before the trigger
         # did not depend on it. A loom-judge before SL-22 writes no such key.
         $checks = @($verdict.cases | ForEach-Object { @($_.checks) })
