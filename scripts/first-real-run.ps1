@@ -75,8 +75,19 @@ function Add-Scorecard {
     }
     $lines = @()
     if ($script:Judged -and (Test-Path $verdictFile)) {
-        $c = (Get-Content $verdictFile -Raw | ConvertFrom-Json).counts
+        $verdict = Get-Content $verdictFile -Raw | ConvertFrom-Json
+        $c = $verdict.counts
         $lines += "verdicts=$($c.pass + $c.fail) of $($c.cases) cases (pass=$($c.pass) fail=$($c.fail))"
+        # SL-22: an eventually pass whose expect already held before the trigger
+        # did not depend on it. A loom-judge before SL-22 writes no such key.
+        $checks = @($verdict.cases | ForEach-Object { @($_.checks) })
+        $passes = ($checks | Measure-Object -Property pass -Sum).Sum
+        if (@($checks | Where-Object { $null -eq $_.pass_already_held }).Count -gt 0) {
+            $lines += "pass_already_held=n/a of $([int]$passes) check passes (loom-judge before SL-22)"
+        } else {
+            $held = ($checks | Measure-Object -Property pass_already_held -Sum).Sum
+            $lines += "pass_already_held=$([int]$held) of $([int]$passes) check passes"
+        }
         $lines += "cases_with_checks=$nChecked of $nCases"
         $lines += "not_exercised=$($c.not_exercised) not_judgeable=$($c.not_judgeable) inconclusive=$($c.inconclusive)"
     } elseif ($nCases -gt 0) {
