@@ -181,13 +181,7 @@ against them. The first scores are the baseline; no threshold is set.
 
 Paste these into the chat. They contain no corpus content.
 
-0. **The scorecard first.** The run's result is `verdicts=N of M cases`: generated tests that
-   reached a pass or a fail on the recording. A passed validation only lets a case in; on its
-   own it is not a result. `cases_with_checks` shows how many cases the judge could test at
-   all. `pass_already_held=K of P check passes` counts passes whose expected value already
-   held before the trigger (loom-judge from SL-22 on): such a pass did not depend on the
-   trigger, so it says little. `scripts\first-real-run.ps1` writes this block at the end of
-   every run, including one that stopped.
+0. **The scorecard first:** the headline `verdicts=` counts pass and fail only over cases whose every check a person approved. Review a check with `python scripts/review_checks.py --run <run> --approve <case>:<check>`.
 1. The `step 4` and `step 5` lines of both builds (§3).
 2. For each run id: the generation line, i.e. `p17-1 …` or `<status> n_issues=<n>` (§4).
 3. The judge counts line, or the refusal message (§5).
