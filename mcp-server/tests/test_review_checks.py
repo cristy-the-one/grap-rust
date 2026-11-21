@@ -15,20 +15,17 @@ REPO = Path(__file__).resolve().parents[2]
 SCRIPT = REPO / "scripts" / "review_checks.py"
 _SENTINEL = "SENTINEL-REQUIREMENT-TEXT"
 
-_DBC = """\
-VERSION "SYN-14"
-
-NS_ :
-
-BS_:
-
-BU_: NodeA
-
-BO_ 100 Box: 8 NodeA
- SG_ Side : 0|8@1+ (1,0) [0|7] "" NodeA
-
-VAL_ 100 Side 3 "none" ;
-"""
+_PROJECTION = {
+    "nodes": [
+        {
+            "type": "Signal",
+            "native_id": "Box.Side",
+            "values": {"3": "none"},
+        }
+    ],
+    "edges": [],
+    "counts": {},
+}
 
 
 def _check(check_id, *, expect_value=3, expect_op="!=", when_value=1):
@@ -98,7 +95,7 @@ def _reverse_keys(value):
     return value
 
 
-def _write_run(tmp_path, cases, verdict=None, dbc=None, reorder=False):
+def _write_run(tmp_path, cases, verdict=None, projection=None, reorder=False):
     run = tmp_path / "run-syn"
     (run / "spec-out").mkdir(parents=True)
     (run / "in").mkdir()
@@ -115,8 +112,13 @@ def _write_run(tmp_path, cases, verdict=None, dbc=None, reorder=False):
             json.dumps(verdict, ensure_ascii=False, indent=2) + "\n",
             encoding="utf-8",
         )
-    if dbc is not None:
-        (run / "in" / "synth.dbc").write_text(dbc, encoding="utf-8")
+    if projection is not None:
+        graph_out = run / "graph-out"
+        graph_out.mkdir()
+        (graph_out / "projection.json").write_text(
+            json.dumps(projection, ensure_ascii=False) + "\n",
+            encoding="utf-8",
+        )
     (run / "report.md").write_text("kept line\n", encoding="utf-8")
     return run
 
@@ -191,9 +193,9 @@ def test_b_hash_is_stable_under_key_order(tmp_path):
 
 
 def test_c_value_table_name_is_printed_beside_the_raw_value(tmp_path):
-    """A made-up DBC VAL_ name is printed with that raw value."""
+    """A Signal values entry names that raw value in the list line."""
     check = _check("chk-1", expect_value=3, expect_op="!=")
-    run = _write_run(tmp_path, [_case("CASE-A", [check])], dbc=_DBC)
+    run = _write_run(tmp_path, [_case("CASE-A", [check])], projection=_PROJECTION)
     listed = _invoke(run, "--list")
     assert listed.returncode == 0, listed.stderr
     assert "!= 3 (none)" in listed.stdout

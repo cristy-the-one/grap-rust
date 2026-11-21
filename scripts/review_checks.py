@@ -14,6 +14,10 @@ id, the check id, and the first verifies id. It does not store requirement text.
 uses it when it builds the scorecard. --approve and --reject rewrite the
 approvals file and, when the run has a verdict, append those two lines to
 report.md under "### scorecard (after review)".
+
+Value names come from graph-out/projection.json. A Signal node whose
+native_id is "MSG.SIG" and whose values map raw strings to names supplies
+those names. A missing file, or a signal with no values, prints no name.
 """
 
 from __future__ import annotations
@@ -22,7 +26,6 @@ import argparse
 import hashlib
 import json
 import os
-import re
 import sys
 import tempfile
 from datetime import date
@@ -30,9 +33,6 @@ from pathlib import Path
 
 _FORMAT = "grap-check-review/1"
 _EN_DASH = "\u2013"
-_BO = re.compile(r"^[ \t]*BO_[ \t]+(\d+)[ \t]+([^: \t]+)[ \t]*:")
-_VAL = re.compile(r"^\s*VAL_\s+(\d+)\s+(\S+)\s+(.*?)\s*;\s*$")
-_PAIR = re.compile(r'(-?\d+)\s+"((?:\\.|[^"\\])*)"')
 
 
 def check_sha256(check: dict) -> str:
@@ -206,88 +206,56 @@ def _format_value(value) -> str:
     return str(value)
 
 
-def _raw_key(value):
+def _raw_key(value) -> str | None:
+    """The projection values key for a check's raw number. Keys are strings."""
     if isinstance(value, bool):
         return None
     if isinstance(value, int):
-        return value
+        return str(value)
     if isinstance(value, float) and value.is_integer():
-        return int(value)
-    if isinstance(value, str) and re.fullmatch(r"-?\d+", value):
-        return int(value)
+        return str(int(value))
+    if isinstance(value, str):
+        try:
+            number = int(value, 10)
+        except ValueError:
+            return None
+        return str(number)
     return None
 
 
-def _value_names(run: Path) -> dict[tuple[str, str], dict[int, str]]:
-    inbox = run / "in"
-    if not inbox.is_dir():
+def _value_names(run: Path) -> dict[tuple[str, str], dict[str, str]]:
+    """(message, signal) -> {raw string: name} from the run's projection."""
+    path = run / "graph-out" / "projection.json"
+    if not path.is_file():
         return {}
-    tables: dict[tuple[str, str], dict[int, str]] = {}
-    for path in sorted(inbox.glob("*.dbc")):
-        tables.update(_dbc_tables(_read_text(path)))
-    return tables
-
-
-def _read_text(path: Path) -> str:
-    data = path.read_bytes()
     try:
-        return data.decode("utf-8")
-    except UnicodeDecodeError:
-        return data.decode("latin-1")
-
-
-def _dbc_tables(text: str) -> dict[tuple[str, str], dict[int, str]]:
-    logical = _logical_lines(text)
-    frames: dict[str, str] = {}
-    for line in logical:
-        match = _BO.match(line)
-        if match:
-            frames[match.group(1)] = match.group(2)
-    tables: dict[tuple[str, str], dict[int, str]] = {}
-    for line in logical:
-        match = _VAL.match(line.strip())
-        if not match:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    nodes = data.get("nodes") if isinstance(data, dict) else None
+    if not isinstance(nodes, list):
+        return {}
+    tables: dict[tuple[str, str], dict[str, str]] = {}
+    for node in nodes:
+        if not isinstance(node, dict) or node.get("type") != "Signal":
             continue
-        message = frames.get(match.group(1))
-        if not message:
+        values = node.get("values")
+        if not isinstance(values, dict) or not values:
             continue
-        names: dict[int, str] = {}
-        for raw, label in _PAIR.findall(match.group(3)):
-            names[int(raw)] = _unescape(label)
-        tables[(message, match.group(2))] = names
+        native = node.get("native_id")
+        if not isinstance(native, str) or "." not in native:
+            continue
+        message, signal = native.split(".", 1)
+        if message == "" or signal == "":
+            continue
+        names = {
+            raw: label
+            for raw, label in values.items()
+            if isinstance(raw, str) and isinstance(label, str)
+        }
+        if names:
+            tables[(message, signal)] = names
     return tables
-
-
-def _logical_lines(text: str) -> list[str]:
-    lines: list[str] = []
-    pending = None
-    for raw in text.splitlines():
-        if pending is not None:
-            pending = pending + " " + raw.strip()
-            if ";" in raw:
-                lines.append(pending)
-                pending = None
-            continue
-        if raw.strip().startswith("VAL_") and ";" not in raw:
-            pending = raw.strip()
-        else:
-            lines.append(raw)
-    if pending is not None:
-        lines.append(pending)
-    return lines
-
-
-def _unescape(text: str) -> str:
-    out: list[str] = []
-    index = 0
-    while index < len(text):
-        if text[index] == "\\" and index + 1 < len(text):
-            out.append(text[index + 1])
-            index += 2
-        else:
-            out.append(text[index])
-            index += 1
-    return "".join(out)
 
 
 def _load_cases(run: Path, *, required: bool) -> list:
