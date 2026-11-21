@@ -270,7 +270,7 @@ class ModelOperations:
 
     Any other operation is refused. Each call is appended to ``calls``
     and each draft to ``drafts``. ``template`` is the one ``choose_template``
-    returned.
+    returned. ``verifies`` is limited to the scope's requirement ids when context is known.
     """
 
     def __init__(self, provider, template: Mapping[str, Any] | None = None):
@@ -278,6 +278,7 @@ class ModelOperations:
         self.template = template
         self.calls: list[dict] = []
         self.drafts: list[dict] = []
+        self.verifies_ids: list[str] = []
 
     def __call__(self, operation: str, inputs: Mapping[str, Any]) -> dict[str, Any]:
         if operation != "invoke_model":
@@ -286,7 +287,9 @@ class ModelOperations:
             raise ModelError(
                 "level is copied from the template; choose_template has not run"
             )
-        draft, receipt = _invoke(inputs["instructions"], self.provider, self.template)
+        draft, receipt = _invoke(
+            inputs["instructions"], self.provider, self.template, self.verifies_ids,
+        )
         self.calls.append(receipt)
         self.drafts.append(draft)
         return {"draft": draft}
@@ -335,18 +338,34 @@ def run_generate_test_spec(
     )
 
 
-def _invoke(instructions: Any, provider, template: Mapping[str, Any]) -> tuple[dict, dict]:
-    draft, receipt = _call(instructions, provider, template)
+def _invoke(
+    instructions: Any,
+    provider,
+    template: Mapping[str, Any],
+    verifies_ids: list[str] | None = None,
+) -> tuple[dict, dict]:
+    draft, receipt = _call(instructions, provider, template, verifies_ids)
     print(format_invoke(receipt))
     return draft, receipt
 
 
-def _call(instructions: Any, provider, template: Mapping[str, Any]) -> tuple[dict, dict]:
+def _call(
+    instructions: Any,
+    provider,
+    template: Mapping[str, Any],
+    verifies_ids: list[str] | None = None,
+) -> tuple[dict, dict]:
     if not isinstance(instructions, str):
         raise ModelError("instructions must be text")
     level = _template_level(template)
+    schema = copy.deepcopy(DRAFT_SCHEMA)
+    if verifies_ids:
+        schema["$defs"]["case"]["properties"]["verifies"]["items"] = {
+            "type": "string",
+            "enum": list(verifies_ids),
+        }
     configure = getattr(provider, "with_json_schema", None)
-    target = configure(copy.deepcopy(DRAFT_SCHEMA)) if callable(configure) else provider
+    target = configure(schema) if callable(configure) else provider
     started = time.perf_counter()
     raw = target.complete(SYSTEM, instructions)
     duration_ms = int((time.perf_counter() - started) * 1000)
@@ -752,6 +771,11 @@ class _Operations:
         if operation == "fetch_context":
             result = self.graph(operation, inputs)
             self.context = result["context"]
+            self.model.verifies_ids = sorted({
+                group["item_id"]
+                for group in self.context["requirements"]
+                if isinstance(group["item_id"], str) and group["item_id"] != ""
+            })
             return result
         if operation == "choose_template":
             result = self.templates(operation, inputs)
