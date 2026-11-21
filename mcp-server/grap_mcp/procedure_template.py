@@ -64,6 +64,8 @@ FIXED_TEXT = (
     "inside_ecu is for a result visible only inside the ECU. "
     "Every condition the requirement says must already hold "
     "(while ..., only when ..., when ... is ...) goes into given as a condition on its signal. "
+    "A values row maps a Signal's raw numbers to names. A check compares the raw number: "
+    "if values says 0 = off, 1 = on, then switched on is == 1, and if it says 3 = none, any side selected is != 3. "
     "verifies and uses are lists.\n"
     "A check makes a case judgeable on a CAN recording. Write one when the "
     "expected result is a signal value that follows a cause, and both signals "
@@ -245,6 +247,9 @@ def compose_instructions(
                 context_docs.add(node["source_id"])
             context_rows.append(f"{node['native_id']} ({node['source_id']})")
             context_rows.append(_own_text(kg, node))
+            values = node.get("values")
+            if isinstance(values, Mapping) and values:
+                context_rows.append(_values_row(values))
     text = (
         FIXED_TEXT
         + _section(
@@ -512,6 +517,15 @@ def _own_text(kg, node: Mapping[str, Any]) -> str:
     if raw.startswith(prefix):
         return raw[len(prefix):]
     return raw
+
+
+def _values_row(values: Mapping) -> str:
+    """One row. Numeric raws sort by number; any other raw sorts as text."""
+    try:
+        ordered = sorted(values, key=lambda raw: int(raw))
+    except (TypeError, ValueError):
+        ordered = sorted(values, key=lambda raw: str(raw))
+    return "values: " + ", ".join(f"{raw} = {values[raw]}" for raw in ordered)
 
 
 def _section(heading: str, rows: list[str]) -> str:
