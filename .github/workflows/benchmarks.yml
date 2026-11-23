@@ -19,7 +19,7 @@ jobs:
 
       - name: Run Criterion benchmarks
         run: |
-          cargo bench --features "fulltext,sharding" -- --save-baseline weekly
+          cargo bench --features "fulltext,sharding" --bench '*' -- --save-baseline weekly
 
       - name: Upload benchmark results
         uses: actions/upload-artifact@v7
