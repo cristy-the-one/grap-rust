@@ -1,6 +1,6 @@
 """GJ-03 step 0: the signal-loom judge fixture is copied byte for byte.
 
-signal-loom owns fixtures/judge/ at 177cc41e77ed70e942c04c38c13f1db6c73a2dd5.
+signal-loom owns fixtures/judge/ at tag v0.3.0 (69a863cd07cd2c9e1e379114417047bcbf010f70).
 This tree keeps that copy under tests/fixtures/loom_judge/ with the same
 SHA256SUMS. Every recorded line is checked here. A one-byte edit fails.
 """
