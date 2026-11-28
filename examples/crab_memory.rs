@@ -47,8 +47,8 @@ fn import(out: &Path) -> Result<IndexedKnowledgeGraph, Box<dyn Error>> {
             Err(_) if index + 1 == lines.len() && !text.ends_with('\n') => break,
             Err(error) => return Err(format!("journal line {}: {error}", index + 1).into()),
         };
-        // Hashes are filenames supplied by an external journal. Never let
-        // a malformed record select a file outside this run's work directory.
+        // The 16-hex check stops path traversal through the hash. It is not
+        // filesystem containment: a symlink already inside work/ is followed.
         if record.hash.len() != 16 || !record.hash.bytes().all(|b| b.is_ascii_hexdigit()) {
             return Err(format!("invalid candidate hash on line {}", index + 1).into());
         }
@@ -159,5 +159,76 @@ mod tests {
         )
         .unwrap();
         assert!(import(dir.path()).is_err());
+    }
+
+    #[test]
+    fn traversal_reaches_neighbor_absent_from_text_search_seeds() {
+        let dir = tempfile::tempdir().unwrap();
+        fs::create_dir(dir.path().join("work")).unwrap();
+        let query = "zephyrquartzmarker";
+        fs::write(
+            dir.path().join("work/aaaaaaaaaaaaaaaa.rs"),
+            "fn seed_only() { let _ = \"zephyrquartzmarker\"; }\n",
+        )
+        .unwrap();
+        fs::write(
+            dir.path().join("work/bbbbbbbbbbbbbbbb.rs"),
+            "fn neighbor_only() { let _ = 1; }\n",
+        )
+        .unwrap();
+        let journal = concat!(
+            "{\"hash\":\"aaaaaaaaaaaaaaaa\",\"status\":\"rejected\",\"diagnostics\":[{\"code\":\"E4401\",\"message\":\"shared gate failed\"}]}\n",
+            "{\"hash\":\"bbbbbbbbbbbbbbbb\",\"status\":\"rejected\",\"diagnostics\":[{\"code\":\"E4401\",\"message\":\"shared gate failed\"}]}\n",
+        );
+        assert!(
+            !journal.contains(query),
+            "the query term must appear only in candidate A's source"
+        );
+        fs::write(dir.path().join("journal.jsonl"), journal).unwrap();
+
+        let graph = import(dir.path()).unwrap();
+        let seeds = graph.search(query, 5);
+        let seed_labels: Vec<_> = seeds
+            .iter()
+            .map(|hit| graph.graph.node_label(hit.node_id))
+            .collect();
+        assert!(
+            seed_labels.contains(&Some("aaaaaaaaaaaaaaaa")),
+            "text search should seed candidate A: {seed_labels:?}"
+        );
+        assert!(
+            !seed_labels.contains(&Some("bbbbbbbbbbbbbbbb")),
+            "candidate B must not be a text-search seed: {seed_labels:?}"
+        );
+        assert!(
+            !seed_labels.contains(&Some("E4401")),
+            "the shared diagnostic must not be a text-search seed: {seed_labels:?}"
+        );
+
+        let related = graph.search_and_traverse(
+            query,
+            5,
+            &["evidence"],
+            0.0,
+            2,
+            10,
+            FusionWeights::default(),
+        );
+        let neighbor = related
+            .iter()
+            .find(|result| result.text.contains("bbbbbbbbbbbbbbbb"))
+            .expect("candidate B is reachable only by traversing the shared diagnostic");
+        assert!(
+            !neighbor.text.contains(query),
+            "candidate B text must not contain the query term"
+        );
+        let diagnostic = related
+            .iter()
+            .find(|result| result.text.contains("diagnostic E4401"))
+            .expect("shared diagnostic is on the path from A to B");
+        assert!(
+            !diagnostic.text.contains(query),
+            "diagnostic text must not contain the query term"
+        );
     }
 }

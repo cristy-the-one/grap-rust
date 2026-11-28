@@ -49,6 +49,8 @@ jobs:
         with:
           toolchain: ${{ matrix.rust }}
       - run: cargo test --all-features
+      - name: Crab memory example tests
+        run: cargo test --all-features --example crab_memory
 
   test-matrix:
     name: Test (features)

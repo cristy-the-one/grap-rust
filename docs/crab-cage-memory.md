@@ -18,6 +18,11 @@ source path and recorded status. Missing source files leave metadata searchable.
 A crash fragment at the end is ignored; malformed complete lines are errors.
 No model, embeddings, network service or new dependencies are needed.
 
+A candidate hash is accepted only when it is exactly 16 hexadecimal characters.
+That check stops path traversal through the hash. It is not filesystem
+containment: a symlink already inside `work/` is followed, so the tool is for
+trusted local run directories.
+
 Recorded `proven` means agreement on that run's cases, with that run's compilers.
 Search relevance does not strengthen that claim. Re-evaluate retrieved regions
 against the current nugget and prove any promoted candidate with rustc. Do not
