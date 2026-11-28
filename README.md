@@ -188,6 +188,10 @@ grap = { version = "0.1", features = ["fulltext", "sharding"] }
 
 ## The Three Main APIs
 
+For a concrete offline consumer, [Crab Cage search memory](docs/crab-cage-memory.md)
+indexes recorded Rust candidates and links shared diagnostics, without joining
+the compiler or scoring loop. Run `cargo run --example crab_memory -- RUN_DIRECTORY QUERY`.
+
 The engine owns index consistency, traversal, and ranking. Python and MCP expose
 those operations; extraction and lifecycle workflows build on them. For a focused
 development loop, run `cargo test -p grap` and
